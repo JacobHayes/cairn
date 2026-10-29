@@ -55,18 +55,12 @@ mod in_process {
         );
     }
 
-    /// A21, C19: a segment is inserted through the service, the route index filters by kind,
-    /// and the segment's detail lists where its version is inserted.
+    /// B13: a route is inserted through the service, and the journey's inserted root keeps
+    /// the pointer to the version it came from.
     #[tokio::test]
-    async fn a_segment_is_listed_by_kind_and_lists_its_insertions() {
+    async fn an_inserted_route_leaves_a_pointer_on_its_root() {
         let world = World::start().await;
         let ann = world.vendor_after(1).await;
-        // Two process routes sort before the segment, so a page of one must look past them.
-        for name in ["hiring-loop", "product-launch"] {
-            let seed = support::publish_fixture_route(name);
-            let path = format!("/api/routes/{name}/patches");
-            support::ok::<serde_json::Value>(&post(&ann, &path, &support::request(&seed)).await);
-        }
         let seed = support::publish_fixture_route("security-review");
         support::ok::<serde_json::Value>(
             &post(
@@ -76,7 +70,7 @@ mod in_process {
             )
             .await,
         );
-        let insert = "- op: insert_segment\n  insertion: i_review\n  segment: {route: security-review, version: 1}\n";
+        let insert = "- op: insert_route\n  insertion: i_review\n  route: {route: security-review, version: 1}\n";
         let patch = support::patch("p_insert", "{journey: j_vendor_eval}", 1, insert);
         let reply = post(
             &ann,
@@ -86,13 +80,15 @@ mod in_process {
         .await;
         support::ok::<serde_json::Value>(&reply);
 
-        let listed: RoutePage = get(&ann, "/api/routes?kind=segment&size=1").await;
-        assert_eq!(listed.items.len(), 1);
-        let detail: RouteDetail = get(&ann, "/api/routes/security-review/versions").await;
-        assert_eq!(
-            detail.versions[0].insertions[0].title.as_str(),
-            "Security review"
-        );
+        let journey: Journey = get(&ann, JOURNEY).await;
+        let pointed: Vec<_> = journey
+            .graph
+            .nodes
+            .values()
+            .filter_map(|node| node.from_route.as_ref())
+            .collect();
+        assert_eq!(pointed.len(), 1);
+        assert_eq!(pointed[0].route.as_str(), "security-review");
     }
 
     /// E6: the references read names the journeys that refer to an identity, as the service

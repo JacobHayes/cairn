@@ -142,14 +142,18 @@ mod open {
             &["deployment.revision", "identities", "identity_aliases"],
         ),
         ("Graph", &["graphs"]),
-        ("Route, Segment", &["routes", "routes.kind"]),
-        ("Insertion", &["insertions"]),
+        ("Route", &["routes"]),
         ("Route version", &["route_versions"]),
         ("Route draft", &["route_drafts"]),
         ("Journey", &["journeys"]),
         (
             "Lineage",
-            &["journeys.lineage_route", "journeys.lineage_version"],
+            &[
+                "journeys.lineage_route",
+                "journeys.lineage_version",
+                "nodes.from_route",
+                "nodes.from_version",
+            ],
         ),
         ("Node, Node kind", &["nodes", "nodes.kind"]),
         (

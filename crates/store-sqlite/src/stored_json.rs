@@ -29,7 +29,7 @@ pub(crate) fn column(
     table: &str,
     key: &str,
     columns: &[&str],
-    rewrite: fn(&mut Value) -> bool,
+    mut rewrite: impl FnMut(&mut Value) -> bool,
 ) -> Result<(), SqlError> {
     for name in columns {
         let select = format!("SELECT {key}, {name} FROM {table}");

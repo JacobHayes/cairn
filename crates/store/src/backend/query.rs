@@ -1,15 +1,10 @@
 //! The read side of the commit rules, shared by the memory and SQLite backends: which keys name
 //! the same identities, which nodes an event is about, the text a search matches, which
-//! journeys an index lists, and where a segment is inserted.
+//! journeys an index lists.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use cairn_schema::{
-    Domain, Graph, GraphId, IdentityKey, InsertionKey, JourneyId, NodeKey, RecordKey, RouteId,
-    Subject, VersionNumber, Write,
-};
-
-use crate::query::InsertionUse;
+use cairn_schema::{GraphId, IdentityKey, JourneyId, NodeKey, RecordKey, Subject, Write};
 
 /// E6: the keys that name the same identities as `identities`: each one's identity (an alias
 /// resolves to the identity it was merged into), and every key naming one of those identities,
@@ -147,71 +142,6 @@ pub fn journey_listed(
         && query.version.is_none_or(|wanted| version == Some(wanted))
         && referencing.is_none_or(|found| found.contains(&summary.id))
         && owners.is_none_or(|wanted| summary.owners.iter().any(|owner| wanted.contains(owner)))
-}
-
-/// C19: the insertions of `segment`'s versions across `graphs`, each under the version it is on:
-/// journeys, route drafts, and each route's latest version, where an insertion a draft also
-/// holds is listed once, as the draft's. `latest` is a route's latest published version, and
-/// `root` the key of a version of `segment`'s one root. Cost: one pass over the insertions of
-/// the graphs given.
-#[must_use]
-pub fn insertion_uses<'g>(
-    segment: &RouteId,
-    latest: impl Fn(&RouteId) -> Option<VersionNumber>,
-    root: impl Fn(VersionNumber) -> Option<NodeKey>,
-    graphs: impl IntoIterator<Item = (&'g GraphId, &'g Graph)>,
-) -> BTreeMap<VersionNumber, Vec<InsertionUse>> {
-    let graphs: Vec<_> = graphs.into_iter().collect();
-    let drafted: BTreeSet<(&RouteId, &InsertionKey)> = graphs
-        .iter()
-        .filter_map(|(id, graph)| match id {
-            GraphId::RouteDraft(route) => Some((route, graph)),
-            _ => None,
-        })
-        .flat_map(|(route, graph)| graph.insertions.values().map(move |i| (route, &i.key)))
-        .collect();
-    let mut found: BTreeMap<VersionNumber, Vec<InsertionUse>> = BTreeMap::new();
-    for (id, graph) in graphs {
-        let (host, current) = match id {
-            GraphId::Journey(journey) => (Domain::Journey(journey.clone()), true),
-            GraphId::RouteDraft(route) => (Domain::Route(route.clone()), true),
-            GraphId::RouteVersion { route, version } => (
-                Domain::Route(route.clone()),
-                latest(route) == Some(*version),
-            ),
-        };
-        for insertion in graph.insertions.values() {
-            let held_by_draft = matches!(id, GraphId::RouteVersion { route, .. }
-                if drafted.contains(&(route, &insertion.key)));
-            if insertion.segment.route != *segment || !current || held_by_draft {
-                continue;
-            }
-            // Members may move, so the root is the member copied from the version's root; once
-            // it is removed, the insertion is listed under what is left of it.
-            let version_root = root(insertion.segment.version);
-            let members = insertion.nodes.iter();
-            let copied = members
-                .clone()
-                .find(|(_, from)| Some(*from) == version_root.as_ref());
-            let root = copied
-                .or_else(|| members.clone().next())
-                .and_then(|(member, _)| graph.nodes.get(member));
-            let Some(root) = root else { continue };
-            found
-                .entry(insertion.segment.version)
-                .or_default()
-                .push(InsertionUse {
-                    host: host.clone(),
-                    graph: id.clone(),
-                    insertion: insertion.key.clone(),
-                    title: root.title.clone(),
-                });
-        }
-    }
-    for uses in found.values_mut() {
-        uses.sort_by(|a, b| (&a.graph, &a.insertion).cmp(&(&b.graph, &b.insertion)));
-    }
-    found
 }
 
 #[cfg(test)]

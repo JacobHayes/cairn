@@ -1,6 +1,6 @@
 // C19: the incoming root and its wiring drawn on the graph at their proposed place, marked as the
 // proposal layer marks an addition (the fill, the solid edge and the word ADDED), so what the
-// stepper shows is what a proposal's review will. A segment only adds, so this draws the graph
+// stepper shows is what a proposal's review will. A route only adds, so this draws the graph
 // after alone: a trimmed canvas that reads the level and lays it out, with no state and no actions.
 import { useMemo } from "react";
 
@@ -42,7 +42,7 @@ export function InsertionCanvas({ preview, domain }: { preview: InsertPreview; d
   const model = useMemo<CanvasModel | undefined>(() => (level === undefined ? undefined : { cards: cardsOf(level, nodes), lines: linesOf(level, nodes) }), [level, nodes]);
   const laid = useLaidOut(`insert:${domain}`, "diff", model);
   const laidOut = valueOf(laid);
-  const overlay = useMemo(() => (laidOut === undefined ? undefined : marksOverlay("What the segment adds", marks, laidOut.model, { added: diff.edgesAdded, removed: diff.edgesRemoved })), [laidOut, marks, diff]);
+  const overlay = useMemo(() => (laidOut === undefined ? undefined : marksOverlay("What the route adds", marks, laidOut.model, { added: diff.edgesAdded, removed: diff.edgesRemoved })), [laidOut, marks, diff]);
   const actions = useMemo<CardActions>(
     () => ({ open: undefined, expand: undefined, trace: undefined, title: (key) => (preview.after.nodes ?? []).find((node) => node.key === key)?.title ?? NODE_GONE, menu: undefined }),
     [preview.after],
@@ -55,5 +55,5 @@ export function InsertionCanvas({ preview, domain }: { preview: InsertPreview; d
   if (laidOut === undefined || overlay === undefined) {
     return <p className="muted small">Laying out the canvas...</p>;
   }
-  return <GraphCanvas model={laidOut.model} layout={laidOut.layout} overlay={overlay} lens={undefined} selected={undefined} actions={actions} firstFit={changed} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The segment's preview" />;
+  return <GraphCanvas model={laidOut.model} layout={laidOut.layout} overlay={overlay} lens={undefined} selected={undefined} actions={actions} firstFit={changed} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The route's preview" />;
 }

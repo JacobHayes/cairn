@@ -8,6 +8,7 @@ mod evidence_guards_migration;
 mod finish_revisions_migration;
 mod journey_owners_migration;
 mod milestone_done_migration;
+mod one_route_migration;
 mod open;
 mod pointer_migration;
 mod property_round_trip;

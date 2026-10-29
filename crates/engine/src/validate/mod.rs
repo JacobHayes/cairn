@@ -4,7 +4,6 @@
 //! them on every graph a patch writes and adds the stages that need the rest of the domain.
 
 mod cycles;
-mod insertions;
 mod references;
 pub(crate) mod state;
 mod structure;
@@ -29,14 +28,12 @@ pub(crate) struct GraphCheck<'a> {
 pub(crate) type GraphStage = fn(&GraphCheck<'_>, &mut Vec<Violation>);
 
 /// The graph stages, in order: the tree, ids, keys, and limits; references; dependency
-/// cycles among the gate edges of the full effective dependency graph; journey state;
-/// insertions.
-pub(crate) const GRAPH_STAGES: [GraphStage; 5] = [
+/// cycles among the gate edges of the full effective dependency graph; journey state.
+pub(crate) const GRAPH_STAGES: [GraphStage; 4] = [
     structure::check,
     references::check,
     cycles::check,
     state::check,
-    insertions::check,
 ];
 
 /// Every violation of the graph stages in a document on its own. A document with state is a

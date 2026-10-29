@@ -67,7 +67,6 @@ pub fn save_as_route(
         mutations.push(Mutation::CreateRoute {
             name: name.clone(),
             description: held.header.description.clone(),
-            kind: cairn_schema::RouteKind::Process,
         });
     }
     mutations.push(Mutation::OpenDraft {

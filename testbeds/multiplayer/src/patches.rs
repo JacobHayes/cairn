@@ -146,6 +146,7 @@ fn action(key: NodeKey, index: u32) -> Node<KeyRefs> {
         not_before: None,
         participations: Participations::default(),
         resources: Vec::new(),
+        from_route: None,
         payload: Payload::Action(Action::default()),
     }
 }

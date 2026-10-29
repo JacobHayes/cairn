@@ -5,14 +5,13 @@ use std::collections::BTreeSet;
 
 use cairn_schema::{
     Domain, Email, GraphId, Identity, IdentityKey, JourneyId, ProposalOutline, ProposalStatus,
-    RouteId, RouteKind, VersionNumber,
+    RouteId,
 };
 
 use super::State;
 use crate::backend;
 use crate::query::{
-    DestinationKind, DestinationNow, ProposalCursor, ProposalPage, ProposalQuery, ProposalScope,
-    ProposalSummary,
+    DestinationNow, ProposalCursor, ProposalPage, ProposalQuery, ProposalScope, ProposalSummary,
 };
 use crate::query::{
     EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoggedEvent, Page, RouteDetail,
@@ -20,15 +19,6 @@ use crate::query::{
 };
 
 impl State {
-    fn latest_version(&self, route: &RouteId) -> Option<VersionNumber> {
-        self.domains
-            .versions
-            .keys()
-            .filter(|(held, _)| held == route)
-            .map(|(_, version)| *version)
-            .max()
-    }
-
     pub(super) fn journeys(&self, query: &JourneyQuery) -> Page<JourneySummary, JourneyId> {
         let referencing = query.referencing.as_ref().map(|identities| {
             backend::query::journeys_among(&self.domains.graphs_referencing(identities))
@@ -75,23 +65,15 @@ impl State {
                     exists: found.is_some(),
                     name: found.map(|(header, _)| header.name.clone()),
                     revision: found.map(|(_, revision)| *revision).unwrap_or_default(),
-                    kind: DestinationKind::Journey,
                     status: found.map(|(header, _)| header.status),
                 }
             }
             Domain::Route(id) => {
                 let found = self.domains.routes.get(id);
-                let kind = match found {
-                    Some((header, _)) if header.kind == RouteKind::Segment => {
-                        DestinationKind::Segment
-                    }
-                    _ => DestinationKind::Route,
-                };
                 DestinationNow {
                     exists: found.is_some(),
                     name: found.map(|(header, _)| header.name.clone()),
                     revision: found.map(|(_, revision)| *revision).unwrap_or_default(),
-                    kind,
                     status: None,
                 }
             }
@@ -99,7 +81,6 @@ impl State {
                 exists: true,
                 name: None,
                 revision: self.domains.deployment.revision,
-                kind: DestinationKind::Deployment,
                 status: None,
             },
         }
@@ -143,28 +124,12 @@ impl State {
 
     pub(super) fn route_detail(&self, route: &RouteId) -> Option<RouteDetail> {
         let (header, revision) = self.domains.routes.get(route)?;
-        let mut uses = backend::query::insertion_uses(
-            route,
-            |held| self.latest_version(held),
-            |version| {
-                let id = GraphId::RouteVersion {
-                    route: route.clone(),
-                    version,
-                };
-                let root = self.domains.graphs.get(&id)?.nodes.values();
-                root.into_iter()
-                    .find(|node| node.parent.is_none())
-                    .map(|node| node.key.clone())
-            },
-            self.domains.graphs.iter(),
-        );
         let versions = self
             .domains
             .versions
             .iter()
             .filter(|((held, _), _)| held == route)
             .map(|((_, version), published_at)| VersionJourneys {
-                insertions: uses.remove(version).unwrap_or_default(),
                 version: *version,
                 published_at: *published_at,
                 journeys: self

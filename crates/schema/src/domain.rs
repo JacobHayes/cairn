@@ -55,7 +55,7 @@ impl fmt::Display for Domain {
 pub enum DeletedId {
     /// A journey.
     Journey(JourneyId),
-    /// A route or segment, with its draft and every version.
+    /// A route, with its draft and every version.
     Route(RouteId),
 }
 
@@ -229,40 +229,6 @@ pub struct Journey {
     pub graph: Graph,
 }
 
-// PRD: glossary, Route.
-/// What a route is for: fixed when it is created.
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum RouteKind {
-    /// A process template: journeys start from it.
-    #[default]
-    Process,
-    // PRD: A21.
-    /// A reusable piece of a process: it is only inserted, never started.
-    Segment,
-}
-
-impl RouteKind {
-    /// True for the default kind, which a document leaves out.
-    #[must_use]
-    pub fn is_process(&self) -> bool {
-        *self == RouteKind::Process
-    }
-}
-
 /// A route's own fields, apart from its graphs.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -278,10 +244,6 @@ pub struct RouteHeader {
     /// Hidden from new-journey creation.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub retired: bool,
-    // PRD: A21.
-    /// Process or segment; routes stored before segments existed are processes.
-    #[serde(default, skip_serializing_if = "RouteKind::is_process")]
-    pub kind: RouteKind,
 }
 
 // PRD: A11.

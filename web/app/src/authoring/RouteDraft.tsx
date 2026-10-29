@@ -33,7 +33,7 @@ import type { UnsavedForm } from "./unsaved.ts";
 import { usePublishPreviewRead } from "./write.ts";
 import { namedList } from "../ui/words.ts";
 import { RetiredBadge } from "../routes/RetiredBadge.tsx";
-import { DeleteRoute, deleteRouteLabel, DeletingRoute } from "../routes/DeleteRoute.tsx";
+import { DeleteRoute, DELETE_ROUTE_LABEL, DeletingRoute } from "../routes/DeleteRoute.tsx";
 import { Tip } from "../ui/Tip.tsx";
 
 type Notice = Schema<"Notice">;
@@ -75,7 +75,6 @@ function RouteMenu({ route, of, write, imports, send, onDelete }: { route: Route
   const exporting = useExport(id);
   const drafting = of === "draft";
   const moves = routeMoves(route);
-  const segment = route.header.kind === "segment";
   const writable = useWritable();
   const unused = useRouteRead(id)?.detail.in_use === false;
   return (
@@ -96,12 +95,12 @@ function RouteMenu({ route, of, write, imports, send, onDelete }: { route: Route
             </button>
           ) : null}
           {!writable ? null : <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="menu-retire" onClick={() => { close(); send(retireMutation(moves.retire)); }}>
-            {moves.retire ? `Retire the ${segment ? "segment" : "route"}` : "Bring it back"}
+            {moves.retire ? "Retire the route" : "Bring it back"}
           </button>}
           {!writable || !unused ? null : <hr />}
           {!writable || !unused ? null : (
             <button type="button" role="menuitem" className="menu-item" data-testid="menu-delete-route" onClick={() => { close(); onDelete(); }}>
-              {deleteRouteLabel(route)}
+              {DELETE_ROUTE_LABEL}
             </button>
           )}
         </>
@@ -119,7 +118,6 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onBlocked
   const id = route.header.id;
   const { search } = useLocation();
   const drafting = of === "draft";
-  const segment = route.header.kind === "segment";
   const navigate = useNavigate();
   const deleting = use(DeletingRoute);
   // C14: under the proposal layer, in any mode, the version is the one the proposal leaves, and the page offers no live write (screens/writable.ts).
@@ -132,12 +130,11 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onBlocked
   return (
     <section className="stack route-header" aria-label={route.header.name} data-testid="route-header">
       <div className="row">
-        {segment ? <span className="label" data-testid="route-kind">Segment</span> : null}
         <Tip tip={route.header.name} kind="cut" tap>
           <h1 data-testid="route-name">{route.header.name}</h1>
         </Tip>
         {of === undefined ? null : reviewing ? <Tip tip="The proposal is shown over this graph" tap><Badge data-testid="version-select">{of === "draft" ? draftWords(route) : `Version ${String(of)}`}</Badge></Tip> : <VersionSelect route={route} of={of} />}
-        {route.header.retired === true ? <RetiredBadge kind={route.header.kind} /> : null}
+        {route.header.retired === true ? <RetiredBadge /> : null}
         <span className="spacer" />
         <AssistantDock target={{ route: id }} />
         {screen === undefined ? null : <ViewPicker screen={screen} screens={ROUTE_OFFERS.screens} to={(to) => routeSwitched(id, search, to, node, proposal)} tip={ROUTE_VIEW_TIP} />}

@@ -58,11 +58,10 @@ describe("what a read of the references has shown", () => {
 });
 
 describe("a route a reference names", () => {
-  const header = (kind: "process" | "segment") => ({ id: "r_a", name: "R", kind }) as never;
-  it("tells a route from a segment, lists the versions that name the identity, and says draft only when the draft does", () => {
-    const process = routeFact({ draft: false, versions: [2, 3], header: header("process") });
+  const header = { id: "r_a", name: "R" } as never;
+  it("lists the versions that name the identity, and says draft only when the draft does", () => {
+    const process = routeFact({ draft: false, versions: [2, 3], header });
     expect(process).toContain("2, 3");
-    expect(routeFact({ draft: true, versions: [2, 3], header: header("process") })).not.toBe(process);
-    expect(routeFact({ draft: false, versions: [2, 3], header: header("segment") })).not.toBe(process);
+    expect(routeFact({ draft: true, versions: [2, 3], header })).not.toBe(process);
   });
 });

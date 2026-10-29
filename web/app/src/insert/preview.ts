@@ -9,7 +9,7 @@ import { Skewed, type Deriver } from "../data/host.ts";
 import { beforeWork, previewPolicy, type ReadSource } from "../data/keyed-read.ts";
 import { useKeyedRead, useSession, useCaller } from "../data/react.ts";
 import { newPatchId, reasonOf } from "../data/writes.ts";
-import type { SegmentVersion } from "./read.ts";
+import type { RouteCopy } from "./read.ts";
 
 /** How long the choices must hold still before they are previewed (ms). */
 const SETTLE_MS = 200;
@@ -31,23 +31,23 @@ interface CandidateArgs {
   user: string;
   authored: Authored;
   mutation: Mutation;
-  segment: SegmentVersion;
+  copy: RouteCopy;
 }
 
 /** The engine's answer for the insertion: the graph it leaves, or why it refuses (a value, not a failure). */
 const CANDIDATE: ReadSource<CandidateArgs, Candidate> = {
   policy: previewPolicy(SETTLE_MS),
-  read: async ({ deriver, user, authored, mutation, segment }, at) => {
+  read: async ({ deriver, user, authored, mutation, copy }, at) => {
     beforeWork(at);
     const patch = { id: newPatchId(), target: authored.target, base_revision: authored.revision, mutations: [mutation] };
     const actor = { user };
     const now = new Date().toISOString();
     try {
       if ("journey" in authored.target) {
-        const applied = await deriver.apply(authored.target.journey, { patch, at: now, actor, versions: [segment.version], segments: [segment.segment] });
+        const applied = await deriver.apply(authored.target.journey, { patch, at: now, actor, versions: [copy.version], routes: [copy.route] });
         return { status: "placed", before: authored.graph, after: applied.document.journey.graph };
       }
-      const route = await deriver.applyRoute({ patch, at: now, actor, today: authored.today, deployment: authored.deployment, versions: [segment.version], segments: [segment.segment], ...(authored.route === undefined ? {} : { route: authored.route }) });
+      const route = await deriver.applyRoute({ patch, at: now, actor, today: authored.today, deployment: authored.deployment, versions: [copy.version], routes: [copy.route], ...(authored.route === undefined ? {} : { route: authored.route }) });
       return { status: "placed", before: authored.graph, after: route.draft?.graph ?? authored.graph };
     } catch (thrown) {
       if (thrown instanceof DOMException || thrown instanceof Skewed) {
@@ -58,20 +58,20 @@ const CANDIDATE: ReadSource<CandidateArgs, Candidate> = {
   },
 };
 
-/** The graph `authored` would hold after `mutation` inserts `segment`, or why not; pending while it settles. */
-export function useCandidate(authored: Authored, mutation: Mutation | undefined, segment: SegmentVersion | undefined): Candidate {
+/** The graph `authored` would hold after `mutation` inserts the route `copy`, or why not; pending while it settles. */
+export function useCandidate(authored: Authored, mutation: Mutation | undefined, copy: RouteCopy | undefined): Candidate {
   const { deriver } = useSession();
   const { caller } = useCaller();
   const user = caller?.user ?? "u_local";
   const { view } = useKeyedRead(
     CANDIDATE,
-    mutation === undefined || segment === undefined
+    mutation === undefined || copy === undefined
       ? undefined
       : {
           of: [JSON.stringify(authored.target)],
-          // The segment's route revision and version are what it inserts; the deployment and the day are what the engine reads besides the graph.
-          freshness: [authored.revision, authored.deploymentRevision, authored.today, authored.route?.revision, JSON.stringify(mutation), segment.version.version, segment.segment.revision, user],
-          args: { deriver, user, authored, mutation, segment },
+          // The route's revision and version are what it inserts; the deployment and the day are what the engine reads besides the graph.
+          freshness: [authored.revision, authored.deploymentRevision, authored.today, authored.route?.revision, JSON.stringify(mutation), copy.version.version, copy.route.revision, user],
+          args: { deriver, user, authored, mutation, copy },
         },
   );
   return view.status === "current" ? view.value : { status: "pending" };

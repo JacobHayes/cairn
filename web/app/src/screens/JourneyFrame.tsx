@@ -31,8 +31,8 @@ import { JourneyLayerHost } from "../proposals/Hosts.tsx";
 import { useLayer, useReviewing } from "../proposals/layer.ts";
 import { Rail } from "../proposals/Rail.tsx";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia, usePageKeys } from "../shell/frame.tsx";
-import { InsertEntryContext, useInserting } from "../segments/entry.ts";
-import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
+import { InsertEntryContext, useInserting } from "../insert/entry.ts";
+import { InsertStepper, type InsertPreview } from "../insert/Stepper.tsx";
 import { JourneyHeader } from "./JourneyHeader.tsx";
 import { KeySheet } from "./KeySheet.tsx";
 import { keyBindingsFor, useJourneyKeys } from "./keys.ts";
@@ -43,7 +43,7 @@ import "./screens.css";
 import { Failed } from "../ui/Failed.tsx";
 import { Pending } from "../ui/Pending.tsx";
 
-const InsertionCanvas = lazy(() => import("../segments/Preview.tsx").then((module) => ({ default: module.InsertionCanvas })));
+const InsertionCanvas = lazy(() => import("../insert/Preview.tsx").then((module) => ({ default: module.InsertionCanvas })));
 
 export interface FrameProps {
   id: string;
@@ -124,7 +124,7 @@ function InspectorSlot({
   }
   if (inserting.at !== undefined && insertable !== undefined) {
     return (
-      <Inspector focus="insert-segment">
+      <Inspector focus="insert-route">
         <InsertStepper key={`${domainOf(insertable)}:${inserting.at.parent ?? ""}`} authored={insertable} parent={inserting.at.parent} onClose={inserting.close} onPreview={inserting.setPreview} />
       </Inspector>
     );
@@ -155,7 +155,7 @@ function InspectorSlot({
   );
 }
 
-/** The page's body: the segment being placed, drawn as review will draw it, while the stepper has a preview; else the page's own. */
+/** The page's body: the route being placed, drawn as review will draw it, while the stepper has a preview; else the page's own. */
 function Workspace({ ready, view, screen, selected, edge, authored, drawing, selection, preview, onCard }: Pick<FrameProps, "screen" | "selected" | "edge"> & { onCard: ProjectionProps["onCard"]; ready: Ready; view: GraphView; authored: ProjectionProps["authored"]; drawing: ProjectionProps["drawing"]; selection: Selection; preview: InsertPreview | undefined }) {
   if (preview !== undefined) {
     return (

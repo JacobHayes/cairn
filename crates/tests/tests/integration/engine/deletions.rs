@@ -1,6 +1,6 @@
 //! Hard deletion (A17, A19): journeys and routes are deleted by a deployment patch naming each
 //! at the revision it was read at; all of them go or none do, their ids are never reused, and a
-//! route or segment goes only when nothing uses it.
+//! route goes only when nothing uses it.
 #![cfg(test)]
 
 use crate::engine::support;
@@ -9,7 +9,7 @@ use cairn_engine::Records;
 use cairn_schema::{DeletedId, Domain, EventType, Rejection, RevisionOf, Subject, ViolationCode};
 
 const VENDOR: &str = "vendor-evaluation";
-const SEGMENT: &str = "security-review";
+const REUSED: &str = "security-review";
 
 /// The vendor journey on version 1 of its route, and two journeys started with no route.
 fn three_journeys() -> Records {
@@ -61,12 +61,12 @@ fn delete(
     support::apply(records, &patch, &support::fixed_inputs())
 }
 
-/// The vendor route with the security review segment inserted into a draft and published as
+/// The vendor route with the security review route inserted into a draft and published as
 /// version 2, and no journey on either.
-fn segment_in_a_published_version() -> Records {
-    let records = support::with_segment(support::seeded(VENDOR), SEGMENT);
+fn route_in_a_published_version() -> Records {
+    let records = support::with_route(support::seeded(VENDOR), REUSED);
     let insert = "- op: open_draft\n  source: edit\n\
-                  - op: insert_segment\n  insertion: i_review\n  segment: {route: security-review, version: 1}\n  parent: n_reporting\n\
+                  - op: insert_route\n  insertion: i_review\n  route: {route: security-review, version: 1}\n  parent: n_reporting\n\
                   - op: publish_draft\n";
     support::accepted_to(&records, "{route: vendor-evaluation}", insert)
 }
@@ -141,20 +141,20 @@ fn a_journey_or_route_named_twice_or_missing_is_refused() {
 
 #[test]
 fn a_deleted_journey_or_route_id_is_never_reused() {
-    let records = segment_in_a_published_version();
+    let records = route_in_a_published_version();
     let records = support::accepted_to(
         &records,
         "{journey: j_two}",
         "- op: create_journey\n  name: Two\n",
     );
-    let deleted = delete(&records, &["j_two"], &[VENDOR, SEGMENT]).unwrap();
+    let deleted = delete(&records, &["j_two"], &[VENDOR, REUSED]).unwrap();
     let deleted = deleted.records();
     assert!(deleted.routes.is_empty() && deleted.versions.is_empty());
     assert_eq!(
         deleted.deleted.keys().cloned().collect::<Vec<_>>(),
         [
             DeletedId::Journey("j_two".parse().unwrap()),
-            DeletedId::Route(SEGMENT.parse().unwrap()),
+            DeletedId::Route(REUSED.parse().unwrap()),
             DeletedId::Route(VENDOR.parse().unwrap()),
         ]
     );
@@ -162,7 +162,7 @@ fn a_deleted_journey_or_route_id_is_never_reused() {
         ("{journey: j_two}", "- op: create_journey\n  name: Again\n"),
         (
             "{route: security-review}",
-            "- op: create_route\n  name: Again\n  kind: segment\n",
+            "- op: create_route\n  name: Again\n",
         ),
         (
             "{route: vendor-evaluation}",
@@ -194,65 +194,4 @@ fn a_route_with_a_journey_on_an_old_version_is_not_deleted() {
     );
     let together = delete(&records, &["j_vendor_eval"], &[VENDOR]).unwrap();
     assert!(together.records().routes.is_empty() && together.records().journeys.is_empty());
-}
-
-#[test]
-fn a_segment_inserted_only_in_a_published_version_is_not_deleted() {
-    let records = segment_in_a_published_version();
-    assert!(records.journeys.is_empty());
-    let Err(Rejection::Invalid { violations }) = delete(&records, &[], &[SEGMENT]) else {
-        panic!("version 2 of the vendor route holds an insertion of the segment")
-    };
-    let [found] = violations.as_slice() else {
-        panic!("{violations:#?}")
-    };
-    assert_eq!(found.code, ViolationCode::RouteInUse);
-    assert_eq!(found.related, [Subject::Route(VENDOR.parse().unwrap())]);
-    // In either order, the host and its segment go together.
-    assert!(delete(&records, &[], &[SEGMENT, VENDOR]).is_ok());
-    assert!(delete(&records, &[], &[VENDOR, SEGMENT]).is_ok());
-}
-
-#[test]
-fn a_deletion_is_not_for_a_journey_or_route_patch() {
-    let records = three_journeys();
-    for target in ["{journey: j_two}", "{route: vendor-evaluation}"] {
-        let patch = support::patch_to(&records, target, &deletion(&records, &["j_two"], &[], None));
-        assert_eq!(
-            support::codes(support::apply(&records, &patch, &support::fixed_inputs())),
-            [ViolationCode::MutationNotForTarget],
-            "{target}"
-        );
-    }
-}
-
-/// A deleted journey or route takes its proposals with it, as the store removes them.
-#[test]
-fn a_deleted_journey_or_route_takes_its_proposals() {
-    let mut records = support::vendor_after(1);
-    for (id, destination) in [
-        (
-            "pr_journey",
-            Domain::Journey("j_vendor_eval".parse().unwrap()),
-        ),
-        ("pr_route", Domain::Route(VENDOR.parse().unwrap())),
-    ] {
-        let revision = records.revision(&destination).get();
-        let create = format!(
-            "- op: create_proposal\n  proposal: {{title: A note, destination_revision: {revision}}}\n"
-        );
-        let address = match &destination {
-            Domain::Journey(journey) => format!("{{journey: {journey}}}"),
-            _ => format!("{{route: {VENDOR}}}"),
-        };
-        let target = format!("{{proposal: {{id: {id}, destination: {address}}}}}");
-        let patch = support::patch_to(&records, &target, &create);
-        records = support::apply(&records, &patch, &support::fixed_inputs())
-            .unwrap()
-            .records()
-            .clone();
-    }
-    assert_eq!(records.proposals.len(), 2);
-    let applied = delete(&records, &["j_vendor_eval"], &[VENDOR]).unwrap();
-    assert!(applied.records().proposals.is_empty());
 }

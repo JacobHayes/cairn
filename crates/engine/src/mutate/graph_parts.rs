@@ -50,10 +50,6 @@ fn put_role(session: &mut Session<'_>, role: &Role<KeyRefs>, add: bool) -> Vec<W
         unreachable!("a graph patch targets an existing graph")
     };
     let exists = graph.roles.get(&role.key).is_some();
-    let flips = graph
-        .roles
-        .get(&role.key)
-        .is_some_and(|held| held.multi != role.multi);
     let problem = match (add, exists) {
         (true, true) => Some(ViolationCode::DuplicateKey),
         (true, false) if graph.retired_keys.roles.contains(&role.key) => {
@@ -85,16 +81,10 @@ fn put_role(session: &mut Session<'_>, role: &Role<KeyRefs>, add: bool) -> Vec<W
         return Vec::new();
     }
     assert_eq!(exists, !add, "an add is new and an edit exists");
-    if flips {
-        session
-            .cardinality_changed
-            .insert(Subject::Role(role.key.clone()));
-    }
     vec![session.put(GraphRecord::Role(role.clone()))]
 }
 
-/// A18: removing a role retires its key and drops its direct fill and the maps insertions
-/// have onto it (B13); anything still naming it is caught by validation.
+/// A18: removing a role retires its key and drops its direct fill; anything still naming it is caught by validation.
 fn remove_role(session: &mut Session<'_>, role: &RoleKey) -> Vec<Write> {
     let exists = session
         .graph()
@@ -115,7 +105,6 @@ fn remove_role(session: &mut Session<'_>, role: &RoleKey) -> Vec<Write> {
         session.remove(GraphKey::Role(role.clone())),
         retire(session, RetiredKey::Role(role.clone())),
     ];
-    writes.extend(super::insertion::unmapped_role(session, role));
     let filled = session
         .journey()
         .is_some_and(|journey| journey.graph.state.role_fills.contains_key(role));
@@ -131,8 +120,6 @@ fn put_kind(session: &mut Session<'_>, kind: &ParticipationKind<KeyRefs>, add: b
         unreachable!("a graph patch targets an existing graph")
     };
     let exists = graph.participation_kinds.get(&kind.key).is_some() || kind.key == KindKey::owner();
-    let held = graph.participation_kinds.get(&kind.key);
-    let flips = held.is_some_and(|held| held.multi != kind.multi);
     let problem = match (add, exists) {
         (true, true) => Some(ViolationCode::DuplicateKey),
         (true, false) if graph.retired_keys.kinds.contains(&kind.key) => {
@@ -170,11 +157,6 @@ fn put_kind(session: &mut Session<'_>, kind: &ParticipationKind<KeyRefs>, add: b
     }
     assert_eq!(exists, !add, "an add is new and an edit exists");
     assert_ne!(kind.key, KindKey::owner(), "owner is built in (A7)");
-    if flips {
-        session
-            .cardinality_changed
-            .insert(Subject::Kind(kind.key.clone()));
-    }
     vec![session.put(GraphRecord::Kind(kind.clone()))]
 }
 
@@ -194,11 +176,10 @@ fn remove_kind(session: &mut Session<'_>, kind: &KindKey) -> Vec<Write> {
         );
         return Vec::new();
     }
-    let mut writes = vec![
+    let writes = vec![
         session.remove(GraphKey::Kind(kind.clone())),
         retire(session, RetiredKey::Kind(kind.clone())),
     ];
-    writes.extend(super::insertion::unmapped_kind(session, kind));
     writes
 }
 

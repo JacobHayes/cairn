@@ -12,11 +12,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::{
     Action, Annotation, AnnotationBody, AnnotationContent, AnswerSpec, AnswerType, AnswerValue,
     BoundedSet, Bypass, Checklist, Choices, Date, Days, Decision, Deliverable, Domain, Graph,
-    Group, GuardFailure, Identity, Insertion, JourneyHeader, JourneyState, JourneyStatus, Keyed,
-    Lineage, Milestone, Node, NodeKey, NodeKind, NodeState, Overrides, ParticipationKind,
+    Group, GuardFailure, Identity, JourneyHeader, JourneyState, JourneyStatus, Keyed, Lineage,
+    Milestone, Node, NodeKey, NodeKind, NodeState, Overrides, ParticipationKind,
     ParticipationSource, Participations, Payload, Proposal, ProposalDraft, ProposalStatus,
-    Reopened, Resource, ResourceContent, RetiredKeys, Revision, Role, RouteHeader, RouteKind,
-    SnoozeTarget, State, Weight, refs::KeyRefs,
+    Reopened, Resource, ResourceContent, RetiredKeys, Revision, Role, RouteHeader, SnoozeTarget,
+    State, Weight, refs::KeyRefs,
 };
 use serde_json::json;
 
@@ -333,6 +333,10 @@ fn nodes(fill: Fill) -> Vec<Node<KeyRefs>> {
             } else {
                 Vec::new()
             },
+            from_route: fill.some(Lineage {
+                route: id("every"),
+                version: version(1),
+            }),
             payload,
         })
         .collect()
@@ -368,37 +372,7 @@ pub fn content(fill: Fill) -> Graph {
             roles: BTreeSet::from([id("r_old")]),
             kinds: BTreeSet::from([id("k_old")]),
         },
-        insertions: Keyed::new([insertion(fill)]).unwrap(),
         state: JourneyState::default(),
-    }
-}
-
-/// An insertion with its parent, role and kind maps, and members when filled; one member and
-/// no maps when cleared, on another version.
-#[must_use]
-pub fn insertion(fill: Fill) -> Insertion {
-    Insertion {
-        key: id("i_security"),
-        segment: Lineage {
-            route: id("every"),
-            version: version(if fill.on() { 1 } else { 2 }),
-        },
-        parent: fill.some(node_key(1)),
-        roles: if fill.on() {
-            BTreeMap::from([(id("r_lead"), id("r_other"))])
-        } else {
-            BTreeMap::new()
-        },
-        kinds: if fill.on() {
-            BTreeMap::from([(id("k_role"), id("k_identities"))])
-        } else {
-            BTreeMap::new()
-        },
-        nodes: if fill.on() {
-            BTreeMap::from([(node_key(0), id("n_root")), (node_key(1), id("n_child"))])
-        } else {
-            BTreeMap::from([(node_key(0), id("n_root"))])
-        },
     }
 }
 
@@ -501,7 +475,6 @@ pub fn graph(fill: Fill) -> Graph {
         participation_kinds,
         nodes,
         retired_keys,
-        insertions,
         state: _,
     } = content(fill);
     Graph {
@@ -510,7 +483,6 @@ pub fn graph(fill: Fill) -> Graph {
         participation_kinds,
         nodes,
         retired_keys,
-        insertions,
         state: state(fill),
     }
 }
@@ -542,8 +514,6 @@ pub fn route_header(route: &str, fill: Fill) -> RouteHeader {
         name: title(if fill.on() { "Every field" } else { "Cleared" }),
         description: fill.some(id("A route with every field.")),
         retired: fill.on(),
-        // A route's kind is fixed when it is created, so a rewrite never changes it.
-        kind: RouteKind::Segment,
     }
 }
 

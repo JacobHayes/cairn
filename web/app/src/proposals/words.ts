@@ -202,10 +202,10 @@ export function mutationWords(mutation: Mutation, names: Names): string {
       return `${mutation.op === "add_role" ? "Add" : "Change"} the role ${quoted(mutation.role.title ?? mutation.role.id)}`;
     case "remove_role":
       return `Remove the role ${quoted(names.role(mutation.role))}`;
-    case "insert_segment": {
+    case "insert_route": {
       const parent = mutation.parent;
       const left = (mutation.omit ?? []).length;
-      return `Insert the segment ${mutation.segment.route} version ${String(mutation.segment.version)}${parent == null ? " at the top level" : ` under ${node(parent)}`}${left === 0 ? "" : `, leaving ${plural(left, "step")} out`}`;
+      return `Insert the route ${mutation.route.route} version ${String(mutation.route.version)}${parent == null ? " at the top level" : ` under ${node(parent)}`}${left === 0 ? "" : `, leaving ${plural(left, "step")} out`}`;
     }
     default:
       return `${mutation.op.replaceAll("_", " ")}${"node" in mutation && typeof mutation.node === "string" ? ` on ${node(mutation.node)}` : ""}`;
@@ -253,8 +253,8 @@ function factWords(fact: OutlineFact): string {
       return "discards the draft";
     case "publishes_draft":
       return "publishes the draft";
-    case "inserts_segment":
-      return "inserts a segment";
+    case "inserts_route":
+      return "inserts a route";
   }
 }
 

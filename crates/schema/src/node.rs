@@ -25,6 +25,7 @@ use crate::collections::{
     EdgeCountPerNode, IdentityCountPerFill, OneOrMany, ResourceCountPerNode,
 };
 use crate::condition::Condition;
+use crate::domain::Lineage;
 use crate::id::{IdentityKey, Slug};
 use crate::limits::Limit;
 use crate::number::{Days, Weight};
@@ -954,6 +955,9 @@ pub struct Node<R: References> {
     /// the engine edits in place, so validation checks the count after every patch as the
     /// parse checks it on read.
     pub resources: Vec<Resource<R>>,
+    /// The route version this node was inserted from, kept on the root of an insertion and
+    /// never followed afterwards; none on any other node.
+    pub from_route: Option<Lineage>,
     /// The kind and its own fields.
     pub payload: Payload<R>,
 }
@@ -1400,6 +1404,8 @@ struct NodeWire<R: References> {
     )]
     #[schemars(with = "BoundedVec<Resource<R>, ResourceCountPerNode>")]
     resources: Vec<Resource<R>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    from_route: Option<Lineage>,
 }
 
 /// A node's resources as written: at most `resource_count_per_node_max`.
@@ -1757,6 +1763,7 @@ impl<R: References> TryFrom<NodeWire<R>> for Node<R> {
             not_before: wire.not_before,
             participations: wire.participations,
             resources: wire.resources,
+            from_route: wire.from_route,
             payload,
         })
     }
@@ -1816,6 +1823,7 @@ impl<R: References> From<Node<R>> for NodeWire<R> {
             not_before: node.not_before,
             participations: node.participations,
             resources: node.resources,
+            from_route: node.from_route,
         }
     }
 }

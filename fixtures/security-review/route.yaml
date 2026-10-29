@@ -2,7 +2,6 @@ format: 1
 route: security-review
 name: Security review
 description: "A reusable security check: classify the data, model threats unless it is low sensitivity, and name who reviews."
-kind: segment
 roles:
 - key: r_reviewer
   id: reviewer

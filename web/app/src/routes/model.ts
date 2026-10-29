@@ -76,19 +76,6 @@ export function download(name: string, text: string): void {
   }, 0);
 }
 
-/** The routes index's types: every one, only routes (the processes a journey is started from), or only segments (the pieces inserted into them). */
-export type RouteType = "all" | "routes" | "segments";
-
-/** The type `?type=` names; every type when it names none. */
-export function typeOf(param: string | null): RouteType {
-  return param === "routes" || param === "segments" ? param : "all";
-}
-
-/** The kind of route the host is asked to list for `type`: none for every type. */
-export function kindOf(type: RouteType): Schema<"RouteKind"> | undefined {
-  return type === "all" ? undefined : type === "segments" ? "segment" : "process";
-}
-
 /** How many active journeys each route has: counted from the journeys' own lineage, never derived. */
 export function activeJourneyCounts(journeys: readonly JourneySummary[]): Map<string, number> {
   const counts = new Map<string, number>();
@@ -100,23 +87,14 @@ export function activeJourneyCounts(journeys: readonly JourneySummary[]): Map<st
   return counts;
 }
 
-/** What a route or segment is used by: a route's active journeys, a segment's insertions (B13). */
-export type InUse = { kind: "journeys"; count: number } | { kind: "places"; places: number };
-
-/** The use in words: `2 active journeys`, `Used in 6 places`, and what none says. */
-export function inUseWords(use: InUse): string {
-  if (use.kind === "journeys") {
-    return use.count === 0 ? "No active journeys" : plural(use.count, "active journey");
-  }
-  if (use.places === 0) {
-    return "Not used yet";
-  }
-  return `Used in ${plural(use.places, "place")}`;
+/** The use in words: `2 active journeys`, and what none says. */
+export function inUseWords(count: number): string {
+  return count === 0 ? "No active journeys" : plural(count, "active journey");
 }
 
-/** A19, A21: whether journeys start from the route's published versions: not from a segment, and not once the route is retired. */
-export function startsJourneys(header: Pick<Schema<"RouteSummary">["header"], "kind" | "retired">): boolean {
-  return header.kind !== "segment" && header.retired !== true;
+/** A19: whether journeys start from the route's published versions: not once the route is retired. */
+export function startsJourneys(header: Pick<Schema<"RouteSummary">["header"], "retired">): boolean {
+  return header.retired !== true;
 }
 
 /** The version a journey starts from by default: the latest published, of a route that starts journeys; none otherwise. A draft being open does not stop it. */

@@ -8,12 +8,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use cairn_schema::collections::{InsertionCount, LimitOf};
+use cairn_schema::collections::LimitOf;
 use cairn_schema::{
-    AnswerType, BoundedSet, Days, Graph, GraphId, HasKey, IdentityKey, Insertion, Keyed,
-    KindColumns, KindKey, Lineage, Node, NodeKey, NodeKind, ParticipationKind, ParticipationSource,
-    Participations, Payload, Resource, ResourceContent, RetiredKeys, Role, RoleKey, Weight,
-    node::Requires, refs::KeyRefs,
+    AnswerType, BoundedSet, Days, Graph, GraphId, HasKey, IdentityKey, Keyed, KindColumns, KindKey,
+    Lineage, Node, NodeKey, NodeKind, ParticipationKind, ParticipationSource, Participations,
+    Payload, Resource, ResourceContent, RetiredKeys, Role, RoleKey, Weight, node::Requires,
+    refs::KeyRefs,
 };
 use cairn_store::StoreError;
 use rusqlite::Connection;
@@ -26,7 +26,7 @@ use crate::sql::{
 /// The nodes table's columns after `graph_id`, in the order [`node_values`] writes them and
 /// [`node_from_row`] reads them (A1a): the fields every kind shares, then [`KindColumns`].
 /// A node's `requires`, `participations`, and `resources` are rows of their own tables.
-pub(crate) const NODE_COLUMNS: [&str; 28] = [
+pub(crate) const NODE_COLUMNS: [&str; 30] = [
     "key",
     "parent_key",
     "id",
@@ -55,6 +55,8 @@ pub(crate) const NODE_COLUMNS: [&str; 28] = [
     "fills_role",
     "feeds_milestone",
     "help",
+    "from_route",
+    "from_version",
 ];
 
 /// Where [`KindColumns`] start in [`NODE_COLUMNS`].
@@ -78,6 +80,7 @@ pub(crate) fn node_values(node: &Node<KeyRefs>) -> Result<Vec<Value>, StoreError
         not_before,
         participations: _,
         resources: _,
+        from_route,
         payload,
     } = node;
     let mut values = vec![
@@ -93,6 +96,10 @@ pub(crate) fn node_values(node: &Node<KeyRefs>) -> Result<Vec<Value>, StoreError
         opt_json(not_before.as_ref())?,
     ];
     values.extend(kind_values(payload)?);
+    values.push(opt_text(from_route.as_ref().map(|lineage| &lineage.route)));
+    values.push(opt_int(
+        from_route.as_ref().map(|lineage| lineage.version.get()),
+    ));
     Ok(values)
 }
 
@@ -239,8 +246,22 @@ fn node_from_row(row: &Row, children: &mut Children) -> Result<Node<KeyRefs>, St
         relevant_when: row.opt_json(7)?,
         due_by: row.opt_json(8)?,
         not_before: row.opt_json(9)?,
+        from_route: from_route(row)?,
         payload: payload_from_row(row, kind)?,
     })
+}
+
+/// The route version a node was inserted from, from its two columns.
+fn from_route(row: &Row) -> Result<Option<Lineage>, StoreError> {
+    let route = row.opt_parse(28)?;
+    let version = row.opt_int(29)?.map(sql::number).transpose()?;
+    match (route, version) {
+        (Some(route), Some(version)) => Ok(Some(Lineage { route, version })),
+        (None, None) => Ok(None),
+        _ => Err(corrupt(
+            "a node's route and version are both set or both null",
+        )),
+    }
 }
 
 fn keyed<V: HasKey, L: LimitOf>(values: Vec<V>, what: &str) -> Result<Keyed<V, L>, StoreError> {
@@ -285,7 +306,6 @@ pub(crate) fn load(connection: &Connection, graph: &GraphId) -> Result<Graph, St
         participation_kinds: keyed(kinds, "participation kinds")?,
         nodes: keyed(nodes, "nodes")?,
         retired_keys: retired_keys(connection, &id)?,
-        insertions: insertions(connection, &id)?,
         state: crate::state::load(connection, &id)?,
     })
 }
@@ -301,29 +321,6 @@ fn labeled(connection: &Connection, table: &str, id: &str) -> Result<Vec<Labeled
         found.push((row.text(0)?, row.text(1)?, row.opt_text(2)?, row.flag(3)?));
     }
     Ok(found)
-}
-
-fn insertions(
-    connection: &Connection,
-    id: &str,
-) -> Result<Keyed<Insertion, InsertionCount>, StoreError> {
-    let select = "SELECT key, segment, version, parent_key, roles, kinds, nodes \
-                  FROM insertions WHERE graph_id = ?1 ORDER BY key";
-    let mut found = Vec::new();
-    for row in rows(connection, select, vec![text(id)])? {
-        found.push(Insertion {
-            key: row.parse(0)?,
-            segment: Lineage {
-                route: row.parse(1)?,
-                version: row.number(2)?,
-            },
-            parent: row.opt_parse(3)?,
-            roles: row.json(4)?,
-            kinds: row.json(5)?,
-            nodes: row.json(6)?,
-        });
-    }
-    keyed(found, "insertions")
 }
 
 fn retired_keys(connection: &Connection, id: &str) -> Result<RetiredKeys, StoreError> {

@@ -65,7 +65,6 @@ on_both_stores!(
     publishing_a_route_never_touches_its_journeys,
     an_archived_journey_takes_only_a_status_move_or_deletion_and_its_id_never_returns,
     a_route_a_journey_follows_on_an_old_version_is_deleted_only_with_it,
-    a_segment_inserted_only_in_a_published_version_is_not_deleted,
     a_users_patch_and_their_agents_land_alike_but_for_the_stamp,
     every_commit_is_announced_with_each_revision_it_moved,
     consequences_report_what_the_patch_caused_and_not_what_midnight_did,
@@ -1238,51 +1237,6 @@ async fn a_route_a_journey_follows_on_an_old_version_is_deleted_only_with_it(
         .filter(|kind| matches!(kind, EventType::JourneyDeleted | EventType::RouteDeleted))
         .collect();
     assert_eq!(logged, [EventType::JourneyDeleted, EventType::RouteDeleted]);
-}
-
-/// A19, A21: a segment that only a published version of another route inserts is in use: no
-/// journey and no draft holds it, and the delete is still refused, naming the route.
-async fn a_segment_inserted_only_in_a_published_version_is_not_deleted(
-    service: &Service,
-    _: &InProcessNotifier,
-) {
-    let segment = "{route: reuse}";
-    let made = "- op: create_route\n  name: Reuse\n  kind: segment\n- op: open_draft\n  source: import\n\
-                - op: add_node\n  node: {key: n_reuse, id: reuse, kind: group, title: Reuse}\n\
-                - op: add_node\n  node: {key: n_check, id: check, parent: n_reuse, kind: action, title: Check}\n\
-                - op: publish_draft\n";
-    applied(
-        service
-            .patch(
-                &call("u_author", AT),
-                &domain(patch("p_segment", segment, 0, made)),
-            )
-            .await,
-    );
-    let host = "{route: host}";
-    let inserted = "- op: create_route\n  name: Host\n- op: open_draft\n  source: import\n\
-                    - op: add_node\n  node: {key: n_slot, id: slot, kind: group, title: Slot}\n\
-                    - op: insert_segment\n  insertion: i_reuse\n  segment: {route: reuse, version: 1}\n  parent: n_slot\n\
-                    - op: publish_draft\n";
-    applied(
-        service
-            .patch(
-                &call("u_author", AT),
-                &domain(patch("p_host", host, 0, inserted)),
-            )
-            .await,
-    );
-    let reuse = "reuse".parse().unwrap();
-    assert!(service.route_detail(&reuse).await.unwrap().unwrap().in_use);
-    let alone = deletion(service, "p_segment_gone", &[], &[("reuse", 1)]).await;
-    let refused = rejected(service.patch(&call("u_lead", AT), &alone).await);
-    assert_eq!(
-        route_in_use(&refused),
-        [Subject::Route("host".parse().unwrap())]
-    );
-    let both = deletion(service, "p_both", &[], &[("reuse", 1), ("host", 1)]).await;
-    applied(service.patch(&call("u_lead", AT), &both).await);
-    assert_eq!(service.route_detail(&reuse).await.unwrap(), None);
 }
 
 /// A12, H2: the same mutations from a user and from their agent produce the same journey;

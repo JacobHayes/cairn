@@ -331,8 +331,8 @@ prefixed! {
     RoleKey, "r_";
     /// A participation kind's stable key (`k_`). The built-in `owner` kind is `k_owner`.
     KindKey, "k_";
-    /// A segment insertion's key (`i_`), minted by the client like any new key; every key
-    /// the insertion creates derives from it (B13).
+    /// An insertion's key (`i_`), minted by the client like any new key; every key the
+    /// insertion creates derives from it (B13). Nothing stores it.
     InsertionKey, "i_";
     /// An identity's key (`who_`): deployment-scoped, so one person is one identity everywhere.
     IdentityKey, "who_";

@@ -95,7 +95,7 @@ pub(crate) const GROUPS: &[(&str, &str)] = &[
     ("add_role", "Roles and participation kinds"),
     ("set_participation", "Who does a node"),
     ("add_resource", "A node's resources"),
-    ("insert_segment", "Segments"),
+    ("insert_route", "Inserting a route"),
     (
         "transition",
         "What happened: progress, answers, dates, snoozes, overrides, ticks",

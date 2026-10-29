@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     Deployment, GraphId, IdentityKey, Journey, JourneyId, Revision, Route, RouteHeader, RouteId,
-    RouteKind, RouteVersion, VersionNumber,
+    RouteVersion, VersionNumber,
 };
 use cairn_store::{
     Document, EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoadTarget, LoggedEvent,
@@ -146,8 +146,7 @@ impl Service {
         }))
     }
 
-    /// I2: the route index, in id order, paged: the routes of `kind` (every kind when none)
-    /// after `after`, at most `size`. Cost: the store's revisions of every domain (a row each),
+    /// I2: the route index, in id order, paged: the routes after `after`, at most `size`. Cost: the store's revisions of every domain (a row each),
     /// then one route load per route passed over or on the page.
     ///
     /// # Errors
@@ -155,7 +154,6 @@ impl Service {
     /// When the store fails.
     pub async fn routes(
         &self,
-        kind: Option<RouteKind>,
         after: Option<&RouteId>,
         size: PageSize,
     ) -> Result<Page<RouteSummary, RouteId>, ServiceError> {
@@ -170,9 +168,7 @@ impl Service {
                 break;
             }
             // A route the revisions name always loads: routes are never deleted (A19).
-            if let Some(route) = self.route(&id).await?
-                && kind.is_none_or(|kind| route.header.kind == kind)
-            {
+            if let Some(route) = self.route(&id).await? {
                 items.push(RouteSummary {
                     latest_version: route.versions.last().copied(),
                     draft_open: route.draft.is_some(),

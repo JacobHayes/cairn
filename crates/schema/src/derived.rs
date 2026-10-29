@@ -166,8 +166,8 @@ pub enum NodeMove {
     Reopen,
     /// Answering the decision, a first answer or a revision.
     Answer,
-    /// A segment inserted under the node: any node but a decision or milestone holds children.
-    InsertSegment,
+    /// A route inserted under the node: any node but a decision or milestone holds children.
+    InsertRoute,
 }
 
 impl NodeMove {
@@ -181,7 +181,7 @@ impl NodeMove {
         NodeMove::MarkDone,
         NodeMove::Reopen,
         NodeMove::Answer,
-        NodeMove::InsertSegment,
+        NodeMove::InsertRoute,
     ];
 }
 
@@ -719,7 +719,7 @@ pub struct NodeDerived {
     pub snoozable: bool,
     /// The moves the node accepts now: the transitions its kind's table has from its stored
     /// state, those that need the node in scope only while it is, a completion only while its
-    /// guards hold (else `complete_anyway`), and `insert_segment` where it may hold children.
+    /// guards hold (else `complete_anyway`), and `insert_route` where it may hold children.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub moves: BTreeSet<NodeMove>,
     // PRD: D1a.

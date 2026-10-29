@@ -271,7 +271,6 @@ mod in_process {
             ("GET", "/journeys/new?route=r", Reached::Page),
             ("GET", "/journeys/j_a/nodes/n_plan?view=list", Reached::Page),
             ("GET", "/journeys/j_a/edges/n_a~n_plan", Reached::Page),
-            ("GET", "/routes?type=segments", Reached::Page),
             ("GET", "/routes/new", Reached::Page),
             ("HEAD", "/routes/vendor-evaluation/versions", Reached::Page),
             ("GET", "/capabilities", Reached::Page),

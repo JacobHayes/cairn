@@ -57,7 +57,7 @@ PRD terms keep their meaning. Additionally:
 
 | Term | Definition |
 |---|---|
-| **Domain** | A patch target (A17), loaded and revision-checked as one unit: a journey, a route with its draft (a segment is a route of kind `segment`), or the deployment. Published versions are immutable graphs loaded singly by id, never part of the domain; inserting a segment (B13) reads the version it names as an input. |
+| **Domain** | A patch target (A17), loaded and revision-checked as one unit: a journey, a route with its draft, or the deployment. Published versions are immutable graphs loaded singly by id, never part of the domain; inserting a route (B13) reads the version it names as an input. |
 | **Derive inputs** | Today, deployment timezone, the viewer's identities (resolved by the host from verified emails, H3), and the deployment context (identities, emails, aliases at a deployment revision) through which ownership, "mine", and the owner factor resolve (E4, E6). Supplied by the host. |
 | **Projection** | A read-only view over a derived journey (snapshot, level, trace, decision view, timeline, status summary, next, mine). |
 | **Domain document** | A journey's graph and state plus its derive inputs. Nothing derived, no proposals; the browser derives it locally. |
@@ -90,7 +90,7 @@ cairn/
     client/        TypeScript client: generated/ plus the hand-written subscription wrapper (H6) and the patch types
     wasm/          wasm package: generated/ bindings plus the hand-written loader and the derive worker
   instructions/    the shipped agent guide (I4), served by MCP and published as SKILL.md
-  fixtures/        generic seed routes with a journey scenario each, one journey with no route, one segment
+  fixtures/        generic seed routes with a journey scenario each, one journey with no route, one route inserted into others
   testbeds/        simulation testbeds (PRACTICES.md, Simulation)
   openapi/         generated OpenAPI document
   schema/          generated JSON Schema for the file format
@@ -126,7 +126,7 @@ flowchart LR
 ### Model
 
 - One `Node` struct with shared fields and a per-kind payload enum (A1a), so a field a kind cannot have is unrepresentable. Kinds, states, transitions, guard outcomes, relevance (`Relevant | NotRelevant | Undecided`), override kinds, and attachment scopes are closed enums matched exhaustively. `Key`, `Id`, `Path`, `Revision`, `PatchId`, `IdentityKey` are newtypes.
-- A `Graph` is the tree of nodes plus edges, roles, participation kinds, resources, insertions, retired keys (never reused), and for a journey its state. Route versions and drafts are graphs with empty state. An insertion (B13) records its segment version, parent, role and kind maps, and members.
+- A `Graph` is the tree of nodes plus edges, roles, participation kinds, resources, retired keys (never reused), and for a journey its state. Route versions and drafts are graphs with empty state. A node copied in by an insertion (B13) may carry a pointer to its route and version.
 - A `Proposal` is separate from every graph, with its own revision (I6, C14); editing one never changes its destination.
 - `Deployment` holds identities (emails unique across identities, H3), aliases, and the deployment revision. Users and logins are auth state.
 
@@ -181,15 +181,15 @@ All projections live in the engine so every host produces the same views (I1, C2
 
 A structured predicate tree with the fixed operators of A5 (`equals`, `not_equals`, `in`, `contains`, `answered`, `all`, `any`, `not`), no parser. References resolve to decision keys at import or edit time and are validated for answer-type compatibility and the no-own-subtree rule. The static reference set is what makes implicit gates, the decision view (C12), and explanations possible. The sentence rendering is display only. New operators are a PRD change.
 
-### Save-as-route and segments
+### Save-as-route and insertion
 
 A pure function from a journey to a proposal (B8): the journey's structure as mutations that create or open a route's draft, with participation mapping and exclusion as reviewer-edited items (C14). A journey keeps only its lineage pointer (B7); nothing is merged back. `resolve(proposal)` turns choices into mutations; apply refuses unresolved items; `preview` applies to a copy.
 
-Segment insertion mints keys from the insertion key and each segment key with one pure function, so preview and apply agree. Save as segment cuts the selection's boundary and drafts a segment the way save-as-route drafts a route.
+Route insertion mints keys from the insertion key and each route key with one pure function, so preview and apply agree; it stores no insertion record, only the pointer on each inserted root. Saving a selection as a route cuts the selection's boundary and drafts a route the way save-as-route drafts one.
 
 ### File format
 
-YAML on disk, JSON on the wire, one schema (A13, A14). Files carry paths and ids for reading, keys for identity, and the route id and version extended; a route file carries `kind`; insertions are never written. Export is deterministic. Round-trip (parse, export, parse, compare) is tested.
+YAML on disk, JSON on the wire, one schema (A13, A14). Files carry paths and ids for reading, keys for identity, and the route id and version extended; an inserted root's pointer is an ordinary field of the node. Export is deterministic. Round-trip (parse, export, parse, compare) is tested.
 
 ### Testing the engine
 
@@ -287,7 +287,7 @@ React (Vite) with the wasm engine. DESIGN owns how screens look; the PRD owns wh
 - **State** (rule in PRACTICES, Frontend state):
   - The **session root** starts once at boot, outside React, and owns tab-wide state: version skew, recent saves, and its children (tick subscription, deployment context and caller reads, journey manager, edit manager, sync scheduler, toast, conversation manager).
   - **Edits**: the edit manager runs one write actor per patch id. Controls start writes but never own them: unmount drops only the view, and an edit has at most one busy write. Every control write is a patch, a proposal write, or a route import, found by a stable edit key. A stale write of any kind is rejected for a person to review again. A pre-send engine preview is the write's first phase. States: `idle`, `sending`, `landed`, `rejected`, `unconfirmed` (resends with the same id and patch on backoff, up to a limit, then asks for Retry), `stopped`, `gone`. Discard and Retry are events to the write. Explicit keyed maps, never XState's registry. Agent token minting is never an edit-manager write (a resend would mint a second secret).
-  - Page workflows (edge drawing, import, identity merge, segment insertion) are page-owned machines whose deliveries are manager writes; leaving one never stops its write.
+  - Page workflows (edge drawing, import, identity merge, route insertion) are page-owned machines whose deliveries are manager writes; leaving one never stops its write.
   - The sync chip's state is a pure projection (`summarize`) of facts read from their owners; `settled` (no read, screen load, or scheduled canvas work pending, no write in flight, stream not connecting) is what browser tests wait on. A landed receipt counts as its domain's tick. Time thresholds are delayed transitions in the scheduler, never polling.
   - The conversation manager runs one read and one turn actor per target; a turn ends in its own read, so stale reads never replace an answer and late answers after stop change nothing.
 - **Reads**: every read is one keyed-read actor behind one hook. A key names what is shown (`of`), its freshness, and arguments: a new `of` resets and releases; a new freshness keeps the shown answer and rereads; values and failures show only for their own key. One read at a time; ticks and key changes coalesce. Transient failures retry on the shared backoff; auth, engine, skew, and deleted-subject (A19) refusals do not. Each derivation in the worker belongs to the load that made it and to its slot (the journey's, or a preview's `<journey>/proposals/<pid>#<n>`), so no release frees another's.

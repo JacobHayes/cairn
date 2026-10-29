@@ -1460,16 +1460,11 @@ pub async fn a_hard_delete_of_a_route_takes_its_versions_and_events<B: Backend>(
 }
 
 /// A19, H5: a route delete is checked at commit against what uses the route: a journey
-/// started on it, or an insertion of it, committed after the delete was read makes it stale on
-/// that domain; a journey on it that the same patch deletes does not.
+/// started on it, committed after the delete was read, makes it stale on that domain; a
+/// journey on it that the same patch deletes does not.
 pub async fn a_route_delete_is_stale_when_something_started_using_it<B: Backend>(backend: &B) {
     let store = open(backend).await;
     published_route(&store, "gone").await;
-    applied(
-        &store,
-        create_journey("p_host", "j_host", vec![action("n_task", "task", None)]).commit(),
-    )
-    .await;
     let delete = || build::hard_delete("p_delete", 0, &[(gone_route("gone"), 1)]).commit();
 
     // A journey started on the route meanwhile.
@@ -1487,27 +1482,7 @@ pub async fn a_route_delete_is_stale_when_something_started_using_it<B: Backend>
     assert_eq!(conflicts, vec![conflict(journey_of("j_follower"), 0, 1)]);
     assert_eq!(snapshot(&store).await, before);
 
-    // Deleting that journey in the same patch frees the route.
-    let together = [(gone_journey("j_follower"), 1), (gone_route("gone"), 1)];
-    let with_journey = build::hard_delete("p_together", 0, &together).commit();
-
-    // An insertion of the route's version in another journey meanwhile.
-    let insertion = insertion_of("p_insert", "j_host", 1, "gone");
-    applied(&store, insertion.commit()).await;
-    let (conflicts, _) = stale_parts(failed(&store, with_journey.clone()).await);
-    assert_eq!(conflicts, vec![conflict(journey_of("j_host"), 0, 2)]);
-
-    let freed = [
-        (gone_journey("j_follower"), 1),
-        (gone_journey("j_host"), 2),
-        (gone_route("gone"), 1),
-    ];
-    applied(
-        &store,
-        create_journey("p_other", "j_other", vec![action("n_task", "task", None)]).commit(),
-    )
-    .await;
-    // Drafted before the delete: a journey on the route, and an insertion of it.
+    // Drafted before the delete: a journey on the route.
     let follower = journey_patch("p_late", "j_late", 0).event(
         EventType::JourneyCreated,
         Subject::Journey(id("j_late")),
@@ -1517,37 +1492,14 @@ pub async fn a_route_delete_is_stale_when_something_started_using_it<B: Backend>
             Some(("gone", 1)),
         )))],
     );
-    let late_insertion = insertion_of("p_late_insert", "j_other", 1, "gone");
-    applied(&store, build::hard_delete("p_all", 0, &freed).commit()).await;
+    // Deleting that journey in the same patch frees the route.
+    let together = [(gone_journey("j_follower"), 1), (gone_route("gone"), 1)];
+    applied(&store, build::hard_delete("p_all", 0, &together).commit()).await;
     assert_eq!(route(&store, "gone").await, None);
     let before = snapshot(&store).await;
-    for late in [follower, late_insertion] {
-        let error = failed(&store, late.commit()).await;
-        assert_eq!(violation_codes(&error), vec![ViolationCode::DeletedId]);
-    }
+    let error = failed(&store, follower.commit()).await;
+    assert_eq!(violation_codes(&error), vec![ViolationCode::DeletedId]);
     assert_eq!(snapshot(&store).await, before);
-}
-
-/// An insertion of `route`'s version 1 into `journey`'s `n_task`, in a patch at `base`.
-fn insertion_of(patch: &str, journey: &str, base: u32, route: &str) -> crate::build::PatchBuilder {
-    journey_patch(patch, journey, base).event(
-        EventType::SegmentInserted,
-        Subject::Insertion(id("i_gone")),
-        vec![put_in(
-            &journey_graph(journey),
-            GraphRecord::Insertion(cairn_schema::Insertion {
-                key: id("i_gone"),
-                segment: cairn_schema::Lineage {
-                    route: id(route),
-                    version: build::version(1),
-                },
-                parent: None,
-                roles: std::collections::BTreeMap::new(),
-                kinds: std::collections::BTreeMap::new(),
-                nodes: std::collections::BTreeMap::from([(node_key("n_task"), node_key("n_root"))]),
-            }),
-        )],
-    )
 }
 
 /// The two identities a merge or delete case starts from, `who_a` and `who_b`.

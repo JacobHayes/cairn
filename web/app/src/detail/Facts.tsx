@@ -1,7 +1,9 @@
 // C8, E2: who takes part in the node, and where it came from (held by the
 // Details section): they explain rather than ask for anything.
-import { memberOrigin, originLine } from "../segments/model.ts";
-import { useSegmentNames } from "../segments/read.ts";
+import { Link } from "react-router";
+
+import { useRouteLookup } from "../insert/read.ts";
+import { routePath } from "../routes/address.ts";
 import { originText } from "./explain.ts";
 import { ParticipationEditor } from "./editors.tsx";
 import { foldKey } from "./folds.ts";
@@ -29,24 +31,23 @@ export function People({ view, detail }: { view: Ready; detail: NodeDetail }) {
   );
 }
 
-/** C8, B13: a segment member's origin: which segment and version, where the root went (text only). */
-function SegmentOrigin({ view, node }: { view: Ready; node: string }) {
-  const graph = view.journey.graph;
-  const origin = memberOrigin(graph, node);
-  const nameOf = useSegmentNames();
-  if (origin === undefined) {
-    return <span>From a segment.</span>;
+/** C8, B13: where a node copied in from a route came from, as the journey's own lineage says it: the route and version, linked. A node of the graph's own says nothing. */
+export function Origin({ detail }: { detail: NodeDetail }) {
+  const from = detail.node.from_route;
+  const lookup = useRouteLookup();
+  const found = from == null ? undefined : lookup(from.route);
+  if (from == null || found === undefined) {
+    return null;
   }
-  const parent = origin.insertion.parent;
-  const under = parent == null ? undefined : (graph.nodes ?? []).find((each) => each.key === parent)?.title;
-  return <span data-testid="segment-origin">{originLine(origin, { segment: nameOf(origin.insertion.segment.route), parent: under })}</span>;
-}
-
-/** B13: where a segment's node came from; a node of the journey's own says nothing. */
-export function Origin({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  return memberOrigin(view.journey.graph, detail.node.key) === undefined ? null : (
+  return (
     <span className="stack" data-testid="provenance">
-      <SegmentOrigin view={view} node={detail.node.key} />
+      {found === "gone" ? (
+        <span data-testid="origin-route">A route since deleted, version {from.version}</span>
+      ) : (
+        <Link to={routePath(from.route, { version: from.version })} data-testid="origin-route">
+          {found.name}, version {from.version}
+        </Link>
+      )}
     </span>
   );
 }

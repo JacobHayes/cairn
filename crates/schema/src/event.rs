@@ -13,8 +13,8 @@ use crate::domain::Domain;
 use crate::field::NodeField;
 use crate::graph::Edge;
 use crate::id::{
-    AgentId, AttachmentKey, IdentityKey, InsertionKey, JourneyId, KindKey, NodeKey, PatchId,
-    ProposalId, RoleKey, RouteId, UserId,
+    AgentId, AttachmentKey, IdentityKey, JourneyId, KindKey, NodeKey, PatchId, ProposalId, RoleKey,
+    RouteId, UserId,
 };
 use crate::number::Revision;
 use crate::patch::{DraftSource, Mutation, Patch, PatchTarget};
@@ -56,7 +56,7 @@ pub enum EventType {
     DefaultOwnerChanged,
     ParticipationChanged,
     ResourceChanged,
-    SegmentInserted,
+    RouteInserted,
     NodeTransitioned,
     AnswerSet,
     RecordedDateChanged,
@@ -101,8 +101,6 @@ pub enum Subject {
     Kind(KindKey),
     /// A resource, note, or link.
     Attachment(AttachmentKey),
-    /// A segment insertion.
-    Insertion(InsertionKey),
     /// An identity.
     Identity(IdentityKey),
     /// A journey.
@@ -222,7 +220,7 @@ impl Mutation {
             Mutation::AddResource { .. }
             | Mutation::EditResource { .. }
             | Mutation::RemoveResource { .. } => EventType::ResourceChanged,
-            Mutation::InsertSegment { .. } => EventType::SegmentInserted,
+            Mutation::InsertRoute { .. } => EventType::RouteInserted,
             // One event records a container's skip; the cascade is derived (D1a).
             Mutation::Transition { .. } => EventType::NodeTransitioned,
             Mutation::Answer { .. } => EventType::AnswerSet,
@@ -323,7 +321,6 @@ impl Mutation {
             Mutation::DeleteJourney { journey, .. } => Subject::Journey(journey.clone()),
             Mutation::DeleteRoute { route, .. } => Subject::Route(route.clone()),
             Mutation::ApplyProposal { proposal, .. } => Subject::Proposal(proposal.clone()),
-            Mutation::InsertSegment { insertion, .. } => Subject::Insertion(insertion.clone()),
             other => other.node().map_or_else(
                 || domain_subject(target),
                 |node| Subject::Node(node.clone()),

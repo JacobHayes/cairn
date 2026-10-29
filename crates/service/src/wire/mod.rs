@@ -12,14 +12,13 @@ mod users;
 pub use crate::{AgentSignIn, AuthKind, AuthMethod, Capabilities, McpAccess};
 pub use projections::{ChildEntry, History, Mine, NodeDetail, Projected};
 pub use proposals::{
-    DestinationKind, DestinationNow, ProposalAnswer, ProposalApply, ProposalCreate, ProposalCursor,
-    ProposalEdit, ProposalList, ProposalReview, ProposalStep, ProposalSummary, RouteImport,
-    SaveAsRouteRequest, StaleBase,
+    DestinationNow, ProposalAnswer, ProposalApply, ProposalCreate, ProposalCursor, ProposalEdit,
+    ProposalList, ProposalReview, ProposalStep, ProposalSummary, RouteImport, SaveAsRouteRequest,
+    StaleBase,
 };
 pub use reads::{
-    EventPage, IdentityReferences, InsertionUse, JourneyMatches, JourneyPage, JourneySummary,
-    LoggedEvent, RouteDetail, RoutePage, RouteReference, RouteSummary, SearchHit, SearchPage,
-    VersionJourneys,
+    EventPage, IdentityReferences, JourneyMatches, JourneyPage, JourneySummary, LoggedEvent,
+    RouteDetail, RoutePage, RouteReference, RouteSummary, SearchHit, SearchPage, VersionJourneys,
 };
 pub use users::{
     Caller, LinkedLogin, Tour, TourExpect, TourStanding, TourWrite, TourWriteState, UserName,

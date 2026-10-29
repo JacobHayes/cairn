@@ -50,7 +50,7 @@ export function destinationWords(item: ProposalSummary): string {
     return now.name;
   }
   if ("route" in destination) {
-    return `New ${now.kind === "segment" ? "segment" : "route"} ${destination.route}`;
+    return `New route ${destination.route}`;
   }
   return "New journey";
 }

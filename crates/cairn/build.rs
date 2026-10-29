@@ -11,7 +11,7 @@
 //! The script also writes `fixtures.rs` into the build directory: one `Fixture` for each
 //! directory under `fixtures/` that holds a `journey.yaml`, in name order, with its
 //! `route.yaml` when it has one. The directory is the list's one owner: a fixture added there
-//! is seeded with no edit here, and a directory with no scenario (a lone segment) is not a
+//! is seeded with no edit here, and a directory with no scenario (a lone route file) is not a
 //! fixture.
 //!
 //! The script also hands the compile the version the binary reports, in

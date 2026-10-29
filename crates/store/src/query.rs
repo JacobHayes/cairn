@@ -7,9 +7,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use cairn_schema::{
-    AgentId, AttachmentKey, Domain, Event, EventType, GraphId, IdentityKey, InsertionKey,
-    JourneyId, JourneyStatus, Lineage, NodeKey, PatchId, ProposalId, ProposalOutline, Revision,
-    RouteHeader, RouteId, Timestamp, Title, UserId, VersionNumber,
+    AgentId, AttachmentKey, Domain, Event, EventType, IdentityKey, JourneyId, JourneyStatus,
+    Lineage, NodeKey, PatchId, ProposalId, ProposalOutline, Revision, RouteHeader, RouteId,
+    Timestamp, Title, UserId, VersionNumber,
 };
 
 use crate::limits::PAGE_ITEM_COUNT_MAX;
@@ -172,8 +172,7 @@ pub struct RouteDetail {
     pub revision: Revision,
     /// Its versions, oldest first.
     pub versions: Vec<VersionJourneys>,
-    /// A19: whether anything uses it: a journey following one of its versions, or an insertion
-    /// of one in any journey, draft or published version. A route in use cannot be deleted.
+    /// A19: whether a journey follows one of its versions. A route in use cannot be deleted.
     pub in_use: bool,
 }
 
@@ -186,21 +185,6 @@ pub struct VersionJourneys {
     pub published_at: Timestamp,
     /// The journeys whose lineage is this version.
     pub journeys: BTreeSet<JourneyId>,
-    /// The insertions of this version, when the route is a segment (C19).
-    pub insertions: Vec<InsertionUse>,
-}
-
-/// One insertion of a segment version, as the segment's detail lists it (C19).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct InsertionUse {
-    /// The domain holding it.
-    pub host: Domain,
-    /// The graph holding it.
-    pub graph: GraphId,
-    /// The insertion.
-    pub insertion: InsertionKey,
-    /// The root member's current title.
-    pub title: Title,
 }
 
 /// C14: which open proposals a listing holds.
@@ -243,20 +227,6 @@ pub struct ProposalQuery {
     pub size: PageSize,
 }
 
-/// What a proposal's destination is.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DestinationKind {
-    /// A journey.
-    Journey,
-    /// A process route.
-    Route,
-    /// A segment route.
-    Segment,
-    /// The deployment.
-    Deployment,
-}
-
 /// A proposal's destination as it is now: read at listing time, never stored.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DestinationNow {
@@ -267,8 +237,6 @@ pub struct DestinationNow {
     pub name: Option<Title>,
     /// Its revision; 0 when it does not exist.
     pub revision: Revision,
-    /// What it is (what it would be, for a route that does not exist yet: a process).
-    pub kind: DestinationKind,
     /// A journey's status.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<JourneyStatus>,

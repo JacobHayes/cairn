@@ -10,7 +10,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive, useCaller } from "../data/react.ts";
-import { indexKey, isSegment, journeyIndex, routeIndex } from "../data/reads.ts";
+import { indexKey, journeyIndex, routeIndex } from "../data/reads.ts";
 import { NewDestinations } from "../proposals/NewDestinations.tsx";
 import { IndexHead } from "../ui/IndexHead.tsx";
 import { IndexState } from "../ui/kit.tsx";
@@ -97,7 +97,7 @@ export function JourneyIndex() {
           </Link>
         }
       >
-        <IndexFilterBar filters={filters} routes={known.filter((route) => !isSegment(route))} onChange={(next) => void navigate(indexPath(next))} />
+        <IndexFilterBar filters={filters} routes={known} onChange={(next) => void navigate(indexPath(next))} />
       </IndexHead>
       <NewDestinations scope="new_journeys" />
       {unknownViewer ? <IndexState kind="failed"><Failed what="Who you are" error={failed} /></IndexState> : null}

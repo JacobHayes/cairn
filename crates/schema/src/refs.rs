@@ -187,7 +187,7 @@ impl JsonSchema for KeyRefs {
 
 // ARCHITECTURE: File format. PRD: A13, B13.
 /// Translates every reference of a node from one document form to another: an insertion
-/// from the segment's keys to the graph's, an export from keys to paths and ids, an import
+/// from the route's keys to the graph's, an export from keys to paths and ids, an import
 /// from paths and ids to keys. [`Node::map_references`] is the one walk over a node's
 /// fields, generic over both forms, so a new reference field cannot compile without being
 /// translated, even when both forms are one.
@@ -266,6 +266,7 @@ impl<A: References> Node<A> {
             not_before,
             participations,
             resources,
+            from_route: self.from_route.clone(),
             payload,
         }
     }

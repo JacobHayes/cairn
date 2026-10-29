@@ -1,15 +1,15 @@
-// C19, B13: inserting a segment, the stepper's three steps as a machine: choose a segment,
-// place it, and, when the segment declares roles or kinds, say who they become here. The step is
+// C19, B13: inserting a route, the stepper's three steps as a machine: choose a route,
+// place it, and, when the route declares roles or kinds, say who they become here. The step is
 // the machine's state, so no move can leave it somewhere the steps do not go:
 //
 //   choosing -- choose --> placing -- next (when there are people to map) --> mapping
 //   choosing <-- back --- placing <-- back, or planned (no people, after all) --- mapping
 //
-// What the person has chosen (the segment and version, the choices, and the key the insertion
+// What the person has chosen (the route and version, the choices, and the key the insertion
 // is minted under) is the machine's context and is kept as a plain draft whenever it changes,
 // so a reload picks the stepper up where it was. A draft restored from storage is corrected on
 // the way in (`heldOf`): whatever is not a valid draft is a fresh one, a step past the first
-// without a segment is the first, and nodes the graph no longer holds are dropped from it. The
+// without a route is the first, and nodes the graph no longer holds are dropped from it. The
 // insertion key is minted once, when no valid draft names one, and never again (B13: the
 // preview and the apply write the same keys).
 import { assign, setup, type SnapshotFrom } from "xstate";
@@ -20,13 +20,13 @@ import { NO_CHOICES, type Choices, type Mapping } from "./model.ts";
 
 export type Step = 1 | 2 | 3;
 
-/** The segment and version chosen. */
+/** The route and version chosen. */
 export interface Picked {
   id: string;
   version: number;
 }
 
-/** What the stepper keeps of an insertion not yet reviewed: the step, the segment and version, the choices, and the key it will mint. */
+/** What the stepper keeps of an insertion not yet reviewed: the step, the route and version, the choices, and the key it will mint. */
 export interface Held {
   step: Step;
   picked: Picked | undefined;

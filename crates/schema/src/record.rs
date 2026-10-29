@@ -10,10 +10,9 @@ use serde::{Deserialize, Serialize};
 use crate::attachment::{Annotation, Resource};
 use crate::domain::{DeletedId, Domain, GraphId, Identity, JourneyHeader, RouteHeader};
 use crate::field::{NodeField, NodeFieldValue};
-use crate::graph::{Edge, Insertion, ParticipationKind, Role};
+use crate::graph::{Edge, ParticipationKind, Role};
 use crate::id::{
-    AttachmentKey, IdentityKey, InsertionKey, JourneyId, KindKey, NodeKey, ProposalId, RoleKey,
-    RouteId, Slug,
+    AttachmentKey, IdentityKey, JourneyId, KindKey, NodeKey, ProposalId, RoleKey, RouteId, Slug,
 };
 use crate::node::{IdentitySet, Node, ParticipationSource};
 use crate::number::VersionNumber;
@@ -79,9 +78,6 @@ pub enum GraphRecord {
     },
     /// A retired key.
     RetiredKey(RetiredKey),
-    // PRD: B13.
-    /// A segment insertion.
-    Insertion(Insertion),
     /// A node's stored state.
     NodeState {
         /// The node.
@@ -234,8 +230,6 @@ pub enum GraphKey {
     },
     /// A retired key.
     RetiredKey(RetiredKey),
-    /// A segment insertion.
-    Insertion(InsertionKey),
     /// A node's stored state.
     NodeState(NodeKey),
     /// A ticked checklist item.
@@ -346,7 +340,6 @@ impl GraphRecord {
                 resource: resource.key.clone(),
             },
             GraphRecord::RetiredKey(key) => GraphKey::RetiredKey(key.clone()),
-            GraphRecord::Insertion(insertion) => GraphKey::Insertion(insertion.key.clone()),
             GraphRecord::NodeState { node, .. } => GraphKey::NodeState(node.clone()),
             GraphRecord::Tick { node, item } => GraphKey::Tick {
                 node: node.clone(),
@@ -389,7 +382,6 @@ impl GraphKey {
             | GraphKey::Kind(_)
             | GraphKey::DefaultOwner
             | GraphKey::RetiredKey(_)
-            | GraphKey::Insertion(_)
             | GraphKey::RoleFill(_)
             | GraphKey::Annotation { node: None, .. } => None,
         }

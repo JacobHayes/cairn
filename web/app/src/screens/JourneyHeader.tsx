@@ -1,5 +1,5 @@
 // The journey header: one line with the name, the status when the journey is not active (a
-// read-only chip), the View picker and the journey's `⋯` (Edit, insert a segment, save it as a
+// read-only chip), the View picker and the journey's `⋯` (Edit, insert a route, save it as a
 // route, copy its link, and its Status: the moves the status allows, B11, and
 // deletion once archived, A19). What the journey is (progress, next milestone, route) is on the
 // journey card in the inspector. When completion is suggested, a band under the header offers it.
@@ -13,7 +13,7 @@ import { DeleteJourney } from "../journeys/DeleteJourneys.tsx";
 import { deletable, statusActions } from "../journeys/lifecycle.ts";
 import { screenSwitched, unavailableScreens, type Screen } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
-import { useInsertEntry } from "../segments/entry.ts";
+import { useInsertEntry } from "../insert/entry.ts";
 import { useSuggested } from "../journeys/suggested.ts";
 import { OpenProposalsItem } from "../proposals/DestinationProposals.tsx";
 import { JOURNEY_OFFERS } from "../journeys/view.ts";
@@ -118,8 +118,8 @@ function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready:
               </Link>
             )}
             {insert === undefined || !writable ? null : (
-              <button type="button" role="menuitem" className="menu-item" data-testid="menu-insert-segment" onClick={() => { close(); insert(); }}>
-                Insert segment...
+              <button type="button" role="menuitem" className="menu-item" data-testid="menu-insert-route" onClick={() => { close(); insert(); }}>
+                Insert route...
               </button>
             )}
             {!live ? null : item("menu-save", "Save as route...", "save")}

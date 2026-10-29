@@ -61,7 +61,7 @@ describe("the steps", () => {
     expect(stepOf(started(held(step)).actor.getSnapshot())).toBe(step);
   });
 
-  it("starts the choices afresh, under the parent already chosen, when another segment is chosen", () => {
+  it("starts the choices afresh, under the parent already chosen, when another route is chosen", () => {
     const { actor, kept } = started(held(1, { choices: { ...NO_CHOICES, parent: "n_phase", title: "Old" } }));
     actor.send({ type: "choose", id: "other", version: 2 });
     expect(kept.at(-1)).toEqual({ step: 2, picked: { id: "other", version: 2 }, choices: { ...NO_CHOICES, parent: "n_phase" }, insertion: "i_kept" });
@@ -122,7 +122,7 @@ describe("heldOf", () => {
     expect(made.count()).toBe(0);
   });
 
-  it("puts a step past the first back to the first when no segment is chosen", () => {
+  it("puts a step past the first back to the first when no route is chosen", () => {
     const draft = { step: 3, picked: undefined, choices: { ...NO_CHOICES }, insertion: "i_kept" };
     expect(heldOf(draft, tree, undefined).step).toBe(1);
   });
@@ -151,7 +151,7 @@ describe("heldOf", () => {
     expect(corrected.insertion).toBe("i_minted1");
   });
 
-  it("drops a picked segment whose version is not a whole number", () => {
+  it("drops a picked route whose version is not a whole number", () => {
     const draft = { step: 2, picked: { id: "s", version: 1.5 }, choices: { ...NO_CHOICES }, insertion: "i_kept" };
     expect(heldOf(draft, tree, undefined)).toMatchObject({ picked: undefined, step: 1 });
   });

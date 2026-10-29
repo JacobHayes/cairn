@@ -42,7 +42,7 @@ async function rejectionStaysAndResolves(page: Page) {
   await expect(conflict).toBeVisible();
   await expect(panel.getByTestId("skip-form").getByLabel("Why skip it")).toHaveValue(reason);
   // Away from the control it is still counted, and Go to it comes back to it.
-  await goWithin(page, "/routes?type=routes");
+  await goWithin(page, "/routes");
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
   await syncChip(page).click();
   const needsYou = page.getByTestId("sync-popover").getByTestId("sync-problem");

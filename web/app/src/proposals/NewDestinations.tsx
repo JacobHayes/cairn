@@ -10,7 +10,7 @@ import { listKey, proposalsListed } from "./read.ts";
 import { Failed } from "../ui/Failed.tsx";
 
 /** The open proposals that would create a journey (`new_journeys`) or a route (`new_routes`). */
-export function NewDestinations({ scope, segments }: { scope: "new_journeys" | "new_routes"; segments?: boolean | undefined }) {
+export function NewDestinations({ scope }: { scope: "new_journeys" | "new_routes" }) {
   const { view, refresh } = useLive(listKey(scope), proposalsListed(scope));
   const found = valueOf(view);
   if (view.status === "failed") {
@@ -25,7 +25,6 @@ export function NewDestinations({ scope, segments }: { scope: "new_journeys" | "
   if (found === undefined) {
     return <p className="muted small" data-testid="proposed-reading">Reading the proposals that would create one...</p>;
   }
-  // The Routes index shows only the kind it is showing: a segment proposal is not listed under Routes.
-  const items = segments === undefined ? found.items : found.items.filter((item) => (item.now.kind === "segment") === segments);
+  const { items } = found;
   return items.length === 0 ? null : <RowsPanel title="Proposed" testId="proposed-panel" rows={proposalRows(items, destinationWords)} />;
 }

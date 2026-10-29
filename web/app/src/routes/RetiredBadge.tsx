@@ -3,9 +3,9 @@ import { Badge } from "../ui/kit.tsx";
 import { Tip } from "../ui/Tip.tsx";
 
 /** What the Retired chip says: what a retired route is hidden from. */
-export function RetiredBadge({ kind }: { kind: "process" | "segment" | undefined }) {
+export function RetiredBadge() {
   return (
-    <Tip tip={kind === "segment" ? "Hidden from new insertions" : "Hidden from new journeys"} tap>
+    <Tip tip="Hidden from new journeys and insertions" tap>
       <Badge data-testid="retired">Retired</Badge>
     </Tip>
   );

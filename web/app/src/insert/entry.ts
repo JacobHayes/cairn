@@ -1,4 +1,4 @@
-// C19: where inserting a segment starts, on any screen that can: the journey's `⋯`, a container's
+// C19: where inserting a route starts, on any screen that can: the journey's `⋯`, a container's
 // `⋯`, and a draft's Add. The frame that can show the stepper provides `start`; a screen with
 // no frame around it provides none, and offers no entry.
 import { createContext, useContext, useState } from "react";
@@ -6,10 +6,10 @@ import { createContext, useContext, useState } from "react";
 import { useDraft, writeDraft } from "../data/drafts.ts";
 import type { InsertPreview } from "./Stepper.tsx";
 
-/** Starts the stepper, with the container to place the segment under when the entry names one. */
+/** Starts the stepper, with the container to place the route under when the entry names one. */
 export const InsertEntryContext = createContext<((parent?: string) => void) | undefined>(undefined);
 
-/** The entry to inserting a segment here, or none where the screen cannot show it. */
+/** The entry to inserting a route here, or none where the screen cannot show it. */
 export function useInsertEntry(): ((parent?: string) => void) | undefined {
   return useContext(InsertEntryContext);
 }

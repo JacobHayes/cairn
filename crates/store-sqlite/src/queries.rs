@@ -5,13 +5,13 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     Actor, Domain, Email, Event, GraphId, Identity, IdentityKey, JourneyId, Mutation,
-    ProposalOutline, RevisionOf, RouteId, RouteKind,
+    ProposalOutline, RevisionOf, RouteId,
 };
 use cairn_store::backend;
 use cairn_store::{
-    DestinationKind, DestinationNow, EventQuery, JourneyMatches, JourneyQuery, JourneySummary,
-    LoggedEvent, Page, ProposalCursor, ProposalPage, ProposalQuery, ProposalScope, ProposalSummary,
-    RouteDetail, SearchHit, SearchQuery, StoreError, VersionJourneys,
+    DestinationNow, EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoggedEvent, Page,
+    ProposalCursor, ProposalPage, ProposalQuery, ProposalScope, ProposalSummary, RouteDetail,
+    SearchHit, SearchQuery, StoreError, VersionJourneys,
 };
 use rusqlite::Connection;
 use rusqlite::types::Value;
@@ -105,20 +105,6 @@ pub(crate) fn route_detail(
     let Some((header, revision)) = load::route_row(connection, route)? else {
         return Ok(None);
     };
-    let latest = latest_versions(connection)?;
-    let select = "SELECT DISTINCT graph_id FROM insertions WHERE segment = ?1";
-    let mut graphs = Vec::new();
-    for row in rows(connection, select, vec![text(route)])? {
-        let id = crate::sql::graph_from(&row.text(0)?)?;
-        graphs.push((id.clone(), crate::graph::load(connection, &id)?));
-    }
-    let roots = version_roots(connection, route)?;
-    let mut uses = backend::query::insertion_uses(
-        route,
-        |held| latest.get(held).copied(),
-        |version| roots.get(&version).cloned(),
-        graphs.iter().map(|(id, graph)| (id, graph)),
-    );
     let select = "SELECT version_number, published_at FROM route_versions WHERE route_id = ?1 \
                   ORDER BY version_number";
     let mut versions = Vec::new();
@@ -133,7 +119,6 @@ pub(crate) fn route_detail(
             version,
             published_at: row.timestamp(1)?,
             journeys,
-            insertions: uses.remove(&version).unwrap_or_default(),
         });
     }
     Ok(Some(RouteDetail {
@@ -144,8 +129,7 @@ pub(crate) fn route_detail(
     }))
 }
 
-/// A19: the graphs using `route`: journeys whose lineage is on it, and graphs holding an
-/// insertion of one of its versions.
+/// A19: the graphs using `route`: the journeys whose lineage is on it.
 pub(crate) fn using(
     connection: &Connection,
     route: &RouteId,
@@ -158,48 +142,7 @@ pub(crate) fn using(
     )? {
         found.insert(GraphId::Journey(row.parse(0)?));
     }
-    for row in rows(
-        connection,
-        "SELECT DISTINCT graph_id FROM insertions WHERE segment = ?1",
-        vec![text(route)],
-    )? {
-        found.insert(graph_from(&row.text(0)?)?);
-    }
     Ok(found)
-}
-
-/// The key of each published version's root of `route`.
-fn version_roots(
-    connection: &Connection,
-    route: &RouteId,
-) -> Result<BTreeMap<cairn_schema::VersionNumber, cairn_schema::NodeKey>, StoreError> {
-    let select = "SELECT graph_id, key FROM nodes WHERE parent_key IS NULL AND graph_id LIKE ?1";
-    let pattern = format!("version/{route}/%");
-    let mut roots = BTreeMap::new();
-    for row in rows(connection, select, vec![text(&pattern)])? {
-        // `_` in a route's id matches any character in LIKE, so the graph is checked exactly.
-        if let cairn_schema::GraphId::RouteVersion {
-            route: held,
-            version,
-        } = crate::sql::graph_from(&row.text(0)?)?
-            && held == *route
-        {
-            roots.insert(version, row.parse(1)?);
-        }
-    }
-    Ok(roots)
-}
-
-/// Each route's latest published version.
-fn latest_versions(
-    connection: &Connection,
-) -> Result<BTreeMap<RouteId, cairn_schema::VersionNumber>, StoreError> {
-    let select = "SELECT route_id, max(version_number) FROM route_versions GROUP BY route_id";
-    let mut latest = BTreeMap::new();
-    for row in rows(connection, select, Vec::new())? {
-        latest.insert(row.parse(0)?, row.number(1)?);
-    }
-    Ok(latest)
 }
 
 /// E6: the graphs referring to any of `identities`, directly or through an alias.
@@ -258,21 +201,15 @@ fn destination_now(
                     .as_ref()
                     .map(|(_, revision)| *revision)
                     .unwrap_or_default(),
-                kind: DestinationKind::Journey,
                 status: found.map(|(header, _)| header.status),
             }
         }
         Domain::Route(id) => {
             let found = load::route_row(connection, id)?;
-            let kind = match &found {
-                Some((header, _)) if header.kind == RouteKind::Segment => DestinationKind::Segment,
-                _ => DestinationKind::Route,
-            };
             DestinationNow {
                 exists: found.is_some(),
                 name: found.as_ref().map(|(header, _)| header.name.clone()),
                 revision: found.map(|(_, revision)| revision).unwrap_or_default(),
-                kind,
                 status: None,
             }
         }
@@ -280,7 +217,6 @@ fn destination_now(
             exists: true,
             name: None,
             revision: load::revision_of(connection, &RevisionOf::Domain(Domain::Deployment))?,
-            kind: DestinationKind::Deployment,
             status: None,
         },
     })

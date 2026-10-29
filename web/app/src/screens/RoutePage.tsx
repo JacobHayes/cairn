@@ -43,13 +43,13 @@ import { RouteLayerHost } from "../proposals/Hosts.tsx";
 import { useLayer } from "../proposals/layer.ts";
 import { Rail } from "../proposals/Rail.tsx";
 import { useImportFlow, useOnImported, type ImportFlow } from "../routes/ImportFile.tsx";
-import { ROUTES_PATH, routePath, routeScreenOf, routeSwitched, versionIn } from "../routes/address.ts";
+import { ROUTES_INDEX_PATH, routePath, routeScreenOf, routeSwitched, versionIn } from "../routes/address.ts";
 import { openDraft } from "../routes/model.ts";
 import { useRouteRead, VersionCard } from "../routes/RouteCard.tsx";
 import { RouteStages } from "../routes/RouteStages.tsx";
-import { InsertionCanvas } from "../segments/Preview.tsx";
-import { useInserting } from "../segments/entry.ts";
-import { InsertStepper } from "../segments/Stepper.tsx";
+import { InsertionCanvas } from "../insert/Preview.tsx";
+import { useInserting } from "../insert/entry.ts";
+import { InsertStepper } from "../insert/Stepper.tsx";
 import { COLUMN, Inspector, PHONE_WIDTH, useFrameActions, useFrameState, useMedia, usePageKeys } from "../shell/frame.tsx";
 import { useEscapeTo } from "../shell/useEscapeTo.ts";
 import { treeOf } from "../authoring/graph.ts";
@@ -165,13 +165,13 @@ interface FrameProps {
   imports: ImportFlow;
 }
 
-/** What a draft's inspector holds: the stepper while a segment is being inserted, else the draft card (where the inspector has a column) or the open node's form. */
+/** What a draft's inspector holds: the stepper while a route is being inserted, else the draft card (where the inspector has a column) or the open node's form. */
 function DraftInspector({ authored, held, selected, card, close, inserting }: { authored: Authored; held: Held | undefined; selected: string | undefined; card: ReactNode; close: string; inserting: ReturnType<typeof useInserting> }) {
   const navigate = useNavigate();
   const id = "route" in authored.target ? authored.target.route : "";
   if (inserting.at !== undefined) {
     return (
-      <Inspector focus="insert-segment">
+      <Inspector focus="insert-route">
         <InsertStepper key={`${domainOf(authored)}:${inserting.at.parent ?? ""}`} authored={authored} parent={inserting.at.parent} onClose={inserting.close} onPreview={inserting.setPreview} />
       </Inspector>
     );
@@ -242,7 +242,7 @@ function DraftFrame({ shown, derived, schedule, authored, selected, edge, write,
   const discard = () => void write.run({ target, baseRevision: shown.route.revision, mutations: [{ op: "discard_draft" }] }, () => { void navigate(here(undefined)); });
   const card = <DraftCard route={id} violations={violations} notices={notices} hrefOf={hrefOf} write={write} blocked={blocked} unsaved={unsaved} onShow={show} titleOf={titleOf} onPublish={publish} onDiscard={discard} stages={<RouteStages shown={valueOf(derived)} schedule={schedule} framing={screen === "graph"} />} />;
   const close = here(undefined);
-  // The line's card is the inspector's only while no node is open and no segment is being placed.
+  // The line's card is the inspector's only while no node is open and no route is being placed.
   const line = selected === undefined && inserting.at === undefined ? edge : undefined;
   useEscapeTo(selected === undefined && line === undefined ? undefined : close);
   const fills = screen === "graph" || inserting.preview !== undefined;
@@ -521,7 +521,7 @@ function RouteContent({ result: kept, setResult }: { result: Result | undefined;
     body = <LayerPage id={id} proposal={proposal} selected={at.key} write={write} imports={imports} />;
   } else if (found === undefined) {
     if (read.status === "gone") {
-      body = <p className="callout">This route does not exist. <Link to={ROUTES_PATH}>All routes</Link></p>;
+      body = <p className="callout">This route does not exist. <Link to={ROUTES_INDEX_PATH}>All routes</Link></p>;
     } else {
       body = read.status === "failed" ? <p className="callout callout-bad"><Failed what="The route" error={read.error} /></p> : <p className="muted small">Reading the route...</p>;
     }

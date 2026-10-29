@@ -26,8 +26,8 @@ const WORKFLOW_FILES: [(&str, &str); 9] = [
         include_str!("../../../instructions/workflows/author-route.md"),
     ),
     (
-        "insert-segment",
-        include_str!("../../../instructions/workflows/insert-segment.md"),
+        "insert-route",
+        include_str!("../../../instructions/workflows/insert-route.md"),
     ),
     (
         "structure-journey",

@@ -4,9 +4,8 @@
 // yes-or-no question until its form changes the answer type. In a journey it is local (B4).
 // The new node opens in its form once it lands.
 import { useDraft } from "../data/drafts.ts";
-import { wrapRoots } from "../segments/model.ts";
 import { Button } from "../ui/kit.tsx";
-import { canHoldChildren, childrenOf, newNode, type GraphNode, type NodeKind } from "./graph.ts";
+import { newNode, type GraphNode, type NodeKind } from "./graph.ts";
 import { NewNodeFields, useNewNodeCheck } from "./NewNodeFields.tsx";
 import { Refusal } from "./StructureEditors.tsx";
 import { domainOf, type Authored } from "./target.ts";
@@ -18,21 +17,6 @@ export interface AddNodeProps {
   container: string | undefined;
   /** Called with the new node once it lands. */
   onAdded: (node: GraphNode) => void;
-}
-
-/** C19: why a segment's second top-level node is not added as asked, and what is offered: under the root, or under a group with it when it is a leaf. */
-function OneRoot({ root, disabled, onUnder, onWrap }: { root: GraphNode; disabled: boolean; onUnder: () => void; onWrap: () => void }) {
-  const holds = canHoldChildren(root.kind);
-  return (
-    <p className="stack" data-testid="one-root">
-      <span>A segment has one top-level node.{holds ? "" : " Put these 2 under a group."}</span>
-      <span>
-        <Button primary disabled={disabled} onClick={holds ? onUnder : onWrap}>
-          {holds ? `Put it under ${root.title}` : "Wrap in a group"}
-        </Button>
-      </span>
-    </p>
-  );
 }
 
 export function AddNode({ authored, container, onAdded }: AddNodeProps) {
@@ -52,36 +36,19 @@ export function AddNode({ authored, container, onAdded }: AddNodeProps) {
       onAdded(node);
     }
   };
-  const roots = childrenOf(authored.tree, undefined);
-  // C19: a segment has one top-level node. A second is not sent (the engine would refuse it); the
-  // palette offers to put it under the root, or under a group with the root when that is a leaf.
-  const root = roots[0];
-  const second = authored.route?.header.kind === "segment" && parent === "" && root !== undefined;
   const add = () => {
-    if (second || unsendable) {
+    if (unsendable) {
       return;
     }
     const node = newNode(authored.tree, kind, title, parent === "" ? undefined : parent);
     void write.run([{ op: "add_node", node }]).then(added(node));
   };
-  const addUnder = (under: GraphNode) => {
-    const node = newNode(authored.tree, kind, title, under.key);
-    void write.run([{ op: "add_node", node }]).then(added(node));
-  };
-  const wrap = (rest: GraphNode) => {
-    const node = newNode(authored.tree, kind, title, undefined);
-    void write.run(wrapRoots([rest], authored.route?.header.name ?? "", [node])).then(added(node));
-  };
   return (
     <form className="stack" data-testid="add-node" onSubmit={(event) => { event.preventDefault(); add(); }}>
       <NewNodeFields values={values} onChange={setKept} tree={authored.tree} check={check} />
-      {second ? (
-        <OneRoot root={root} disabled={unsendable} onUnder={() => { addUnder(root); }} onWrap={() => { wrap(root); }} />
-      ) : (
-        <Button type="submit" primary disabled={unsendable}>
-          Add
-        </Button>
-      )}
+      <Button type="submit" primary disabled={unsendable}>
+        Add
+      </Button>
       <Refusal write={write} />
     </form>
   );

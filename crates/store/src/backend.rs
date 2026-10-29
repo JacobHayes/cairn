@@ -34,8 +34,8 @@ pub struct Shape {
     pub bumps_deployment: bool,
     /// The journeys and routes a deployment patch hard-deletes (A19).
     pub deletes: BTreeSet<DeletedId>,
-    /// The routes the change set's records use: a journey's lineage, or an insertion's
-    /// segment. Each must not have been hard-deleted meanwhile (A19).
+    /// The routes the change set's records use: a journey's lineage. Each must not have been
+    /// hard-deleted meanwhile (A19).
     pub used_routes: BTreeSet<RouteId>,
     /// Every graph the change set writes into.
     pub graphs: BTreeSet<GraphId>,
@@ -113,20 +113,12 @@ impl Shape {
                 {
                     self.created_identities.insert(identity.key.clone());
                 }
-                match record {
-                    Record::JourneyHeader(JourneyHeader {
-                        lineage: Some(lineage),
-                        ..
-                    }) => {
-                        self.used_routes.insert(lineage.route.clone());
-                    }
-                    Record::Graph {
-                        record: GraphRecord::Insertion(insertion),
-                        ..
-                    } => {
-                        self.used_routes.insert(insertion.segment.route.clone());
-                    }
-                    _ => {}
+                if let Record::JourneyHeader(JourneyHeader {
+                    lineage: Some(lineage),
+                    ..
+                }) = record
+                {
+                    self.used_routes.insert(lineage.route.clone());
                 }
                 record.key()
             }
@@ -404,14 +396,14 @@ pub fn deleted_id(id: &DeletedId) -> Violation {
     )
 }
 
-/// A19: a journey's lineage or an insertion on a route hard-deleted since the patch was
+/// A19: a journey's lineage on a route hard-deleted since the patch was
 /// checked: what it would use is gone, and its id is never reused.
 #[must_use]
 pub fn used_deleted(route: &RouteId) -> Violation {
     violation(
         ViolationCode::DeletedId,
         Subject::Route(route.clone()),
-        format!("{route} was deleted, so nothing can follow or insert it"),
+        format!("{route} was deleted, so nothing can follow it"),
     )
 }
 
@@ -622,7 +614,6 @@ pub fn graph_records(graph: &Graph) -> Vec<GraphRecord> {
                 roles: retired_roles,
                 kinds: retired_kinds,
             },
-        insertions,
         state,
     } = graph;
     let mut records: Vec<GraphRecord> = Vec::new();
@@ -634,7 +625,6 @@ pub fn graph_records(graph: &Graph) -> Vec<GraphRecord> {
         .chain(retired_roles.iter().cloned().map(RetiredKey::Role))
         .chain(retired_kinds.iter().cloned().map(RetiredKey::Kind));
     records.extend(retired.map(GraphRecord::RetiredKey));
-    records.extend(insertions.values().cloned().map(GraphRecord::Insertion));
     records.extend(state_records(state));
     records
 }

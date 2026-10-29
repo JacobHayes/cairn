@@ -82,11 +82,9 @@ pub enum ViolationCode {
     DraftExists,
     NoDraft,
     RouteInUse,
-    // Segments (A21, B13).
-    SegmentRule,
+    // Inserting a route (B13).
     InsertionInvalid,
     InsertionKeyTaken,
-    NotAProcessRoute,
     // Identities (E6, H3).
     IdentityKeyTaken,
     IdentityEmpty,

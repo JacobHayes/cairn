@@ -59,7 +59,7 @@ function derivedNodes(): Ready["derived"]["nodes"] {
     n_stage: {
       ...relevant,
       skip_count: 2,
-      moves: ["insert_segment", "mark_done", "skip"],
+      moves: ["insert_route", "mark_done", "skip"],
       display_state: "active",
       actionable: false,
       dates: {},
@@ -71,7 +71,7 @@ function derivedNodes(): Ready["derived"]["nodes"] {
     },
     n_report: {
       ...relevant,
-      moves: ["complete", "insert_segment", "skip", "stop"],
+      moves: ["complete", "insert_route", "skip", "stop"],
       display_state: "active",
       actionable: false,
       blocked_by: [{ node: "n_findings", via: "explicit" }],
@@ -83,7 +83,7 @@ function derivedNodes(): Ready["derived"]["nodes"] {
     },
     n_findings: {
       ...relevant,
-      moves: ["complete", "insert_segment", "skip", "start"],
+      moves: ["complete", "insert_route", "skip", "start"],
       display_state: "ready",
       actionable: true,
       dates: { due: derivedDue },

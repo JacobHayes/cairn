@@ -102,8 +102,7 @@ fn puts(id: &str, record: &GraphRecord) -> Result<Vec<Statement>, CommitError> {
         | GraphRecord::Kind(_)
         | GraphRecord::DefaultOwner(_)
         | GraphRecord::Participation { .. }
-        | GraphRecord::Resource { .. }
-        | GraphRecord::Insertion(_) => {
+        | GraphRecord::Resource { .. } => {
             return Err(malformed(format!("{record:?} is graph content, not state")));
         }
     })
@@ -275,7 +274,6 @@ fn removal(id: &str, key: &GraphKey) -> Result<Vec<Statement>, CommitError> {
         )],
         GraphKey::Role(_)
         | GraphKey::Kind(_)
-        | GraphKey::Insertion(_)
         | GraphKey::RetiredKey(_)
         | GraphKey::NodeState(_)
         | GraphKey::Answer(_)
@@ -293,7 +291,6 @@ fn keyed_removal(id: &str, key: &GraphKey) -> Vec<Statement> {
     let tables: Vec<(&str, &str, &str)> = match key {
         GraphKey::Role(role) => vec![("roles", "key", role.as_str())],
         GraphKey::Kind(kind) => vec![("participation_kinds", "key", kind.as_str())],
-        GraphKey::Insertion(insertion) => vec![("insertions", "key", insertion.as_str())],
         GraphKey::RetiredKey(key) => {
             retired = retired_columns(key).1;
             vec![("retired_keys", "key", retired.as_str())]

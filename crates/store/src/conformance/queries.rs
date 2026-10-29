@@ -5,8 +5,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, EventType, GraphId, GraphRecord, Insertion, JourneyId, JourneyStatus, Lineage, Record,
-    Subject, ViolationCode, Write,
+    Domain, EventType, GraphId, GraphRecord, JourneyId, JourneyStatus, Record, Subject,
+    ViolationCode, Write,
 };
 use serde_json::json;
 
@@ -18,8 +18,8 @@ use crate::build::{
 };
 use crate::commit::CommitError;
 use crate::query::{
-    DestinationKind, EventQuery, InsertionUse, JourneyQuery, PageSize, ProposalCursor,
-    ProposalPage, ProposalQuery, ProposalScope, SearchHit, SearchQuery, VersionJourneys,
+    EventQuery, JourneyQuery, PageSize, ProposalCursor, ProposalPage, ProposalQuery, ProposalScope,
+    SearchHit, SearchQuery, VersionJourneys,
 };
 use crate::store::Store;
 
@@ -439,7 +439,6 @@ async fn index_fixture(store: &dyn Store) {
     applied(
         store,
         build::publish(
-            // The one root an insertion of this version is copied from (C19).
             route_patch("p_v1", "vendor", 1).event(
                 EventType::NodeAdded,
                 Subject::Node(node_key("n_root")),
@@ -490,25 +489,6 @@ async fn index_fixture(store: &dyn Store) {
                         "key": "n_task", "id": "task", "kind": "action", "title": "Task",
                         "participations": {"k_owner": ["who_x"]},
                     }))),
-                )],
-            );
-            // C19: an insertion of vendor's first version, whose second is later.
-            builder = builder.event(
-                EventType::SegmentInserted,
-                Subject::Insertion(id("i_task")),
-                vec![put_in(
-                    &journey_graph(journey),
-                    GraphRecord::Insertion(Insertion {
-                        key: id("i_task"),
-                        segment: Lineage {
-                            route: id("vendor"),
-                            version: version(1),
-                        },
-                        parent: None,
-                        roles: BTreeMap::new(),
-                        kinds: BTreeMap::new(),
-                        nodes: BTreeMap::from([(node_key("n_task"), id("n_root"))]),
-                    }),
                 )],
             );
         }
@@ -648,8 +628,7 @@ pub async fn the_journey_index_events_and_search_page<B: Backend>(backend: &B) {
     assert_eq!(found, keys(&names));
 }
 
-/// C17, C19: route detail lists a route's versions, oldest first, with the journeys on each
-/// and the insertions of it.
+/// C17: route detail lists a route's versions, oldest first, with the journeys on each.
 pub async fn route_detail_lists_versions_with_their_journeys<B: Backend>(backend: &B) {
     let store = open(backend).await;
     index_fixture(&store).await;
@@ -663,18 +642,11 @@ pub async fn route_detail_lists_versions_with_their_journeys<B: Backend>(backend
                 version: version(1),
                 published_at: build::at(1),
                 journeys: BTreeSet::from([id("j_a")]),
-                insertions: vec![InsertionUse {
-                    host: Domain::Journey(id("j_d")),
-                    graph: journey_graph("j_d"),
-                    insertion: id("i_task"),
-                    title: build::title("Task"),
-                }],
             },
             VersionJourneys {
                 version: version(2),
                 published_at: build::at(2),
                 journeys: BTreeSet::from([id("j_b")]),
-                insertions: Vec::new(),
             },
         ]
     );
@@ -1183,13 +1155,8 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
     assert_eq!((active.count, active.items.len()), (3, 1));
     let now = active.destination.unwrap();
     assert_eq!(
-        (now.exists, now.kind, now.status, now.revision),
-        (
-            true,
-            DestinationKind::Journey,
-            Some(JourneyStatus::Active),
-            revision(1)
-        )
+        (now.exists, now.status, now.revision),
+        (true, Some(JourneyStatus::Active), revision(1))
     );
     assert_eq!(active.items[0].now, now);
     assert_eq!(active.items[0].drafted_against, revision(1));

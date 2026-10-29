@@ -1,11 +1,11 @@
-//! Hard deletion (A19): a route or segment a patch deletes is used by nothing the patch leaves.
+//! Hard deletion (A19): a route a patch deletes is used by nothing the patch leaves.
 //! Checked once on the records the whole patch produced, so a patch that deletes a route and
-//! the journeys on it passes whatever their order. The records hold every graph the host found
-//! using the route, up to the limit on what a rejection names, and count the rest. Cost: one
-//! pass over the loaded journeys' lineage and the loaded graphs' insertions per deleted route.
+//! the journeys on it passes whatever their order. The records hold every journey the host found
+//! following the route, up to the limit on what a rejection names, and count the rest. Cost: one
+//! pass over the loaded journeys' lineage per deleted route.
 
 use cairn_schema::{
-    DeletedId, GraphId, RouteId, Subject, ViolationCode, limits::CHAIN_COUNT_PER_REJECTION_MAX,
+    DeletedId, RouteId, Subject, ViolationCode, limits::CHAIN_COUNT_PER_REJECTION_MAX,
 };
 
 use super::Check;
@@ -39,8 +39,8 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
         let mut found = violation(
             ViolationCode::RouteInUse,
             format!(
-                "route {route} is still in use: a journey follows one of its versions or an \
-                 insertion is on one{tail}; retire it instead"
+                "route {route} is still in use: a journey follows one of its versions{tail}; \
+                 retire it instead"
             ),
         );
         found.at.subject = Some(Subject::Route(route.clone()));
@@ -49,10 +49,9 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
     }
 }
 
-/// The journeys whose lineage is on `route`, and the journeys and routes holding an insertion
-/// of one of its versions, among the records the patch leaves; each once.
+/// The journeys whose lineage is on `route`, among the records the patch leaves.
 fn users(records: &Records, route: &RouteId) -> Vec<Subject> {
-    let mut found: Vec<Subject> = records
+    records
         .journeys
         .iter()
         .filter(|(_, journey)| {
@@ -63,41 +62,5 @@ fn users(records: &Records, route: &RouteId) -> Vec<Subject> {
                 .is_some_and(|lineage| lineage.route == *route)
         })
         .map(|(id, _)| Subject::Journey(id.clone()))
-        .collect();
-    let graphs = records
-        .journeys
-        .keys()
-        .map(|id| GraphId::Journey(id.clone()))
-        .chain(
-            records
-                .routes
-                .keys()
-                .map(|id| GraphId::RouteDraft(id.clone())),
-        )
-        .chain(
-            records
-                .versions
-                .keys()
-                .map(|lineage| GraphId::RouteVersion {
-                    route: lineage.route.clone(),
-                    version: lineage.version,
-                }),
-        );
-    for graph in graphs {
-        let holds = records.graph(&graph).is_some_and(|held| {
-            held.insertions
-                .values()
-                .any(|insertion| insertion.segment.route == *route)
-        });
-        let subject = match graph {
-            GraphId::Journey(journey) => Subject::Journey(journey),
-            GraphId::RouteDraft(owner) | GraphId::RouteVersion { route: owner, .. } => {
-                Subject::Route(owner)
-            }
-        };
-        if holds && !found.contains(&subject) {
-            found.push(subject);
-        }
-    }
-    found
+        .collect()
 }

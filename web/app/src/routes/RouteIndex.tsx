@@ -1,40 +1,32 @@
-// The routes index (`/routes`): routes and segments in one table (C17, C19), each linking to its
-// detail with how much it is used: a route its active journeys (counted
-// from their own lineage), a segment its places ("Used in 6 places"), and a
-// route with a published version the way to start a journey from it. A retired route (A19:
+// The routes index (`/routes`): the routes in one table (C17), each linking to its
+// detail with how much it is used (its active journeys, counted from their own lineage) and, with a
+// published version, the way to start a journey from it. A retired route (A19:
 // hidden from new-journey creation) or one with a draft open says so
-// in one chip. The Type filter keeps it to one type; `New route` opens the
-// form that starts a route or segment empty, to author by hand (A12), or imports a route file as
+// in one chip. `New route` opens the
+// form that starts a route empty, to author by hand (A12), or imports a route file as
 // a new route or draft (A13). Each read says whether it is still going or failed. Kept current (H6).
 import { NewDestinations } from "../proposals/NewDestinations.tsx";
-import { Link, useSearchParams } from "react-router";
+import { Link } from "react-router";
 
-import { valueOf, type ReadView } from "../data/keyed-read.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
-import { indexKey, journeyIndex, routesOfKind, segmentUses, type RouteSummary } from "../data/reads.ts";
+import { indexKey, journeyIndex, routeIndex, type RouteSummary } from "../data/reads.ts";
 import { DEFAULT_FILTERS, indexPath, newJourneyPath } from "../journeys/address.ts";
-import { IndexHead, FilterSelect } from "../ui/IndexHead.tsx";
+import { IndexHead } from "../ui/IndexHead.tsx";
 import { Badge, IndexState } from "../ui/kit.tsx";
 import { newRoutePath, routePath } from "./address.ts";
-import { activeJourneyCounts, inUseWords, kindOf, startableVersion, typeOf, type InUse, type RouteType } from "./model.ts";
+import { activeJourneyCounts, inUseWords, startableVersion } from "./model.ts";
 import "../journeys/journeys.css";
 import { Failed } from "../ui/Failed.tsx";
 import { RetiredBadge } from "./RetiredBadge.tsx";
 import { Tip } from "../ui/Tip.tsx";
 
-const TYPES = [
-  { value: "all", label: "All types" },
-  { value: "routes", label: "Routes" },
-  { value: "segments", label: "Segments" },
-] as const satisfies readonly { value: RouteType; label: string }[];
-
 const ACTIVE = { ...DEFAULT_FILTERS };
 
 /** What the use cell shows: the use, or that it is being read or could not be. */
-type UseReading = { kind: "reading" } | { kind: "failed" } | { kind: "known"; use: InUse };
+type UseReading = { kind: "reading" } | { kind: "failed" } | { kind: "known"; count: number };
 
 function UseCell({ route, reading }: { route: RouteSummary; reading: UseReading }) {
-  const segment = route.header.kind === "segment";
   if (reading.kind === "reading") {
     return (
       <td data-column="use" className="muted">
@@ -49,14 +41,14 @@ function UseCell({ route, reading }: { route: RouteSummary; reading: UseReading 
       </td>
     );
   }
-  const words = inUseWords(reading.use);
-  const nothing = reading.use.kind === "journeys" ? reading.use.count === 0 : reading.use.places === 0;
+  const words = inUseWords(reading.count);
+  const nothing = reading.count === 0;
   return (
-    <td data-column="use" data-testid={segment ? "segment-use" : "route-use"}>
-      {reading.use.kind === "journeys" && !nothing ? (
-        <Link to={indexPath({ ...ACTIVE, route: route.header.id })}>{words}</Link>
+    <td data-column="use" data-testid="route-use">
+      {nothing ? (
+        <span className="muted">{words}</span>
       ) : (
-        <span className={nothing ? "muted" : undefined}>{words}</span>
+        <Link to={indexPath({ ...ACTIVE, route: route.header.id })}>{words}</Link>
       )}
     </td>
   );
@@ -64,15 +56,14 @@ function UseCell({ route, reading }: { route: RouteSummary; reading: UseReading 
 
 function RouteRow({ route, reading }: { route: RouteSummary; reading: UseReading }) {
   const { header } = route;
-  const segment = header.kind === "segment";
   const start = startableVersion(route);
   const summary = header.description?.split("\n")[0]?.trim();
   return (
-    <tr data-testid="route-row" data-route={header.id} data-kind={segment ? "segment" : "process"}>
+    <tr data-testid="route-row" data-route={header.id}>
       <td data-column="name">
         <span className="cell-first">
           <Link to={routePath(header.id)}>{header.name}</Link>
-          {header.retired === true ? <RetiredBadge kind={header.kind} /> : route.draft_open ? <Badge tone="warn">Draft open</Badge> : null}
+          {header.retired === true ? <RetiredBadge /> : route.draft_open ? <Badge tone="warn">Draft open</Badge> : null}
         </span>
         {summary === undefined || summary === "" ? null : (
           // The row prints the first line only: the whole description is the tip when there is more than that line.
@@ -87,16 +78,7 @@ function RouteRow({ route, reading }: { route: RouteSummary; reading: UseReading
   );
 }
 
-/** What a read shows for the table's use column. */
-function readingOf<T>(view: ReadView<T>, known: (value: T) => InUse): UseReading {
-  const value = valueOf(view);
-  if (value !== undefined) {
-    return { kind: "known", use: known(value) };
-  }
-  return view.status === "failed" ? { kind: "failed" } : { kind: "reading" };
-}
-
-/** The routes and segments as a table, each with its use as `useOf` reads it. */
+/** The routes as a table, each with its active journeys read from `active`. */
 function RouteTable({ routes, useOf }: { routes: RouteSummary[]; useOf: (route: RouteSummary) => UseReading }) {
   return (
     <div className="index-table">
@@ -121,39 +103,30 @@ function RouteTable({ routes, useOf }: { routes: RouteSummary[]; useOf: (route: 
 }
 
 export function RouteIndex() {
-  const [params, setParams] = useSearchParams();
-  const type = typeOf(params.get("type"));
-  const kind = kindOf(type);
-  const { view, refresh } = useLive(kind === undefined ? "routes" : `routes:${kind}`, routesOfKind(kind));
+  const { view, refresh } = useLive("routes", routeIndex);
   const journeyQuery = { status: ["active" as const] };
-  const active = useLive(type === "segments" ? undefined : indexKey(journeyQuery), journeyIndex(journeyQuery));
-  const uses = useLive(type === "routes" ? undefined : "segment-uses", segmentUses);
+  const active = useLive(indexKey(journeyQuery), journeyIndex(journeyQuery));
   const routes = valueOf(view);
   const shown = [...(routes ?? [])].sort((left, right) => left.header.name.localeCompare(right.header.name));
   const counts = activeJourneyCounts(valueOf(active.view) ?? []);
-  const useOf = (route: RouteSummary): UseReading =>
-    route.header.kind === "segment"
-      ? readingOf(uses.view, (all) => ({ kind: "places", places: all[route.header.id]?.places ?? 0, }))
-      : readingOf(active.view, () => ({ kind: "journeys", count: counts.get(route.header.id) ?? 0 }));
-  const newWords = type === "segments" ? "New segment" : "New route";
+  const useOf = (route: RouteSummary): UseReading => {
+    const value = valueOf(active.view);
+    if (value !== undefined) {
+      return { kind: "known", count: counts.get(route.header.id) ?? 0 };
+    }
+    return active.view.status === "failed" ? { kind: "failed" } : { kind: "reading" };
+  };
   return (
     <section className="stack index-page" aria-label="Routes" data-testid="routes" data-rows-page tabIndex={-1}>
       <IndexHead
         title="Routes"
         action={
-          <Link className="button" to={newRoutePath(type === "segments" ? "segment" : undefined)} data-testid="new-route-link">
-            {newWords}
+          <Link className="button" to={newRoutePath()} data-testid="new-route-link">
+            New route
           </Link>
         }
-      >
-        <FilterSelect
-          label="Type"
-          value={type}
-          options={TYPES}
-          onChange={(next) => { setParams(next === "all" ? {} : { type: typeOf(next) }, { replace: true }); }}
-        />
-      </IndexHead>
-      <NewDestinations scope="new_routes" segments={type === "all" ? undefined : type === "segments"} />
+      />
+      <NewDestinations scope="new_routes" />
       {view.status === "idle" || view.status === "loading" ? <IndexState kind="loading">Reading the routes...</IndexState> : null}
       {view.status === "failed" ? (
         <IndexState
@@ -167,8 +140,8 @@ export function RouteIndex() {
         </IndexState>
       ) : null}
       {routes !== undefined && shown.length === 0 ? (
-        <IndexState kind="empty" action={<Link to={newRoutePath(type === "segments" ? "segment" : undefined)}>{newWords} &rsaquo;</Link>} data-testid="routes-empty">
-          {type === "segments" ? "No segments yet." : "No routes yet."}
+        <IndexState kind="empty" action={<Link to={newRoutePath()}>New route &rsaquo;</Link>} data-testid="routes-empty">
+          No routes yet.
         </IndexState>
       ) : null}
       {routes !== undefined && shown.length > 0 ? <RouteTable routes={shown} useOf={useOf} /> : null}

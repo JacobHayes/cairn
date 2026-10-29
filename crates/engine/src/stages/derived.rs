@@ -205,7 +205,6 @@ fn shapes(write: &Write) -> Vec<Shape<'_>> {
             | GraphRecord::Participation { .. }
             | GraphRecord::Resource { .. }
             | GraphRecord::RetiredKey(_)
-            | GraphRecord::Insertion(_)
             | GraphRecord::Tick { .. }
             | GraphRecord::RoleFill { .. }
             | GraphRecord::Snooze { .. }
@@ -230,7 +229,6 @@ fn shapes(write: &Write) -> Vec<Shape<'_>> {
             | GraphKey::Participation { .. }
             | GraphKey::Resource { .. }
             | GraphKey::RetiredKey(_)
-            | GraphKey::Insertion(_)
             | GraphKey::Tick { .. }
             | GraphKey::RoleFill(_)
             | GraphKey::Snooze(_)

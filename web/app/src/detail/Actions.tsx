@@ -22,8 +22,7 @@ import { newPatchId } from "../data/writes.ts";
 import { journeyPath } from "../journeys/address.ts";
 import { BreakDown } from "../proposals/Entries.tsx";
 import { Menu } from "../screens/Menu.tsx";
-import { useInsertEntry } from "../segments/entry.ts";
-import { insertionRoot, memberOrigin } from "../segments/model.ts";
+import { useInsertEntry } from "../insert/entry.ts";
 import { Button, Input } from "../ui/kit.tsx";
 import { Dismiss, ReasonForm } from "./ReasonForm.tsx";
 import { actionsDraftKey, actionsForm, changing, formView, opening, takeOpened, type Drafted, type FormCase, type FormValues, type FormView, type Opened, type PanelCase } from "./actions-form.ts";
@@ -139,14 +138,13 @@ interface Menus {
   form: ActionsForm;
   onRename: () => void;
   onCopied: () => void;
-  /** Starts inserting a segment under a container; none where the screen has no stepper. */
+  /** Starts inserting a route under a container; none where the screen has no stepper. */
   insertHere: ((parent: string) => void) | undefined;
 }
 
 /** What each menu entry does: its one move, or the form it opens. */
 function runnersOf({ view, detail, write, form, onRename, onCopied, insertHere }: Menus, navigate: (to: string, state?: unknown) => void, search: string): Record<MenuId, () => void> {
   const key = detail.node.key;
-  const origin = memberOrigin(view.journey.graph, key);
   const journey = view.journey.header.id;
   const move = (...mutations: Mutation[]) => () => void write.run(mutations);
   const reason = (kind: "skip" | "mark-done" | "keep" | "include" | "bypass") => () => { form.openForm(kind, ""); };
@@ -169,12 +167,7 @@ function runnersOf({ view, detail, write, form, onRename, onCopied, insertHere }
     pin: () => { setFold(datesFold(detail.node.kind), true); },
     "break-down": () => { form.openPanel("break-down"); },
     "show-in-graph": () => { navigate(graphPath(journey, graph, { node: key }, search)); },
-    "insert-segment": () => { insertHere?.(key); },
-    "show-insertion": () => {
-      const root = (origin === undefined ? undefined : insertionRoot(view.journey.graph, origin.insertion)) ?? key;
-      // The graph draws the insertion's root and its containers whatever the view hides.
-      navigate(graphPath(journey, graph, { node: root }, search), { reveal: { key: root, how: "centre" } });
-    },
+    "insert-route": () => { insertHere?.(key); },
     "edit-node": () => { navigate(graphPath(journey, { ...graph, edit: true }, { node: key }, search)); },
     "copy-link": () => { globalThis.navigator.clipboard.writeText(link).then(onCopied, () => undefined); },
   };
@@ -396,7 +389,7 @@ function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runn
   const [focusAsked, setFocusAsked] = useState(false);
   // Only a frame with a stepper can insert: elsewhere the entry is not offered.
   const groups = menuOf(view, detail, write.writable)
-    .map((group) => group.filter((item) => item.id !== "insert-segment" || insertHere !== undefined))
+    .map((group) => group.filter((item) => item.id !== "insert-route" || insertHere !== undefined))
     .filter((group) => group.length > 0);
   const runners = runnersOf({ ...menus, insertHere }, (to, state) => void navigate(to, state === undefined ? {} : { state }), search);
   useContextChoice(detail.node.key, (id) => {

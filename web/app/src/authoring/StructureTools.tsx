@@ -1,5 +1,5 @@
 // What structure authoring adds to a page's head, a route draft's or a journey's Edit
-// structure: `+ Add` (the palette that adds a node, and on a draft, Insert segment) and `Roles
+// structure: `+ Add` (the palette that adds a node, and on a draft, Insert route) and `Roles
 // and kinds`, each a popover so the forms take no room until asked for.
 import { Menu } from "../screens/Menu.tsx";
 import { Button } from "../ui/kit.tsx";
@@ -27,8 +27,8 @@ export function StructureTools({ authored, container, onAdded, onInsert }: { aut
               }}
             />
             {onInsert === undefined ? null : (
-              <Button ghost data-testid="add-insert-segment" onClick={() => { close(); onInsert(); }}>
-                Insert segment...
+              <Button ghost data-testid="add-insert-route" onClick={() => { close(); onInsert(); }}>
+                Insert route...
               </Button>
             )}
           </>

@@ -17,8 +17,7 @@ use cairn_schema::{
     Actor, Annotation, ChangeSet, Date, DeletedId, Deployment, Domain, Event, EventType, GraphId,
     GraphRecord, Identity, IdentitySet, JourneyHeader, JourneyId, JourneyStatus, Lineage, Node,
     NodeKey, PatchId, PatchReceipt, PatchTarget, Record, RecordKey, Revision, RevisionOf,
-    RouteHeader, RouteId, RouteKind, Subject, Timestamp, Title, VersionNumber, Write,
-    refs::KeyRefs,
+    RouteHeader, RouteId, Subject, Timestamp, Title, VersionNumber, Write, refs::KeyRefs,
 };
 use serde_json::json;
 
@@ -91,7 +90,6 @@ pub fn route_header(route: &str, name: &str) -> RouteHeader {
         name: title(name),
         description: None,
         retired: false,
-        kind: RouteKind::Process,
     }
 }
 

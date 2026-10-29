@@ -63,7 +63,7 @@ pub use document::{
 };
 pub use domain::{
     DeletedId, Deployment, Domain, GraphId, Identity, Journey, JourneyHeader, JourneyStatus,
-    Lineage, Route, RouteDraft, RouteHeader, RouteKind, RouteVersion,
+    Lineage, Route, RouteDraft, RouteHeader, RouteVersion,
 };
 pub use event::{Actor, ChangeSet, ContentHash, Event, EventType, PatchReceipt, Subject};
 pub use field::{NodeField, NodeFieldValue};
@@ -72,8 +72,8 @@ pub use form::{
     ValueKind, ValueProblem, node_form_problems, value_problems,
 };
 pub use graph::{
-    Edge, FormatVersion, Graph, Insertion, OWNER_KIND_MULTI, ParticipationKind, RetiredKeys, Role,
-    RouteFile, role_fits_slot,
+    Edge, FormatVersion, Graph, OWNER_KIND_MULTI, ParticipationKind, RetiredKeys, Role, RouteFile,
+    role_fits_slot,
 };
 pub use id::{
     AgentId, AttachmentKey, ConversationId, IdError, IdentityKey, InsertionKey, JourneyId,

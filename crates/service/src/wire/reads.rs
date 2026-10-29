@@ -4,8 +4,8 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AttachmentKey, Domain, Event, GraphId, IdentityKey, InsertionKey, JourneyId, JourneyStatus,
-    Lineage, NodeKey, Revision, RouteHeader, RouteId, Timestamp, Title, VersionNumber,
+    AttachmentKey, Event, IdentityKey, JourneyId, JourneyStatus, Lineage, NodeKey, Revision,
+    RouteHeader, RouteId, Timestamp, Title, VersionNumber,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -142,8 +142,7 @@ pub struct RouteDetail {
     /// Its versions, oldest first.
     pub versions: Vec<VersionJourneys>,
     // PRD: A19.
-    /// Whether anything uses it: a journey following one of its versions, or an insertion of
-    /// one anywhere. A route in use cannot be deleted.
+    /// Whether a journey follows one of its versions. A route in use cannot be deleted.
     pub in_use: bool,
 }
 
@@ -157,25 +156,6 @@ pub struct VersionJourneys {
     pub published_at: Timestamp,
     /// The journeys whose lineage is this version.
     pub journeys: BTreeSet<JourneyId>,
-    // PRD: C19.
-    /// Where this version of a segment is inserted.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub insertions: Vec<InsertionUse>,
-}
-
-// PRD: C19.
-/// One insertion of a segment version.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct InsertionUse {
-    /// The domain holding it.
-    pub host: Domain,
-    /// The graph holding it.
-    pub graph: GraphId,
-    /// The insertion.
-    pub insertion: InsertionKey,
-    /// The root member's current title.
-    pub title: Title,
 }
 
 impl From<cairn_store::RouteDetail> for RouteDetail {
@@ -191,29 +171,11 @@ impl From<cairn_store::RouteDetail> for RouteDetail {
                 version,
                 published_at,
                 journeys,
-                insertions,
             } = version;
             VersionJourneys {
                 version,
                 published_at,
                 journeys,
-                insertions: insertions
-                    .into_iter()
-                    .map(|held| {
-                        let cairn_store::InsertionUse {
-                            host,
-                            graph,
-                            insertion,
-                            title,
-                        } = held;
-                        InsertionUse {
-                            host,
-                            graph,
-                            insertion,
-                            title,
-                        }
-                    })
-                    .collect(),
             }
         });
         Self {

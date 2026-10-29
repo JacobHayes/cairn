@@ -205,9 +205,9 @@ mutations:
     artifact: https://example.org/plan
 - op: remove_annotation
   annotation: a_note
-- op: insert_segment
+- op: insert_route
   insertion: i_review
-  segment:
+  route:
     route: security-review
     version: 1
   parent: n_plan
@@ -222,7 +222,7 @@ mutations:
   - n_who_reviews
   edges:
   - node:
-      segment: n_review
+      route: n_review
     requires:
       host: n_plan
 - op: create_identity

@@ -102,7 +102,7 @@ export interface Host {
   /** A page of the journey index (C16), filtered as `query` asks; every journey when none. */
   journeys(query?: JourneyIndexQuery): Promise<JourneyPage>;
   /** A page of the route index, after `after`. */
-  routes(after?: string, kind?: Schema<"RouteKind">): Promise<RoutePage>;
+  routes(after?: string): Promise<RoutePage>;
   /** C17: a route's versions with the journeys on each; `Missing` when there is none. */
   routeDetail(route: string): Promise<RouteDetail>;
   /** A13: a route version as its file, or the route's draft with no version. */

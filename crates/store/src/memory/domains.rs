@@ -154,11 +154,9 @@ impl Domains {
             .collect()
     }
 
-    /// A19: the graphs using `route`: a journey whose lineage is on it, or any graph holding an
-    /// insertion of one of its versions.
+    /// A19: the graphs using `route`: the journeys whose lineage is on it.
     pub fn graphs_using(&self, route: &RouteId) -> BTreeSet<GraphId> {
-        let following = self
-            .journeys
+        self.journeys
             .iter()
             .filter(|(_, (header, _))| {
                 header
@@ -166,18 +164,8 @@ impl Domains {
                     .as_ref()
                     .is_some_and(|lineage| lineage.route == *route)
             })
-            .map(|(id, _)| GraphId::Journey(id.clone()));
-        let inserting = self
-            .graphs
-            .iter()
-            .filter(|(_, graph)| {
-                graph
-                    .insertions
-                    .values()
-                    .any(|insertion| insertion.segment.route == *route)
-            })
-            .map(|(id, _)| id.clone());
-        following.chain(inserting).collect()
+            .map(|(id, _)| GraphId::Journey(id.clone()))
+            .collect()
     }
 
     /// Applies one write.
@@ -387,12 +375,6 @@ fn put_graph_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
             put_resource(&mut changed, resource);
             put_node(graph, changed)?;
         }
-        GraphRecord::Insertion(insertion) => {
-            graph
-                .insertions
-                .put(insertion.clone())
-                .map_err(collection)?;
-        }
         GraphRecord::RetiredKey(_)
         | GraphRecord::NodeState { .. }
         | GraphRecord::Tick { .. }
@@ -472,8 +454,7 @@ fn put_state_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
         | GraphRecord::Kind(_)
         | GraphRecord::DefaultOwner(_)
         | GraphRecord::Participation { .. }
-        | GraphRecord::Resource { .. }
-        | GraphRecord::Insertion(_) => {
+        | GraphRecord::Resource { .. } => {
             return malformed(format!("{record:?} is graph content, not state"));
         }
     }
@@ -523,9 +504,6 @@ fn remove_graph_key(graph: &mut Graph, key: &GraphKey) -> Result<(), StoreError>
                 changed.resources.retain(|held| held.key != *resource);
                 put_node(graph, changed)?;
             }
-        }
-        GraphKey::Insertion(insertion) => {
-            graph.insertions.remove(insertion);
         }
         GraphKey::RetiredKey(_)
         | GraphKey::NodeState(_)
@@ -593,8 +571,7 @@ fn remove_state_key(graph: &mut Graph, key: &GraphKey) {
         | GraphKey::Kind(_)
         | GraphKey::DefaultOwner
         | GraphKey::Participation { .. }
-        | GraphKey::Resource { .. }
-        | GraphKey::Insertion(_) => {}
+        | GraphKey::Resource { .. } => {}
     }
 }
 

@@ -391,7 +391,7 @@ const SAY: Record<EventType, (c: Context) => Said> = {
     const resource = c.records.flatMap((record) => ("resource" in record ? [record.resource.resource] : []))[0];
     return { what: resource === undefined ? `removed a resource from ${it(c)}` : `changed the resource ${quoted(resource.title ?? "untitled")} on ${it(c)}` };
   },
-  segment_inserted: () => ({ what: "inserted a segment" }),
+  route_inserted: () => ({ what: "inserted a route" }),
   node_transitioned: transitioned,
   answer_set: (c) => ({ what: `answered ${thing(c)}` }),
   recorded_date_changed: (c) => {

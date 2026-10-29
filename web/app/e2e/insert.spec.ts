@@ -1,22 +1,21 @@
-// Segments on cairn demo: the security-review segment imported and published, then
+// Route insertion on cairn demo: the security-review route imported and published, then
 // inserted into the vendor evaluation's Testing group (C19, B13, C14). The insertion starts
-// after a host node and maps the segment's reviewer onto the journey's existing findings
-// reviewer, so the segment's own filling decision is left out; review shows the incoming nodes
-// and the wiring edge before anything applies, and a member's Origin names the segment and
-// version. A second insertion's id, where a segment is used and its newer versions are the
-// service's tests (insertion.rs).
+// after a host node and maps the route's reviewer onto the journey's existing findings
+// reviewer, so the route's own filling decision is left out; review shows the incoming nodes
+// and the wiring edge before anything applies, and the inserted root's Origin names the route and
+// version. A second insertion's id is the service's test (insertion.rs).
 
 import { expect, test } from "./test.ts";
 
-import { goTo, menuItem, openJourney, readable } from "./shell.ts";
+import { goTo, openJourney, readable } from "./shell.ts";
 import { apply } from "./proposals.ts";
-import { publishSegment, startInsert, stepper } from "./segments.ts";
+import { publishRoute, startInsert, stepper } from "./insert.ts";
 
 const JOURNEY = "j_vendor_eval";
 
-test("C19, C14: a segment inserted from a container, reviewed, applied, and shown in Origin", async ({ page }) => {
+test("C19, C14: a route inserted from a container, reviewed, applied, and shown in Origin", async ({ page }) => {
   await readable(page);
-  await publishSegment(page);
+  await publishRoute(page);
 
   // After the access deliverable, with the reviewer mapped onto the journey's findings reviewer.
   await startInsert(page, JOURNEY, "n_testing", "Security review");
@@ -34,12 +33,9 @@ test("C19, C14: a segment inserted from a container, reviewed, applied, and show
   await expect(page.getByTestId("changes-fold")).toContainText("Environment access");
   await apply(page);
 
-  // A member's Details name the segment and version.
+  // The inserted root's Details name the route and version.
   await openJourney(page, JOURNEY);
-  await page.getByTestId("node-card").filter({ hasText: "Threat model" }).first().getByTestId("card-open").click();
+  await page.getByTestId("node-card").filter({ hasText: "Security review" }).first().getByTestId("card-open").click();
   await page.getByTestId("details").locator("summary").click();
-  await expect(page.getByTestId("segment-origin").first()).toHaveText("From segment Security review, version 1.");
-  // Show insertion selects the insertion's root.
-  await menuItem(page.getByTestId("node-detail"), "show-insertion");
-  await expect(page.getByTestId("node-detail")).toHaveAttribute("aria-label", "Security review");
+  await expect(page.getByTestId("origin-route").first()).toHaveText("Security review, version 1");
 });

@@ -177,8 +177,8 @@ pub enum OutlineFact {
     DiscardsDraft,
     /// Publishes the route's draft.
     PublishesDraft,
-    /// Inserts a published segment.
-    InsertsSegment,
+    /// Inserts a published route.
+    InsertsRoute,
 }
 
 // PRD: C14.
@@ -222,7 +222,7 @@ pub struct ProposalOutline {
     /// Journeys it deletes.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
     pub journeys_deleted: u32,
-    /// Routes and segments it deletes.
+    /// Routes it deletes.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
     pub routes_deleted: u32,
     /// Roles, participation kinds, role fills, the default owner and annotations it changes.
@@ -235,7 +235,7 @@ impl ProposalOutline {
     /// other things they name. A node is counted once, by the first thing that happened to it:
     /// a node added and then changed is added, one added and then removed is not counted at
     /// all; state mutations (pins, answers, transitions, snoozes, overrides) count as changes
-    /// to their node. A segment insertion is a fact of its own: the nodes it adds
+    /// to their node. A route insertion is a fact of its own: the nodes it adds
     /// or changes are the preview's, not the mutations'.
     #[must_use]
     pub fn of(mutations: &[Mutation]) -> Self {
@@ -293,7 +293,7 @@ fn lifecycle_fact(mutation: &Mutation) -> Option<OutlineFact> {
         Mutation::OpenDraft { .. } => OutlineFact::OpensDraft,
         Mutation::DiscardDraft {} => OutlineFact::DiscardsDraft,
         Mutation::PublishDraft {} => OutlineFact::PublishesDraft,
-        Mutation::InsertSegment { .. } => OutlineFact::InsertsSegment,
+        Mutation::InsertRoute { .. } => OutlineFact::InsertsRoute,
         _ => return None,
     })
 }
@@ -344,7 +344,7 @@ fn tally_other(outline: &mut ProposalOutline, mutation: &Mutation) -> bool {
         | Mutation::OpenDraft { .. }
         | Mutation::DiscardDraft {}
         | Mutation::PublishDraft {}
-        | Mutation::InsertSegment { .. } => {
+        | Mutation::InsertRoute { .. } => {
             unreachable!("a lifecycle mutation makes a lifecycle fact")
         }
         // The rest act on a node, which the caller tallies against the others.

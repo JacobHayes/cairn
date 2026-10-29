@@ -49,8 +49,8 @@ pub async fn document(
 /// `GET /api/routes` (I2).
 pub async fn routes(State(api): State<Api>, RawQuery(raw): RawQuery) -> Answer<RoutePage> {
     let params = Params::parse(raw.as_deref(), query::ROUTE_PARAMS)?;
-    let (kind, after, size) = query::routes(&params)?;
-    let page = api.service.routes(kind, after.as_ref(), size).await?;
+    let (after, size) = query::routes(&params)?;
+    let page = api.service.routes(after.as_ref(), size).await?;
     Ok(Json(page.into()))
 }
 

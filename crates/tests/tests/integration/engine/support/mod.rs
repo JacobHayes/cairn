@@ -47,12 +47,17 @@ pub fn seeded(name: &str) -> Records {
     }
 }
 
-/// The records with a segment fixture's `segment.yaml` published as version 1 of its route.
-pub fn with_segment(records: Records, name: &str) -> Records {
-    let path = fixtures_root().join(name).join("segment.yaml");
-    let file: RouteFile = from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap();
+/// The records with a fixture's route file published as version 1 of its route.
+pub fn with_route(records: Records, name: &str) -> Records {
+    let path = fixtures_root().join(name).join("route.yaml");
+    with_route_text(records, &std::fs::read_to_string(&path).unwrap())
+}
+
+/// The records with the route file `text` published as version 1 of its route.
+pub fn with_route_text(records: Records, text: &str) -> Records {
+    let file: RouteFile = from_yaml(text).unwrap();
     let graph = from_file(&file, &mut SequentialKeys::default())
-        .unwrap_or_else(|violations| panic!("{name}: {violations:#?}"))
+        .unwrap_or_else(|violations| panic!("{}: {violations:#?}", file.route))
         .into_document();
     published(records, &file, graph)
 }
@@ -67,7 +72,6 @@ fn published(mut records: Records, file: &RouteFile, graph: cairn_schema::Graph)
                 name: file.name.clone(),
                 description: file.description.clone(),
                 retired: false,
-                kind: file.kind,
             },
             revision: cairn_schema::Revision::NONE.next(),
             versions: [version].into(),

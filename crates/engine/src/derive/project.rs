@@ -258,7 +258,7 @@ impl Derived {
     /// kind table from its stored state is needed, and a move that needs the node in scope (a
     /// start, a complete, a first answer) is accepted only while it is. A completion whose
     /// guards fail is not accepted but, for work, can go ahead past them: `complete_anyway`
-    /// stands in for `complete`. A node that is not a leaf takes an inserted segment.
+    /// stands in for `complete`. A node that is not a leaf takes an inserted route.
     /// `failures` is the node's [`static_failures`].
     fn moves(
         &self,
@@ -285,7 +285,7 @@ impl Derived {
             });
         }
         if !kind.is_leaf() {
-            found.insert(NodeMove::InsertSegment);
+            found.insert(NodeMove::InsertRoute);
         }
         found
     }

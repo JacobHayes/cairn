@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::attachment::{AnnotationBody, Resource};
 use crate::collections::{BoundedVec, CollectionError, MutationCountPerPatch};
-use crate::domain::{Domain, Identity, JourneyStatus, Lineage, RouteKind};
+use crate::domain::{Domain, Identity, JourneyStatus, Lineage};
 use crate::field::{NodeField, NodeFieldValue};
 use crate::graph::{Edge, ParticipationKind, Role};
 use crate::id::{
@@ -186,7 +186,7 @@ pub enum DraftSource {
 }
 
 // PRD: B13.
-/// What a segment role becomes in the graph it is inserted into.
+/// What a route's role becomes in the graph it is inserted into.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -199,7 +199,7 @@ pub enum RoleChoice {
 }
 
 // PRD: B13.
-/// What a segment participation kind becomes in the graph it is inserted into.
+/// What a route's participation kind becomes in the graph it is inserted into.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -211,20 +211,20 @@ pub enum KindChoice {
     Add,
 }
 
-/// One end of an edge an insertion adds: a node of the segment, or of the graph.
+/// One end of an edge an insertion adds: a node of the route, or of the graph.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum EdgeEnd {
-    /// A node by its key in the segment version.
-    Segment(NodeKey),
+    /// A node by its key in the route version.
+    Route(NodeKey),
     /// A node by its key in the graph.
     Host(NodeKey),
 }
 
 // PRD: B13.
-/// An edge an insertion adds: `node` requires `requires`, one end in the segment and the
+/// An edge an insertion adds: `node` requires `requires`, one end in the route and the
 /// other in the graph.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -431,10 +431,6 @@ pub enum Mutation {
         /// The description.
         #[serde(skip_serializing_if = "Option::is_none")]
         description: Option<Markdown>,
-        // PRD: A21.
-        /// Process (the default) or segment; fixed from here on.
-        #[serde(default, skip_serializing_if = "RouteKind::is_process")]
-        kind: RouteKind,
     },
     /// Rename or redescribe the route.
     EditRoute {
@@ -581,33 +577,34 @@ pub enum Mutation {
         resource: AttachmentKey,
     },
     // PRD: B13.
-    /// Insert a published segment version under a parent, wired to the graph's own nodes and
-    /// with its roles and kinds mapped, in one event.
-    InsertSegment {
-        /// The insertion's key, new in the graph.
+    /// Insert a published route version under a parent, wired to the graph's own nodes and
+    /// with its roles and kinds mapped, in one event. Each copied root keeps a pointer to the
+    /// version.
+    InsertRoute {
+        /// The key every new key of the insertion derives from.
         insertion: InsertionKey,
-        /// The segment and one of its published versions.
-        segment: Lineage,
+        /// The route and one of its published versions.
+        route: Lineage,
         /// The group, deliverable, or action the root goes under; none for the top level.
         #[serde(skip_serializing_if = "Option::is_none")]
         parent: Option<NodeKey>,
-        /// The root's id; the segment root's own, suffixed when a sibling has it, if none.
+        /// The root's id (when the route has one root); the route root's own, suffixed when a sibling has it, if none.
         #[serde(skip_serializing_if = "Option::is_none")]
         root_id: Option<Slug>,
-        /// The root's title; the segment root's own if none.
+        /// The root's title (when the route has one root); the route root's own if none.
         #[serde(skip_serializing_if = "Option::is_none")]
         root_title: Option<Title>,
-        /// What each segment role becomes; a role not named takes the graph's role with its
+        /// What each route role becomes; a role not named takes the graph's role with its
         /// id and cardinality, else is added.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         roles: BTreeMap<RoleKey, RoleChoice>,
-        /// What each segment participation kind becomes, likewise.
+        /// What each route participation kind becomes, likewise.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         kinds: BTreeMap<KindKey, KindChoice>,
-        /// Segment nodes left out, each with its subtree.
+        /// Route nodes left out, each with its subtree.
         #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
         omit: BTreeSet<NodeKey>,
-        /// The wiring: each edge joins one segment node and one node of the graph.
+        /// The wiring: each edge joins one route node and one node of the graph.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         edges: Vec<InsertedEdge>,
     },
@@ -800,9 +797,8 @@ pub enum Mutation {
         revision: Revision,
     },
     // PRD: A19.
-    /// Delete a route or segment with its draft, every version, and its events, for good
-    /// (deployment): only while no journey's lineage and no insertion names any of its
-    /// versions. Its id is never used again. Rejected when the route is not at `revision`; the
+    /// Delete a route with its draft, every version, and its events, for good
+    /// (deployment): only while no journey's lineage names any of its versions. Its id is never used again. Rejected when the route is not at `revision`; the
     /// commit rechecks the revision and that nothing has started using it.
     DeleteRoute {
         /// The route. Delete the journeys using it in the same patch, or retire the route
@@ -921,7 +917,7 @@ impl Mutation {
             | Mutation::EditParticipationKind { .. }
             | Mutation::RemoveParticipationKind { .. }
             | Mutation::SetDefaultOwner { .. }
-            | Mutation::InsertSegment { .. }
+            | Mutation::InsertRoute { .. }
             | Mutation::FillRole { .. }
             | Mutation::ClearRoleFill { .. }
             | Mutation::AddAnnotation { .. }
@@ -969,7 +965,7 @@ impl Mutation {
             | Mutation::AddResource { .. }
             | Mutation::EditResource { .. }
             | Mutation::RemoveResource { .. }
-            | Mutation::InsertSegment { .. }
+            | Mutation::InsertRoute { .. }
             | Mutation::MergeIdentities { .. }
             | Mutation::DeleteIdentity { .. }
             | Mutation::ApplyProposal { .. } => ChangeClass::Structural,

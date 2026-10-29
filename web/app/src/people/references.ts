@@ -77,7 +77,7 @@ export function identityActions(members: readonly string[], reading: Reading): A
 
 /** A route a reference names, in a few words: what it is and which of its draft and versions name the identity. */
 export function routeFact(route: IdentityReferences["routes"][number]): string {
-  const what = route.header.kind === "segment" ? "Segment" : "Route";
+  const what = "Route";
   const where = [...(route.draft ? ["draft"] : []), ...(route.versions.length === 0 ? [] : [`${route.versions.length === 1 ? "version" : "versions"} ${route.versions.join(", ")}`])];
   return where.length === 0 ? what : `${what}, in its ${where.join(" and ")}`;
 }

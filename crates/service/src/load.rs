@@ -189,7 +189,7 @@ pub(crate) async fn records(store: &dyn Store, patch: &Patch) -> Result<Loaded, 
     let merges = merges(&mutations);
     let deletes = deletes(&mutations);
     let hard_deletes = hard_deletes(&mutations);
-    for id in kinds_read(&mutations) {
+    for id in headers_read(&mutations) {
         if !records.routes.contains_key(&id)
             && let Some(Document::Route(route)) = store.load(&LoadTarget::Route(id.clone())).await?
         {
@@ -442,8 +442,8 @@ fn versions_read(records: &Records, patch: &Patch, mutations: &[&Mutation]) -> B
             ) => {
                 read.insert(from.clone());
             }
-            (Mutation::InsertSegment { segment, .. }, _) => {
-                read.insert(segment.clone());
+            (Mutation::InsertRoute { route, .. }, _) => {
+                read.insert(route.clone());
             }
             (Mutation::DiscardDraft {}, PatchTarget::Route(id)) => {
                 // C14: a proposal that discards the draft leaves the route's latest version on show.
@@ -477,16 +477,16 @@ fn versions_read(records: &Records, patch: &Patch, mutations: &[&Mutation]) -> B
     read
 }
 
-/// A21: the routes whose kind the mutations check: the one a journey is created from, or a
-/// segment is inserted from.
-fn kinds_read(mutations: &[&Mutation]) -> BTreeSet<RouteId> {
+/// The routes whose header the mutations check (A19: a retired route is closed): the one a
+/// journey is created from, or a route is inserted from.
+fn headers_read(mutations: &[&Mutation]) -> BTreeSet<RouteId> {
     mutations
         .iter()
         .filter_map(|mutation| match mutation {
             Mutation::CreateJourney {
                 from: Some(from), ..
             }
-            | Mutation::InsertSegment { segment: from, .. } => Some(from.route.clone()),
+            | Mutation::InsertRoute { route: from, .. } => Some(from.route.clone()),
             _ => None,
         })
         .collect()

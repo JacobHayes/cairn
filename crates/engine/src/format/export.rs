@@ -11,8 +11,8 @@ use std::collections::BTreeMap;
 
 use cairn_schema::{
     AttachmentKey, BoundedVec, FileRefs, FormatVersion, KeyRefs, KindKey, MapReferences, Markdown,
-    Node, NodeField, NodeKey, ParticipationKind, Path, Role, RoleKey, RouteFile, RouteId,
-    RouteKind, Slug, Title, VersionNumber,
+    Node, NodeField, NodeKey, ParticipationKind, Path, Role, RoleKey, RouteFile, RouteId, Slug,
+    Title, VersionNumber,
 };
 
 use crate::graph::Graph;
@@ -26,8 +26,6 @@ pub struct RouteHeading {
     pub name: Title,
     /// What the route is for.
     pub description: Option<Markdown>,
-    /// Process or segment.
-    pub kind: RouteKind,
     /// The published version the exported graph extends, if any.
     pub extends: Option<VersionNumber>,
 }
@@ -79,7 +77,6 @@ pub fn export(graph: &Graph, heading: &RouteHeading) -> RouteFile {
         route: heading.route.clone(),
         name: heading.name.clone(),
         description: heading.description.clone(),
-        kind: heading.kind,
         extends: heading.extends,
         default_owner: document
             .default_owner

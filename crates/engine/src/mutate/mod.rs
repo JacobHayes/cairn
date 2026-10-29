@@ -66,9 +66,6 @@ pub(crate) struct Session<'a> {
     pub created_identities: BTreeSet<IdentityKey>,
     /// Route versions published in this patch.
     pub published: Vec<Lineage>,
-    /// Roles and kinds a mutation in this patch gave the other cardinality: no insertion may
-    /// map onto one in the graph the patch produces (B13).
-    pub cardinality_changed: BTreeSet<Subject>,
     /// Journeys the identity merges in this patch are checked against, every merge's (E6).
     pub merge_checked: BTreeSet<JourneyId>,
     /// The journeys and routes this patch deletes (A19).
@@ -148,7 +145,7 @@ fn scope(mutation: &Mutation) -> Scope {
         | Mutation::AddResource { .. }
         | Mutation::EditResource { .. }
         | Mutation::RemoveResource { .. }
-        | Mutation::InsertSegment { .. } => Scope::Graph,
+        | Mutation::InsertRoute { .. } => Scope::Graph,
         Mutation::EditIdentity { .. }
         | Mutation::MergeIdentities { .. }
         | Mutation::DeleteIdentity { .. }
@@ -224,7 +221,6 @@ impl<'a> Session<'a> {
             completed: BTreeMap::new(),
             bypassed: BTreeMap::new(),
             snoozed: BTreeMap::new(),
-            cardinality_changed: BTreeSet::new(),
             unsnoozed_through: BTreeMap::new(),
             created_identities: BTreeSet::new(),
             published: Vec::new(),

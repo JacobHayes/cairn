@@ -24,8 +24,8 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Draft a proposal for someone to review, under an id you choose: your own ordered \
             mutations to a destination (one that does not exist yet is created at revision 0), \
             or one Cairn drafts: saving a journey's structure as a new route. Name exactly one.\n\n\
-            To reuse a recurring piece of a process, find a segment first (`list_routes` with \
-            `kind` `segment`) and propose an `insert_segment`; the insert-segment workflow has \
+            To reuse a recurring piece of a process, find the route first (`list_routes`) and propose an \
+            `insert_route`; the insert-route workflow has \
             the wiring and an example.",
         writes: Writes::Proposal,
         destructive: false,

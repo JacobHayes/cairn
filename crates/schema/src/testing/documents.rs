@@ -6,18 +6,15 @@ use super::model::{bounded_set, bounded_vec, keyed};
 
 use super::{
     ArbRefs, arb_annotation, arb_date, arb_email, arb_identity_key, arb_identity_set,
-    arb_insertion_key, arb_journey_id, arb_kind_key, arb_markdown, arb_node, arb_node_key,
-    arb_reason, arb_revision, arb_role_key, arb_route_id, arb_slug, arb_timestamp, arb_title,
-    arb_version_number,
+    arb_journey_id, arb_kind_key, arb_markdown, arb_node, arb_node_key, arb_reason, arb_revision,
+    arb_role_key, arb_route_id, arb_slug, arb_timestamp, arb_title, arb_version_number,
 };
 
 use crate::domain::{
     Deployment, Identity, Journey, JourneyHeader, JourneyStatus, Lineage, Route, RouteDraft,
-    RouteHeader, RouteKind, RouteVersion,
+    RouteHeader, RouteVersion,
 };
-use crate::graph::{
-    FormatVersion, Graph, Insertion, ParticipationKind, RetiredKeys, Role, RouteFile,
-};
+use crate::graph::{FormatVersion, Graph, ParticipationKind, RetiredKeys, Role, RouteFile};
 use crate::refs::{FileRefs, KeyRefs};
 use crate::state::{
     AnswerText, AnswerValue, Bypass, Guard, GuardFailure, JourneyState, NodeState, Overrides,
@@ -56,31 +53,6 @@ pub fn arb_participation_kind<R: ArbRefs>() -> impl Strategy<Value = Participati
         })
 }
 
-/// A route kind.
-pub fn arb_route_kind() -> impl Strategy<Value = RouteKind> {
-    prop::sample::select(vec![RouteKind::Process, RouteKind::Segment])
-}
-
-/// An insertion.
-pub fn arb_insertion() -> impl Strategy<Value = Insertion> {
-    (
-        arb_insertion_key(),
-        arb_lineage(),
-        prop::option::of(arb_node_key()),
-        prop::collection::btree_map(arb_role_key(), arb_role_key(), 0..3),
-        prop::collection::btree_map(arb_kind_key(), arb_kind_key(), 0..3),
-        prop::collection::btree_map(arb_node_key(), arb_node_key(), 1..4),
-    )
-        .prop_map(|(key, segment, parent, roles, kinds, nodes)| Insertion {
-            key,
-            segment,
-            parent,
-            roles,
-            kinds,
-            nodes,
-        })
-}
-
 /// A route file (the file document).
 pub fn arb_route_file() -> impl Strategy<Value = RouteFile> {
     (
@@ -88,7 +60,6 @@ pub fn arb_route_file() -> impl Strategy<Value = RouteFile> {
             arb_route_id(),
             arb_title(),
             prop::option::of(arb_markdown()),
-            arb_route_kind(),
             prop::option::of(arb_version_number()),
             prop::option::of(arb_slug()),
         ),
@@ -97,19 +68,16 @@ pub fn arb_route_file() -> impl Strategy<Value = RouteFile> {
         prop::collection::vec(arb_node::<FileRefs>(), 0..6),
     )
         .prop_map(
-            |((route, name, description, kind, extends, default_owner), roles, kinds, nodes)| {
-                RouteFile {
-                    format: FormatVersion,
-                    route,
-                    name,
-                    description,
-                    kind,
-                    extends,
-                    default_owner,
-                    roles: bounded_vec(roles),
-                    participation_kinds: bounded_vec(kinds),
-                    nodes: bounded_vec(nodes),
-                }
+            |((route, name, description, extends, default_owner), roles, kinds, nodes)| RouteFile {
+                format: FormatVersion,
+                route,
+                name,
+                description,
+                extends,
+                default_owner,
+                roles: bounded_vec(roles),
+                participation_kinds: bounded_vec(kinds),
+                nodes: bounded_vec(nodes),
             },
         )
 }
@@ -274,7 +242,6 @@ pub fn arb_graph() -> impl Strategy<Value = Graph> {
             prop::collection::btree_set(arb_role_key(), 0..2),
             prop::collection::btree_set(arb_kind_key(), 0..2),
         ),
-        prop::collection::vec(arb_insertion(), 0..2),
         arb_journey_state(),
     )
         .prop_map(
@@ -284,7 +251,6 @@ pub fn arb_graph() -> impl Strategy<Value = Graph> {
                 kinds,
                 nodes,
                 (retired_nodes, retired_roles, retired_kinds),
-                insertions,
                 state,
             )| Graph {
                 default_owner,
@@ -296,7 +262,6 @@ pub fn arb_graph() -> impl Strategy<Value = Graph> {
                     roles: retired_roles,
                     kinds: retired_kinds,
                 },
-                insertions: keyed(insertions),
                 state,
             },
         )
@@ -362,14 +327,12 @@ pub fn arb_route_header() -> impl Strategy<Value = RouteHeader> {
         arb_title(),
         prop::option::of(arb_markdown()),
         any::<bool>(),
-        arb_route_kind(),
     )
-        .prop_map(|(id, name, description, retired, kind)| RouteHeader {
+        .prop_map(|(id, name, description, retired)| RouteHeader {
             id,
             name,
             description,
             retired,
-            kind,
         })
 }
 

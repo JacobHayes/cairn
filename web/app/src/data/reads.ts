@@ -60,43 +60,13 @@ export function referencesOf(identities: readonly string[]) {
   });
 }
 
-/** A21: whether the route is a segment, which is inserted and never started or followed. */
-export const isSegment = (route: RouteSummary): boolean => route.header.kind === "segment";
-
-/** The route index of `kind` (both kinds when none), kept current. */
-export function routesOfKind(kind: Schema<"RouteKind"> | undefined) {
-  return (session: Session): LiveSpec<RouteSummary[]> => ({
+/** The route index, kept current. */
+export function routeIndex(session: Session): LiveSpec<RouteSummary[]> {
+  return {
     watching: ["routes"],
     about: (of) => isRoute(of),
-    fetch: () => allPages<RouteSummary, string>((after) => session.host.routes(after, kind)),
+    fetch: () => allPages<RouteSummary, string>((after) => session.host.routes(after)),
     holds: (items) => items.map((item) => ({ of: routeOf(item.header.id), revision: item.revision })),
-  });
-}
-
-/** The route index of both kinds, kept current. */
-export const routeIndex = routesOfKind(undefined);
-
-/** B13: how much a segment is used: the insertions of it across every version. */
-export interface SegmentUse {
-  places: number;
-}
-
-/** C19: each segment's use, kept current: any route or journey moving can change it, so every tick asks again. */
-export function segmentUses(session: Session): LiveSpec<Record<string, SegmentUse>> {
-  return {
-    watching: ["routes", "journeys"],
-    about: (of) => isRoute(of) || isJourney(of),
-    fetch: async () => {
-      const segments = await allPages<RouteSummary, string>((after) => session.host.routes(after, "segment"));
-      const uses = await Promise.all(
-        segments.map(async (route): Promise<[string, SegmentUse]> => {
-          const found = (await session.host.routeDetail(route.header.id)).versions.flatMap((version) => version.insertions ?? []);
-          return [route.header.id, { places: found.length }];
-        }),
-      );
-      return Object.fromEntries(uses);
-    },
-    holds: () => [],
   };
 }
 
@@ -109,13 +79,12 @@ export interface RouteRead {
 
 /**
  * C17: route `id` with its versions and the journeys on each, kept current: its own ticks
- * (publishing, a draft, retiring) and any journey's (one started or deleted). A
- * segment's insertions may sit in another route, so any route's tick asks again too (C19).
+ * (publishing, a draft, retiring) and any journey's (one started or deleted).
  */
 export function routeRead(id: string) {
   return (session: Session): LiveSpec<RouteRead> => ({
-    watching: [`route:${id}`, "routes", "journeys"],
-    about: (of) => isRoute(of) || isJourney(of),
+    watching: [`route:${id}`, "journeys"],
+    about: (of) => isRoute(of, id) || isJourney(of),
     fetch: async () => {
       const [route, detail, journeys] = await Promise.all([
         session.host.route(id),

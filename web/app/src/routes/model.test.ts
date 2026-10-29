@@ -3,7 +3,7 @@ import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
 import type { RouteRead } from "../data/reads.ts";
-import { activeJourneyCounts, exportName, inUseWords, kindOf, routeMoves, startableVersion, typeOf, versionRows } from "./model.ts";
+import { activeJourneyCounts, exportName, inUseWords, routeMoves, startableVersion, versionRows } from "./model.ts";
 
 type Summary = Schema<"JourneySummary">;
 
@@ -71,7 +71,6 @@ describe("the routes index", () => {
     expect(startableVersion({ ...route({}, 3), draft_open: true })).toBe(3);
     expect(startableVersion(route({ retired: true }, 3))).toBeUndefined();
     expect(startableVersion(route({}, null))).toBeUndefined();
-    expect(startableVersion(route({ kind: "segment" }, 3))).toBeUndefined();
   });
 
   it("counts active journeys by the route they came from, and no others", () => {
@@ -84,15 +83,8 @@ describe("the routes index", () => {
     expect([counts.get("a"), counts.get("b"), counts.get("c")]).toEqual([2, 1, undefined]);
   });
 
-  it("asks the host for the kind of the type shown, and for every kind with none named", () => {
-    expect([kindOf("all"), kindOf("segments"), kindOf("routes")]).toEqual([undefined, "segment", "process"]);
-    expect([typeOf(null), typeOf("segments"), typeOf("routes"), typeOf("anything")]).toEqual(["all", "segments", "routes", "all"]);
-  });
-
   it("says a use in words that agree with its figures", () => {
-    expect(inUseWords({ kind: "journeys", count: 0 })).not.toBe(inUseWords({ kind: "journeys", count: 2 }));
-    expect(inUseWords({ kind: "journeys", count: 2 })).toContain("2");
-    expect(inUseWords({ kind: "places", places: 6 })).toContain("6");
-    expect(inUseWords({ kind: "places", places: 0 })).not.toContain("0");
+    expect(inUseWords(0)).not.toBe(inUseWords(2));
+    expect(inUseWords(2)).toContain("2");
   });
 });

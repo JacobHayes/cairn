@@ -70,7 +70,7 @@ const CASES: Record<EventType, Case> = {
   default_owner_changed: { event: event("default_owner_changed", plan, [put({ default_owner: "r_lead" })]) },
   participation_changed: { event: event("participation_changed", plan, [put({ participation: { node: "n_plan", kind: "k_owner", source: ["who_ana"] } })]), facts: { identities: ["Ana Reyes"] } },
   resource_changed: { event: event("resource_changed", plan, [put({ resource: { node: "n_plan", resource: { key: "a_tip", tip: "Start early", title: "A tip" } } })]) },
-  segment_inserted: { event: event("segment_inserted", { insertion: "i_one" }) },
+  route_inserted: { event: event("route_inserted", plan) },
   node_transitioned: { event: event("node_transitioned", plan, [state("n_plan", { state: "active" })]), facts: { state: "active" } },
   answer_set: { event: event("answer_set", { node: "n_decide" }, [put({ answer: { decision: "n_decide", value: { boolean: true } } })]) },
   recorded_date_changed: { event: event("recorded_date_changed", plan, [state("n_plan", { state: "done", finished_on: "2026-10-05" })]), facts: { date: "2026-10-05", recorded: "finished" } },

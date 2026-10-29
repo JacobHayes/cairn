@@ -147,7 +147,7 @@ export function serverHost(origin: string, build: string | undefined): Host {
   return {
     capabilities: () => answered("the capabilities", () => client.GET("/api/capabilities")),
     journeys: (query) => answered("the journey index", () => client.GET("/api/journeys", { params: { query: indexParams(query) } })),
-    routes: (after, kind) => answered("the route index", () => client.GET("/api/routes", { params: { query: { ...(after === undefined ? {} : { after }), ...(kind === undefined ? {} : { kind }) } } })),
+    routes: (after) => answered("the route index", () => client.GET("/api/routes", { params: { query: after === undefined ? {} : { after } } })),
     routeDetail: (route) => answered(route, () => client.GET("/api/routes/{id}/versions", { params: { path: { id: route } } })),
     exportRoute: (route, version) =>
       answered(version === undefined ? `${route}'s draft` : `${route} version ${String(version)}`, () =>

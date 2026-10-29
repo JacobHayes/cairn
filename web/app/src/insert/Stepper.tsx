@@ -1,11 +1,11 @@
-// C19, B13: inserting a segment, in the inspector column, three short steps with one primary
-// each: choose a segment, place it (under, name, starts after, comes before), and, when the
-// segment declares roles or kinds, who they become here. Placing and mapping are previewed by
+// C19, B13: inserting a route, in the inspector column, three short steps with one primary
+// each: choose a route, place it (under, name, starts after, comes before), and, when the
+// route declares roles or kinds, who they become here. Placing and mapping are previewed by
 // the tab's engine as the incoming root and its wiring on the canvas, in review's Add style;
-// `Review` drafts one `insert_segment` proposal and opens proposal review (I5: an agent's
+// `Review` drafts one `insert_route` proposal and opens proposal review (I5: an agent's
 // insertion and a person's are reviewed the same way). The same stepper serves a journey and a
-// route or segment draft, since both are an `Authored` graph.
-import "./segments.css";
+// route draft, since both are an `Authored` graph.
+import "./insert.css";
 
 import { useActorRef, useSelector } from "@xstate/react";
 import { useEffect, useMemo, useState } from "react";
@@ -18,26 +18,25 @@ import { Problem, useDraftAndOpen } from "../proposals/Entries.tsx";
 import { Button, Input } from "../ui/kit.tsx";
 import { stepperDraftKey } from "./entry.ts";
 import { heldOf, insertion, stepOf } from "./insertion.ts";
-import { insertionMembers, planInsertion, sizeWords, type Choices, type Mapping, type PeopleRow, type Plan } from "./model.ts";
+import { insertionMembers, planInsertion, type Choices, type Mapping, type PeopleRow, type Plan } from "./model.ts";
 import { useCandidate, type Candidate } from "./preview.ts";
-import { useSegmentNames, useSegmentOffers, useSegmentVersion, type SegmentOffer, type SegmentVersion } from "./read.ts";
+import { useRouteNames, useRouteOffers, useRouteCopy, type RouteOffer, type RouteCopy } from "./read.ts";
 
-/** What the canvas draws while a segment is being placed: the graph before and after, and how its new insertion is named. */
+/** What the canvas draws while a route is being placed: the graph before and after, and how its new insertion is named. */
 export interface InsertPreview {
   before: Graph;
   after: Graph;
   members: Record<string, string>;
 }
 
-/** One segment of the list: its name, a line of what it is, and its size; the latest version is chosen, the others folded. */
-function Offer({ offer, onChoose }: { offer: SegmentOffer; onChoose: (version: number) => void }) {
+/** One route of the list: its name and a line of what it is; the latest version is chosen, the others folded. */
+function Offer({ offer, onChoose }: { offer: RouteOffer; onChoose: (version: number) => void }) {
   const older = Array.from({ length: offer.latest - 1 }, (_, at) => offer.latest - 1 - at);
   return (
-    <li className="stack segment-offer" data-testid="segment-offer" data-segment={offer.id}>
-      <button type="button" className="segment-choice" onClick={() => { onChoose(offer.latest); }}>
+    <li className="stack route-offer" data-testid="route-offer" data-route={offer.id}>
+      <button type="button" className="route-choice" onClick={() => { onChoose(offer.latest); }}>
         <strong>{offer.name}</strong>
         {offer.description === undefined ? null : <span className="muted small">{offer.description}</span>}
-        <span className="muted small">{sizeWords(offer.version.graph)}</span>
       </button>
       {older.length === 0 ? null : (
         <details className="small">
@@ -55,16 +54,16 @@ function Offer({ offer, onChoose }: { offer: SegmentOffer; onChoose: (version: n
   );
 }
 
-function ChooseStep({ authored, onChoose }: { authored: Authored; onChoose: (segment: string, version: number) => void }) {
-  const { offers, loading, leftOut } = useSegmentOffers("route" in authored.target ? authored.target.route : undefined);
+function ChooseStep({ onChoose }: { onChoose: (route: string, version: number) => void }) {
+  const { offers, loading } = useRouteOffers();
   const [text, setText] = useState("");
   const shown = offers.filter((offer) => `${offer.name} ${offer.description ?? ""}`.toLowerCase().includes(text.trim().toLowerCase()));
   return (
     <div className="stack" data-testid="step-choose">
-      <Input aria-label="Search segments" placeholder="Search segments" value={text} onChange={(event) => { setText(event.target.value); }} />
-      {loading ? <p className="muted small">Reading the segments...</p> : null}
-      {!loading && offers.length === 0 ? <p className="muted small">{leftOut ? "No other segments are published yet." : "There are no published segments yet. Publish one from Routes first."}</p> : null}
-      <ul className="plain-list stack segment-offers">
+      <Input aria-label="Search routes" placeholder="Search routes" value={text} onChange={(event) => { setText(event.target.value); }} />
+      {loading ? <p className="muted small">Reading the routes...</p> : null}
+      {!loading && offers.length === 0 ? <p className="muted small">There are no published routes yet.</p> : null}
+      <ul className="plain-list stack route-offers">
         {shown.map((offer) => (
           <Offer key={offer.id} offer={offer} onChoose={(version) => { onChoose(offer.id, version); }} />
         ))}
@@ -102,15 +101,12 @@ function PlaceStep({ authored, plan, choices, onChange }: { authored: Authored; 
         <span className="author-label">Under</span>
         <Picker aria-label="Under" value={choices.parent ?? ""} none="At the top level" options={containers.map((node) => ({ value: node.key, label: `${node.title} (${pathOf(authored.tree, node.key)})` }))} onChange={(event) => { onChange({ parent: event.target.value === "" ? undefined : event.target.value }); }} />
       </label>
-      <label className="stack">
-        <span className="author-label">Name</span>
-        <Input aria-label="Name" value={choices.title} placeholder={plan.root.title} onChange={(event) => { onChange({ title: event.target.value }); }} />
-        {plan.root.idTaken ? (
-          <span className="muted small" data-testid="id-suffix">
-            Its id here is {plan.root.id}: the first is taken.
-          </span>
-        ) : null}
-      </label>
+      {plan.root === undefined ? null : (
+        <label className="stack">
+          <span className="author-label">Name</span>
+          <Input aria-label="Name" value={choices.title} placeholder={plan.root.title} onChange={(event) => { onChange({ title: event.target.value }); }} />
+        </label>
+      )}
       <NodePicks label="Starts after" authored={authored} chosen={choices.after} onChange={(after) => { onChange({ after }); }} />
       <NodePicks label="Comes before" authored={authored} chosen={choices.before} onChange={(before) => { onChange({ before }); }} />
     </div>
@@ -134,7 +130,7 @@ function PeopleStep({ rows, where, onMap }: { rows: readonly PeopleRow[]; where:
           </label>
           {row.filled === undefined ? null : (
             <p className="muted small" data-testid="filled-here">
-              {row.filled.by === undefined ? "Already filled here." : `Filled here by ${row.filled.by}.`} The segment's {row.filled.leftOut.map((node) => node.title).join(", ")} will be left out.
+              {row.filled.by === undefined ? "Already filled here." : `Filled here by ${row.filled.by}.`} The route's {row.filled.leftOut.map((node) => node.title).join(", ")} will be left out.
               <br />
               <button type="button" className="link" onClick={() => { onMap(row, "add"); }}>
                 Ask separately
@@ -159,7 +155,7 @@ function Refusal({ candidate }: { candidate: Candidate }) {
 
 export interface InsertStepperProps {
   authored: Authored;
-  /** The container the root is first placed under (a container's "Insert segment here"). */
+  /** The container the root is first placed under (a container's "Insert route here"). */
   parent: string | undefined;
   onClose: () => void;
   /** Tells the page what to draw: the incoming root as proposed, or nothing while it cannot be placed. */
@@ -174,13 +170,13 @@ function useInsertion(authored: Authored, parent: string | undefined, onPreview:
   const flow = useActorRef(insertion, { input: { held, keep: (next) => { writeDraft(draftKey, next); } } });
   const step = useSelector(flow, stepOf);
   const { picked, choices, insertion: key } = useSelector(flow, (snapshot) => snapshot.context);
-  const loaded = useSegmentVersion(picked?.id, picked?.version);
-  const nameOf = useSegmentNames();
+  const loaded = useRouteCopy(picked?.id, picked?.version);
+  const nameOf = useRouteNames();
   const plan = useMemo(
-    () => (picked === undefined || loaded === undefined ? undefined : planInsertion(authored.graph, authored.tree, loaded.version.graph, { route: picked.id, version: picked.version }, key, choices)),
+    () => (picked === undefined || loaded === undefined ? undefined : planInsertion(authored.graph, loaded.version.graph, { route: picked.id, version: picked.version }, key, choices)),
     [authored, picked, loaded, key, choices],
   );
-  // Whether the segment has people to map is known once its plan is: a people step restored from a reload waits for that.
+  // Whether the route has people to map is known once its plan is: a people step restored from a reload waits for that.
   const people = plan !== undefined && plan.rows.length > 0;
   useEffect(() => {
     if (plan !== undefined) {
@@ -214,22 +210,22 @@ function useInsertion(authored: Authored, parent: string | undefined, onPreview:
 export function InsertStepper({ authored, parent, onClose, onPreview }: InsertStepperProps) {
   const { step, loaded, plan, people, candidate, choices, next, back, change, choose } = useInsertion(authored, parent, onPreview);
   const { write, start } = useDraftAndOpen(`insert:${domainOf(authored)}`);
-  const review = (segment: SegmentVersion, mutation: Plan["mutation"]) => {
-    const draft = { title: `Insert ${segment.segment.header.name}`, destination_revision: authored.revision, mutations: [mutation] };
+  const review = (copy: RouteCopy, mutation: Plan["mutation"]) => {
+    const draft = { title: `Insert ${copy.route.header.name}`, destination_revision: authored.revision, mutations: [mutation] };
     // Drafted, the insertion is no longer unsent: the stepper and its choices go with it.
     start((id) => ({ op: "create", destination: authored.target, request: { id, draft } }), onClose);
   };
   const last = step === 3 || (step === 2 && !people);
   return (
-    <aside className="detail-panel panel stack insert-stepper" aria-label="Insert a segment" data-testid="insert-stepper" data-step={step}>
-      <h2>{step === 1 ? "Choose a segment" : step === 2 ? "Place it" : "People"}</h2>
+    <aside className="detail-panel panel stack insert-stepper" aria-label="Insert a route" data-testid="insert-stepper" data-step={step}>
+      <h2>{step === 1 ? "Choose a route" : step === 2 ? "Place it" : "People"}</h2>
       {step === 1 || loaded === undefined ? null : (
         <p className="muted small">
-          {loaded.segment.header.name}, version {loaded.version.version} · Step {step} of {people ? 3 : 2}
+          {loaded.route.header.name}, version {loaded.version.version} · Step {step} of {people ? 3 : 2}
         </p>
       )}
-      {step === 1 ? <ChooseStep authored={authored} onChoose={choose} /> : null}
-      {step > 1 && (plan === undefined || loaded === undefined) ? <p className="muted small">Reading the segment...</p> : null}
+      {step === 1 ? <ChooseStep onChoose={choose} /> : null}
+      {step > 1 && (plan === undefined || loaded === undefined) ? <p className="muted small">Reading the route...</p> : null}
       {step === 2 && plan !== undefined ? <PlaceStep authored={authored} plan={plan} choices={choices} onChange={change} /> : null}
       {step === 3 && plan !== undefined ? (
         <PeopleStep

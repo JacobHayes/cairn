@@ -6,7 +6,7 @@ import { expect, test } from "./test.ts";
 
 import { nodeCard, nodePanel, open, readable, whenSettled } from "./shell.ts";
 
-test("C16, C17: Done on a Home row acts in place and the address stays `/`, a row opens its node's address, Home ends with a link to every journey, and the rail leads to Routes, whose Type filter writes ?type=", async ({ page }) => {
+test("C16, C17: Done on a Home row acts in place and the address stays `/`, a row opens its node's address, Home ends with a link to every journey, and the rail leads to Routes", async ({ page }) => {
   await readable(page);
   await open(page, "/");
   const group = page.getByTestId("home-journey").first();
@@ -34,17 +34,9 @@ test("C16, C17: Done on a Home row acts in place and the address stays `/`, a ro
   await page.getByTestId("home-all-journeys").click();
   await expect(page).toHaveURL(/\/journeys$/);
   await checkpoint(page);
-  // The Routes Type filter writes ?type= and keeps only that type's rows.
   await page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "Routes" }).click();
   await expect(page.getByTestId("route-row").first()).toBeVisible();
-  const all = await whenSettled(page, () => page.getByTestId("route-row").count());
-  await page.getByLabel("Type").selectOption("segments");
-  await expect(page).toHaveURL(/[?&]type=segments/);
-  await expect(page.getByTestId("route-use")).toHaveCount(0);
-  await page.getByLabel("Type").selectOption("routes");
-  await expect(page).toHaveURL(/[?&]type=routes/);
-  await expect(page.getByTestId("segment-use")).toHaveCount(0);
-  expect(await whenSettled(page, () => page.getByTestId("route-row").count())).toBeLessThanOrEqual(all);
+  await expect(page.getByTestId("route-use").first()).toBeVisible();
 });
 
 test("C16, C17: the Journeys index at 390px shows both of each row's facts and nothing wider than the window", async ({ page }) => {

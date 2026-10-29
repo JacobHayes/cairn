@@ -1,5 +1,4 @@
-// The addresses of the route screens (C17): the routes index, `/routes`, which lists routes and
-// segments (`?type=routes|segments` keeps it to one), the new-route form, `/routes/new`, and a
+// The addresses of the route screens (C17): the routes index, `/routes`, which lists routes, the new-route form, `/routes/new`, and a
 // route's page. A route is one page (screens/RoutePage.tsx) whose address says which version its
 // views show and which view is open:
 //
@@ -21,12 +20,9 @@ import { PROJECTIONS, type Screen } from "../journeys/address.ts";
 /** What the rail links to: the routes index, every type. */
 export const ROUTES_INDEX_PATH = pathTo("routes");
 
-/** The routes index kept to routes. */
-export const ROUTES_PATH = `${ROUTES_INDEX_PATH}?type=routes`;
-
-/** A11, A12: the new-route form (`?kind=segment` for a segment). A route's id `new` is shadowed by it, so the form refuses it. */
-export function newRoutePath(kind?: "segment"): string {
-  return kind === "segment" ? `${pathTo("routeNew")}?kind=segment` : pathTo("routeNew");
+/** A11, A12: the new-route form. A route's id `new` is shadowed by it, so the form refuses it. */
+export function newRoutePath(): string {
+  return pathTo("routeNew");
 }
 
 /** Where on a route's page an address points: a published version (none is the route as it stands), a draft node, the view, and a proposal whose layer is on (which reviews the route as it stands, so names no version). */

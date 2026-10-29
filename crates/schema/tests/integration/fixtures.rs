@@ -33,16 +33,16 @@ fn directories() -> Vec<(String, PathBuf)> {
     found
 }
 
-/// Every route document the fixtures hold, whether or not a scenario runs over it: the route
-/// files, and the segments (which the engine's insertion tests insert).
+/// Every route document the fixtures hold, whether or not a scenario runs over it.
 fn route_documents() -> Vec<(String, RouteFile)> {
     let mut found = Vec::new();
     for (name, directory) in directories() {
-        for file in ["route.yaml", "segment.yaml"] {
-            let path = directory.join(file);
-            if path.exists() {
-                found.push((format!("{name}/{file}"), read_canonical::<RouteFile>(&path)));
-            }
+        let path = directory.join("route.yaml");
+        if path.exists() {
+            found.push((
+                format!("{name}/route.yaml"),
+                read_canonical::<RouteFile>(&path),
+            ));
         }
     }
     found

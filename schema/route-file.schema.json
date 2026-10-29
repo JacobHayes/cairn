@@ -476,6 +476,25 @@
       ],
       "type": "object"
     },
+    "Lineage": {
+      "additionalProperties": false,
+      "description": "The route version a journey was made from.",
+      "properties": {
+        "route": {
+          "$ref": "#/$defs/RouteId",
+          "description": "The route."
+        },
+        "version": {
+          "$ref": "#/$defs/VersionNumber",
+          "description": "The version."
+        }
+      },
+      "required": [
+        "route",
+        "version"
+      ],
+      "type": "object"
+    },
     "Markdown": {
       "description": "Markdown, at most body_bytes_max (64 KiB) bytes.",
       "maxLength": 65536,
@@ -852,6 +871,16 @@
         "final": {
           "type": "boolean"
         },
+        "from_route": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Lineage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "gates": {
           "description": "False lets the contents be done before the opening milestone. A stage holds the work done\nduring it; work that can as well be done ahead goes in a stage with this false; prep that\nmust come first sits outside, due before the opening milestone.",
           "type": "boolean"
@@ -1197,21 +1226,6 @@
       "pattern": "^[a-z0-9][a-z0-9_-]*$",
       "type": "string"
     },
-    "RouteKind": {
-      "description": "What a route is for: fixed when it is created.",
-      "oneOf": [
-        {
-          "const": "process",
-          "description": "A process template: journeys start from it.",
-          "type": "string"
-        },
-        {
-          "const": "segment",
-          "description": "A reusable piece of a process: it is only inserted, never started.",
-          "type": "string"
-        }
-      ]
-    },
     "Slug": {
       "description": "An id: lowercase letters, digits, '_' and '-', at most id_bytes_max (64) bytes.",
       "maxLength": 64,
@@ -1282,10 +1296,6 @@
     "format": {
       "$ref": "#/$defs/FormatVersion",
       "description": "The file format version."
-    },
-    "kind": {
-      "$ref": "#/$defs/RouteKind",
-      "description": "Process or segment; a file that leaves it out is a process."
     },
     "name": {
       "$ref": "#/$defs/Title",

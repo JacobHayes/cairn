@@ -12,7 +12,7 @@ use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
     Cursor, DisplayState, Domain, EventType, IdentityKey, JourneyId, JourneyStatus, KindKey,
     LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId,
-    ProposalId, Revision, RevisionOf, RouteId, RouteKind, SortBy, State, Timestamp, Title, UserId,
+    ProposalId, Revision, RevisionOf, RouteId, SortBy, State, Timestamp, Title, UserId,
     VersionNumber,
 };
 use cairn_store::{EventQuery, JourneyQuery, PageSize, ProposalCursor, SearchQuery, Watch};
@@ -181,7 +181,6 @@ pub fn proposals(params: &Params) -> Result<(Option<ProposalCursor>, PageSize), 
 
 /// `GET /api/routes`.
 pub const ROUTE_PARAMS: &[ParamSpec] = &[
-    ParamSpec::one::<RouteKind>("kind", "Only routes of this kind; all kinds when absent."),
     ParamSpec::one::<RouteId>("after", "The page starts after this route."),
     SIZE,
 ];
@@ -471,13 +470,13 @@ pub fn journeys(params: &Params) -> Result<JourneyQuery, ApiError> {
     .owned_by(params.all::<IdentityKey>("owner")?.into_iter().collect()))
 }
 
-/// The route index's page: the kind it lists, where it starts, and its size.
+/// The route index's page: where it starts and its size.
 ///
 /// # Errors
 ///
 /// A bad request for a parameter that does not parse.
-pub fn routes(params: &Params) -> Result<(Option<RouteKind>, Option<RouteId>, PageSize), ApiError> {
-    Ok((params.one("kind")?, params.one("after")?, params.size()?))
+pub fn routes(params: &Params) -> Result<(Option<RouteId>, PageSize), ApiError> {
+    Ok((params.one("after")?, params.size()?))
 }
 
 /// The search query.

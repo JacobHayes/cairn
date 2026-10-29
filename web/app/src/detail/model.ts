@@ -185,7 +185,7 @@ export function completeAnyway(node: string, reason?: string): Mutation {
 }
 
 /** A transition by name (D1); answering a decision is its own mutation. */
-export type Move = Exclude<NodeMove, "answer" | "complete_anyway" | "insert_segment">;
+export type Move = Exclude<NodeMove, "answer" | "complete_anyway" | "insert_route">;
 
 /** D1: whether the engine derived `move` among what a node accepts now. */
 export function accepts(derived: NodeDerived | undefined, move: NodeMove): boolean {

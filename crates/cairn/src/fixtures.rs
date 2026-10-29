@@ -81,7 +81,6 @@ impl Fixture {
             Mutation::CreateRoute {
                 name: file.name.clone(),
                 description: file.description.clone(),
-                kind: file.kind,
             },
             Mutation::OpenDraft {
                 source: DraftSource::Import,

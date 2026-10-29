@@ -7,8 +7,8 @@ use cairn_schema::{
     Actor, AgentId, AttachmentKey, Consequences, Cursor, Domain, EventType, Identity, IdentityKey,
     JourneyId, JourneyStatus, KeyRefs, Lineage, Markdown, Node, NodeKey, Notice, ParticipationKind,
     PatchEvents, PatchId, Proposal, ProposalId, ProposalPreview, Revision, RevisionConflict, Role,
-    RoleKey, RouteHeader, RouteId, RouteKind, Subject, Timestamp, Title, TouchedSet,
-    UnresolvedItem, UserId, VersionNumber, Violation, Write, to_yaml,
+    RoleKey, RouteHeader, RouteId, Subject, Timestamp, Title, TouchedSet, UnresolvedItem, UserId,
+    VersionNumber, Violation, Write, to_yaml,
 };
 use cairn_service::{Call, ProposalListing, ProposalReview, StaleBase};
 use cairn_store::{JourneyQuery, PageSize, ProposalCursor, SearchHit, SearchQuery};
@@ -43,7 +43,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "list_routes",
-        description: "Routes, paged: name, kind (process or segment), latest version, \
+        description: "Routes, paged: name, latest version, \
             whether a draft is open.",
         writes: Writes::Nothing,
         destructive: false,
@@ -174,8 +174,6 @@ struct IdentityRow {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListRoutes {
-    #[serde(default)]
-    kind: Option<RouteKind>,
     #[serde(default)]
     after: Option<RouteId>,
 }
@@ -645,7 +643,7 @@ impl ToolSet {
     async fn list_routes(&self, arguments: ListRoutes) -> Result<RoutesOutput, ToolError> {
         let page = self
             .service
-            .routes(arguments.kind, arguments.after.as_ref(), PageSize::MAX)
+            .routes(arguments.after.as_ref(), PageSize::MAX)
             .await?;
         let routes = page.items.into_iter().map(|summary| RouteRow {
             header: summary.header,

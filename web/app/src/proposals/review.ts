@@ -13,8 +13,8 @@ import type { ProposalReview } from "../data/proposals.ts";
 import { useKeyedRead, useSession, useToday, useCaller } from "../data/react.ts";
 import { isPatchAnswer } from "../data/writes.ts";
 import type { Ready } from "../detail/model.ts";
-import { addedRoles, insertionMembers } from "../segments/model.ts";
-import { useSegmentNames } from "../segments/read.ts";
+import { addedRoles, insertionMembers } from "../insert/model.ts";
+import { useRouteNames } from "../insert/read.ts";
 import { applyRevision, layerMarks, type Kept, type LayerModel, type ProposalOutline, type Reviewing } from "./layer.ts";
 import { ADD_NODE_EDITOR, applyBlockers, type DiffMark, type Proposal, type ProposalDraft, type ProposalPreview, type UnresolvedReason } from "./model.ts";
 import { useNodeTyped } from "./typed.ts";
@@ -125,9 +125,9 @@ export function reviewing(edits: Edits, review: ProposalReview, preview: Proposa
   };
 }
 
-/** The route versions a journey proposal's mutations read: an insertion's segment. */
+/** The route versions a journey proposal's mutations read: an insertion's route. */
 function versionsRead(draft: ProposalDraft): Schema<"Lineage">[] {
-  return (draft.mutations ?? []).flatMap((mutation) => (mutation.op === "insert_segment" ? [mutation.segment] : []));
+  return (draft.mutations ?? []).flatMap((mutation) => (mutation.op === "insert_route" ? [mutation.route] : []));
 }
 
 /** What a journey proposal's local preview holds: the engine's answer for the edited proposal, and the journey it would leave, derived and held under the proposal's slot. */
@@ -170,13 +170,13 @@ const JOURNEY_AFTER: ReadSource<AfterArgs, JourneyAfter> = {
   read: async ({ host, deriver, before, proposal, draft, user }, at) => {
     const lineages = versionsRead(draft);
     const versions: RouteVersion[] = await Promise.all(lineages.map((lineage) => host.routeVersion(lineage.route, lineage.version)));
-    // B13: the engine reads a segment's header for its kind and retirement.
-    const segments = await Promise.all([...new Set((draft.mutations ?? []).flatMap((mutation) => (mutation.op === "insert_segment" ? [mutation.segment.route] : [])))].map((route) => host.route(route)));
+    // B13: the engine reads an inserted route's header for its retirement.
+    const routes = await Promise.all([...new Set((draft.mutations ?? []).flatMap((mutation) => (mutation.op === "insert_route" ? [mutation.route.route] : [])))].map((route) => host.route(route)));
     // The edits may have moved on while the versions were out: obsolete work posts nothing.
     beforeWork(at);
     const journey = before.journey.header.id;
     const slot = slotOf(journey, proposal.id);
-    const answer = await deriver.preview(before.key, { proposal: { ...proposal, draft }, versions, segments, at: new Date().toISOString(), actor: { user } }, slot);
+    const answer = await deriver.preview(before.key, { proposal: { ...proposal, draft }, versions, routes, at: new Date().toISOString(), actor: { user } }, slot);
     const handle = answer.loaded?.handle;
     let freed = false;
     const free = () => {
@@ -260,7 +260,7 @@ export function useLayerModel(args: ModelArgs): LayerModel {
   const preview = local ?? review.preview;
   // A candidate that breaks a rule has no destination after; that is not an empty graph, so nothing is compared.
   const known = after !== undefined;
-  const nameOf = useSegmentNames();
+  const nameOf = useRouteNames();
   const members = useMemo(() => insertionMembers(before, after, nameOf), [before, after, nameOf]);
   const current = previewOfEdits || kept === undefined;
   // Which items still need a choice is known only from a preview of the edits on screen.
@@ -295,7 +295,7 @@ export function useLayerModel(args: ModelArgs): LayerModel {
   };
 }
 
-/** The insertions and roles a proposal adds, named for the rail (C19). */
+/** The roles a proposal adds, named for the rail (C19). */
 export function rolesAddedBy(model: LayerModel) {
   return addedRoles(model.before, model.after);
 }

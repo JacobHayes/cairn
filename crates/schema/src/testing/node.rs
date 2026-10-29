@@ -3,6 +3,7 @@
 use proptest::prelude::*;
 
 use super::arb_identity_key;
+use super::arb_lineage;
 use super::model::{bounded_set, bounded_vec};
 use super::{
     ArbRefs, arb_condition, arb_days, arb_markdown, arb_resource, arb_slug, arb_title, arb_weight,
@@ -205,11 +206,12 @@ pub fn arb_node<R: ArbRefs>() -> impl Strategy<Value = Node<R>> {
         prop::option::of(arb_date_rule::<R>()),
         arb_participations::<R>(),
         prop::collection::vec(arb_resource::<R>(), 0..2),
+        prop::option::of(arb_lineage()),
     );
     (identity, links, arb_payload::<R>()).prop_map(
         |(
             (key, id, parent, title, description, weight),
-            (requires, relevant_when, due_by, not_before, participations, resources),
+            (requires, relevant_when, due_by, not_before, participations, resources, from_route),
             payload,
         )| Node {
             key,
@@ -224,6 +226,7 @@ pub fn arb_node<R: ArbRefs>() -> impl Strategy<Value = Node<R>> {
             not_before,
             participations,
             resources,
+            from_route,
             payload,
         },
     )

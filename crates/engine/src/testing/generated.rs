@@ -553,6 +553,7 @@ impl Shape {
             not_before: None,
             participations: participations(seed.participation),
             resources: Vec::new(),
+            from_route: None,
             payload: self.payload(index, seed),
         }
     }

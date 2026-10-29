@@ -154,10 +154,11 @@ fn walk_route(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     )
 }
 
-/// A21: a segment refuses a second root, a default owner, a final milestone, and an empty
-/// publish, and is never started from nor saved to. Answers the records with it published.
-fn segment_rules(records: &Records, ops: &mut BTreeSet<String>) -> Records {
-    const SEGMENT: &str = "{route: reuse}";
+/// B13: a route inserted into a route draft survives the publish with its root's pointer, a
+/// second insert under the same parent finds no free root id when the id is at the length
+/// limit, and a journey started from that version holds the inserted nodes as its own.
+fn walk_insertion(records: &Records, ops: &mut BTreeSet<String>) -> Records {
+    const REUSE: &str = "{route: reuse}";
     let reject = |records: &Records, target: &str, mutations: &str| {
         let patch = support::patch_to(records, target, mutations);
         support::codes(support::apply(records, &patch, &support::fixed_inputs()))
@@ -167,55 +168,16 @@ fn segment_rules(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     let id = format!("reuse-{}", "x".repeat(58));
     let root =
         format!("- op: add_node\n  node: {{key: n_reuse, id: {id}, kind: group, title: Reuse}}\n");
-    let records = accept(
-        records,
-        SEGMENT,
-        "- op: create_route\n  name: Reuse\n  kind: segment\n- op: open_draft\n  source: import\n",
-        ops,
-    );
-    let rules = [
-        "- op: add_node\n  node: {key: n_two, id: two, kind: group, title: Two}\n",
-        "- op: add_role\n  role: {key: r_lead, id: lead}\n- op: set_default_owner\n  role: r_lead\n",
-        "- op: add_node\n  node: {key: n_end, id: end, parent: n_reuse, kind: milestone, title: End, final: true}\n",
-    ];
-    for rule in rules {
-        assert_eq!(
-            reject(&records, SEGMENT, &format!("{root}{rule}")),
-            [ViolationCode::SegmentRule]
-        );
-    }
-    assert_eq!(
-        reject(&records, SEGMENT, "- op: publish_draft\n"),
-        [ViolationCode::SegmentRule]
-    );
     let child = "- op: add_node\n  node: {key: n_check, id: check, parent: n_reuse, kind: action, title: Check}\n";
     let records = accept(
-        &records,
-        SEGMENT,
-        &format!("{root}{child}- op: publish_draft\n"),
+        records,
+        REUSE,
+        &format!(
+            "- op: create_route\n  name: Reuse\n- op: open_draft\n  source: import\n{root}{child}- op: publish_draft\n"
+        ),
         ops,
     );
-    let start = "- op: create_journey\n  name: Started\n  from: {route: reuse, version: 1}\n";
-    let saved = "- op: open_draft\n  source: {save_as_route: {journey: j_vendor_eval}}\n";
-    for (target, mutations) in [("{journey: j_reuse}", start), (SEGMENT, saved)] {
-        assert_eq!(
-            reject(&records, target, mutations),
-            [ViolationCode::NotAProcessRoute]
-        );
-    }
-    records
-}
-
-/// A21, B13: a segment refuses a second root, a default owner, a final milestone, and an
-/// empty publish, and is never started from; inserted into a route draft it survives the
-/// publish, and a journey started from that version holds its nodes as the route's own.
-fn walk_segment(records: &Records, ops: &mut BTreeSet<String>) -> Records {
-    let reject = |records: &Records, target: &str, mutations: &str| {
-        let patch = support::patch_to(records, target, mutations);
-        support::codes(support::apply(records, &patch, &support::fixed_inputs()))
-    };
-    let records = segment_rules(records, ops);
-    let insert = "- op: open_draft\n  source: edit\n- op: insert_segment\n  insertion: i_reuse\n  segment: {route: reuse, version: 1}\n  parent: n_reporting\n";
+    let insert = "- op: open_draft\n  source: edit\n- op: insert_route\n  insertion: i_reuse\n  route: {route: reuse, version: 1}\n  parent: n_reporting\n";
     let records = accept(&records, ROUTE, insert, ops);
     let again = insert
         .replace("open_draft\n  source: edit\n- op: ", "")
@@ -225,17 +187,23 @@ fn walk_segment(records: &Records, ops: &mut BTreeSet<String>) -> Records {
         [ViolationCode::InsertionInvalid]
     );
     let records = accept(&records, ROUTE, "- op: publish_draft\n", ops);
-    assert!(
-        records
-            .versions
+    let pointed = |graph: &cairn_schema::Graph| {
+        graph
+            .nodes
             .values()
-            .any(|v| v.graph.insertions.len() == 1)
-    );
+            .filter(|node| node.from_route.is_some())
+            .count()
+    };
+    assert!(records.versions.values().any(|v| pointed(&v.graph) == 1));
     let start =
         "- op: create_journey\n  name: Started\n  from: {route: vendor-evaluation, version: 3}\n";
     let started = accept(&records, "{journey: j_reuse}", start, ops);
     let graph = &started.journeys[&"j_reuse".parse().unwrap()].graph;
-    assert!(graph.insertions.is_empty());
+    assert_eq!(
+        pointed(graph),
+        1,
+        "a journey keeps the pointer on the nodes it copies"
+    );
     records
 }
 
@@ -334,7 +302,7 @@ fn an_identity_something_refers_to_is_not_deleted() {
     let mut ops = BTreeSet::new();
     let records = support::finished("vendor-evaluation");
     let records = walk_route(&records, &mut ops);
-    let records = walk_segment(&records, &mut ops);
+    let records = walk_insertion(&records, &mut ops);
     let records = walk_journey(&records, &mut ops);
     let reject = |records: &Records, key: &str| {
         let patch = support::patch_to(
@@ -500,7 +468,7 @@ fn every_mutation_type_applies_and_emits_its_event() {
     }
     let records = support::finished("vendor-evaluation");
     let records = walk_route(&records, &mut ops);
-    let records = walk_segment(&records, &mut ops);
+    let records = walk_insertion(&records, &mut ops);
     let records = walk_journey(&records, &mut ops);
     let records = walk_deployment(&records, &mut ops);
     let records = walk_proposals(&records, &mut ops);
@@ -510,7 +478,7 @@ fn every_mutation_type_applies_and_emits_its_event() {
 }
 
 /// A19: one deployment patch deletes every journey and route at once, routes that journeys
-/// follow and segments routes insert among them, since nothing the patch leaves uses them.
+/// follow among them, since nothing the patch leaves uses them.
 fn delete_everything(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     let journeys = records.journeys.iter().map(|(id, journey)| {
         format!(

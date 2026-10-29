@@ -227,20 +227,6 @@ pub struct RouteImport {
     pub note: Option<Markdown>,
 }
 
-/// What a proposal's destination is.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum DestinationKind {
-    /// A journey.
-    Journey,
-    /// A process route.
-    Route,
-    /// A segment route.
-    Segment,
-    /// The deployment.
-    Deployment,
-}
-
 // PRD: C14.
 /// A proposal's destination as it is now.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -253,8 +239,6 @@ pub struct DestinationNow {
     pub name: Option<Title>,
     /// Its revision; 0 when it does not exist.
     pub revision: Revision,
-    /// What it is.
-    pub kind: DestinationKind,
     /// A journey's status.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<JourneyStatus>,
@@ -320,31 +304,18 @@ pub struct ProposalList {
     pub next: Option<ProposalCursor>,
 }
 
-impl From<cairn_store::DestinationKind> for DestinationKind {
-    fn from(kind: cairn_store::DestinationKind) -> Self {
-        match kind {
-            cairn_store::DestinationKind::Journey => Self::Journey,
-            cairn_store::DestinationKind::Route => Self::Route,
-            cairn_store::DestinationKind::Segment => Self::Segment,
-            cairn_store::DestinationKind::Deployment => Self::Deployment,
-        }
-    }
-}
-
 impl From<cairn_store::DestinationNow> for DestinationNow {
     fn from(now: cairn_store::DestinationNow) -> Self {
         let cairn_store::DestinationNow {
             exists,
             name,
             revision,
-            kind,
             status,
         } = now;
         Self {
             exists,
             name,
             revision,
-            kind: kind.into(),
             status,
         }
     }

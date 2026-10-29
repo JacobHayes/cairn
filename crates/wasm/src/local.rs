@@ -33,13 +33,13 @@ pub struct ApplyRequest {
     /// A note for each of its events (J1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<Markdown>,
-    /// The segment versions an `insert_segment` in it reads (B13), as
+    /// The route versions an `insert_route` in it reads (B13), as
     /// `GET /api/routes/{id}/versions/{version}` answers them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub versions: Vec<RouteVersion>,
-    /// The segments those versions belong to, as `GET /api/routes/{id}` answers them.
+    /// The routes those versions belong to, as `GET /api/routes/{id}` answers them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub segments: Vec<Route>,
+    pub routes: Vec<Route>,
     /// When it would commit.
     pub at: Timestamp,
     /// Who would submit it (H2).
@@ -64,12 +64,12 @@ pub struct AppliedLocally {
 pub struct PreviewRequest {
     /// The proposal, as `GET /api/{destination}/proposals/{proposal}` answers it; its destination is the journey.
     pub proposal: Proposal,
-    /// The segment versions its `insert_segment` mutations read, as `GET /api/routes/{id}/versions/{version}` answers them.
+    /// The route versions its `insert_route` mutations read, as `GET /api/routes/{id}/versions/{version}` answers them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub versions: Vec<RouteVersion>,
-    /// The segments an insertion in it reads (B13), as `GET /api/routes/{id}` answers them.
+    /// The routes an insertion in it reads (B13), as `GET /api/routes/{id}` answers them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub segments: Vec<Route>,
+    pub routes: Vec<Route>,
     /// When the preview is asked for.
     pub at: Timestamp,
     /// Who asks (H2).
@@ -101,9 +101,9 @@ pub struct RouteApplyRequest {
     /// The published versions the patch reads (the latest, for a patch opening a draft from it).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub versions: Vec<RouteVersion>,
-    /// The segments an insertion in the patch reads (B13), as `GET /api/routes/{id}` answers them.
+    /// The routes an insertion in the patch reads (B13), as `GET /api/routes/{id}` answers them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub segments: Vec<Route>,
+    pub routes: Vec<Route>,
     /// The deployment context (E6): identities a participation names.
     pub deployment: Deployment,
     /// The patch; it targets the route.
@@ -146,7 +146,7 @@ pub fn apply_route_locally(request: &RouteApplyRequest) -> Result<Route, HostErr
     if let Some(route) = &request.route {
         records.routes.insert(id.clone(), route.clone());
     }
-    hold_versions(&mut records, &request.versions, &request.segments);
+    hold_versions(&mut records, &request.versions, &request.routes);
     let inputs = ApplyInputs {
         today: request.today,
         at: request.at,
@@ -162,8 +162,8 @@ pub fn apply_route_locally(request: &RouteApplyRequest) -> Result<Route, HostErr
 }
 
 /// The published versions a patch reads, and the routes they belong to when it inserts from
-/// them (B13: the engine checks a segment's kind and retirement on its header).
-fn hold_versions(records: &mut Records, versions: &[RouteVersion], segments: &[Route]) {
+/// them (B13: the engine checks a route's retirement on its header).
+fn hold_versions(records: &mut Records, versions: &[RouteVersion], routes: &[Route]) {
     for version in versions {
         let lineage = Lineage {
             route: version.route.clone(),
@@ -171,10 +171,10 @@ fn hold_versions(records: &mut Records, versions: &[RouteVersion], segments: &[R
         };
         records.versions.insert(lineage, version.clone());
     }
-    for segment in segments {
+    for route in routes {
         records
             .routes
-            .insert(segment.header.id.clone(), segment.clone());
+            .insert(route.header.id.clone(), route.clone());
     }
 }
 
@@ -248,7 +248,7 @@ pub fn apply_locally(
         note: request.note.clone(),
     };
     let mut held = records_of(document);
-    hold_versions(&mut held, &request.versions, &request.segments);
+    hold_versions(&mut held, &request.versions, &request.routes);
     let applied = cairn_engine::apply(&held, &request.patch, &inputs)
         .map_err(|rejection| HostError::Rejected { rejection })?;
     let records = applied.records();
@@ -283,7 +283,7 @@ pub fn preview_locally(
     records
         .proposals
         .insert(proposal.id.clone(), proposal.clone());
-    hold_versions(&mut records, &request.versions, &request.segments);
+    hold_versions(&mut records, &request.versions, &request.routes);
     let inputs = ApplyInputs {
         today: document.inputs.today,
         at: request.at,

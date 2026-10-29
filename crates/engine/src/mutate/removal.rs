@@ -156,10 +156,6 @@ pub(super) fn remove(session: &mut Session<'_>, removal: &Removal) -> Vec<Write>
         writes.push(session.remove(GraphKey::Node(key.clone())));
         writes.push(retire(session, RetiredKey::Node(key.clone())));
     }
-    // B13: a removed member leaves its insertion, which goes with its last.
-    writes.extend(super::insertion::narrowed(session, |member| {
-        !inside.contains(member)
-    }));
     assert!(writes.len() >= reach.nodes.len() * 2);
     writes
 }

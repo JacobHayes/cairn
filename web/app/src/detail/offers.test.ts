@@ -156,7 +156,7 @@ describe("a group marked done (D1a)", () => {
 
   /** The stage stored as `state`, with its report effectively skipped through it when it is marked done. */
   function stage(state: "derived" | "done", derived: Partial<NodeDerived> = {}): Ready {
-    const view = made("n_stage", state === "done" ? { moves: ["insert_segment", "reopen"], skips_beneath: true, ...derived } : derived);
+    const view = made("n_stage", state === "done" ? { moves: ["insert_route", "reopen"], skips_beneath: true, ...derived } : derived);
     view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, n_stage: { state, ...(state === "done" ? { reason: "Covered elsewhere." } : {}) } } };
     return view;
   }
@@ -198,10 +198,10 @@ describe("what the engine says a node accepts, read as it derived it", () => {
     expect(ids("n_closed_ruled").slice(0, 2)).toEqual(["reopen", "include"]);
   });
 
-  it("offers Insert segment on work that holds nothing yet, and on no decision or milestone", () => {
-    expect(ids("n_plain")).toContain("insert-segment");
-    expect(ids("n_pick")).not.toContain("insert-segment");
-    expect(ids("n_meet")).not.toContain("insert-segment");
+  it("offers Insert route on work that holds nothing yet, and on no decision or milestone", () => {
+    expect(ids("n_plain")).toContain("insert-route");
+    expect(ids("n_pick")).not.toContain("insert-route");
+    expect(ids("n_meet")).not.toContain("insert-route");
   });
 
   it("offers work that no longer applies neither Start nor Mark done", () => {

@@ -199,9 +199,9 @@ fn the_moves_a_node_derives_are_the_ones_apply_accepts() {
                     "{label} complete_anyway"
                 );
                 assert_eq!(
-                    moves.contains(&NodeMove::InsertSegment),
+                    moves.contains(&NodeMove::InsertRoute),
                     !kind.is_leaf(),
-                    "{label} insert_segment"
+                    "{label} insert_route"
                 );
                 anyway_seen |= moves.contains(&NodeMove::CompleteAnyway);
             }
