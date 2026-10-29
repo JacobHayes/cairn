@@ -3,10 +3,9 @@
 // removing route-copied nodes leaves tombstones, and restoring one adds a local copy of what
 // was removed under fresh keys, at the path it had.
 import type { Schema } from "@cairn/client";
-import type { InBrowserHost } from "@cairn/wasm";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { journeyAfter, planMutations, removalPlan, seeded } from "./engine.test-support.ts";
+import { journeyAfter, planMutations, removalPlan, seeded, type Fixtures } from "./engine.test-support.ts";
 import { pathOf, treeOf, type Graph, type GraphNode, type Mutation } from "./graph.ts";
 import { resetMutations, tombstonesOf, type LocalEdit } from "./local-edits.ts";
 
@@ -17,7 +16,7 @@ const nodeIn = (graph: Graph, key: string): GraphNode | undefined => (graph.node
 const markers = (graph: Graph, key: string): LocalEdit[] => graph.state?.local_edits?.[key] ?? [];
 
 describe("reset to route (B4)", () => {
-  let host: InBrowserHost;
+  let host: Fixtures;
   let version: Graph;
   beforeAll(async () => {
     host = await seeded();
@@ -59,7 +58,7 @@ describe("reset to route (B4)", () => {
 });
 
 describe("tombstones and restore (B4)", () => {
-  let host: InBrowserHost;
+  let host: Fixtures;
   let version: Graph;
   let removed: string;
   beforeAll(async () => {

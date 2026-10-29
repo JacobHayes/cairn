@@ -7,14 +7,14 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 import { importIntoDraft, openRoute, publishDraft, versionSelect } from "./around.ts";
 import { formField, openEditing, openForm, saveForm } from "./authoring.ts";
-import { nodeCard, openFromCanvas, settled, whenSettled, type HostKind } from "./shell.ts";
+import { nodeCard, openFromCanvas, settled, whenSettled } from "./shell.ts";
 
 /** The vendor evaluation's version 2 file (fixtures/README.md). */
 export const VERSION_TWO = fileURLToPath(new URL("../../../fixtures/vendor-evaluation/route-v2.yaml", import.meta.url));
 
 /** Publishes the vendor evaluation's version 2: its file imported as a draft, then published. */
-export async function publishVersionTwo(page: Page, host: HostKind): Promise<void> {
-  await openRoute(page, host, "vendor-evaluation");
+export async function publishVersionTwo(page: Page): Promise<void> {
+  await openRoute(page, "vendor-evaluation");
   await importIntoDraft(page, VERSION_TWO);
   await expect(versionSelect(page)).toContainText("Draft");
   await publishDraft(page);
@@ -25,8 +25,8 @@ export async function publishVersionTwo(page: Page, host: HostKind): Promise<voi
  * the baseline's condition) and where it did not (kickoff's title), as a person does in edit
  * mode.
  */
-export async function editWhereVersionTwoChanges(page: Page, host: HostKind): Promise<void> {
-  await openEditing(page, host, "j_vendor_eval");
+export async function editWhereVersionTwoChanges(page: Page): Promise<void> {
+  await openEditing(page, "j_vendor_eval");
   await openFromCanvas(page, "n_access");
   await formField(page, "title").getByRole("textbox").fill("Access to the environment");
   await saveForm(page);

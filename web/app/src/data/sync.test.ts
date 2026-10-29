@@ -32,7 +32,6 @@ const quiet: SyncInput = {
   now: 100_000,
   stream: "live",
   online: true,
-  demo: false,
   skew: false,
   problems: [],
   inFlight: undefined,
@@ -55,7 +54,6 @@ describe("summarize", () => {
       lag: lag(90_000),
       inFlight: { count: 1, since: 90_000 },
       saved: { at: 99_500, time: "14:02:11" },
-      demo: true,
     };
     // Take away what holds, top of the precedence first: the next state shows.
     const drops: Partial<SyncInput>[] = [
@@ -74,7 +72,7 @@ describe("summarize", () => {
       held = { ...held, ...drop };
     }
     states.push(summarize({ ...quiet, ...held }).state);
-    expect(states).toEqual(["conflict", "not-saved", "new-version", "offline", "reconnecting", "behind", "saving", "saved", "demo"]);
+    expect(states).toEqual(["conflict", "not-saved", "new-version", "offline", "reconnecting", "behind", "saving", "saved", "in-sync"]);
   });
 
   it("lets a conflict or a refused write outrank version skew, so a write skew stopped is red and never amber", () => {
@@ -118,7 +116,6 @@ describe("syncWords", () => {
       [{ state: "updating", shown: 1, announced: 2 }, "working"],
       [{ state: "saved", time: "14:02:11" }, "good"],
       [{ state: "in-sync", live: true, revision: 1 }, "good"],
-      [{ state: "demo" }, "hollow"],
     ];
     expect(cases.map(([shown]) => syncWords(shown).tone)).toEqual(cases.map(([, tone]) => tone));
     expect(cases.map(([shown]) => syncWords(shown).state)).toEqual(cases.map(([shown]) => shown.state));
@@ -143,7 +140,7 @@ describe("syncWords", () => {
 
 describe("what the chip reads of its owners", () => {
   const timing: SyncTiming = { now: 1000, lag: undefined, inFlightSince: undefined, saved: undefined };
-  const read: SyncReading = { stream: "live", online: true, demo: false, skew: false, revision: 7, count: 0, problems: [], latest: undefined };
+  const read: SyncReading = { stream: "live", online: true, skew: false, revision: 7, count: 0, problems: [], latest: undefined };
 
   it("makes the in-flight fact from the edit manager's count and the scheduler's stamp together", () => {
     expect(syncInputOf(timing, { ...read, count: 2 }).inFlight).toBeUndefined();
@@ -180,7 +177,7 @@ describe("what the chip reads of its owners", () => {
 function scheduler() {
   const clock = new CountingClock();
   const actor = createActor(syncMachine, { clock, input: { monotonic: () => clock.now() } }).start();
-  const read: SyncReading = { stream: "live", online: true, demo: false, skew: false, revision: 7, count: 0, problems: [], latest: save(1) };
+  const read: SyncReading = { stream: "live", online: true, skew: false, revision: 7, count: 0, problems: [], latest: save(1) };
   return {
     clock,
     actor,

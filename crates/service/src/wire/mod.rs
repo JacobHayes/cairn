@@ -2,7 +2,7 @@
 //! the source of truth for the OpenAPI document). Domain values (patches, journeys, events,
 //! rejections) cross unchanged as the schema crate's types; these wrap them, and give the
 //! service's answers and the store's query results a wire shape. The HTTP API and the
-//! in-browser host both serialize these types, so a body is the same bytes from either.
+//! cairn demo both serialize these types, so a body is the same bytes from either.
 
 mod projections;
 mod proposals;
@@ -208,8 +208,6 @@ pub enum AuthKind {
     Tailscale,
     /// Google Cloud Identity-Aware Proxy's signed assertion.
     GcpIap,
-    /// The browser host's single local login.
-    Local,
 }
 
 impl From<&crate::Capabilities> for Capabilities {
@@ -229,7 +227,6 @@ impl From<&crate::Capabilities> for Capabilities {
                 crate::AuthKind::BuiltinOauth => AuthKind::BuiltinOauth,
                 crate::AuthKind::Tailscale => AuthKind::Tailscale,
                 crate::AuthKind::GcpIap => AuthKind::GcpIap,
-                crate::AuthKind::Local => AuthKind::Local,
             },
         });
         Self {

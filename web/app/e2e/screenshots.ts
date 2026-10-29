@@ -1,5 +1,5 @@
 // Every address of the app and the states of it worth a look, for `mise run screenshots`
-// (screenshots.run.ts walks this table, in the in-browser host, at a desktop and a phone width in
+// (screenshots.run.ts walks this table, in cairn demo, at a desktop and a phone width in
 // light and dark) and for the functions that reach a state, which the stress walk (stress.spec.ts)
 // uses too, so the navigation here runs in every browser check and cannot rot unseen.
 //
@@ -9,7 +9,7 @@
 // pictured with no edit. The rest are chosen states: an inspector open, a popover, a layer over a
 // page, a form. They are chosen coverage, not every state.
 //
-// Left out, for the in-browser host has no server behind it: sign-in, and the assistant talking to
+// Left out, for cairn demo has no server behind it: sign-in, and the assistant talking to
 // a provider.
 //
 // The stress walk uses `journeyAt`, `routeAt`, `openPopover`, `openCardMenu`, `openControlsMenu`
@@ -20,7 +20,7 @@ import type { AddressName } from "../src/address.ts";
 import { JOURNEY_OFFERS, ROUTE_OFFERS } from "../src/journeys/view.ts";
 import { openJourneyCard } from "./around.ts";
 import { editWhereVersionTwoChanges, publishVersionTwo, reviewOpen } from "./proposals.ts";
-import { nodeCard, nodePanel, open, openAt, reachCard, settled } from "./shell.ts";
+import { holdToday, nodeCard, nodePanel, open, openAt, reachCard, settled } from "./shell.ts";
 
 /** What the walk reaches states of: the journey and the route it opens, a node and an edge both have, an identity, and the proposals `seedProposals` made. */
 export interface Subject {
@@ -56,7 +56,7 @@ export interface State {
 
 /** The journey screen `view` of `journey`, with `node` open beside it when given. */
 export async function journeyAt(page: Page, journey: string, view: string, node?: string): Promise<void> {
-  await openAt(page, "browser", journey, view, node === undefined ? {} : { node });
+  await openAt(page, journey, view, node === undefined ? {} : { node });
 }
 
 /** The graph of the page as it stands, fitted: the opening fit can land before the canvas has its size, and a picture of the graph reads at the fitted zoom. */
@@ -70,12 +70,12 @@ export async function fitGraph(page: Page): Promise<void> {
 
 /** The route `route` in `view`, with `suffix` after its path (a node's or an edge's address) when given. */
 export async function routeAt(page: Page, route: string, view: string, suffix = ""): Promise<void> {
-  await open(page, "browser", `/routes/${route}${suffix}?view=${view}`);
+  await open(page, `/routes/${route}${suffix}?view=${view}`);
 }
 
 /** An index or form page that has no subject of its own (`/journeys`, `/identities/new`). */
 export async function indexAt(page: Page, path: string): Promise<void> {
-  await open(page, "browser", path);
+  await open(page, path);
 }
 
 /** The toolbar popover of `trigger` (a test id on the view controls or the sync chip), open on the page as it is. */
@@ -154,7 +154,7 @@ function nonEmpty(states: State[]): [State, ...State[]] {
   return [first, ...rest];
 }
 
-/** Reaches `state` of `address` from wherever the page is, once the page has settled and shows its ready sign. The page is kept between states (the in-browser store lives in it), so what the last one left open or focused is closed first. */
+/** Reaches `state` of `address` from wherever the page is, once the page has settled and shows its ready sign. The page is kept between states (the demo's store is shared by all of them), so what the last one left open or focused is closed first. */
 export async function reachState(page: Page, address: AddressName, state: State, on: Subject): Promise<void> {
   // Escape is sent as an event, not typed: a real key press makes the focus the next screen sets keyboard focus, which shows a tip a touch screen's would not.
   await page.evaluate(() => { document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
@@ -211,15 +211,15 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
  * journey, so the walk takes it last.
  */
 export async function seedProposals(page: Page, on: Subject): Promise<Proposals> {
-  await editWhereVersionTwoChanges(page, "browser");
-  await publishVersionTwo(page, "browser");
-  await openJourneyCard(page, "browser", on.journey);
+  await editWhereVersionTwoChanges(page);
+  await publishVersionTwo(page);
+  await openJourneyCard(page, on.journey);
   await page.getByTestId("journey-upgrade").click();
   await page.getByTestId("upgrade-flow").getByRole("button", { name: "Propose the upgrade" }).click();
   await reviewOpen(page);
   const upgrade = /\/proposals\/(pr_[0-9a-f]+)$/.exec(new URL(page.url()).pathname)?.[1] ?? "";
   expect(upgrade).not.toBe("");
-  await openJourneyCard(page, "browser", on.journey);
+  await openJourneyCard(page, on.journey);
   await page.getByTestId("journey-menu").click();
   await page.getByTestId("menu-save").click();
   await page.getByTestId("save-as-route-flow").getByLabel("Route id").fill("r_saved");
@@ -252,8 +252,8 @@ export async function walkStates(
   phone: boolean,
   visit: (address: AddressName, state: State, reach: () => Promise<void>) => Promise<void>,
 ): Promise<string[]> {
-  await page.clock.setFixedTime(new Date(`${WALK_TODAY}T12:00:00Z`));
-  await open(page, "browser", "/");
+  await holdToday(page, WALK_TODAY);
+  await open(page, "/");
   const failed: string[] = [];
   let on: Subject = FIXTURE_SUBJECT;
   const addresses = Object.keys(SCREENS) as AddressName[];

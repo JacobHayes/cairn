@@ -1,6 +1,6 @@
 // The app frame: one scroller per region, so a node's Details (its History) are reachable in the
 // inspector (or the tablet's sheet) at each width, the page itself never scrolls from it; a
-// phone's graph is in the page, with the inspector a bottom sheet over it. On the in-browser host.
+// phone's graph is in the page, with the inspector a bottom sheet over it. On cairn demo.
 import type { Page } from "@playwright/test";
 
 import { checkpoint } from "./invariants.ts";
@@ -33,7 +33,7 @@ async function reachHistory(page: Page, node: string, height: number): Promise<v
 // the sheet over a phone's page.
 test("the inspector scrolls to the end of Details at 1440 and 1024px, a node opens at its top, and the page behind never scrolls", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 768 });
-  await openAt(page, "browser", "j_vendor_eval", "graph?depth=actions", { node: "n_plan" });
+  await openAt(page, "j_vendor_eval", "graph?depth=actions", { node: "n_plan" });
   await reachHistory(page, "n_plan", 768);
   // From here a window that draws every card, so the canvas is clicked rather than framed.
   await readable(page);
@@ -64,7 +64,7 @@ test("the inspector scrolls to the end of Details at 1440 and 1024px, a node ope
   await checkpoint(page);
 
   // The decision graph takes the wheel to pan, and the page behind it does not scroll.
-  await openAt(page, "browser", "j_vendor_eval", "graph?depth=decisions");
+  await openAt(page, "j_vendor_eval", "graph?depth=decisions");
   const canvas = page.getByTestId("canvas");
   const viewport = canvas.locator(".react-flow__viewport");
   const before = await whenSettled(page, () => viewport.evaluate((element) => (element as HTMLElement).style.transform));
@@ -77,7 +77,7 @@ test("the inspector scrolls to the end of Details at 1440 and 1024px, a node ope
 
   // On a tablet the summary's inspector reaches History, the screen's end is above the sheet, and Esc closes it.
   await page.setViewportSize({ width: 1024, height: 700 });
-  await openAt(page, "browser", "j_vendor_eval", "summary", { node: "n_plan" });
+  await openAt(page, "j_vendor_eval", "summary", { node: "n_plan" });
   // Narrowing from a column starts the sheet at its peek: open it up to read.
   await openSheet(page);
   await reachHistory(page, "n_plan", 700);
@@ -149,7 +149,7 @@ async function expectCardsInside(page: Page): Promise<void> {
 }
 
 async function phoneGraphFills(page: Page): Promise<void> {
-  await openJourney(page, "browser", "j_vendor_eval");
+  await openJourney(page, "j_vendor_eval");
   await expect(sheet(page)).toBeVisible();
   expect(await snapOf(page)).toBe("peek");
   const peek = await whenSettled(page, () => sheet(page).boundingBox());
@@ -171,7 +171,7 @@ async function phoneGraphFills(page: Page): Promise<void> {
   expect(await scrolled(page)).toBe(0);
   await checkpoint(page);
   // On the list, the page's last row can be reached above the sheet.
-  await openAt(page, "browser", "j_vendor_eval", "list");
+  await openAt(page, "j_vendor_eval", "list");
   await page.evaluate(() => {
     window.scrollTo(0, document.documentElement.scrollHeight);
   });
@@ -183,7 +183,7 @@ async function phoneGraphFills(page: Page): Promise<void> {
 }
 
 async function phoneSheetSnaps(page: Page): Promise<void> {
-  await openAt(page, "browser", "j_hiring", "graph?depth=decisions");
+  await openAt(page, "j_hiring", "graph?depth=decisions");
   await expectCardsInside(page);
   const zoom = page.locator(".canvas .react-flow__controls");
   // The graph's bottom controls clear the sheet at every height it leaves room at.
@@ -281,7 +281,7 @@ const graphShare = async (page: Page, height: number) => {
 
 
 async function phoneTurns(page: Page): Promise<void> {
-  await openAt(page, "browser", "j_hiring", "graph?depth=decisions");
+  await openAt(page, "j_hiring", "graph?depth=decisions");
   await hiringNode(page).getByTestId("card-open").click();
   // A landscape phone's peek is a small share of a short window, so the graph keeps most of it.
   await page.setViewportSize({ width: 844, height: 390 });

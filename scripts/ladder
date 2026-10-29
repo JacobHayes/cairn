@@ -17,10 +17,8 @@
 # With --fast, steps are left out when the current change touches none of their inputs
 # (scripts/changed): the Rust steps (unit, property) and the Rust half of lint (rustfmt,
 # clippy, also over the testbeds, the wasm32 build, patina labels) when no Rust input changed, and the web steps
-# (web-unit, browser) when neither side changed (the web unit tests compare the browser host's
-# module with the server's answers). The browser step runs only against the in-browser host,
-# with no web build embedded and no binary built or tested, unless the change touches the
-# server side of the web app. The full check and CI skip nothing. The integration step runs when the
+# (web-unit, browser) when neither side changed (the web unit tests read the fixtures from a
+# `cairn demo`). The full check and CI skip nothing. The integration step runs when the
 # change touches the crates its tests build, with their dependencies, derived from the manifests
 # (scripts/changed; decisions/2026-10-21-check-fast-runs-the-integration-tests-their-inputs-touch.md),
 # and so does the cost step, whose tests are modules of that same test binary
@@ -110,20 +108,18 @@ esac
 
 rust=1
 web=1
-server=1
 integration=1
 if [ -n "$fast" ]; then
-  read -r changed_rust changed_web changed_server changed_integration changed_count < <(scripts/changed)
+  read -r changed_rust changed_web changed_integration changed_count < <(scripts/changed)
   if [ "$changed_count" != - ]; then
     rust=$changed_rust
     web=$changed_web
-    server=$changed_server
     integration=$changed_integration
-    echo "ladder: $changed_count files changed (Rust inputs: $rust, web inputs: $web, server side: $server, integration tests: $integration); leaving out the steps they do not touch"
+    echo "ladder: $changed_count files changed (Rust inputs: $rust, web inputs: $web, integration tests: $integration); leaving out the steps they do not touch"
   fi
 fi
-# The steps read these: lint leaves out the Rust half, browser the binary and its web build.
-export LADDER_RUST=$rust LADDER_SERVER=$server
+# The steps read this: lint leaves out the Rust half.
+export LADDER_RUST=$rust
 
 # The steps that run one at a time, then the ones that run side by side.
 first=()
@@ -164,16 +160,16 @@ cache_note() {
 # embed, which in a part of its own gets no build from a step beside it), then the test
 # binaries every Rust test step picks from (scripts/ladder-tests), built once. They read the web
 # build at run time (CAIRN_WEB_DIR), so it is no input of them. The browser step needs the web
-# build and the tests only when it runs the binary (server is 1: always in the full check).
+# build and the tests, for the binary it starts a demo from.
 # A part without those steps (lint) builds nothing.
 prepare() {
   local step log=dist/ladder/build.log needs_tests= needs_web= built= build_started=$SECONDS
   : >"$log"
   for step in ${first[@]+"${first[@]}"} ${side[@]+"${side[@]}"}; do
     case $step in
-      unit | property | integration | cost) needs_tests=1 ;;
+      unit | property | integration | cost | web-unit) needs_tests=1 ;;
       embed) needs_web=1 ;;
-      browser) [ "$server" != 1 ] || { needs_tests=1; needs_web=1; } ;;
+      browser) needs_tests=1; needs_web=1 ;;
     esac
   done
   if [ -n "$needs_web" ]; then

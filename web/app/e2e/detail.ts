@@ -2,11 +2,11 @@
 // person does (from its card on the journey's canvas), and its sections, forms, and dates.
 import type { Locator, Page } from "@playwright/test";
 
-import { openFromCanvas, openJourney, whenSettled, type HostKind } from "./shell.ts";
+import { openFromCanvas, openJourney, whenSettled } from "./shell.ts";
 
 /** Opens journey `journey` on `host`, then node `node`'s detail from its card on the canvas. */
-export async function openNode(page: Page, host: HostKind, journey: string, node: string): Promise<Locator> {
-  await openJourney(page, host, journey);
+export async function openNode(page: Page, journey: string, node: string): Promise<Locator> {
+  await openJourney(page, journey);
   return openFromCanvas(page, node);
 }
 

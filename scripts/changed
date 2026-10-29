@@ -6,11 +6,10 @@
 // running more. The full `mise run check` and CI never ask.
 //
 // usage: scripts/changed
-//   Prints one line, "RUST WEB SERVER INTEGRATION COUNT": RUST, WEB, SERVER, and INTEGRATION
-//   are 1 when the change touches that side's inputs (see below) and 0 when it does not, COUNT
-//   the number of changed files ("-" when the diff was unavailable, which sets all four to 1).
+//   Prints one line, "RUST WEB INTEGRATION COUNT": RUST, WEB, and INTEGRATION are 1 when the
+//   change touches that side's inputs (see below) and 0 when it does not, COUNT the number of
+//   changed files ("-" when the diff was unavailable, which sets all three to 1).
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
 
 // A path is an input of the Rust side when anything Cargo builds or a Rust test reads can
 // change with it: the crates and their lock, the fixtures, the generated schema and OpenAPI
@@ -19,16 +18,6 @@ const rustInputs = /^(crates|testbeds|fixtures|schema|openapi|instructions)\/|^(
 // And of the web side: the web packages, the design they import, and the fixtures the
 // browser tests walk.
 const webInputs = /^(web|design|fixtures)\/|^(package\.json|package-lock\.json|tsconfig\.json|eslint\.config\.js)$/;
-// The server side of the web app, which only the binary exercises (the `server` Playwright
-// projects): the API client, the server host and the assistant it alone has, the proposals
-// module with its server half, the boot code and Vite config that choose the host, the config
-// that runs against the binary, and the specs that hold a test tagged @server (any spec, see
-// `holdsServerTest`). Every Rust input counts too, since the binary embeds the web build and
-// serves the API.
-const serverInputs =
-  /^web\/client\/|^web\/app\/(src\/(boot\.ts|data\/(server-host|assistant|proposals)\.|assistant\/)|vite\.config\.ts)|^web\/app\/playwright\.config\.ts$/;
-/** Whether `file` is a browser spec with a test tagged @server (a removed spec holds none). */
-const holdsServerTest = (file) => /^web\/app\/e2e\/[^/]+\.spec\.ts$/.test(file) && existsSync(file) && readFileSync(file, "utf8").includes("@server");
 // The integration step's inputs: the directories of the crates its tests build and run (the
 // test binary's and the cairn binary's, with everything they depend on, from `cargo metadata`,
 // so a crate that gains or loses a dependency moves in or out with no list kept here), and the
@@ -64,7 +53,7 @@ function changedFiles() {
   return [];
 }
 
-/** @returns {{ rust: boolean, web: boolean, server: boolean, integration: boolean, count: number | null, error?: string }} */
+/** @returns {{ rust: boolean, web: boolean, integration: boolean, count: number | null, error?: string }} */
 function changedInputs() {
   try {
     const files = changedFiles();
@@ -72,12 +61,12 @@ function changedInputs() {
     const rust = touches(rustInputs);
     const covered = integrationInputs();
     const integration = files.some((file) => covered(file) || /^(Cargo\.(toml|lock))$/.test(file) || bothInputs.test(file));
-    return { rust, web: touches(webInputs), server: rust || touches(serverInputs) || files.some(holdsServerTest), integration, count: files.length };
+    return { rust, web: touches(webInputs), integration, count: files.length };
   } catch (error) {
-    return { rust: true, web: true, server: true, integration: true, count: null, error: String(error instanceof Error ? error.message : error).split("\n")[0] ?? "" };
+    return { rust: true, web: true, integration: true, count: null, error: String(error instanceof Error ? error.message : error).split("\n")[0] ?? "" };
   }
 }
 
-const { rust, web, server, integration, count, error } = changedInputs();
+const { rust, web, integration, count, error } = changedInputs();
 if (error !== undefined) console.error(`changed: no diff (${error}); treating everything as changed`);
-console.log(`${Number(rust)} ${Number(web)} ${Number(server)} ${Number(integration)} ${count ?? "-"}`);
+console.log(`${Number(rust)} ${Number(web)} ${Number(integration)} ${count ?? "-"}`);

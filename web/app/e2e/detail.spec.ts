@@ -1,5 +1,5 @@
 // The inspector's one write path that no unit test reaches, over the
-// in-browser host (each page load seeds the fixtures afresh): a date pin the chain rejects
+// cairn demo (each test has its own, with the fixtures afresh): a date pin the chain rejects
 // (F5), with the rejection and an unsent bypass reason (D4), counted by the
 // sync chip wherever you go, and resolved with a listed move. A node's actions hold one open
 // form, which a reload brings back (D1, B6). The inspector's sections, forms and offers are
@@ -15,7 +15,7 @@ import { openNode, pin, section, state } from "./detail.ts";
 import { fresh, goTo, goWithin, menuItem, nodeCard, nodePanel, openAt, openFromCanvas, openJourney, openSheet, readable, settled, syncChip, whenSettled } from "./shell.ts";
 
 async function discardClearsRejection(page: Page) {
-  const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
+  const panel = await openNode(page, "j_vendor_eval", "n_final_report");
   // Discard on the chip clears a section's rejection on its screen.
   await pin(panel, "2026-11-25");
   await expect(panel.getByTestId("date-conflict")).toBeVisible();
@@ -57,7 +57,7 @@ async function rejectionStaysAndResolves(page: Page) {
 }
 
 async function oneOpenFormSurvivesReload(page: Page) {
-  let panel = await openNode(page, "browser", "j_launch", "n_announcement");
+  let panel = await openNode(page, "j_launch", "n_announcement");
   await menuItem(panel, "skip");
   const waiting = fresh("Waiting on legal");
   await panel.getByTestId("skip-form").getByLabel("Why skip it").fill(waiting);
@@ -120,7 +120,7 @@ test("a later pin is rejected with its chain, counted away from it, discarded or
 });
 
 test("a node held by its container's snooze offers Unsnooze of the container, which lifts it (B6)", async ({ page }) => {
-  const panel = await openNode(page, "browser", "j_launch", "n_announcement");
+  const panel = await openNode(page, "j_launch", "n_announcement");
   await menuItem(panel, "snooze");
   await panel.getByRole("radio", { name: /^All of / }).first().check();
   await panel.getByTestId("snooze").getByRole("button", { name: "Snooze", exact: true }).click();
@@ -133,7 +133,7 @@ test("a node held by its container's snooze offers Unsnooze of the container, wh
 
 test("a milestone done on a phone: an empty date says what to choose and blocks Mark done, done leaves its sentence a readable line, and editing the date offers Save only for a new one", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await openAt(page, "browser", "j_vendor_eval", "list", { node: "n_decision_meeting" });
+  await openAt(page, "j_vendor_eval", "list", { node: "n_decision_meeting" });
   await openSheet(page);
   const panel = page.getByTestId("node-detail");
   await panel.getByLabel("Done on").fill("");
@@ -157,7 +157,7 @@ test("a milestone done on a phone: an empty date says what to choose and blocks 
 
 test("a stage is marked done with a reason: what was left inside reads skipped and what waited for it is freed, and Reopen takes it back (D1a)", async ({ page }) => {
   await readable(page);
-  const stage = await openNode(page, "browser", "j_launch", "n_materials");
+  const stage = await openNode(page, "j_launch", "n_materials");
   await expect(nodeCard(page, "n_announcement").getByTestId("card-state")).not.toHaveAttribute("data-state", "skipped");
   await menuItem(stage, "mark-done");
   const form = stage.getByTestId("mark-done-form");
@@ -188,7 +188,7 @@ async function press(page: Page, control: Locator): Promise<void> {
 
 test("a checklist is written in the node form, ticked in place, finished with Mark done... from the list in one patch, and its progress is on the card (G5)", async ({ page }) => {
   // Author: require the checklist, add three items, move one, and type a fourth that Save must not drop.
-  await openEditing(page, "browser", "j_bakeoff");
+  await openEditing(page, "j_bakeoff");
   await openFromCanvas(page, "n_trial_a");
   const completion = await openForm(page, "completion");
   await completion.getByLabel("Requires all items ticked before done").check();
@@ -209,7 +209,7 @@ test("a checklist is written in the node form, ticked in place, finished with Ma
   await expect(page.getByTestId("node-form-save")).toHaveCount(0);
   await settled(page);
   // Act: the checklist is in the inspector in the order written; ticking two moves the card's count.
-  await openJourney(page, "browser", "j_bakeoff");
+  await openJourney(page, "j_bakeoff");
   const panel = await openFromCanvas(page, "n_trial_a");
   const checklist = panel.getByTestId("checklist");
   await expect(checklist.getByTestId("checklist-item")).toHaveText(["Rollback plan written", "Support team briefed", "Load test passed", "Status page drafted"]);
@@ -220,7 +220,7 @@ test("a checklist is written in the node form, ticked in place, finished with Ma
   await expect(nodeCard(page, "n_trial_a").getByTestId("card-checklist")).toHaveAttribute("data-total", "4");
   await checkpoint(page);
   // Finish from the list: the row opens the inspector's form, which ticks the rest and completes in one patch.
-  await openActing(page, "browser", "j_bakeoff", "list?frontier=1");
+  await openActing(page, "j_bakeoff", "list?frontier=1");
   await frontierItem(page, "n_trial_a").getByRole("button", { name: "Mark done…" }).click();
   const done = nodePanel(page, "n_trial_a");
   await expect(done.getByTestId("done-ticks")).toBeVisible();
@@ -240,7 +240,7 @@ test("a checklist is written in the node form, ticked in place, finished with Ma
 });
 
 test("leaving the new-item field adds the typed item and clears the field (G5)", async ({ page }) => {
-  await openEditing(page, "browser", "j_bakeoff");
+  await openEditing(page, "j_bakeoff");
   await openFromCanvas(page, "n_trial_b");
   const completion = await openForm(page, "completion");
   await completion.getByLabel("New item", { exact: true }).fill("Left behind");
@@ -250,7 +250,7 @@ test("leaving the new-item field adds the typed item and clears the field (G5)",
 });
 
 test("one press of Save keeps an item typed in the new-item field when it is the only change (G5)", async ({ page }) => {
-  await openEditing(page, "browser", "j_bakeoff");
+  await openEditing(page, "j_bakeoff");
   await openFromCanvas(page, "n_trial_b");
   const completion = await openForm(page, "completion");
   await completion.getByLabel("New item", { exact: true }).fill("Solo item");
@@ -258,13 +258,13 @@ test("one press of Save keeps an item typed in the new-item field when it is the
   await press(page, page.getByTestId("node-form-save"));
   await expect(page.getByTestId("node-form-save")).toHaveCount(0);
   await settled(page);
-  await openJourney(page, "browser", "j_bakeoff");
+  await openJourney(page, "j_bakeoff");
   const panel = await openFromCanvas(page, "n_trial_b");
   await expect(panel.getByTestId("checklist").getByTestId("checklist-item")).toHaveText(["Solo item"]);
 });
 
 test("a checklist item typed and not added survives a reload, and a replacement for a removed ticked item starts unticked (G5)", async ({ page }) => {
-  await openEditing(page, "browser", "j_bakeoff");
+  await openEditing(page, "j_bakeoff");
   await openFromCanvas(page, "n_trial_a");
   let completion = await openForm(page, "completion");
   await completion.getByLabel("Requires all items ticked before done").check();
@@ -278,12 +278,12 @@ test("a checklist item typed and not added survives a reload, and a replacement 
   await completion.getByLabel("New item", { exact: true }).fill("");
   await page.getByTestId("node-form-save").click();
   await settled(page);
-  await openJourney(page, "browser", "j_bakeoff");
+  await openJourney(page, "j_bakeoff");
   const panel = await openFromCanvas(page, "n_trial_a");
   await panel.getByTestId("checklist").getByTestId("checklist-item").first().click();
   await expect(nodeCard(page, "n_trial_a").getByTestId("card-checklist")).toHaveAttribute("data-ticked", "1");
   // Remove the ticked item and add one with the same title: it is a new item, so it carries no tick.
-  await openEditing(page, "browser", "j_bakeoff");
+  await openEditing(page, "j_bakeoff");
   await openFromCanvas(page, "n_trial_a");
   completion = await openForm(page, "completion");
   await completion.getByRole("button", { name: "Remove the item Alpha" }).click();
@@ -291,11 +291,11 @@ test("a checklist item typed and not added survives a reload, and a replacement 
   await completion.getByLabel("New item", { exact: true }).press("Enter");
   await page.getByTestId("node-form-save").click();
   await settled(page);
-  await openJourney(page, "browser", "j_bakeoff");
+  await openJourney(page, "j_bakeoff");
   await openFromCanvas(page, "n_trial_a");
   await expect(nodeCard(page, "n_trial_a").getByTestId("card-checklist")).toHaveAttribute("data-ticked", "0");
   // A refused completion offers the remedy first; the reason field opens only when the bypass is chosen.
-  await openActing(page, "browser", "j_bakeoff", "list?frontier=1");
+  await openActing(page, "j_bakeoff", "list?frontier=1");
   await frontierItem(page, "n_trial_a").locator("input[type=checkbox]").click();
   await frontierItem(page, "n_trial_b").locator("input[type=checkbox]").click();
   await page.getByTestId("selection-status").click();
@@ -317,19 +317,19 @@ test("a checklist item typed and not added survives a reload, and a replacement 
 });
 
 test("work that waits is started and finished, and a decision that waits is answered, each as a plain move (F6, D4)", async ({ page }) => {
-  let panel = await openNode(page, "browser", "j_bakeoff", "n_comparison");
+  let panel = await openNode(page, "j_bakeoff", "n_comparison");
   await expect(state(panel)).toContainText(/blocked/i);
   await panel.getByRole("button", { name: "Start", exact: true }).click();
   await settled(page);
   await expect(state(panel)).toContainText(/active/i);
   await expect(panel.getByTestId("refused")).toHaveCount(0);
   // A milestone whose prerequisites are open is marked done from its own button.
-  panel = await openNode(page, "browser", "j_launch", "n_go_no_go");
+  panel = await openNode(page, "j_launch", "n_go_no_go");
   await panel.getByRole("button", { name: "Mark done", exact: true }).click();
   await settled(page);
   await expect(state(panel)).toContainText(/done/i);
   await checkpoint(page);
-  panel = await openNode(page, "browser", "j_bakeoff", "n_winner");
+  panel = await openNode(page, "j_bakeoff", "n_winner");
   await panel.getByRole("radio").first().check();
   await panel.getByRole("button", { name: "Save", exact: true }).click();
   await settled(page);

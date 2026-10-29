@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Builds the binary that `cairn demo` runs from and prints its path. The browser tests and the
+# web unit tests each start their own demo from it (web/app/src/demo-server.test-support.ts), so
+# every test begins on the fixtures as seeded. It is the binary the ladder's one build of the
+# test binaries links (scripts/ladder-tests), by the same command, so in the ladder this is a
+# no-op: a build of `-p cairn` resolves features differently, compiling the crates again and
+# replacing the binary the tests run.
+#
+# usage: scripts/demo-binary
+set -euo pipefail
+cd "$(dirname "$0")/.."
+scripts/timed build cargo test --locked --quiet --workspace --all-features --tests --no-run >&2
+echo "$(scripts/target-dir)/debug/cairn"

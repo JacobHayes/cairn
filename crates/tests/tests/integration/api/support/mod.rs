@@ -131,8 +131,7 @@ impl World {
         Self::begin(true, Some(provider), start_clock(), &Front::Team).await
     }
 
-    /// As [`World::start`], for a host that does not offer MCP, as the browser host does not
-    /// (capability gating: its root serves no MCP endpoint).
+    /// As [`World::start`], for a root that serves no MCP endpoint (capability gating).
     pub async fn start_without_mcp() -> Self {
         Self::begin(false, None, start_clock(), &Front::Team).await
     }

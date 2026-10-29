@@ -48,28 +48,8 @@ mod composition {
         assert_eq!(server.version.as_deref(), Some("1.2.3"));
         assert_eq!(server.mcp, Some(access));
         assert_eq!(server.auth, vec![dev]);
-        let browser = Capabilities::browser();
-        assert!(
-            browser.mcp.is_none()
-                && !browser.sse
-                && !browser.assistant
-                && browser.version.is_none()
-        );
-        assert_eq!(
-            browser
-                .auth
-                .iter()
-                .map(|method| method.kind)
-                .collect::<Vec<_>>(),
-            vec![AuthKind::Local]
-        );
-        for document in [server, browser] {
-            let json = serde_json::to_string(&document).unwrap();
-            assert_eq!(
-                serde_json::from_str::<Capabilities>(&json).unwrap(),
-                document
-            );
-        }
+        let json = serde_json::to_string(&server).unwrap();
+        assert_eq!(serde_json::from_str::<Capabilities>(&json).unwrap(), server);
     }
 
     /// A store whose deployment holds `who_lead` (lead@example.org), `who_alias_holder`

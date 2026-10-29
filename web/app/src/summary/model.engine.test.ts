@@ -2,23 +2,22 @@
 // attention, who has which action, what finished recently) read from fixtures and from patches
 // of them, so they cannot drift from what the engine derives.
 import type { Schema } from "@cairn/client";
-import type { InBrowserHost } from "@cairn/wasm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { derivedJourney, journeyAfter, seeded, type DerivedJourney } from "../authoring/engine.test-support.ts";
+import { derivedJourney, journeyAfter, seeded, type DerivedJourney, type Fixtures } from "../authoring/engine.test-support.ts";
 import type { Mutation } from "../authoring/graph.ts";
 import { transition } from "../detail/model.ts";
 import { dateWords } from "../status/when.ts";
 import { attentionRows, blockedRows, claimActions, claimedKeys, lifecycleLine, milestoneLine, recentlyFinished, scheduledRows, shortfallWords, summaryModel, underWay } from "./model.ts";
 
-let host: InBrowserHost;
+let host: Fixtures;
 const held: DerivedJourney[] = [];
 /** The journeys the seeded host holds (the fixtures'), read from it rather than listed here. */
 let fixtureJourneys: string[] = [];
 
 beforeAll(async () => {
   host = await seeded();
-  fixtureJourneys = host.journeyIndex({}).items.map((each) => each.id);
+  fixtureJourneys = host.journeyIds();
 });
 
 afterEach(() => {
@@ -36,10 +35,10 @@ function open(journey: string, mutations: Mutation[] = []): DerivedJourney {
 let fresh = 0;
 
 /** A new journey from the vendor evaluation route's first version, derived: nothing is answered yet. */
-function openFresh(mutations: Mutation[] = []): DerivedJourney {
+async function openFresh(mutations: Mutation[] = []): Promise<DerivedJourney> {
   fresh += 1;
   const id = `j_summary_fresh_${String(fresh)}`;
-  host.patch({ patch: { id: `p_summary_fresh_${String(fresh)}`, target: { journey: id }, base_revision: 0, mutations: [{ op: "create_journey", name: "A fresh evaluation", from: { route: "vendor-evaluation", version: 1 } }] } });
+  await host.patch({ patch: { id: `p_summary_fresh_${String(fresh)}`, target: { journey: id }, base_revision: 0, mutations: [{ op: "create_journey", name: "A fresh evaluation", from: { route: "vendor-evaluation", version: 1 } }] } });
   const text = mutations.length === 0 ? host.documentText(id) : journeyAfter(host, id, mutations);
   const derived = derivedJourney(host, text);
   held.push(derived);
@@ -88,8 +87,8 @@ describe("C13, F1, F6: the lead's milestone line", () => {
     expect(model.shortfalls.filter((each) => each.key !== "n_launch").length).toBeGreaterThan(0);
   });
 
-  it("names an undated final milestone's feeding decision", () => {
-    const journey = openFresh();
+  it("names an undated final milestone's feeding decision", async () => {
+    const journey = await openFresh();
     const line = milestoneLine(journey.ready, pageOf(journey).model);
     expect(line).toMatchObject({ role: "final", key: "n_decision_meeting", date: undefined });
     expect(line?.feeder?.key).toBe(journey.ready.journey.graph.nodes?.find((node) => node.feeds_milestone === "n_decision_meeting")?.key);
@@ -229,10 +228,10 @@ describe("C11: decisions waiting", () => {
     expect(winner?.fact).toContain(journey.ready.journey.graph.nodes?.find((node) => node.key === "n_summary")?.title ?? "missing");
   });
 
-  it("says a snoozed decision is snoozed until its date", () => {
-    const fresh = openFresh();
+  it("says a snoozed decision is snoozed until its date", async () => {
+    const fresh = await openFresh();
     const decision = pageOf(fresh).actions.decide[0]?.key ?? "";
-    const journey = openFresh([{ op: "snooze", node: decision, until: { date: "2026-10-20" } }]);
+    const journey = await openFresh([{ op: "snooze", node: decision, until: { date: "2026-10-20" } }]);
     expect(keys(pageOf(journey).frontier)).not.toContain(decision);
     expect(pageOf(journey).actions.waiting.find((each) => each.key === decision)?.fact).toBe("Snoozed until Oct 20");
   });

@@ -188,7 +188,7 @@ export function useOnline(): boolean {
  * flight, the revision shown), put through the pure rule. Nothing here is stored.
  */
 export function useSync(): SyncSummary {
-  const { sync, edits, host } = useSession();
+  const { sync, edits } = useSession();
   const timing = useSelector(sync, (snapshot) => snapshot.context.timing);
   const count = useSelector(edits, (snapshot) => inFlightOf(snapshot.context.writes));
   const stream = useStreamStatus();
@@ -197,8 +197,7 @@ export function useSync(): SyncSummary {
   const problems = useProblems();
   const revision = useDerivation()?.revision;
   const latest = useSaves()[0];
-  const demo = host.kind === "browser";
-  return useMemo(() => syncSummary(syncInputOf(timing, { stream, online, demo, skew, revision, count, problems, latest })), [timing, stream, online, demo, skew, revision, count, problems, latest]);
+  return useMemo(() => syncSummary(syncInputOf(timing, { stream, online, skew, revision, count, problems, latest })), [timing, stream, online, skew, revision, count, problems, latest]);
 }
 
 /** Whether nothing the tab has under way will change what it shows (`settled`), as the sync chip carries it. */

@@ -4,15 +4,14 @@
 // and refuses it without. Removing a role rewrites what names it first.
 import type { Schema } from "@cairn/client";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { InBrowserHost } from "@cairn/wasm";
 
-import { applyToDraft, applyToJourney, journeyAfter, planMutations, removalPlan, seeded } from "./engine.test-support.ts";
+import { applyToDraft, applyToJourney, journeyAfter, planMutations, removalPlan, seeded, type Fixtures } from "./engine.test-support.ts";
 import type { Mutation } from "./graph.ts";
 
 const JOURNEY = "j_vendor_eval";
 
 describe("the engine's removal plan (A18)", () => {
-  let host: InBrowserHost;
+  let host: Fixtures;
   beforeAll(async () => {
     host = await seeded();
   });
@@ -77,7 +76,7 @@ describe("the engine's removal plan (A18)", () => {
 });
 
 describe("removing a role or a kind (A18)", () => {
-  let host: InBrowserHost;
+  let host: Fixtures;
   beforeAll(async () => {
     host = await seeded();
   });

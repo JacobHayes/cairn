@@ -314,7 +314,7 @@ if [ "$rust" = 1 ]; then
 
   # ARCHITECTURE, Repository layout: the service is runtime-free (no tokio, database driver,
   # or transport), so it builds for the browser with the engine, schema, and store beneath it,
-  # and the browser host (crates/wasm) on top. A dependency that pulls in a runtime fails here.
+  # and the browser's engine module (crates/wasm) on top. A dependency that pulls in a runtime fails here.
   wasm_crates=(cairn-service cairn-wasm)
   wasm_packages=()
   for name in "${wasm_crates[@]}"; do

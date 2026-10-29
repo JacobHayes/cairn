@@ -1,40 +1,43 @@
-//! Native half: the in-browser root reads a route and its published versions as
-//! the API answers them, and a route's graph, which has no state, has a canvas level by the
-//! journey level's rules (C2): every node of the graph when every kind is shown, its implicit
+//! A route's graph, which has no state, has a canvas level by the journey level's rules (C2): every node of the graph when every kind is shown, its implicit
 //! gates among the edges, and hidden actions rolled up into their deliverable.
 #![cfg(test)]
 
 use std::collections::BTreeSet;
 
+use cairn_engine::from_file;
 use cairn_schema::{
-    EdgeOrigin, Level, LevelDisplay, LevelQuery, NodeKey, NodeKind, Payload, Rejection, Route,
-    RouteSchedule, RouteVersion, Trace, ViolationCode,
+    Deployment, EdgeOrigin, Graph, Level, LevelDisplay, LevelQuery, NodeKey, NodeKind, Payload,
+    Rejection, Route, RouteFile, RouteSchedule, SequentialKeys, Trace, ViolationCode, from_yaml,
 };
 use cairn_wasm::{
-    BrowserRoot, Derivation, HostError, Projection, RouteApplyRequest, RouteDerivation,
-    RouteDeriveRequest, RouteNoticesRequest, apply_route_locally, read_document, route_notices,
+    Derivation, HostError, Projection, RouteApplyRequest, RouteDerivation, RouteDeriveRequest,
+    RouteNoticesRequest, apply_route_locally, read_document, route_notices,
 };
 
-fn version_one(root: &BrowserRoot) -> RouteVersion {
-    serde_json::from_str(&root.route_version("vendor-evaluation", "1").unwrap()).unwrap()
+/// The graph of a fixture route, built as published.
+fn graph_of(text: &str) -> Graph {
+    let file: RouteFile = from_yaml(text).unwrap();
+    from_file(&file, &mut SequentialKeys::default())
+        .unwrap()
+        .into_document()
 }
 
-fn deployment() -> cairn_schema::Deployment {
-    serde_json::from_str(&BrowserRoot::seeded().unwrap().deployment().unwrap()).unwrap()
+fn vendor_evaluation() -> Graph {
+    graph_of(include_str!(
+        "../../../../../fixtures/vendor-evaluation/route.yaml"
+    ))
 }
 
-fn derived(version: &RouteVersion) -> RouteDerivation {
+fn derived(graph: &Graph) -> RouteDerivation {
     RouteDerivation::of(&RouteDeriveRequest {
-        graph: version.graph.clone(),
-        deployment: deployment(),
+        graph: graph.clone(),
+        deployment: Deployment::default(),
     })
     .unwrap()
 }
 
-fn level_of(version: &RouteVersion, query: LevelQuery) -> Level {
-    let answer = derived(version)
-        .projected(&Projection::Level(query))
-        .unwrap();
+fn level_of(graph: &Graph, query: LevelQuery) -> Level {
+    let answer = derived(graph).projected(&Projection::Level(query)).unwrap();
     serde_json::from_str(&answer).unwrap()
 }
 
@@ -50,44 +53,20 @@ fn keys(nodes: &[NodeKey]) -> BTreeSet<String> {
     nodes.iter().map(ToString::to_string).collect()
 }
 
-fn level(version: &RouteVersion, shown: &[NodeKind]) -> Level {
+fn level(graph: &Graph, shown: &[NodeKind]) -> Level {
     level_of(
-        version,
+        graph,
         LevelQuery::of_kinds(shown.iter().copied().collect(), None),
     )
 }
 
 #[test]
-fn the_root_reads_a_route_and_its_versions() {
-    let root = BrowserRoot::seeded().unwrap();
-    let route: Route = serde_json::from_str(&root.route("vendor-evaluation").unwrap()).unwrap();
-    assert!(
-        route
-            .versions
-            .iter()
-            .any(|number| number.to_string() == "1")
-    );
-    assert_eq!(version_one(&root).version.to_string(), "1");
-    let missing: HostError =
-        serde_json::from_str(&root.route("no-such-route").unwrap_err()).unwrap();
-    assert!(matches!(missing, HostError::Missing { .. }));
-    let missing: HostError =
-        serde_json::from_str(&root.route_version("vendor-evaluation", "99").unwrap_err()).unwrap();
-    assert!(matches!(missing, HostError::Missing { .. }));
-}
-
-#[test]
 fn every_node_of_a_route_is_on_its_canvas_with_its_implicit_gates() {
-    let version = version_one(&BrowserRoot::seeded().unwrap());
-    let all = level(&version, &NodeKind::ALL);
+    let graph = vendor_evaluation();
+    let all = level(&graph, &NodeKind::ALL);
     let drawn: BTreeSet<_> = all.nodes.iter().map(|node| node.key.clone()).collect();
-    let graph: BTreeSet<_> = version
-        .graph
-        .nodes
-        .values()
-        .map(|node| node.key.clone())
-        .collect();
-    assert_eq!(drawn, graph);
+    let in_graph: BTreeSet<_> = graph.nodes.values().map(|node| node.key.clone()).collect();
+    assert_eq!(drawn, in_graph);
     let origins: BTreeSet<_> = all
         .edges
         .iter()
@@ -105,14 +84,14 @@ fn every_node_of_a_route_is_on_its_canvas_with_its_implicit_gates() {
 
 #[test]
 fn hidden_actions_roll_up_into_their_deliverable() {
-    let version = version_one(&BrowserRoot::seeded().unwrap());
+    let graph = vendor_evaluation();
     let shown = [
         NodeKind::Group,
         NodeKind::Decision,
         NodeKind::Deliverable,
         NodeKind::Milestone,
     ];
-    let plan = level(&version, &shown)
+    let plan = level(&graph, &shown)
         .nodes
         .into_iter()
         .find(|node| node.key.to_string() == "n_plan")
@@ -125,7 +104,7 @@ fn hidden_actions_roll_up_into_their_deliverable() {
 #[test]
 fn a_route_graph_lists_the_work_its_final_milestone_cannot_see() {
     let request = RouteNoticesRequest {
-        graph: version_one(&BrowserRoot::seeded().unwrap()).graph,
+        graph: vendor_evaluation(),
     };
     let answer = route_notices(&serde_json::to_string(&request).unwrap()).unwrap();
     let listed: Vec<cairn_schema::Notice> = serde_json::from_str(&answer).unwrap();
@@ -140,11 +119,11 @@ fn a_route_graph_lists_the_work_its_final_milestone_cannot_see() {
 /// text search narrow it as they narrow a journey's, so the wasm entry carries the whole query.
 #[test]
 fn a_route_level_honours_the_classes_and_the_search_of_the_query() {
-    let version = version_one(&BrowserRoot::seeded().unwrap());
-    let everything = level(&version, &NodeKind::ALL);
+    let graph = vendor_evaluation();
+    let everything = level(&graph, &NodeKind::ALL);
     let mut query = LevelQuery::of_kinds(NodeKind::ALL.iter().copied().collect(), None);
     query.display = BTreeSet::from([LevelDisplay::Relevant]);
-    let relevant = level_of(&version, query);
+    let relevant = level_of(&graph, query);
     assert!(relevant.nodes.len() < everything.nodes.len());
     assert!(
         relevant
@@ -155,10 +134,10 @@ fn a_route_level_honours_the_classes_and_the_search_of_the_query() {
             > 0
     );
     let title = everything.nodes[0].key.clone();
-    let word = version.graph.nodes.get(&title).unwrap().title.to_string();
+    let word = graph.nodes.get(&title).unwrap().title.to_string();
     let mut query = LevelQuery::of_kinds(NodeKind::ALL.iter().copied().collect(), None);
     query.text = Some(word.parse().unwrap());
-    let found = level_of(&version, query);
+    let found = level_of(&graph, query);
     assert!(found.nodes.iter().any(|node| node.key == title));
     assert!(found.nodes.len() < everything.nodes.len());
 }
@@ -168,19 +147,14 @@ fn a_route_level_honours_the_classes_and_the_search_of_the_query() {
 /// no earlier than hardening's end. The estimates are read off the fixture, not typed in.
 #[test]
 fn a_route_schedule_places_the_work_in_days_from_the_start() {
-    let root = BrowserRoot::seeded().unwrap();
-    let launch: RouteVersion =
-        serde_json::from_str(&root.route_version("product-launch", "1").unwrap()).unwrap();
+    let launch = graph_of(include_str!(
+        "../../../../../fixtures/product-launch/route.yaml"
+    ));
     let derivation = derived(&launch);
     let schedule: RouteSchedule = serde_json::from_str(&derivation.schedule()).unwrap();
     assert_eq!(schedule, derivation.scheduled());
     let estimate = |node: &str| {
-        let payload = &launch
-            .graph
-            .nodes
-            .get(&node.parse().unwrap())
-            .unwrap()
-            .payload;
+        let payload = &launch.nodes.get(&node.parse().unwrap()).unwrap().payload;
         let days = match payload {
             Payload::Deliverable(deliverable) => deliverable.estimate,
             Payload::Action(action) => action.estimate,
@@ -220,15 +194,13 @@ fn an_unreadable_route_request_is_refused() {
 /// answers the trace of a journey that has just been created from the version identically.
 #[test]
 fn a_route_version_traces_as_a_journey_just_created_from_it_does() {
-    let root = BrowserRoot::seeded().unwrap();
-    let version = version_one(&root);
-    let route = derived(&version);
-    let id = root.journey_page().unwrap().items[0].id.to_string();
-    let mut pristine = read_document(&root.document(&id, "2026-10-06T12:00:00Z").unwrap()).unwrap();
-    pristine.journey.graph = version.graph.clone();
+    let graph = vendor_evaluation();
+    let route = derived(&graph);
+    let mut pristine = read_document(&super::document::document()).unwrap();
+    pristine.journey.graph = graph.clone();
     let journey = Derivation::of(pristine).unwrap();
     let mut traced_something = false;
-    for node in version.graph.nodes.values().map(|node| &node.key) {
+    for node in graph.nodes.values().map(|node| &node.key) {
         let request = Projection::Trace {
             key: node.clone(),
             standing: Vec::new(),
@@ -242,13 +214,11 @@ fn a_route_version_traces_as_a_journey_just_created_from_it_does() {
 }
 
 fn route_apply(route: Option<Route>, patch: &str) -> Result<Route, HostError> {
-    let deployment =
-        serde_json::from_str(&BrowserRoot::seeded().unwrap().deployment().unwrap()).unwrap();
     apply_route_locally(&RouteApplyRequest {
         route,
         versions: Vec::new(),
         segments: Vec::new(),
-        deployment,
+        deployment: Deployment::default(),
         patch: serde_json::from_str(patch).unwrap(),
         today: "2026-10-06".parse().unwrap(),
         at: "2026-10-06T12:00:00Z".parse().unwrap(),
@@ -305,8 +275,8 @@ fn a_route_draft_is_authored_locally_and_refused_with_its_violations() {
 /// sits in; a group adds nothing to the gravity of what is inside it.
 #[test]
 fn a_node_behind_a_condition_traces_to_its_gate_and_its_stages() {
-    let version = version_one(&BrowserRoot::seeded().unwrap());
-    let trace = trace_of(&derived(&version), "n_partner_results");
+    let graph = vendor_evaluation();
+    let trace = trace_of(&derived(&graph), "n_partner_results");
     let set = |nodes: &[&str]| {
         nodes
             .iter()

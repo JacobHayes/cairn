@@ -264,7 +264,6 @@ export function SyncChip() {
         type="button"
         className="sync"
         data-testid="sync"
-        data-host={session.host.kind}
         data-state={summary.state}
         data-tone={summary.tone}
         data-revision={derivation?.revision}

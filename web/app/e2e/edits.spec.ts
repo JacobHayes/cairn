@@ -25,8 +25,8 @@ async function conflicting(context: BrowserContext, node: string) {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await Promise.all([readable(one), readable(two)]);
   const { id } = await ownJourney(context.request, "hiring-loop");
-  await openJourney(one, "server", id);
-  await openJourney(two, "server", id);
+  await openJourney(one, id);
+  await openJourney(two, id);
   const [theirs, mine] = [fresh("Theirs"), fresh("Mine")];
   await startRename(two, node, mine);
   await rename(one, node, theirs);
@@ -35,7 +35,7 @@ async function conflicting(context: BrowserContext, node: string) {
 
 const problems = (page: Page) => page.getByTestId("sync-popover").getByTestId("sync-problem");
 
-test("a rename rejected after its screen was left stays until discarded", { tag: "@server" }, async ({ context }) => {
+test("a rename rejected after its screen was left stays until discarded", async ({ context }) => {
   const { two, mine } = await conflicting(context, "n_onsite");
   // The rename form's own limit stops a title that is too long, with the reason, before anything is sent.
   await renameOf(two, "n_onsite").getByRole("textbox").fill("x".repeat(300));
@@ -72,8 +72,8 @@ test("a rename rejected after its screen was left stays until discarded", { tag:
   await expect(renameOf(two, "n_onsite")).toHaveCount(0);
 });
 
-test("a rename whose answer is lost is resent with its id and lands once", { tag: "@server" }, async ({ page }) => {
-  await openJourney(page, "server", (await ownJourney(page.request, "hiring-loop")).id);
+test("a rename whose answer is lost is resent with its id and lands once", async ({ page }) => {
+  await openJourney(page, (await ownJourney(page.request, "hiring-loop")).id);
   const ids: string[] = [];
   // The first request reaches the server and commits; its answer never reaches the page.
   await page.route(PATCHES, async (route) => {
@@ -123,8 +123,8 @@ async function holding(page: Page) {
   };
 }
 
-test("a form that sent its write keeps text typed since when the send lands, and closing it leaves the write going, across a reload", { tag: "@server" }, async ({ page }) => {
-  await openJourney(page, "server", (await ownJourney(page.request, "product-launch")).id);
+test("a form that sent its write keeps text typed since when the send lands, and closing it leaves the write going, across a reload", async ({ page }) => {
+  await openJourney(page, (await ownJourney(page.request, "product-launch")).id);
   const { release, sent } = await holding(page);
   // Text typed after the send is kept when it lands, and was never sent.
   const skipping = await openFromCanvas(page, "n_announcement");
@@ -182,12 +182,12 @@ test("a form that sent its write keeps text typed since when the send lands, and
   await expect(nodeCard(page, "n_retro")).toBeVisible();
 });
 
-test("a node action rejected after its screen was left waits under its form", { tag: "@server" }, async ({ context }) => {
+test("a node action rejected after its screen was left waits under its form", async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await Promise.all([readable(one), readable(two)]);
   const { id } = await ownJourney(context.request, "product-launch");
-  await openJourney(one, "server", id);
-  await openJourney(two, "server", id);
+  await openJourney(one, id);
+  await openJourney(two, id);
   // Page two has the form open; page one skips the same node meanwhile, so page two's skip is stale.
   const panelTwo = await openFromCanvas(two, "n_launch");
   await menuItem(panelTwo, "skip");
@@ -213,7 +213,7 @@ test("a node action rejected after its screen was left waits under its form", { 
 });
 
 async function refusedNewRoute(page: Page) {
-  await open(page, "browser", "/routes/new");
+  await open(page, "/routes/new");
   const form = page.getByTestId("new-route");
   // The name's slug is the id of a route the fixtures already hold.
   await form.getByLabel("New route name").fill("Hiring loop");
@@ -235,7 +235,7 @@ async function refusedNewRoute(page: Page) {
 async function refusedImport(page: Page) {
   const buffer = readFileSync(fileURLToPath(new URL("../../../fixtures/hiring-loop/route.yaml", import.meta.url)));
   const file = { name: "hiring-loop.yaml", mimeType: "text/yaml", buffer };
-  await openRoute(page, "browser", "hiring-loop");
+  await openRoute(page, "hiring-loop");
   const importing = page.getByTestId("route-menu-menu").getByTestId("import");
   const choose = () => importIntoDraft(page, file);
   await choose();
@@ -261,8 +261,8 @@ test("a new route refused for an id in use, and an import refused for an open dr
   await refusedImport(page);
 });
 
-test("an authoring edit the engine refuses stays at its field until discarded", { tag: "@server" }, async ({ page }) => {
-  await newRoute(page, "server", routeName("Refusal"));
+test("an authoring edit the engine refuses stays at its field until discarded", async ({ page }) => {
+  await newRoute(page, routeName("Refusal"));
   const first = await addNode(page, "milestone", "Kickoff");
   await addNode(page, "milestone", "Launch");
   await formField(page, "final").getByRole("checkbox").check();
@@ -284,7 +284,7 @@ test("an authoring edit the engine refuses stays at its field until discarded", 
 });
 
 test("an Enter pressed before the engine has read the typed title saves it as soon as it has", async ({ page }) => {
-  await openJourney(page, "browser", "j_launch");
+  await openJourney(page, "j_launch");
   const title = fresh("Quick");
   await startRename(page, "n_docs", title);
   await renameOf(page, "n_docs").getByRole("textbox").press("Enter");

@@ -1,4 +1,4 @@
-// A journey of worst-case content for the in-browser host: the longest titles, names and choice
+// A journey of worst-case content for cairn demo: the longest titles, names and choice
 // labels the limits allow (PRACTICES, limits: 256 bytes), wide capitals, one unbroken word, every
 // display state, stages that are current at the widest chip, containers inside containers, and the
 // most foot facts at once (a date, an owner, a snooze target named by a long title). The
@@ -10,7 +10,7 @@ import { TITLE_BYTES_MAX } from "../../client/generated/rules.ts";
 import { publishDraft, startJourney, versionSelect, journeyName } from "./around.ts";
 import { addIdentity } from "./around.ts";
 import { daysAfter } from "./acting.ts";
-import { importRoute, openAt, open, openSheet, derivedRevision } from "./shell.ts";
+import { holdToday, importRoute, openAt, open, openSheet, derivedRevision } from "./shell.ts";
 
 /** The day the journey runs on. */
 const TODAY = "2026-10-06";
@@ -80,9 +80,9 @@ export function stressRoute(): string {
   return ["format: 1", `route: ${STRESS.route}`, `name: ${title(CAPS)}`, "nodes:", ...nodes].join("\n");
 }
 
-/** Publishes the stress route on the in-browser host. */
+/** Publishes the stress route on cairn demo. */
 async function publishStressRoute(page: Page): Promise<void> {
-  await importRoute(page, "browser", { name: `${STRESS.route}.yaml`, mimeType: "text/yaml", buffer: Buffer.from(stressRoute()) });
+  await importRoute(page, { name: `${STRESS.route}.yaml`, mimeType: "text/yaml", buffer: Buffer.from(stressRoute()) });
   await expect(versionSelect(page)).toContainText("Draft");
   await publishDraft(page);
 }
@@ -111,7 +111,7 @@ async function act(page: Page, menu: "status" | "snooze", item: string, form?: (
 
 /** Answers node `key`'s decision from its page, by `answer`. */
 async function answer(page: Page, journey: string, key: string, how: (page: Page) => Promise<void>): Promise<void> {
-  await openAt(page, "browser", journey, "list", { node: key });
+  await openAt(page, journey, "list", { node: key });
   const revision = await derivedRevision(page);
   await openSheet(page);
   await how(page);
@@ -121,11 +121,11 @@ async function answer(page: Page, journey: string, key: string, how: (page: Page
 
 /** Moves the stress journey into every display state, owner and snooze the walks read. */
 async function setStates(page: Page, journey: string): Promise<void> {
-  await open(page, "browser", "/identities");
+  await open(page, "/identities");
   const owner = await addIdentity(page, NAME);
   await answer(page, journey, "n_flag", (on) => on.getByRole("radio", { name: /^no\b/i }).check());
   await answer(page, journey, "n_when", (on) => on.getByTestId("answer").fill(daysAfter(TODAY, 60)));
-  await openAt(page, "browser", journey, "list");
+  await openAt(page, journey, "list");
   // Two or more rows make a selection (one is the open node), so each action takes a pair.
   await pick(page, ["n_kickoff", "n_d1", "n_d2"]);
   await act(page, "status", "Mark done");
@@ -149,10 +149,10 @@ async function setStates(page: Page, journey: string): Promise<void> {
  * into every state, and returns its id.
  */
 export async function publishStressJourney(page: Page): Promise<string> {
-  await page.clock.setFixedTime(new Date(`${TODAY}T12:00:00Z`));
+  await holdToday(page, TODAY);
   await publishStressRoute(page);
-  const id = await startJourney(page, "browser", journeyName(NAME), { route: STRESS.route });
+  const id = await startJourney(page, journeyName(NAME), { route: STRESS.route });
   await setStates(page, id);
-  await open(page, "browser", `/journeys/${id}?view=list`);
+  await open(page, `/journeys/${id}?view=list`);
   return id;
 }

@@ -3,7 +3,7 @@
 import type { ValueCheck, ValueProblem } from "@cairn/wasm";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { seeded } from "../authoring/engine.test-support.ts";
+import { wasmEngine } from "../authoring/engine.test-support.ts";
 import type { Deriver } from "../data/host.ts";
 import type { ReadEnv } from "../data/keyed-read.ts";
 import { emailRules } from "../people/model.ts";
@@ -11,8 +11,8 @@ import { hasSeparator, takeChips, type ChipRules } from "./chips.ts";
 
 let rules: ChipRules;
 beforeAll(async () => {
-  const host = await seeded();
-  const deriver = { valueProblems: (checks: ValueCheck[]) => Promise.resolve(JSON.parse(host.engine.valueProblemsText(checks)) as ValueProblem[]) } as Deriver;
+  const engine = await wasmEngine();
+  const deriver = { valueProblems: (checks: ValueCheck[]) => Promise.resolve(JSON.parse(engine.valueProblemsText(checks)) as ValueProblem[]) } as Deriver;
   const readEnv: ReadEnv = { stream: { send: () => undefined }, compatible: () => true, latch: () => undefined, now: () => 0 };
   rules = emailRules({ deriver, readEnv });
 });

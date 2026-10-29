@@ -98,8 +98,8 @@ async function pansZoomsAndOpensMenus(page: Page): Promise<void> {
  */
 async function depthCountsHiddenFrontier(page: Page): Promise<void> {
   const cards = page.getByTestId("node-card");
-  const id = await startJourney(page, "browser", journeyName("Depth"), { route: "vendor-evaluation", version: 1 });
-  await openJourney(page, "browser", id, "?frontier=1");
+  const id = await startJourney(page, journeyName("Depth"), { route: "vendor-evaluation", version: 1 });
+  await openJourney(page, id, "?frontier=1");
   const frontierCards = page.locator('[data-testid="node-card"][data-here*="actionable now"]');
   const [drawn, frontier] = await whenSettled(page, () => Promise.all([cards.count(), frontierCards.evaluateAll((found) => found.map((card) => card.getAttribute("data-node") ?? ""))]));
   expect(frontier.length).toBeGreaterThan(0);
@@ -120,7 +120,7 @@ async function depthCountsHiddenFrontier(page: Page): Promise<void> {
 
 test("C2 to C7: the graph opens fitted at every depth, expands in place, traces a selection, follows an edge, and pans and zooms", async ({ page }) => {
   await readable(page);
-  await openJourney(page, "browser", "j_vendor_eval", "");
+  await openJourney(page, "j_vendor_eval", "");
   // It opens at the stock view: every depth, fitted to the whole graph, as Fit does.
   await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Actions");
   await expectTitleLinesAsLaidOut(page);
@@ -222,7 +222,7 @@ async function emptyCanvasDeselects(page: Page): Promise<void> {
 
 /** A menu's arrow keys move over the items that can take the focus, never stalling at a disabled one. */
 async function menuArrowsSkipDisabled(page: Page): Promise<void> {
-  await openJourney(page, "browser", "j_bakeoff");
+  await openJourney(page, "j_bakeoff");
   await nodeCard(page, "n_trial_a").getByTestId("card-open").click();
   await nodeCard(page, "n_wrap_up").click({ modifiers: ["Shift"] });
   await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "2");
@@ -249,7 +249,7 @@ async function menuArrowsSkipDisabled(page: Page): Promise<void> {
 
 /** A right-click on a member of a selection of several opens the selection's menu, which acts on every member; on a card outside it, that card's own. */
 async function contextMenuActsOnTheSelection(page: Page): Promise<void> {
-  await openJourney(page, "browser", "j_vendor_eval");
+  await openJourney(page, "j_vendor_eval");
   await nodeCard(page, "n_kickoff").getByTestId("card-open").click();
   await nodeCard(page, "n_who_informed").click({ modifiers: ["Shift"] });
   await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "2");
@@ -282,7 +282,7 @@ async function contextMenuActsOnTheSelection(page: Page): Promise<void> {
 
 test("selection is one set with no mode: click selects, shift-click adds, the inspector lists the members and the actions that fit them all", async ({ page }) => {
   await readable(page);
-  await openJourney(page, "browser", "j_vendor_eval");
+  await openJourney(page, "j_vendor_eval");
   await selectsASet(page);
   await clearsAndBoxSelects(page);
   await checkpoint(page);
@@ -367,7 +367,7 @@ async function stockAndTracedOpacity(page: Page): Promise<void> {
 
 test("C2, DESIGN opacity: a card takes the lowest opacity that applies: under Fade the cards below the depth are 0.3 whatever their state, a container holding a decision stays clear, Frontier's dimming joins it without multiplying, and a trace's never lifts it", async ({ page }) => {
   await readable(page);
-  await openJourney(page, "browser", "j_vendor_eval", "?depth=decisions&fade=1");
+  await openJourney(page, "j_vendor_eval", "?depth=decisions&fade=1");
   await expect(nodeCard(page, "n_plan")).toBeVisible();
   await fadeAndFrontierLevels(page);
   await checkpoint(page);
@@ -378,7 +378,7 @@ test("C2, DESIGN opacity: a card takes the lowest opacity that applies: under Fa
 
 /** A line between folded stages opens the links it stands for, and each end is a link. */
 async function stagesLineOpensLinks(page: Page): Promise<void> {
-  await visit(page, "browser", "/journeys/j_vendor_eval/edges/n_setup~n_testing?depth=stages");
+  await visit(page, "/journeys/j_vendor_eval/edges/n_setup~n_testing?depth=stages");
   await expect(page.getByTestId("edge-missing")).toHaveCount(0);
   const card = page.getByTestId("edge-card");
   await expect(card).toBeVisible();
@@ -393,14 +393,14 @@ test("C1, C2: a line is selectable only where the view's own level draws it, an 
   await stagesLineOpensLinks(page);
   // Test plan is open at Stages, so its stage is opened for it: the lines inside that stage are drawn only for the selection, and open no card.
   const selectable = (key: string, other: string) => lineBetween(page, key, other).locator("xpath=ancestor::*[contains(@class,'react-flow__edge')][1]");
-  await visit(page, "browser", "/journeys/j_vendor_eval/nodes/n_plan?depth=stages");
+  await visit(page, "/journeys/j_vendor_eval/nodes/n_plan?depth=stages");
   await expect(nodeCard(page, "n_plan")).toBeVisible();
   await expect(selectable("n_access", "n_plan")).not.toHaveClass(/\bselectable\b/);
   // With nothing selected the stages' own line is the view's, and opens one.
-  await visit(page, "browser", "/journeys/j_vendor_eval?depth=stages&view=graph");
+  await visit(page, "/journeys/j_vendor_eval?depth=stages&view=graph");
   await expect(selectable("n_setup", "n_testing")).toHaveClass(/\bselectable\b/);
   // A line address on the List's query is the Graph, with its card; a depth that folds its ends says the view draws no line, and both ends stay one click away.
-  await visit(page, "browser", "/journeys/j_vendor_eval/edges/n_access~n_plan?view=list");
+  await visit(page, "/journeys/j_vendor_eval/edges/n_access~n_plan?view=list");
   await expect(page.getByTestId("edge-card")).toBeVisible();
   await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "graph");
   await setDepth(page, "Stages");
@@ -420,7 +420,7 @@ async function setDatesOpen(page: Page, key: string, open: boolean): Promise<Loc
 
 test("C1: date relationships are drawn only for the one selected node while its Dates section is open, both ways, with an arrowhead where the order is fixed, open no card, and are listed in that section", async ({ page }) => {
   await readable(page);
-  await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
+  await visit(page, "/journeys/j_launch?view=graph&depth=actions");
   await expect(nodeCard(page, "n_launch")).toBeVisible();
   const dates = page.locator('[data-kind="dates"]');
   // At rest no date relationship is drawn.
@@ -482,7 +482,7 @@ test("C1: date relationships are drawn only for the one selected node while its 
 
 test("C1: the Dates fold is remembered per kind of node, and the pin action opens it", async ({ page }) => {
   await readable(page);
-  await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
+  await visit(page, "/journeys/j_launch?view=graph&depth=actions");
   const dates = page.locator('[data-kind="dates"]');
   await openFromCanvas(page, "n_docs");
   await setDatesOpen(page, "n_docs", true);
@@ -501,7 +501,7 @@ test("C1: the Dates fold is remembered per kind of node, and the pin action open
 
 test("C1: a date line's far end stays in focus under Frontier, and a published route's inspector lists the same relationships", async ({ page }) => {
   await readable(page);
-  await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
+  await visit(page, "/journeys/j_launch?view=graph&depth=actions");
   await expect(nodeCard(page, "n_launch")).toBeVisible();
   await page.getByTestId("chip-frontier").click();
   // Launch is not on the frontier, so Frontier dims it; Documentation's line to it keeps it in focus.
@@ -511,7 +511,7 @@ test("C1: a date line's far end stays in focus under Frontier, and a published r
   await expect(page.locator('[data-kind="dates"]')).toHaveCount(1);
   await expect(nodeCard(page, "n_launch")).not.toHaveCSS("opacity", "0.3");
   // A route's version reads the same relationships in its Dates section, and draws them while it is open.
-  await visit(page, "browser", "/routes/product-launch/nodes/n_launch?version=1&view=graph");
+  await visit(page, "/routes/product-launch/nodes/n_launch?version=1&view=graph");
   const section = page.getByTestId("dates");
   await expect(section).toBeVisible();
   await expect(page.locator('[data-kind="dates"]')).toHaveCount(0);
@@ -523,7 +523,7 @@ test("C1: a date line's far end stays in focus under Frontier, and a published r
 });
 
 test("The journey card's Stages list: a row per stage, choosing one selects and frames it, pointing at one outlines it, and a journey without stages has none", async ({ page }) => {
-  await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
+  await visit(page, "/journeys/j_launch?view=graph&depth=actions");
   await expect(nodeCard(page, "n_build")).toBeVisible();
   const stages = page.getByTestId("card-stages");
   await stages.locator("summary").click();
@@ -549,13 +549,13 @@ test("The journey card's Stages list: a row per stage, choosing one selects and 
     )
     .toBe(true);
   // A journey whose nodes are in no group has no Stages section.
-  await visit(page, "browser", "/journeys/j_bakeoff?view=graph&depth=actions");
+  await visit(page, "/journeys/j_bakeoff?view=graph&depth=actions");
   await expect(page.getByTestId("journey-card")).toBeVisible();
   await expect(page.getByTestId("card-stages")).toHaveCount(0);
 });
 
 test("A route's Stages list: a row per stage with its days, choosing one selects and frames it", async ({ page }) => {
-  await visit(page, "browser", "/routes/product-launch?version=1&view=graph&depth=actions");
+  await visit(page, "/routes/product-launch?version=1&view=graph&depth=actions");
   await expect(nodeCard(page, "n_beta")).toBeVisible();
   const stages = page.getByTestId("card-stages");
   await stages.locator("summary").click();
@@ -573,7 +573,7 @@ test("A route's Stages list: a row per stage with its days, choosing one selects
 
 test("A route's Stages list: choosing a stage scrolls its row into view in the List", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 420 });
-  await visit(page, "browser", "/routes/product-launch?version=1&view=list&depth=actions");
+  await visit(page, "/routes/product-launch?version=1&view=list&depth=actions");
   const stages = page.getByTestId("card-stages");
   await stages.locator("summary").click();
   await stages.getByTestId("stage-row").last().click({ position: { x: 4, y: 4 } });
@@ -582,7 +582,7 @@ test("A route's Stages list: choosing a stage scrolls its row into view in the L
 
 test("The Stages list on a phone: choosing a stage from the sheet lowers the sheet and frames the stage above it", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
+  await visit(page, "/journeys/j_launch?view=graph&depth=actions");
   await expect(nodeCard(page, "n_beta")).toBeVisible();
   await openSheet(page);
   const stages = page.getByTestId("card-stages");

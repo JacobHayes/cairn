@@ -9,7 +9,7 @@ import type { AssistantAction, AssistantTarget, Because, ConversationEntry, Ende
 /**
  * Capabilities gating (ARCHITECTURE, Terms: Capabilities document): the panel is offered only
  * when the host's capabilities say it has an assistant and the host can reach one. The
- * in-browser host has neither, so it never shows the panel (I5: fully usable without it).
+ * cairn demo has neither, so it never shows the panel (I5: fully usable without it).
  */
 export function assistantOffered(session: Pick<Session, "capabilities" | "host">): boolean {
   return session.capabilities.assistant && session.host.assistant !== undefined;

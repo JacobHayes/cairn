@@ -1,12 +1,7 @@
 // The app's dev server and build (ARCHITECTURE, Build, run, deploy: Vite serves the UI with
-// hot reload and proxies API calls to a running server, or runs the in-browser host with no
-// server). CAIRN_SERVER is the server's origin to proxy to; CAIRN_APP_PORT the port to serve
-// on (the browser tests pick free ones).
-//
-// The build fixes the host the app runs on (ARCHITECTURE, Web UI: in-browser host): the dev
-// server runs the server host when it proxies to one and the in-browser host when it does
-// not; `vite build` makes the build the binary embeds, on the server host, and `vite build
-// --mode demo` the static demo site, on the in-browser host.
+// hot reload and proxies API calls to a running server, `cairn demo` by default). CAIRN_SERVER
+// is the server's origin to proxy to; CAIRN_APP_PORT the port to serve on. `vite build` makes
+// the build the binary embeds.
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
@@ -92,34 +87,27 @@ function themeKey(): Plugin {
  */
 const SERVER_PATHS = ["/api/", "/.well-known/", "/healthz"];
 
-const server = process.env["CAIRN_SERVER"];
+const server = process.env["CAIRN_SERVER"] ?? "http://127.0.0.1:8080";
 const proxy: Record<string, ProxyOptions> = {};
-if (server !== undefined) {
-  for (const path of SERVER_PATHS) {
-    proxy[path] = { target: server, changeOrigin: false };
-  }
+for (const path of SERVER_PATHS) {
+  proxy[path] = { target: server, changeOrigin: false };
 }
 
-export default defineConfig(({ command, mode }) => ({
-  define: {
-    __CAIRN_HOST__: JSON.stringify(command === "serve" ? (server === undefined ? "browser" : "server") : mode === "demo" ? "browser" : "server"),
-  },
+export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
-  plugins: [react(), fontLicense(), themeKey(), ...(mode === "demo" ? [] : [precompress()])],
+  plugins: [react(), fontLicense(), themeKey(), precompress()],
   resolve: { alias: [{ find: "@design", replacement: DESIGN }, { find: /^.*\/generated\/cairn_wasm\.js$/, replacement: `${BINDGEN}/cairn_wasm.js` }] },
   logLevel: "warn",
-  // `mise run build:web` writes dist/build/, which the binary embeds (crates/cairn/src/assets.rs),
-  // and `mise run build:web demo` dist/demo/; beside them sit the browser tests' reports.
+  // `mise run build:web` writes dist/build/, which the binary embeds (crates/cairn/src/assets.rs);
+  // beside it sit the browser tests' reports.
   build: {
-    outDir: mode === "demo" ? "dist/demo" : "dist/build",
+    outDir: "dist/build",
     emptyOutDir: true,
     // React and the router are most of what every page loads and change only with an upgrade, so
     // they are one chunk of their own (cached across the app's releases); the screens and the
     // graph (main.tsx, Projections.tsx) are loaded when first opened.
     rolldownOptions: { output: { codeSplitting: { groups: [{ name: "react", test: /node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/ }] } } },
   },
-  // The browser tests run a dev server of each host side by side; each bundles into its own.
-  cacheDir: `../../node_modules/.vite/app-${server === undefined ? "demo" : "server"}`,
   // The dev server bundles dependencies it finds by crawling from index.html, which never
   // follows `new Worker(new URL(...))`. A dependency only a worker imports (ELK's worker
   // build, canvas/layout-worker.ts) was found when the first page started that worker: Vite
@@ -133,4 +121,4 @@ export default defineConfig(({ command, mode }) => ({
     strictPort: true,
     proxy,
   },
-}));
+});

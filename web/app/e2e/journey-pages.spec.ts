@@ -1,4 +1,4 @@
-// A journey's page in a real browser, on the in-browser host: what only focus,
+// A journey's page in a real browser, on cairn demo: what only focus,
 // layout and the window show. The view state set on one view follows every other, and each
 // draws the same node from it; the keys act on the view the pointer left them on (j, Enter,
 // Esc, v); Frontier highlights without hiding; the search narrows every view; and no view
@@ -16,7 +16,7 @@ import { expect, test } from "./test.ts";
 import { journeyName, setStatus, startJourney } from "./around.ts";
 import { viewportOf } from "./canvas.ts";
 import { daysAfter, frontierKeys, listKeys, passOrder, select, setFrontier, withFrontier } from "./acting.ts";
-import { expectAddress, fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, readable, setDepth, setFade, settled, whenSettled } from "./shell.ts";
+import { expectAddress, fresh, goTo, holdToday, nodeCard, nodePanel, openAt, openFilter, openJourney, readable, setDepth, setFade, settled, whenSettled } from "./shell.ts";
 import { closePopover, filterOf, ownAndPin, search, setCheck, setViewState, VIEWER } from "./view-state.ts";
 import { FIXED_TODAY } from "./views.ts";
 
@@ -61,7 +61,7 @@ function listRow(page: Page, node: string): Locator {
  */
 async function makeX(page: Page, id: string, x: string): Promise<string> {
   const word = fresh("w").split(" ")[1] ?? "";
-  await openJourney(page, "browser", id);
+  await openJourney(page, id);
   await ownAndPin(page, x, `Purchase or research ${word}`, daysAfter(FIXED_TODAY, -2));
   return word;
 }
@@ -127,8 +127,8 @@ async function expectCurrentView(page: Page, view: string): Promise<void> {
 }
 
 async function viewStateFollows(page: Page): Promise<string> {
-  await page.clock.setFixedTime(new Date(`${FIXED_TODAY}T12:00:00Z`));
-  const id = await startJourney(page, "browser", journeyName("Shared"), { route: "vendor-evaluation", version: 1 });
+  await holdToday(page, FIXED_TODAY);
+  const id = await startJourney(page, journeyName("Shared"), { route: "vendor-evaluation", version: 1 });
   const x = "n_purpose";
   const word = await makeX(page, id, x);
   await setEverything(page, word);
@@ -165,7 +165,7 @@ async function viewStateFollows(page: Page): Promise<string> {
 
 async function depthAndFadeFollow(page: Page, id: string): Promise<void> {
   // Cleared of what was set, the same journey: the depth and Fade follow every view.
-  await openAt(page, "browser", id, "graph");
+  await openAt(page, id, "graph");
   await setDepth(page, "Decisions");
   await setFade(page, true);
   // Fade draws the deliverable and dims it; it is a card on the canvas.
@@ -214,7 +214,7 @@ async function depthAndFadeFollow(page: Page, id: string): Promise<void> {
 
 async function stockViewAndChips(page: Page): Promise<void> {
   // A journey opens as the stock view, switching views keeps the chips, and coming back to the journey starts over.
-  await openJourney(page, "browser", "j_vendor_eval", "");
+  await openJourney(page, "j_vendor_eval", "");
   const depth = page.getByTestId("depth-button");
   // The stock view: every depth, fitted to the whole graph.
   await expect(depth).toHaveAccessibleName("Depth: Actions");
@@ -257,8 +257,8 @@ test("C2, C9, C10, C11, C12: the view state set on the graph follows every view,
 });
 
 test("C10, C11: after a click in the page, j opens the next row, Enter its form, Esc leaves it, and v swaps the view; a done row fades its content, lifts the fade under keyboard focus, and leaves the checkbox at full strength", async ({ page }) => {
-  const id = await startJourney(page, "browser", journeyName("Keys"), { route: "vendor-evaluation", version: 1 });
-  await openAt(page, "browser", id, "list?frontier=1");
+  const id = await startJourney(page, journeyName("Keys"), { route: "vendor-evaluation", version: 1 });
+  await openAt(page, id, "list?frontier=1");
   await setDepth(page, "Decisions");
   // Decisions depth draws the milestones too: the frontier is the up-front decisions and the milestones that need nothing.
   await expect.poll(() => frontierKeys(page).then((keys) => keys.filter((key) => key !== "n_kickoff" && key !== "n_decision_meeting").sort())).toEqual(UP_FRONT);
@@ -288,7 +288,7 @@ test("C10, C11: after a click in the page, j opens the next row, Enter its form,
   await expectAddress(page, `${journeyBase(page)}?view=graph&depth=decisions&frontier=1`);
   await checkpoint(page);
   // A done row fades its content like a done card, lifts the fade under keyboard focus, and leaves the checkbox at full strength.
-  await openAt(page, "browser", "j_vendor_eval", "list");
+  await openAt(page, "j_vendor_eval", "list");
   const done = page.locator('[data-testid="list-row"][data-state="done"]').first();
   const title = done.locator('td[data-column="title"] a').first();
   expect(await effective(title)).toBe(0.5);
@@ -303,7 +303,7 @@ test("C10, C11: after a click in the page, j opens the next row, Enter its form,
 
 test("C10: Frontier highlights the list: every row stays, the frontier's rows carry their action under the title, and the rest fade", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
-  await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
+  await openAt(page, "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   const everything = await listKeys(page);
   await setFrontier(page, true);
   await expectAddress(page, `${journeyBase(page)}?view=list&frontier=1`);
@@ -338,7 +338,7 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
 
 test("C2, C9: a search narrows the graph to its matches and fits them; nothing matching offers Reset the view, which clears the search and the collapses", async ({ page }) => {
   await readable(page);
-  await openJourney(page, "browser", "j_vendor_eval", "");
+  await openJourney(page, "j_vendor_eval", "");
   await settled(page);
   const whole = await whenSettled(page, () => page.getByTestId("node-card").count());
   const fitted = await viewportOf(page);
@@ -351,14 +351,14 @@ test("C2, C9: a search narrows the graph to its matches and fits them; nothing m
   await expectAddress(page, `${journeyBase(page)}?view=graph`);
   await expect(page.getByTestId("node-card")).toHaveCount(whole);
 
-  await openAt(page, "browser", "j_vendor_eval", "graph?q=nothing-is-called-this&shut=n_setup");
+  await openAt(page, "j_vendor_eval", "graph?q=nothing-is-called-this&shut=n_setup");
   await expect(page.getByTestId("nothing-matches")).toBeVisible();
   await page.getByTestId("nothing-matches").getByTestId("reset-view").click();
   await expectAddress(page, `${journeyBase(page)}?view=graph`);
   await expect(nodeCard(page, "n_access")).toBeVisible();
   await checkpoint(page);
   // The list at Decisions with a search that matches nothing is empty, and Reset the view brings back Actions depth and the rows.
-  await openAt(page, "browser", "j_vendor_eval", "list?depth=decisions&q=nothing-is-called-this");
+  await openAt(page, "j_vendor_eval", "list?depth=decisions&q=nothing-is-called-this");
   const empty = page.getByTestId("list-empty");
   await expect(empty).toBeVisible();
   await expect(page.getByTestId("list-row")).toHaveCount(0);
@@ -368,7 +368,7 @@ test("C2, C9: a search narrows the graph to its matches and fits them; nothing m
 });
 
 test("C1, C9: the Filter's badge counts the rows its settings take off the list and never the not relevant; the open Filter counts what a setting hides beside it", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
+  await openAt(page, "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   const total = async () => Number(await whenSettled(page, () => page.getByTestId("list-total").getAttribute("data-total")));
   const badge = page.getByTestId("filter-badge");
   await expect(badge).toHaveCount(0);
@@ -387,7 +387,7 @@ test("C1, C9: the Filter's badge counts the rows its settings take off the list 
 });
 
 test("C2: a fold holds until a depth is picked: back at Actions after another depth, every level is open again", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
+  await openAt(page, "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   const fold = () => listRow(page, "n_setup").getByTestId("list-fold");
   await expect(fold()).toHaveAttribute("aria-expanded", "true");
   await fold().click();
@@ -433,20 +433,20 @@ test("C2: a fold holds until a depth is picked: back at Actions after another de
 test("the window does not scroll: the head stays, a popover scrolls inside itself, the View picker keeps its place on the title's row, and a canvas fills its region", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   for (const address of ["list?frontier=1", "list"]) {
-    await openAt(page, "browser", "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
+    await openAt(page, "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
     await expect(page.getByTestId("journey-header")).toBeVisible();
     await checkpoint(page, address);
   }
   // A popover taller than the room below it scrolls inside itself, not the window.
   await page.setViewportSize({ width: 1280, height: 500 });
-  await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
+  await openAt(page, "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   await openFilter(page);
   await checkpoint(page, "the Filter in a short window");
   // The View picker sits on the title's row, at the same right edge on every view, between 720 and 1100px.
   await page.setViewportSize({ width: 1024, height: 700 });
   const edges: Record<string, number> = {};
   for (const address of ["walk", "graph", "list", "timeline", "summary"]) {
-    await openAt(page, "browser", "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
+    await openAt(page, "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
     const title = await whenSettled(page, () => page.getByTestId("journey-name").boundingBox());
     const picker = await whenSettled(page, () => page.getByTestId("view-picker").boundingBox());
     expect(picker?.y, address).toBeLessThan((title?.y ?? 0) + (title?.height ?? 0));
@@ -456,15 +456,15 @@ test("the window does not scroll: the head stays, a popover scrolls inside itsel
   // Between 720 and 1100px the projection keeps the width and a canvas fills its region.
   const body = page.locator(".journey-body");
   for (const address of ["graph", "graph?depth=decisions"]) {
-    await openAt(page, "browser", "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
+    await openAt(page, "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
     await expect(page.getByTestId("canvas")).toBeVisible();
     const [scrolls, shown] = await whenSettled(page, () => body.evaluate((region) => [region.scrollHeight, region.clientHeight]));
     expect(scrolls, address).toBe(shown);
   }
-  await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
+  await openAt(page, "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   await expect(page.getByTestId("list-row").first()).toBeVisible();
   expect(await whenSettled(page, () => body.evaluate((region) => region.scrollWidth <= region.clientWidth))).toBe(true);
-  await openAt(page, "browser", "j_vendor_eval", "summary", { fixedToday: FIXED_TODAY });
+  await openAt(page, "j_vendor_eval", "summary", { fixedToday: FIXED_TODAY });
   await expect(page.getByTestId("summary-milestones")).toBeVisible();
 });
 
@@ -480,7 +480,7 @@ async function fadeTicked(page: Page): Promise<boolean | undefined> {
 
 test("C2: Fade moves nothing: stepping the depth with Fade on keeps every card and the camera where Actions has them, and Hide returns to a layout of its own", async ({ page }) => {
   await readable(page);
-  await openJourney(page, "browser", "j_vendor_eval", "");
+  await openJourney(page, "j_vendor_eval", "");
   await settled(page);
   const cards = page.getByTestId("node-card");
   const place = () => whenSettled(page, () => nodeCard(page, "n_kickoff").evaluate((card) => [card.getAttribute("data-x"), card.getAttribute("data-y")]));
@@ -516,7 +516,7 @@ test("C2: Fade moves nothing: stepping the depth with Fade on keeps every card a
 
 /** The view root each screen draws, which is there even when the view has no rows. */
 test("C9, C11: the View picker works from the keyboard: it opens on the current view, the arrows wrap, and Esc, Enter and Tab hand the focus back", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "graph", { fixedToday: FIXED_TODAY });
+  await openAt(page, "j_vendor_eval", "graph", { fixedToday: FIXED_TODAY });
   const button = page.getByTestId("view-picker");
   await button.focus();
   await page.keyboard.press("Enter");
@@ -569,7 +569,7 @@ test("C9, C11: the View picker works from the keyboard: it opens on the current 
 });
 
 test("B11, A19, C16: the status moves from the menu's Status, and the header says when the journey is not active", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "graph", { fixedToday: FIXED_TODAY });
+  await openAt(page, "j_vendor_eval", "graph", { fixedToday: FIXED_TODAY });
   const menu = page.getByTestId("journey-menu");
   const status = page.getByTestId("menu-status");
   const chip = page.getByTestId("journey-status");
@@ -610,7 +610,7 @@ test("B11, A19, C16: the status moves from the menu's Status, and the header say
 
 test("B11: an archived journey takes no write: the open node keeps only where to find it, and the list offers nothing to act on", async ({ page }) => {
   const node = "n_announcement";
-  await openAt(page, "browser", "j_launch", "list?frontier=1");
+  await openAt(page, "j_launch", "list?frontier=1");
   await page.locator(`[data-testid="list-row"][data-node="${node}"] a[data-node="${node}"]`).click();
   const actions = nodePanel(page, node).getByTestId("actions");
   await expect(actions.getByRole("button").nth(1)).toBeVisible();
@@ -627,7 +627,7 @@ test("B11: an archived journey takes no write: the open node keeps only where to
 });
 
 test("C13: a pan does not come back when the range is chosen away and back", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "timeline");
+  await openAt(page, "j_vendor_eval", "timeline");
   await page.getByTestId("timeline").hover();
   await page.mouse.wheel(300, 0);
   await expect(page.getByTestId("timeline-reset")).toBeVisible();
@@ -637,7 +637,7 @@ test("C13: a pan does not come back when the range is chosen away and back", asy
 });
 
 test("C9: a search the engine refuses is said at the box and not applied; one it reads is applied", async ({ page }) => {
-  await openJourney(page, "browser", "j_launch", "?view=graph");
+  await openJourney(page, "j_launch", "?view=graph");
   const box = page.getByTestId("toolbar-search");
   await box.fill("s".repeat(300));
   await box.press("Enter");
@@ -650,7 +650,7 @@ test("C9: a search the engine refuses is said at the box and not applied; one it
 test("C9: a search is read as it is typed: the reason shows once the typing rests, clears when fixed, and typing asks once", async ({ page }) => {
   await allowHoldingChecks(page);
   await page.clock.install();
-  await openJourney(page, "browser", "j_launch", "?view=graph");
+  await openJourney(page, "j_launch", "?view=graph");
   const box = page.getByTestId("toolbar-search");
   await page.clock.runFor(1000);
   const before = await checksAsked(page);
@@ -671,7 +671,7 @@ test("C9: a search is read as it is typed: the reason shows once the typing rest
 
 test("C9: a search the engine is still reading is dropped when the box is cleared meanwhile", async ({ page }) => {
   await allowHoldingChecks(page);
-  await openJourney(page, "browser", "j_launch", "?view=graph");
+  await openJourney(page, "j_launch", "?view=graph");
   await holdChecks(page);
   const box = page.getByTestId("toolbar-search");
   await box.fill("kickoff");

@@ -1,6 +1,6 @@
 // PRD: C20. A phone's screens: every control a finger taps has a hit area of at least the touch
 // target in each direction (DESIGN, Sizing), on Home, the graph with the inspector's sheet, the
-// list, the inspector's forms, an open menu and the tour's step. In-browser host, fresh on every load.
+// list, the inspector's forms, an open menu and the tour's step. On cairn demo.
 import type { Locator } from "@playwright/test";
 
 import { checkpoint } from "./invariants.ts";
@@ -36,14 +36,14 @@ async function expectNoOrphanHeading(menu: Locator): Promise<void> {
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
 test("every control on a phone's main screens has a touch-sized hit area", async ({ page }) => {
-  await open(page, "browser", "/");
+  await open(page, "/");
   await checkpoint(page, "Home");
   // The tour's offer is compact: the person's own work starts on the first screen, and a touch screen is not told about keys.
   await expect(page.locator(".tour-keys")).toBeHidden();
   const waiting = await whenSettled(page, () => page.getByRole("heading", { name: "Waiting on you" }).boundingBox());
   expect(waiting?.y ?? Infinity).toBeLessThan(844 - 120);
 
-  await openAt(page, "browser", "j_launch", "graph");
+  await openAt(page, "j_launch", "graph");
   await checkpoint(page, "the graph");
   await page.getByTestId("controls-button").click();
   await checkpoint(page, "the graph's Controls menu");
@@ -54,7 +54,7 @@ test("every control on a phone's main screens has a touch-sized hit area", async
   await page.keyboard.press("Escape");
 
   for (const view of ["summary", "timeline", "walk"]) {
-    await openAt(page, "browser", "j_launch", view);
+    await openAt(page, "j_launch", view);
     await checkpoint(page, `the ${view} view`);
     if (view === "timeline") {
       // The title's link stretches over its row, and the fold button stays tappable above it.
@@ -65,16 +65,16 @@ test("every control on a phone's main screens has a touch-sized hit area", async
     }
   }
   for (const index of ["/journeys", "/routes", "/identities"]) {
-    await open(page, "browser", index);
+    await open(page, index);
     await checkpoint(page, index);
   }
 
-  await openAt(page, "browser", "j_launch", "list");
+  await openAt(page, "j_launch", "list");
   await checkpoint(page, "the list");
   const wrapped = await whenSettled(page, () => page.locator(".badge").evaluateAll((all) => all.filter((each) => each.getBoundingClientRect().height > 24 || each.scrollWidth > each.clientWidth + 1).map((each) => each.textContent)));
   expect(wrapped, "chips that wrap or are cut").toEqual([]);
 
-  await openAt(page, "browser", "j_launch", "list", { node: "n_go_no_go" });
+  await openAt(page, "j_launch", "list", { node: "n_go_no_go" });
   await checkpoint(page, "the inspector's peek");
   await openSheet(page);
   await expect(nodePanel(page, "n_go_no_go")).toBeVisible();
@@ -83,14 +83,14 @@ test("every control on a phone's main screens has a touch-sized hit area", async
   await checkpoint(page, "the inspector's menu");
   await page.keyboard.press("Escape");
 
-  await openAt(page, "browser", "j_launch", "graph", { node: "n_go_no_go" });
+  await openAt(page, "j_launch", "graph", { node: "n_go_no_go" });
   await checkpoint(page, "the graph with the sheet at its peek");
   await openSheet(page);
   await checkpoint(page, "the graph with the sheet raised");
 });
 
 test("every control on the tour's step has a touch-sized hit area", async ({ page }) => {
-  await open(page, "browser", "/");
+  await open(page, "/");
   await page.getByTestId("tour-start").click();
   await expect(page.getByTestId("tour-callout")).toHaveAttribute("data-step", "map");
   await checkpoint(page, "the tour's first step");
@@ -104,7 +104,7 @@ test("every control on the tour's step has a touch-sized hit area", async ({ pag
 });
 
 test("the proposal band's Apply and Close are whole on a phone", async ({ page }) => {
-  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await openJourneyCard(page, "j_vendor_eval");
   await page.getByTestId("journey-menu").click();
   await page.getByTestId("menu-save").click();
   await page.getByTestId("save-as-route-flow").getByRole("button", { name: "Propose saving it as a route" }).click();

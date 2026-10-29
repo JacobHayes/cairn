@@ -30,16 +30,16 @@ function noteAndComplete(journey: string, node: string, base: number): ScriptSte
  */
 async function keptInANewTab(page: Page, journey: string, said: string): Promise<void> {
   const fresh = await page.context().newPage();
-  await openJourney(fresh, "server", journey);
+  await openJourney(fresh, journey);
   const report = (await openPanel(fresh)).getByTestId("assistant-report").first();
   await expect(report).toHaveText(said);
   await expect(report.locator('[data-testid="assistant-node"][data-node="n_kickoff"]')).toHaveCount(1);
   await fresh.close();
 }
 
-test("I5, I7: a direct change reported with its node, and a breakdown proposed, reviewed, and applied", { tag: ["@server", "@serial"] }, async ({ page }) => {
+test("I5, I7: a direct change reported with its node, and a breakdown proposed, reviewed, and applied", async ({ page }) => {
   const journey = await startVendorJourney(page);
-  await openJourney(page, "server", journey);
+  await openJourney(page, journey);
   const panel = await openPanel(page);
   await expect(panel.getByTestId("assistant-empty")).toBeVisible();
 
@@ -103,7 +103,7 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
   await expect(kept.getByTestId("assistant-said")).toHaveText(["Kickoff happened this morning.", "Break the test workload down into an ingest and a query workload."]);
   await expect(kept.getByTestId("assistant-reply").last()).toContainText("I drafted the breakdown");
   await keptInANewTab(page, journey, said);
-  await open(page, "server", "/routes/product-launch");
+  await open(page, "/routes/product-launch");
   await expect(page.getByTestId("assistant-panel")).toHaveAttribute("data-target", "route:product-launch");
   await expect(page.getByTestId("assistant-panel").getByTestId("assistant-said")).toHaveCount(0);
 });

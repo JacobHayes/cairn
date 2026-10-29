@@ -3,7 +3,7 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
-  "description": "The web app: the React shell every screen builds on, one data layer over the server and the in-browser host, the locally derived document, the write path (the edit manager under the session root, with H5's safe retry), and live views (H6).",
+  "description": "The web app: the React shell every screen builds on, one data layer over the server, the locally derived document, the write path (the edit manager under the session root, with H5's safe retry), and live views (H6).",
   "scripts": {
     "dev": "vite",
     "build": "vite build"

@@ -40,8 +40,8 @@ async function zoomTo(page: Page, zoom: number): Promise<void> {
 /** The large program's graph, fitted: stages are tiles. */
 async function fitted(page: Page): Promise<string> {
   await page.setViewportSize({ width: 1280, height: 800 });
-  const id = await startLargeProgram(page, "browser");
-  await openLargeGraph(page, "browser", id);
+  const id = await startLargeProgram(page);
+  await openLargeGraph(page, id);
   await page.keyboard.press("f");
   await expect.poll(async () => (await viewportOf(page)).zoom).toBeLessThan(0.2);
   return id;
@@ -67,7 +67,7 @@ test("a stage is drawn as a tile at the fit, nothing inside it is drawn, and it 
 
 test("a line between two tiles is drawn once, ends on both, and its card lists every link it stands for", async ({ page }) => {
   const id = await fitted(page);
-  await open(page, "browser", `/journeys/${id}/nodes/${LARGE.helpers}?view=graph&depth=actions`);
+  await open(page, `/journeys/${id}/nodes/${LARGE.helpers}?view=graph&depth=actions`);
   await zoomTo(page, READING);
   // Zoom out until the groups of the build are tiles.
   await expect
@@ -102,7 +102,7 @@ test("a line between two tiles is drawn once, ends on both, and its card lists e
 
 test("a selection inside a tile is named on it, and a search says how many matches the tile holds", async ({ page }) => {
   const id = await fitted(page);
-  await open(page, "browser", `/journeys/${id}/nodes/${LARGE.componentTwo}?view=graph&depth=actions`);
+  await open(page, `/journeys/${id}/nodes/${LARGE.componentTwo}?view=graph&depth=actions`);
   await zoomTo(page, READING);
   await pinch(page, -8);
   await expect.poll(async () => (await viewportOf(page)).zoom).toBeLessThan(0.3);
@@ -132,7 +132,7 @@ test("a selection inside a tile is named on it, and a search says how many match
 
 test("focus on a card that a tile forms over moves to the tile, and a double-click on a tile frames it drawn open", async ({ page }) => {
   const id = await fitted(page);
-  await open(page, "browser", `/journeys/${id}/nodes/${LARGE.partA}?view=graph&depth=actions`);
+  await open(page, `/journeys/${id}/nodes/${LARGE.partA}?view=graph&depth=actions`);
   await zoomTo(page, READING);
   await page.locator(`.react-flow__node[data-id="${LARGE.partA}"]`).focus();
   await pinch(page, -8);
@@ -149,7 +149,7 @@ test("focus on a card that a tile forms over moves to the tile, and a double-cli
 
 test("a container opened early, below the reading zoom, draws its state chip inside its head", async ({ page }) => {
   const id = await fitted(page);
-  await open(page, "browser", `/journeys/${id}/nodes/${LARGE.helpers}?view=graph&depth=actions`);
+  await open(page, `/journeys/${id}/nodes/${LARGE.helpers}?view=graph&depth=actions`);
   await zoomTo(page, READING);
   // Zoom out until the build stage has opened with its groups drawn as tiles.
   await expect
@@ -172,7 +172,7 @@ test("a container opened early, below the reading zoom, draws its state chip ins
 
 test("focus on a container's own title stays on it when the container becomes a tile", async ({ page }) => {
   const id = await fitted(page);
-  await open(page, "browser", `/journeys/${id}/nodes/${LARGE.partA}?view=graph&depth=actions`);
+  await open(page, `/journeys/${id}/nodes/${LARGE.partA}?view=graph&depth=actions`);
   await zoomTo(page, READING);
   await nodeCard(page, LARGE.build).getByTestId("card-open").focus();
   await pinch(page, -8);

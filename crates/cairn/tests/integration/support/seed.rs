@@ -1,5 +1,5 @@
-//! The fixtures seeded into a database file through the service, as the in-browser root
-//! seeds them (crates/wasm: one deployment, in UTC), so the binary serves them. Shared by
+//! The fixtures seeded into a database file through the service, as `cairn demo`
+//! seeds them (one deployment, in UTC), so the binary serves them. Shared by
 //! the binary's tests.
 
 use std::path::Path;
@@ -35,7 +35,7 @@ pub async fn seed_fixtures(path: &Path) -> Result<(), String> {
             "dev",
         ),
     });
-    cairn_wasm::fixtures::seed(&service)
+    cairn::fixtures::seed(&service)
         .await
         .map_err(|error| format!("{error:?}"))
 }

@@ -3,19 +3,19 @@
 // when completion is suggested.
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { seeded } from "../authoring/engine.test-support.ts";
+import { wasmEngine } from "../authoring/engine.test-support.ts";
 
 import { createMutation, deleteBlocked, deleteMutations, newJourneyId, statusActions, type Doomed } from "./lifecycle.ts";
 
-let host: Awaited<ReturnType<typeof seeded>>;
+let engine: Awaited<ReturnType<typeof wasmEngine>>;
 beforeAll(async () => {
-  host = await seeded();
+  engine = await wasmEngine();
 });
 
 describe("starting a journey (B1)", () => {
   it.each(["Vendor evaluation, round 2", "  ", "Évaluation à l'étranger", "x".repeat(300)])("mints an id the host accepts from %j", (name) => {
     const id = newJourneyId(name, () => "abc123");
-    expect(host.engine.valueProblemsText([{ field: "id", kind: "journey_id", what: "The id", value: id }])).toBe("[]");
+    expect(engine.valueProblemsText([{ field: "id", kind: "journey_id", what: "The id", value: id }])).toBe("[]");
     expect(id.length).toBeLessThanOrEqual(64);
     expect(id.endsWith("_abc123")).toBe(true);
   });

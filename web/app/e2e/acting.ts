@@ -7,11 +7,11 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 import { fixtureRoute } from "./around.ts";
 import { publishDraft, versionSelect } from "./around.ts";
-import { derivedRevision, fresh, importRoute, openAt, whenSettled, type HostKind } from "./shell.ts";
+import { derivedRevision, fresh, importRoute, openAt, whenSettled } from "./shell.ts";
 
 /** Opens journey `journey`'s projection at `path` (`list?frontier=1`, `walk`, with a query) on `host`, once derived. */
-export async function openActing(page: Page, host: HostKind, journey: string, path: string): Promise<void> {
-  await openAt(page, host, journey, path);
+export async function openActing(page: Page, journey: string, path: string): Promise<void> {
+  await openAt(page, journey, path);
 }
 
 /** The keys of the rows or items `testId` marks, in the order shown, once there are some. */
@@ -131,7 +131,7 @@ export async function startVendorJourney(page: Page): Promise<string> {
 }
 
 /**
- * Publishes, on the in-browser host, a route like the vendor evaluation with one more decision,
+ * Publishes, on cairn demo, a route like the vendor evaluation with one more decision,
  * relevant only when a partner runs the testing and ranking below the up-front decisions: the
  * partner decision unlocks it along with the partner-led work. Its id.
  */
@@ -143,7 +143,7 @@ export async function publishFollowUpRoute(page: Page): Promise<string> {
       "- key: n_kickoff\n",
       "- key: n_partner_scope\n  id: partner-scope\n  kind: decision\n  title: Partner scope\n  prompt: Does the partner run all of the testing?\n  answer_type: boolean\n  weight: 0\n  relevant_when:\n    equals:\n      decision: partner-runs\n      value: true\n- key: n_kickoff\n",
     );
-  await importRoute(page, "browser", { name: `${route}.yaml`, mimeType: "text/yaml", buffer: Buffer.from(file) });
+  await importRoute(page, { name: `${route}.yaml`, mimeType: "text/yaml", buffer: Buffer.from(file) });
   await expect(versionSelect(page)).toContainText("Draft");
   await publishDraft(page);
   return route;

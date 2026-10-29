@@ -33,14 +33,13 @@ export type SyncState =
   | "saving"
   | "updating"
   | "saved"
-  | "demo"
   | "in-sync";
 
 /**
  * The colour rule: good is nothing to do, working is steel, wait is amber (it will sort
  * itself out, or it is safe to wait), act is red (your change is not landing until you act).
  */
-export type SyncTone = "good" | "working" | "wait" | "act" | "hollow";
+export type SyncTone = "good" | "working" | "wait" | "act";
 
 /** A write that did not land, until it is resolved or discarded (an event sent to its owner, the edit manager). */
 export interface Problem {
@@ -64,7 +63,6 @@ export interface SyncInput {
   now: number;
   stream: StreamStatus;
   online: boolean;
-  demo: boolean;
   skew: boolean;
   problems: readonly Problem[];
   /** The writes out or being resent, and since when (monotonic ms) there have been some. */
@@ -87,7 +85,6 @@ export type SyncCase =
   | { state: "saving"; count: number }
   | { state: "updating"; shown: number; announced: number }
   | { state: "saved"; time: string }
-  | { state: "demo" }
   | { state: "in-sync"; live: boolean; revision: number | undefined };
 
 /** What the chip shows of a case. */
@@ -137,9 +134,6 @@ export function summarize(input: SyncInput): SyncCase {
   if (input.saved !== undefined && now - input.saved.at < SYNC_SAVED_MS) {
     return { state: "saved", time: input.saved.time };
   }
-  if (input.demo) {
-    return { state: "demo" };
-  }
   return { state: "in-sync", live: input.stream === "live", revision: input.revision };
 }
 
@@ -179,8 +173,6 @@ export function syncWords(shown: SyncCase): SyncSummary {
       };
     case "saved":
       return { state: "saved", label: "SAVED", tone: "good", sentence: `Saved at ${shown.time}`, announce: undefined };
-    case "demo":
-      return { state: "demo", label: "DEMO", tone: "hollow", sentence: "Sample data in this tab. Nothing persists after a reload.", announce: undefined };
     case "in-sync":
       return {
         state: "in-sync",
@@ -211,7 +203,6 @@ export interface SyncTiming {
 export interface SyncReading {
   stream: StreamStatus;
   online: boolean;
-  demo: boolean;
   skew: boolean;
   revision: number | undefined;
   /** The writes out or being resent, as the edit manager counts them. */
@@ -230,7 +221,6 @@ export function syncInputOf(timing: SyncTiming, read: SyncReading): SyncInput {
     now: timing.now,
     stream: read.stream,
     online: read.online,
-    demo: read.demo,
     skew: read.skew,
     problems: read.problems,
     inFlight: read.count > 0 && timing.inFlightSince !== undefined ? { count: read.count, since: timing.inFlightSince } : undefined,

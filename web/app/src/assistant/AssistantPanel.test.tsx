@@ -1,14 +1,12 @@
 // The assistant panel's gating and what it shows of a turn (I5, I7): offered only when the
-// host's capabilities say there is an assistant, so the in-browser host never shows it; a
+// host's capabilities say there is an assistant; a
 // direct change shows as Cairn's report, linking the nodes it names, and a proposal opens in
 // proposal review.
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { seeded } from "../authoring/engine.test-support.ts";
 import type { AssistantAction, AssistantHost } from "../data/assistant.ts";
-import { browserHost } from "../data/browser-host.ts";
 import { FakeDeriver, FakeHost } from "../data/fake.test-support.ts";
 import type { Host } from "../data/host.ts";
 import { Session } from "../data/session.ts";
@@ -42,13 +40,6 @@ describe("the assistant panel's gating (I5, capabilities)", () => {
     for (const assistant of [anAssistant, undefined]) {
       expect(await offeredOver(serverHost({ offers: false, assistant }))).toBe(false);
     }
-  });
-
-  it("is never shown on the in-browser host", async () => {
-    const host = browserHost(await seeded());
-    expect((await host.capabilities()).assistant).toBe(false);
-    expect(host.assistant).toBeUndefined();
-    expect(await offeredOver(host)).toBe(false);
   });
 });
 

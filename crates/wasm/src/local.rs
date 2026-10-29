@@ -236,7 +236,7 @@ pub fn apply_locally(
     request: &ApplyRequest,
 ) -> Result<AppliedLocally, HostError> {
     // Only the journey's own patches: a proposal's lifecycle and other domains are the
-    // server's (or the in-browser root's) to apply.
+    // server's to apply.
     let target = match &request.patch.target {
         PatchTarget::Journey(id) => Domain::Journey(id.clone()),
         PatchTarget::Route(id) => Domain::Route(id.clone()),

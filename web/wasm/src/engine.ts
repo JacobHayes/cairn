@@ -12,8 +12,6 @@ import init, {
   valueProblems,
   draftStored,
   draftWritten,
-  exportRoute,
-  importRoute,
   preview,
   readRouteFile,
   removalPlan,
@@ -33,8 +31,6 @@ import {
   type DerivationKey,
   type Derived,
   type DraftRequest,
-  type ExportRequest,
-  type ImportRequest,
   type NodeFormValues,
   type PreviewAnswer,
   type PreviewRequest,
@@ -214,26 +210,6 @@ export class Engine {
   /** A10: a written message draft stored with keys, or why it cannot be, as the module wrote it. */
   draftStoredText(graph: Schema<"Graph">, written: string): string {
     return hosted(() => draftStored(JSON.stringify(graph), written));
-  }
-
-  /** A13: a route version or draft as its file, as the module wrote it. */
-  exportRouteText(request: ExportRequest): string {
-    return hosted(() => exportRoute(JSON.stringify(request)));
-  }
-
-  /** A13: a route version or draft as its file. */
-  exportRoute(request: ExportRequest): Schema<"RouteFile"> {
-    return parsed<Schema<"RouteFile">>(this.exportRouteText(request));
-  }
-
-  /** A13: the graph a route file's import would open as a draft, as the module wrote it. */
-  importRouteText(request: ImportRequest): string {
-    return hosted(() => importRoute(JSON.stringify(request)));
-  }
-
-  /** A13: the graph a route file's import would open as a draft. */
-  importRoute(request: ImportRequest): Schema<"Graph"> {
-    return parsed<Schema<"Graph">>(this.importRouteText(request));
   }
 
   /** A13: a route file's text (YAML or JSON) as the file document the API's import takes, as the module wrote it. */

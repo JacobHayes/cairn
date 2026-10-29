@@ -2,12 +2,10 @@
 // until it is answered. The write's states, its resends (the backoff, the wait for the
 // connection, the limit), and what each answer makes of it (A18, A19).
 import { backoffDelayMs, type Answered, type HttpFailure, type Patch, type PatchAnswer, type Rejection } from "@cairn/client";
-import { HostFailure } from "@cairn/wasm";
 import { SimulatedClock, createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
 import type { Command } from "./edit-command.ts";
-import { hostFailure } from "./host-failure.ts";
 import { FakeHost, deferred, settled, writeEnv } from "./fake.test-support.ts";
 import { RESEND_COUNT_MAX, writeMachine, writeView, type WriteView } from "./write-machine.ts";
 import { patchOf } from "./writes.ts";
@@ -141,20 +139,9 @@ describe("a write waiting for the connection", () => {
 });
 
 describe("what an answer makes of a write", () => {
-  it("stops a write the in-browser root refused, as it stops one the server refused", async () => {
-    const { host, actor, view, advance } = setup();
-    const refusal = hostFailure(new HostFailure({ error: "missing", message: "no such journey" }));
-    host.answers = [{ outcome: "failed", error: refusal }, applied];
-    actor.send({ type: "submit" });
-    await settled();
-    expect(view()).toMatchObject({ state: "stopped", failure: { status: 404, message: "no such journey" } });
-    await advance(60_000);
-    expect(host.sent).toHaveLength(1);
-  });
-
   it("leaves a throw that is not a refusal as no answer, to be resent", async () => {
     const { host, actor, view } = setup();
-    host.answers = [{ outcome: "failed", error: hostFailure(new Error("worker died")) }, applied];
+    host.answers = [{ outcome: "failed", error: { status: 0, message: "worker died" } }, applied];
     actor.send({ type: "submit" });
     await settled();
     expect(view().state).toBe("unconfirmed");

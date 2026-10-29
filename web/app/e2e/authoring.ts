@@ -4,14 +4,14 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 import { versionSelect } from "./around.ts";
-import { fresh, open, openJourney, openSheet, settled, whenSettled, type HostKind } from "./shell.ts";
+import { fresh, open, openJourney, openSheet, settled, whenSettled } from "./shell.ts";
 
 /** A fresh name for a route this run starts. */
 export const routeName = (stem: string) => fresh(stem);
 
 /** Starts a route with an empty draft from the new-route form; its id, once its draft's canvas opens. */
-export async function newRoute(page: Page, host: HostKind, name: string): Promise<string> {
-  await open(page, host, "/routes/new");
+export async function newRoute(page: Page, name: string): Promise<string> {
+  await open(page, "/routes/new");
   const form = page.getByTestId("new-route");
   await form.getByLabel("New route name").fill(name);
   const id = await whenSettled(page, () => form.getByLabel("New route id").inputValue());
@@ -105,7 +105,7 @@ export async function section(page: Page, testId: string): Promise<Locator> {
 }
 
 /** A journey's canvas in edit mode on `host`. */
-export async function openEditing(page: Page, host: HostKind, journey: string): Promise<void> {
-  await openJourney(page, host, journey, "?edit=on");
+export async function openEditing(page: Page, journey: string): Promise<void> {
+  await openJourney(page, journey, "?edit=on");
   await expect(page.getByTestId("authoring-bar")).toBeVisible();
 }

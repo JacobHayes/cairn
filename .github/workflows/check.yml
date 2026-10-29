@@ -65,7 +65,7 @@ jobs:
       # The property tests at more cases than a local run's 64, and at a larger count in the
       # nightly run (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
       PROPTEST_CASES: ${{ github.event_name == 'schedule' && 4096 || 256 }}
-      # The browser host's module as it ships, optimized: its bindings are the ones the generated
+      # The engine's module as it ships, optimized: its bindings are the ones the generated
       # step checks, and the browser step tests it (a local check builds the faster wasm-dev profile;
       # decisions/2026-10-08-the-check-builds-the-wasm-module-without-lto.md).
       CAIRN_WASM_PROFILE: wasm

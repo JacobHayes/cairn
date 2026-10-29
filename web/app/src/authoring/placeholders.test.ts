@@ -7,7 +7,7 @@ import type { Engine } from "@cairn/wasm";
 
 import type { Role } from "./graph.ts";
 import { treeOf, type GraphNode } from "./graph.ts";
-import { seeded } from "./engine.test-support.ts";
+import { wasmEngine } from "./engine.test-support.ts";
 import { draftProblemWords, placeholderOptions } from "./placeholders.ts";
 
 const roles: Role[] = [{ key: "r_lead", id: "lead", title: "Lead" }];
@@ -20,7 +20,7 @@ const tree = treeOf(graph);
 
 let engine: Engine;
 beforeAll(async () => {
-  engine = (await seeded()).engine;
+  engine = await wasmEngine();
 });
 
 const stored = (written: string, of = graph) => JSON.parse(engine.draftStoredText(of, written)) as { stored: string } | { problem: Parameters<typeof draftProblemWords>[0] };

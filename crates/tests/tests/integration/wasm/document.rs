@@ -1,4 +1,4 @@
-//! A domain document in the browser host (ARCHITECTURE, Web UI: data flow): read, derived
+//! A domain document in the browser (ARCHITECTURE, Web UI: data flow): read, derived
 //! once, and projected.
 #![cfg(test)]
 
@@ -7,7 +7,7 @@ use cairn_schema::{Deployment, Journey, Revision, from_yaml};
 use cairn_wasm::{Derivation, HostError};
 
 /// The domain document of an empty journey, as the server builds it.
-fn document() -> String {
+pub fn document() -> String {
     let journey = Journey {
         header: from_yaml(
             "id: j_empty\nname: Empty\nstatus: active\ncreated_at: \"2026-10-01T00:00:00Z\"\ncreated_on: \"2026-10-01\"\n",

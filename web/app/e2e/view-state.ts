@@ -7,7 +7,7 @@ import { setFrontier } from "./acting.ts";
 import { pin } from "./detail.ts";
 import { menuItem, nodePanel, openFilter, openFromCanvas, rename, setDepth, settled, whenSettled } from "./shell.ts";
 
-/** The viewer's identity on the in-browser host, as the vendor evaluation names it. */
+/** The viewer's identity on cairn demo, as the vendor evaluation names it. */
 export const VIEWER = "who_k3d7qm2xw5tn6pfa";
 
 /** The Filter's popover. */

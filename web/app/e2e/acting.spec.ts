@@ -2,7 +2,7 @@
 // list's bulk bar (selection, one patch, the frontier rows and the folds under them, C9, B6) and the cards'
 // pass (an answer, what it unlocked, passing, the inspector reached from the rail, a node
 // completed from the pass, C11), over a journey started from a route's form (B1). Every test
-// runs on the in-browser host, whose fixtures are fresh on every load. The rules behind both
+// runs on cairn demo, whose fixtures are fresh on every load. The rules behind both
 // (ranking, filters, guards, the pass's order) are the engine's and vitest's.
 import type { Locator } from "@playwright/test";
 
@@ -17,7 +17,7 @@ import { FIXED_TODAY } from "./views.ts";
 
 test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an unsnooze returns them", async ({ page }) => {
   await readable(page);
-  await openActing(page, "browser", "j_launch", "list?frontier=1");
+  await openActing(page, "j_launch", "list?frontier=1");
   const revision = await derivedRevision(page);
   await select(page, "n_docs");
   await select(page, "n_announcement");
@@ -75,7 +75,7 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
 });
 
 test("C11: the walkthrough's card sits in the middle of the canvas area at every width, and is the node's one editor at the address it was opened at", async ({ page }) => {
-  await openActing(page, "browser", "j_launch", "walk");
+  await openActing(page, "j_launch", "walk");
   await card(page).waitFor();
   for (const width of [1440, 900, 390]) {
     await page.setViewportSize({ width, height: 900 });
@@ -95,7 +95,7 @@ test("C11: the walkthrough's card sits in the middle of the canvas area at every
   // Opened at a node's own address, the card is that node's one editor; the inspector does not open a second one.
   const first = ((await whenSettled(page, () => page.getByTestId("triage").getAttribute("data-order"))) ?? "").split(" ")[0] ?? "";
   const at = `/journeys/j_launch/nodes/${first}?view=walk`;
-  await open(page, "browser", at);
+  await open(page, at);
   await expect(page.getByTestId("triage")).toBeVisible();
   await expectAddress(page, at);
   await expect(page.getByTestId("node-detail")).toHaveCount(1);
@@ -104,7 +104,7 @@ test("C11: the walkthrough's card sits in the middle of the canvas area at every
 
 test("B1, C11: a journey started from a route opens its walkthrough; an answer surfaces and unlocks work, passing writes nothing, and a node completed from the pass unlocks into it", async ({ page }) => {
   const route = await publishFollowUpRoute(page);
-  await startJourney(page, "browser", journeyName("Follow-up"), { route, version: 1 });
+  await startJourney(page, journeyName("Follow-up"), { route, version: 1 });
   await expect(card(page)).toHaveAttribute("data-node", "n_partner_runs");
   await expect(card(page)).toHaveAttribute("data-kind", "decision");
   await answerCard(page, "yes");
@@ -131,7 +131,7 @@ test("B1, C11: a journey started from a route opens its walkthrough; an answer s
   await expect(page.getByTestId("unlocked-by").getByRole("link", { name: "Review the partner's criteria" })).toBeVisible();
   await checkpoint(page);
   // With every decision made (the seeded vendor evaluation) there is nothing to decide, and Continue goes on to everything.
-  await openAt(page, "browser", "j_vendor_eval", "walk?depth=decisions", { fixedToday: FIXED_TODAY });
+  await openAt(page, "j_vendor_eval", "walk?depth=decisions", { fixedToday: FIXED_TODAY });
   await expect(page.getByTestId("no-decisions")).toBeVisible();
   await page.getByRole("button", { name: "Continue with everything" }).click();
   await expectAddress(page, "/journeys/j_vendor_eval?view=walk");

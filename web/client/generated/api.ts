@@ -1278,7 +1278,7 @@ export interface components {
         /** @description Starts with "a_"; at most id_bytes_max (64) bytes. */
         AttachmentKey: string;
         /** @description The kinds of sign-in a host can offer. */
-        AuthKind: "dev" | "oidc" | "builtin_oauth" | "tailscale" | "gcp_iap" | "local";
+        AuthKind: "dev" | "oidc" | "builtin_oauth" | "tailscale" | "gcp_iap";
         /** @description One way to sign in. */
         AuthMethod: {
             /** @description What kind of provider it is. */

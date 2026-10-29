@@ -1,7 +1,7 @@
 # Fixtures
 
 Generic seed routes, each with a journey scenario, plus one journey with no route. The
-engine's scenario tests, the in-browser host, and the server's integration tests all load
+engine's scenario tests, `cairn demo`, and the server's integration tests all load
 them (ARCHITECTURE, Testing the engine). Nothing here refers to a real use case, person, or
 organization (PRD, Domain-free).
 

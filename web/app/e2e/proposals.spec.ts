@@ -1,4 +1,4 @@
-// Proposal review in the browser, on the in-browser host: the one proposal-review flow, the scenario
+// Proposal review in the browser, on cairn demo: the one proposal-review flow, the scenario
 // journey upgraded to the fixture's version 2 with each kind of conflict that version raises
 // resolved and applied (B7, C14), where the review screen meets the canvas, the inspector and
 // the host. What a proposal offers, blocks and reads as stale is model and host tests'.
@@ -13,9 +13,9 @@ import { expectAddress, goTo, nodeCard, open, readable, setDepth, syncChip, when
 
 /** Drafts the upgrade of the scenario journey to version 2 (after the edits version 2 also touches) and returns the review's address. */
 async function draftUpgrade(page: Page): Promise<string> {
-  await editWhereVersionTwoChanges(page, "browser");
-  await publishVersionTwo(page, "browser");
-  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await editWhereVersionTwoChanges(page);
+  await publishVersionTwo(page);
+  await openJourneyCard(page, "j_vendor_eval");
   await page.getByTestId("journey-upgrade").click();
   const flow = page.getByTestId("upgrade-flow");
   await expect(flow.getByLabel("Upgrade to version")).toHaveValue("2");
@@ -29,18 +29,18 @@ async function draftUpgrade(page: Page): Promise<string> {
 /** The drafted upgrade is listed in its journey's Proposals tab and on Home, and opens under the journey. */
 async function proposalIsListed(page: Page, reviewed: string): Promise<void> {
   // Away from it: the journey's tab names it, and its row opens the same address.
-  await open(page, "browser", "/journeys/j_vendor_eval");
+  await open(page, "/journeys/j_vendor_eval");
   await expect(page.getByTestId("tab-proposals")).toContainText("1");
   await page.getByTestId("tab-proposals").click();
   await page.getByTestId("proposals-pane").getByTestId("proposal-row").getByRole("link").click();
   await reviewOpen(page);
   await expectAddress(page, reviewed);
   // The address of the list opens the journey with the tab in view.
-  await open(page, "browser", "/journeys/j_vendor_eval/proposals");
+  await open(page, "/journeys/j_vendor_eval/proposals");
   await expect(page.getByTestId("tab-proposals")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("proposals-panel").getByTestId("proposal-row")).toHaveCount(1);
   // Home waits on it too, in a fold after the journeys.
-  await open(page, "browser", "/");
+  await open(page, "/");
   await page.getByTestId("home-proposals").locator("summary").click();
   await page.getByTestId("home-proposals").getByTestId("proposal-row").getByRole("link").click();
   await reviewOpen(page);
@@ -129,7 +129,7 @@ test("B7, C14, C16: the scenario journey upgraded to version 2 is listed on its 
 });
 
 test("C14, A11: saving a journey as a route is reviewed over the route's own page, in every view, and applied", async ({ page }) => {
-  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await openJourneyCard(page, "j_vendor_eval");
   await page.getByTestId("journey-menu").click();
   await page.getByTestId("menu-save").click();
   await page.getByTestId("save-as-route-flow").getByLabel("Route id").fill("r_saved");
@@ -160,8 +160,8 @@ const LEGIBLE = 0.75;
 /** Away and back at `size`, so the canvas opens afresh there: the first change is framed with a margin, legible and drawn to read. */
 async function firstChangeFramed(page: Page, layered: string, size: { width: number; height: number }): Promise<void> {
   await page.setViewportSize(size);
-  await open(page, "browser", "/journeys/j_vendor_eval");
-  await open(page, "browser", `${layered}?depth=actions`);
+  await open(page, "/journeys/j_vendor_eval");
+  await open(page, `${layered}?depth=actions`);
   await reviewOpen(page);
   // The first change in the rail's order is the first conflict waiting on a choice.
   const first = await whenSettled(page, () => page.getByTestId("to-decide-item").first().evaluate((row) => row.querySelector("button")?.textContent ?? ""));
@@ -201,9 +201,9 @@ async function changeReads(page: Page, node: string): Promise<void> {
 }
 
 test("C14: on a desktop and then a phone the layer opens the graph on its first change, framed with a margin and legible", async ({ page }) => {
-  await editWhereVersionTwoChanges(page, "browser");
-  await publishVersionTwo(page, "browser");
-  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await editWhereVersionTwoChanges(page);
+  await publishVersionTwo(page);
+  await openJourneyCard(page, "j_vendor_eval");
   await page.getByTestId("journey-upgrade").click();
   await page.getByTestId("upgrade-flow").getByRole("button", { name: "Propose the upgrade" }).click();
   await reviewOpen(page);

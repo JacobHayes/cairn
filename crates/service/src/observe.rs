@@ -49,7 +49,7 @@ impl Drop for EngineCall {
     }
 }
 
-/// Runs a derive, recording its duration on the server. The browser host (wasm32) has no
+/// Runs a derive, recording its duration on the server. The wasm32 engine module has no
 /// monotonic clock the standard library can read, and its metrics would go nowhere, so
 /// there the derive runs untimed.
 #[cfg(not(target_arch = "wasm32"))]
@@ -60,7 +60,7 @@ pub(crate) fn timed_derive<T>(derive: impl FnOnce() -> T) -> T {
     derived
 }
 
-/// Runs a derive (the browser host: untimed, see the server's version).
+/// Runs a derive (wasm32: untimed, see the server's version).
 #[cfg(target_arch = "wasm32")]
 pub(crate) fn timed_derive<T>(derive: impl FnOnce() -> T) -> T {
     derive()

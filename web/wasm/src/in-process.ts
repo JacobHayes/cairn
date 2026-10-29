@@ -1,4 +1,4 @@
-// What the Node tests of the browser host share: the wasm32 module loaded from the bytes the
+// What the Node tests of the engine share: the wasm32 module loaded from the bytes the
 // build wrote, and the derive worker's own script run in this thread behind the `Worker`
 // interface, so the code under test is the browser's, not a copy. Each `fresh` call starts
 // from the module graph up when a test resets the registry first (the engine's instance,
@@ -35,7 +35,7 @@ function workerOver(post: (message: unknown, reply: (message: unknown) => void) 
   return worker;
 }
 
-/** The browser host's modules, loaded now, with a derive worker running the worker's own script. */
+/** The package's modules, loaded now, with a derive worker running the worker's own script. */
 export async function inProcess() {
   const host = await import("./index.ts");
   const globals = globalThis as unknown as { onmessage?: (event: { data: unknown }) => void; postMessage?: (message: unknown) => void };

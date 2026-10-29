@@ -2,10 +2,9 @@
 // merely refused, on the shapes the engine itself answers (the page's engine, seeded with the
 // fixtures, as the authoring tests use it).
 import type { Patch, Rejection, Schema } from "@cairn/client";
-import type { InBrowserHost } from "@cairn/wasm";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { applyToJourney, journeyAfter, planMutations, removalPlan, seeded } from "../authoring/engine.test-support.ts";
+import { applyToJourney, journeyAfter, planMutations, removalPlan, seeded, type Fixtures } from "../authoring/engine.test-support.ts";
 import { goneOf } from "./write-machine.ts";
 
 const JOURNEY = "j_vendor_eval";
@@ -13,7 +12,7 @@ const JOURNEY = "j_vendor_eval";
 type Mutation = Schema<"Mutation">;
 
 describe("goneOf", () => {
-  let host: InBrowserHost;
+  let host: Fixtures;
   let removed: string;
   beforeAll(async () => {
     host = await seeded();

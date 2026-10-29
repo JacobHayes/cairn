@@ -111,14 +111,14 @@ pub async fn parts(config: &Config) -> Result<(Arc<dyn Store>, Router), String> 
         settings: config.settings(),
         capabilities: root::capabilities(config),
     });
-    cairn_wasm::fixtures::seed(&service)
+    crate::fixtures::seed(&service)
         .await
         .map_err(|error| error.to_string())?;
     // Named, so the seeded history says who did each thing rather than an id.
     let seeded_at = "2026-09-01T12:00:00Z"
         .parse()
         .map_err(|error| format!("a fixed time: {error}"))?;
-    cairn_wasm::fixtures::put_fixture_users(store.as_ref(), seeded_at)
+    crate::fixtures::put_fixture_users(store.as_ref(), seeded_at)
         .await
         .map_err(|error| error.to_string())?;
     let url = Url::parse(&issuer_url(config.listen)).map_err(|error| error.to_string())?;

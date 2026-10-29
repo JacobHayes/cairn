@@ -630,11 +630,6 @@
             "const": "gcp_iap",
             "description": "Google Cloud Identity-Aware Proxy's signed assertion.",
             "type": "string"
-          },
-          {
-            "const": "local",
-            "description": "The browser host's single local login.",
-            "type": "string"
           }
         ]
       },

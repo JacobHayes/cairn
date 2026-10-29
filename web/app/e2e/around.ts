@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, type Locator, type Page } from "@playwright/test";
 
-import { expectAddress, fresh, open, openSheet, settled, whenSettled, type HostKind } from "./shell.ts";
+import { expectAddress, fresh, open, openSheet, settled, whenSettled } from "./shell.ts";
 
 /** A fixture's route file as it is kept on disk. */
 export function fixtureRoute(fixture: string): string {
@@ -14,9 +14,9 @@ export function fixtureRoute(fixture: string): string {
 }
 
 /** Starts a journey from the new-journey form at `path`; its id, once it opens on its walkthrough. */
-export async function startJourney(page: Page, host: HostKind, name: string, from?: { route: string; version?: number }): Promise<string> {
+export async function startJourney(page: Page, name: string, from?: { route: string; version?: number }): Promise<string> {
   const path = from === undefined ? "/journeys/new" : `/journeys/new?route=${from.route}${from.version === undefined ? "" : `&version=${String(from.version)}`}`;
-  await open(page, host, path);
+  await open(page, path);
   const form = page.getByTestId("new-journey-form");
   await form.getByLabel("Name").fill(name);
   if (from === undefined) {
@@ -33,8 +33,8 @@ export async function startJourney(page: Page, host: HostKind, name: string, fro
 export const journeyName = (stem: string) => fresh(stem);
 
 /** Journey `id`'s graph, with its journey card, once derived. */
-export async function openJourneyCard(page: Page, host: HostKind, id: string): Promise<Locator> {
-  await open(page, host, `/journeys/${id}?view=graph`);
+export async function openJourneyCard(page: Page, id: string): Promise<Locator> {
+  await open(page, `/journeys/${id}?view=graph`);
   const card = page.getByTestId("journey-card");
   await expect(card).toBeVisible();
   return card;
@@ -55,8 +55,8 @@ export async function setStatus(page: Page, to: "active" | "completed" | "archiv
 }
 
 /** Route `route`'s page, once read: its header is up. */
-export async function openRoute(page: Page, host: HostKind, route: string, search = ""): Promise<void> {
-  await open(page, host, `/routes/${route}${search}`);
+export async function openRoute(page: Page, route: string, search = ""): Promise<void> {
+  await open(page, `/routes/${route}${search}`);
   await expect(page.getByTestId("route-header")).toBeVisible();
 }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env -S bash -euo pipefail
-#MISE description="Build the browser host's module: crates/wasm for wasm32 in the CAIRN_WASM_PROFILE cargo profile (wasm-dev by default; wasm, optimized, for the release build and in CI), bound by wasm-bindgen into web/wasm/dist/bindgen/"
+#MISE description="Build the engine's module: crates/wasm for wasm32 in the CAIRN_WASM_PROFILE cargo profile (wasm-dev by default; wasm, optimized, for the release build and in CI), bound by wasm-bindgen into web/wasm/dist/bindgen/"
 # ARCHITECTURE, Generated artifacts: the compiled .wasm is a build output, never checked in.
 # This writes the module and its bindings to web/wasm/dist/bindgen/ (ignored); `mise run
 # gen` copies the bindings (not the .wasm) into web/wasm/generated/, and the browser tests

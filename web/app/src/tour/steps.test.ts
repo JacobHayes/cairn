@@ -1,9 +1,8 @@
 // The steps' gates and copy over the practice journey as the real engine derives it: each gate
 // is a predicate on derived state, and each sentence names what is true now.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { InBrowserHost } from "@cairn/wasm";
 
-import { derivedJourney, journeyAfter, seeded } from "../authoring/engine.test-support.ts";
+import { derivedJourney, journeyAfter, seeded, type Fixtures } from "../authoring/engine.test-support.ts";
 import { transition } from "../detail/model.ts";
 import { PRACTICE, practiceMutations } from "./practice.ts";
 import { cardOf, clampCursor, exampleReply, factsOf, rowOf, stepDone, stepsFor, type Facts, type StepId, type Where, type WindowKind } from "./steps.ts";
@@ -11,9 +10,13 @@ import { cardOf, clampCursor, exampleReply, factsOf, rowOf, stepDone, stepsFor, 
 const { decision, draft, comments, review, summary } = PRACTICE;
 const wide: WindowKind = { phone: false, short: false };
 
-let host: InBrowserHost;
+let host: Fixtures;
+const facts = new Map<Stage, Facts>();
 beforeAll(async () => {
   host = await seeded();
+  for (const stage of STAGES) {
+    facts.set(stage, await factsAfter(stage));
+  }
 });
 const freed: (() => void)[] = [];
 afterAll(() => {
@@ -22,12 +25,22 @@ afterAll(() => {
   });
 });
 
-type Stage = "created" | "yes" | "no" | "yes-draft-done" | "no-draft-done";
+const STAGES = ["created", "yes", "no", "yes-draft-done", "no-draft-done"] as const;
+type Stage = (typeof STAGES)[number];
 
 /** The facts of a practice journey after `stage`. */
 function factsAt(stage: Stage): Facts {
+  const found = facts.get(stage);
+  if (found === undefined) {
+    throw new Error(`no facts for ${stage}`);
+  }
+  return found;
+}
+
+/** Makes a practice journey as the tour does and takes it to `stage`, derived. */
+async function factsAfter(stage: Stage): Promise<Facts> {
   const id = `j_steps_${stage.replaceAll("-", "_")}`;
-  host.patch({ patch: { id: `p_${id}`, target: { journey: id }, base_revision: 0, mutations: practiceMutations("2026-10-06") } });
+  await host.patch({ patch: { id: `p_${id}`, target: { journey: id }, base_revision: 0, mutations: practiceMutations("2026-10-06") } });
   let text = host.documentText(id);
   const said = stage.startsWith("yes") ? true : stage.startsWith("no") ? false : undefined;
   if (said !== undefined) {

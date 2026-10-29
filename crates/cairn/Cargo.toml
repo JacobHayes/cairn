@@ -25,13 +25,12 @@ axum = { workspace = true, features = ["matched-path"] }
 cairn-api.workspace = true
 cairn-assistant.workspace = true
 cairn-auth.workspace = true
+cairn-engine.workspace = true
 cairn-mcp.workspace = true
 cairn-schema.workspace = true
 cairn-service.workspace = true
 cairn-store.workspace = true
 cairn-store-sqlite.workspace = true
-# `cairn demo` seeds the fixtures the in-browser host is seeded with.
-cairn-wasm.workspace = true
 chrono.workspace = true
 clap.workspace = true
 # `cairn demo`'s stub issuer signs its ID tokens.

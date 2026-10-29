@@ -2,15 +2,14 @@
 // move the tour asks of a person. The copy is composed from derived state, so this is the
 // contract it stands on.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { InBrowserHost } from "@cairn/wasm";
 
-import { derivedJourney, journeyAfter, seeded } from "../authoring/engine.test-support.ts";
+import { derivedJourney, journeyAfter, seeded, type Fixtures } from "../authoring/engine.test-support.ts";
 import { transition } from "../detail/model.ts";
 import { addDays, practiceMutations, PRACTICE } from "./practice.ts";
 
 const TODAY = "2026-10-06";
 
-let host: InBrowserHost;
+let host: Fixtures;
 beforeAll(async () => {
   host = await seeded();
 });
@@ -22,8 +21,8 @@ afterAll(() => {
 });
 
 /** The practice journey `id`, created at base revision 0 as the tour sends it. */
-function created(id: string): string {
-  host.patch({ patch: { id: `p_create_${id}`, target: { journey: id }, base_revision: 0, mutations: practiceMutations(TODAY) } });
+async function created(id: string): Promise<string> {
+  await host.patch({ patch: { id: `p_create_${id}`, target: { journey: id }, base_revision: 0, mutations: practiceMutations(TODAY) } });
   return host.documentText(id);
 }
 
@@ -44,8 +43,8 @@ const { decision, draft, comments, review, summary, meeting } = PRACTICE;
 const answer = (value: boolean) => ({ op: "answer" as const, decision, value: { boolean: value } });
 
 describe("the practice journey", () => {
-  it("starts with the decision and the draft ready and the review waiting on the decision", () => {
-    const text = created("j_practice_created");
+  it("starts with the decision and the draft ready and the review waiting on the decision", async () => {
+    const text = await created("j_practice_created");
     const now = states(text);
     expect(keysIn(now, "ready")).toEqual([decision, draft].sort());
     expect(keysIn(now, "blocked")).toEqual([comments, meeting, summary].sort());
@@ -55,9 +54,9 @@ describe("the practice journey", () => {
   it.each([
     { said: true, ready: [comments, review], applies: true },
     { said: false, ready: [comments], applies: false },
-  ])("after the decision is answered $said and the draft is done, $ready are ready", ({ said, ready, applies }) => {
+  ])("after the decision is answered $said and the draft is done, $ready are ready", async ({ said, ready, applies }) => {
     const id = `j_practice_answered_${String(said)}`;
-    const answered = journeyAfter(host, id, [answer(said)], created(id));
+    const answered = journeyAfter(host, id, [answer(said)], await created(id));
     const decided = states(answered);
     expect(keysIn(decided, "ready")).toEqual([draft]);
     expect(decided[review]).toBe(applies ? "blocked" : "not_relevant");
@@ -67,8 +66,8 @@ describe("the practice journey", () => {
     expect(keysIn(after, "blocked")).toEqual([meeting, summary].sort());
   });
 
-  it("pins the meeting fourteen days after the given today and gives the summary the day before", () => {
-    const text = created("j_practice_dates");
+  it("pins the meeting fourteen days after the given today and gives the summary the day before", async () => {
+    const text = await created("j_practice_dates");
     const derived = derivedJourney(host, text);
     freed.push(derived.free);
     expect(derived.ready.derived.nodes[meeting]?.dates.effective_date).toEqual({ date: addDays(TODAY, 14), origin: "pin" });

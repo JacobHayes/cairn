@@ -9,6 +9,7 @@
 pub mod assets;
 pub mod config;
 pub mod demo;
+pub mod fixtures;
 pub mod host;
 pub mod limits;
 pub mod listener;

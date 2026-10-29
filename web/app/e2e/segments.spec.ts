@@ -1,4 +1,4 @@
-// Segments on the in-browser host: the security-review segment imported and published, then
+// Segments on cairn demo: the security-review segment imported and published, then
 // inserted into the vendor evaluation's Testing group (C19, B13, C14). The insertion starts
 // after a host node and maps the segment's reviewer onto the journey's existing findings
 // reviewer, so the segment's own filling decision is left out; review shows the incoming nodes
@@ -16,10 +16,10 @@ const JOURNEY = "j_vendor_eval";
 
 test("C19, C14: a segment inserted from a container, reviewed, applied, and shown in Origin", async ({ page }) => {
   await readable(page);
-  await publishSegment(page, "browser");
+  await publishSegment(page);
 
   // After the access deliverable, with the reviewer mapped onto the journey's findings reviewer.
-  await startInsert(page, "browser", JOURNEY, "n_testing", "Security review");
+  await startInsert(page, JOURNEY, "n_testing", "Security review");
   await expect(stepper(page).getByLabel("Under")).toHaveValue("n_testing");
   await stepper(page).getByLabel("Add to Starts after").selectOption("n_access");
   // The incoming root is drawn on the graph as review will draw it.
@@ -35,7 +35,7 @@ test("C19, C14: a segment inserted from a container, reviewed, applied, and show
   await apply(page);
 
   // A member's Details name the segment and version.
-  await openJourney(page, "browser", JOURNEY);
+  await openJourney(page, JOURNEY);
   await page.getByTestId("node-card").filter({ hasText: "Threat model" }).first().getByTestId("card-open").click();
   await page.getByTestId("details").locator("summary").click();
   await expect(page.getByTestId("segment-origin").first()).toHaveText("From segment Security review, version 1.");

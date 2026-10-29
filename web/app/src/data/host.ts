@@ -1,7 +1,6 @@
-// What the shell's one data layer reads and writes through (ARCHITECTURE, Web UI): a host,
-// either the server over HTTP (server-host.ts) or the in-browser host with no server
-// (browser-host.ts). Both answer the API's JSON, so everything above this reads either.
-import type { Answered, HttpFailure, OpenTicks, Schema } from "@cairn/client";
+// What the shell's one data layer reads and writes through (ARCHITECTURE, Web UI): a host, the
+// server over HTTP (server-host.ts).
+import type { Answered, HttpFailure, OpenTicks, Schema, operations } from "@cairn/client";
 import type {
   AppliedLocally,
   ApplyRequest,
@@ -12,7 +11,6 @@ import type {
   NodeFormValues,
   DraftStored,
   DerivationHandle,
-  JourneyIndexQuery,
   Derived,
   DraftRequest,
   HistoryPage,
@@ -55,9 +53,8 @@ export type TourWriteRequest = Schema<"TourWrite">;
 
 /** What a tour write came to: written, over another record than the writer expected (the current one), or not answered. */
 export type TourWrite = { ok: true } | { ok: false; current: Tour } | { ok: false; failure: HttpFailure };
-export type { JourneyIndexQuery };
-
-export type HostKind = "server" | "browser";
+/** The journey index's filters and page (C16): the API's own query. */
+export type JourneyIndexQuery = NonNullable<operations["listJourneys"]["parameters"]["query"]>;
 
 /** A journey the host does not have (deleted, or never there). */
 export class Missing extends Error {
@@ -99,9 +96,8 @@ export interface AgentTokenHost {
   revoke(agent: string): Promise<void>;
 }
 
-/** One of the two hosts. */
+/** The server, as the app reads and writes it. */
 export interface Host {
-  readonly kind: HostKind;
   capabilities(): Promise<Capabilities>;
   /** A page of the journey index (C16), filtered as `query` asks; every journey when none. */
   journeys(query?: JourneyIndexQuery): Promise<JourneyPage>;
@@ -121,10 +117,7 @@ export interface Host {
   putTour(write: TourWriteRequest): Promise<TourWrite>;
   /** H3: the names of `users` (at most a page of them); one that does not exist is left out. */
   userNames(users: readonly string[]): Promise<UserName[]>;
-  /**
-   * H2: the caller's agent tokens, on a host that serves them (the server; the in-browser host has no
-   * agents). Auth state, not domain writes: a mint is never resent, for it would make a second secret.
-   */
+  /** H2: the caller's agent tokens. Auth state, not domain writes: a mint is never resent, for it would make a second secret. */
   readonly agentTokens: AgentTokenHost | undefined;
   /** A journey's domain document as the host wrote it; `Missing` when there is none, `Skewed` when another engine wrote it. */
   documentText(journey: string): Promise<string>;
@@ -142,7 +135,7 @@ export interface Host {
   send(patch: Patch, note?: Markdown): Promise<Answered<HttpFailure>>;
   /** I6, C14: proposals, and the upgrade, save-as-route, and re-link drafts (B7, B8, B9). */
   readonly proposals: ProposalHost;
-  /** I5: the assistant, on a host that assembled one; the in-browser host never has one. */
+  /** I5: the assistant, when the server has one. */
   readonly assistant: AssistantHost | undefined;
   /** H6: the host's revision ticks. */
   readonly openTicks: OpenTicks;

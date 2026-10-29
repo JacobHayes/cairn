@@ -2,7 +2,7 @@
 // links, and how it fits a phone, a tablet beside the sheet, paper and an archived journey.
 // What each value is (the final milestone, the claimed rows, what finished lately) is the
 // engine-backed model's (summary/model.engine.test.ts); this is what only a browser shows. Every
-// test runs on the in-browser host, whose fixtures are fresh on every load.
+// test runs on cairn demo, whose fixtures are fresh on every load.
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
@@ -16,7 +16,7 @@ import { expectStructure } from "./structure.ts";
 const fixed = { fixedToday: FIXED_TODAY };
 
 test("C10, C18, E1: a row's title opens that node on the graph; Done on a row of Waiting on you acts in place, and the lead moves with the derivation", async ({ page }) => {
-  await openAt(page, "browser", "j_launch", "summary", fixed);
+  await openAt(page, "j_launch", "summary", fixed);
   // A row's title opens that node on the graph, and back is the Summary again.
   const first = (await keysOf(rowsOf(page, "summary-yours")))[0] ?? "";
   await rowsOf(page, "summary-yours").first().locator("a.node-title").click();
@@ -56,7 +56,7 @@ test("C11: Decide goes to the node's address and puts the focus in its answer fo
 /** On a phone the first action row is in the first screen and nothing runs off the side. */
 async function phoneFitsFirstScreen(page: Page): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
-  await openAt(page, "browser", "j_vendor_eval", "summary", fixed);
+  await openAt(page, "j_vendor_eval", "summary", fixed);
   const first = rowsOf(page, "summary-yours").first();
   await expect(first).toBeVisible();
   const box = await whenSettled(page, () => first.boundingBox());
@@ -74,7 +74,7 @@ async function phoneFitsFirstScreen(page: Page): Promise<void> {
 test("C18, D8: on a phone the first action row is in the first screen and nothing runs off the side; beside the sheet at 1024px the Summary is one column and nothing is clipped; work under way and blocked work are listed, each blocked node saying what it waits for", async ({ page }) => {
   await phoneFitsFirstScreen(page);
   await page.setViewportSize({ width: 1024, height: 700 });
-  await openAt(page, "browser", "j_vendor_eval", "summary", { ...fixed, node: "n_plan" });
+  await openAt(page, "j_vendor_eval", "summary", { ...fixed, node: "n_plan" });
   await expect(nodePanel(page, "n_plan")).toBeVisible();
   const columns = await whenSettled(page, () => page.locator(".summary-grid").evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length));
   expect(columns).toBe(1);
@@ -160,6 +160,8 @@ test("D5: the graph's stalled panel offers the same actions, and an unsnooze act
 });
 
 test("C18: a journey with no node invites planning and offers no completion", async ({ page }) => {
+  // Wide enough for two columns beside the side panel the assistant's tab opens.
+  await page.setViewportSize({ width: 1800, height: 900 });
   await startOnSummary(page, undefined);
   await expect(page.getByTestId("summary-empty")).toBeVisible();
   await expect(page.getByTestId("completion-suggested")).toHaveCount(0);
@@ -171,7 +173,7 @@ test("C18: a journey with no node invites planning and offers no completion", as
 });
 
 test("B11, C18: a completed journey still says what is left, has no Waiting on you, and prints its status beside its name and not the controls", async ({ page }) => {
-  await openAt(page, "browser", "j_launch", "summary", fixed);
+  await openAt(page, "j_launch", "summary", fixed);
   await expect(panelOf(page, "summary-yours")).toBeVisible();
   await setStatus(page, "completed");
   await expect(page.getByTestId("summary-left")).toHaveAttribute("data-remaining", /^[1-9]/);

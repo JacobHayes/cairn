@@ -4,7 +4,7 @@ How the PRD is built, never what is built. Read `PRD.md` first; requirement ids 
 
 ## Summary
 
-One Rust binary around a pure **engine**: every PRD rule (model, patches, invariants, derive, date network, projections, upgrade merge, file format) as I/O-free functions over in-memory graphs. The **shell** adds storage, HTTP API, MCP, auth, the optional assistant, and the embedded web UI. The engine also compiles to wasm, so the browser derives and projects journeys locally, and the whole UI can run in-browser over an in-memory store.
+One Rust binary around a pure **engine**: every PRD rule (model, patches, invariants, derive, date network, projections, upgrade merge, file format) as I/O-free functions over in-memory graphs. The **shell** adds storage, HTTP API, MCP, auth, the optional assistant, and the embedded web UI. The engine also compiles to wasm, so the browser derives and projects journeys locally. `cairn demo` runs the binary over an in-memory store seeded with the fixtures, for development, demos, and end-to-end tests.
 
 ```mermaid
 flowchart LR
@@ -39,7 +39,7 @@ Load-bearing decisions:
 1. **Engine is pure.** No storage, HTTP, or clock in it; today, timezone, rank constants, and the viewer are inputs (D6, J3).
 2. **Whole domain in memory.** Every read loads one journey or route whole and derives once; every write validates a full candidate graph.
 3. **State and events in one transaction.** The patch applier is the only writer; row deltas and one event per mutation commit together or not at all (A17, J1, J2).
-4. **One engine, two hosts.** Server and browser run the same crate; the browser is a first-class host, not a mock.
+4. **One engine, two places it runs.** Server and browser run the same crate; the browser runs the pure functions locally, against the server's answers.
 5. **Pluggable edges.** Storage, auth, notification, and the assistant provider are traits assembled in one composition root per host.
 6. **The engine owns every rule and derived value.** Hosts keep only presentation; they read rules from the engine (directly, via wasm, or the generated rule tables) and ask it (a derive, a check, a preview) for anything a table cannot say. No host copies a rule.
 
@@ -65,7 +65,7 @@ PRD terms keep their meaning. Additionally:
 | **Change set** | The persistence-neutral result of an accepted patch: identities put and removed by key, events, patch id, next revision. A `schema` type, so stores depend on `schema`, not the engine; only the engine's `apply` produces one (inside `Applied`). |
 | **Notifier** | Announces "domain X is at revision N". In-process in both hosts. |
 | **Composition root** | The one function per host that picks store, notifier, auth providers, and assistant provider and assembles the service. |
-| **Capabilities document** | `GET /api/capabilities`: what the host offers (auth providers, assistant, MCP address and sign-in, SSE) and the server's release. The browser host offers no MCP or SSE; its MCP entry and version are null. The UI shows features from it. |
+| **Capabilities document** | `GET /api/capabilities`: what the host offers (auth providers, assistant, MCP address and sign-in, SSE) and the server's release. The UI shows features from it. |
 | **Host** | The server binary or the browser bundle: something that assembles the engine with a composition root. |
 
 ## Repository layout
@@ -74,11 +74,11 @@ PRD terms keep their meaning. Additionally:
 cairn/
   crates/
     engine/        pure domain: model, patch, validate, derive, dates, project, upgrade, format
-    wasm/          wasm-bindgen surface for the browser: engine projections and preview for every host; service over the memory store for the in-browser host
+    wasm/          wasm-bindgen surface for the browser: the engine's projections, checks and previews, run locally
     schema/        serde types shared by engine and shell: document, patch, API payloads; JSON Schema export
     store/         Store and Notifier traits; memory backend; the store conformance test suite. No delta types of its own: it persists the change set from schema
     store-sqlite/  SQLite backend (rusqlite: embedded, WAL mode, one writer)
-    service/       service layer: load, call engine, commit; capabilities; composition root types; the wire types both hosts answer with (`wire`). Runtime-free: no tokio, database driver, or transport dependency, so it builds for wasm32-unknown-unknown
+    service/       service layer: load, call engine, commit; capabilities; composition root types; the wire types the API answers with (`wire`). Runtime-free: no tokio, database driver, or transport dependency, so it builds for wasm32-unknown-unknown
     auth/          AuthProvider trait; dev, oidc, builtin-oauth, tailscale, Google Cloud IAP providers; users and logins
     api/           axum endpoints, the generated OpenAPI document, SSE, the Rust client; the wire types only the API has (assistant, agent tokens)
     mcp/           rmcp server: tools, prompt metadata, instructions
@@ -116,8 +116,7 @@ flowchart LR
     assistant --> api
     api --> cairn
     store_sqlite --> cairn
-    service --> wasm
-    wasm --> cairn
+    engine --> wasm
     wasm --> web_wasm[web/wasm]
     web_wasm --> web_app[web/app]
 ```
@@ -194,7 +193,7 @@ YAML on disk, JSON on the wire, one schema (A13, A14). Files carry paths and ids
 
 ### Testing the engine
 
-The J3 replay harness and scenario tests run against the engine with a fixed clock and the memory store. `fixtures/` is shared with the in-browser host and server integration tests.
+The J3 replay harness and scenario tests run against the engine with a fixed clock and the memory store. `fixtures/` is shared with `cairn demo` and the server integration tests.
 
 ## Storage
 
@@ -215,7 +214,7 @@ Whole-domain; nothing in it walks the graph. Async via `async-trait`, object-saf
 ### Backends
 
 - **SQLite** (rusqlite, bundled, built without allocation statistics, whose global mutex serializes readers): one file, WAL, STRICT tables, CHECK constraints, deferred foreign keys. One writer connection runs commits and out-of-domain writes one at a time, so transactions never conflict; a small pool of `query_only` readers each see one commit whole and never wait on writes. Each call runs its whole transaction on tokio's blocking pool. One process per database: `unix-excl` VFS holds an exclusive lock and keeps the WAL index in memory. No sqlx: runtime SQL, our own pool, numbered migrations embedded and applied in one transaction.
-- **Memory**: the reference the conformance suite is written against; tests, fixtures, the in-browser host. Nothing persists.
+- **Memory**: the reference the conformance suite is written against; tests, fixtures, `cairn demo`. Nothing persists.
 
 Durability: nothing is answered from a write that may not be on disk (`synchronous = FULL`). A `COMMIT` failing other than by constraint leaves state in doubt, so the backend fails closed (every call errs, `/healthz` 503) and `cairn serve` exits non-zero for its supervisor. Every open first drops the files' cached pages (Linux) so reads come from disk.
 
@@ -233,7 +232,7 @@ Relational rows, no graph-as-blob (A14); the migrations are the schema. Every co
 
 `crates/service` is the only caller of the engine on the server: receipt lookup (H5), load, `derive` or `apply` (over intervening changes for a stale domain patch), commit, notify. API, MCP, and assistant shape their own surfaces over it and never bypass it.
 
-The composition root in `crates/cairn` assembles store (SQLite), auth providers (Dev, OIDC, built-in OAuth, Tailscale, GCP IAP), an optional assistant provider, and the public URL. Optional subsystems are crates contributing a router and service; absence is a `None` at the root, never a flag in handlers. MCP and SSE are always on (a knob exists only when deployments need different values). The browser host's root (`crates/wasm`): the same service over the memory store, in-process notifier, one local user, no assistant, no MCP. The UI renders from the capabilities document, which is how it stays usable without the assistant (I5).
+The composition root in `crates/cairn` assembles store (SQLite), auth providers (Dev, OIDC, built-in OAuth, Tailscale, GCP IAP), an optional assistant provider, and the public URL. Optional subsystems are crates contributing a router and service; absence is a `None` at the root, never a flag in handlers. MCP and SSE are always on (a knob exists only when deployments need different values). The UI renders from the capabilities document, which is how it stays usable without the assistant (I5).
 
 ## HTTP API
 
@@ -298,7 +297,7 @@ React (Vite) with the wasm engine. DESIGN owns how screens look; the PRD owns wh
 - **Canvas**: React Flow; two-finger scroll pans, pinch zooms, the wheel alone never zooms. Collapse, shown display states, Filter, and search are part of the level request, never tab-side filters. ELK layered layout in a worker, hinted by the view's previous positions (C15), edges drawn as ELK routes them. Positions are cached per domain and view, never stored.
 - **Screens**: screens read engine projections and add no engine concept. A route's graph is derived in the worker as a journey on day 0 with nothing done, so route views use the journey projections. The Summary reads only projections other views already make. Proposal review is a layer over the destination's own page with live writes off. Triage `pass` is client state only.
 - **Addresses**: path names the thing and mirrors the API; query says how to look at it, written only off defaults. Every pattern is defined once in `web/app/src/address.ts` (router, links, rail all use it); no redirects or aliases. Selecting a node pushes its address keeping the query, and a selected node is always drawn. Navigations render as urgent updates, never transitions.
-- **In-browser host**: the same app over the wasm service, memory store, and a local user: dev with hot reload, the static demo site, and Playwright tests. Fixtures seed one UTC deployment on every load; nothing persists except the tour record and theme in local storage. The build fixes the host; nothing in the app switches. Its answers are the API's JSON, so one data layer reads either host.
+- **One host**: the app always talks to the server's API. The binary's embedded build serves it, and a dev server proxies to a running binary (`cairn demo` for development, fixtures in memory); the browser tests start a `cairn demo` for each test. The browser's wasm engine runs only pure functions: derive, form checks, previews.
 
 ## Generated artifacts
 
@@ -309,7 +308,7 @@ Generated from Rust types: the OpenAPI document, the TypeScript client types, th
 - `cairn serve`: API, MCP, assistant, SSE, and embedded UI on one port over one database file. `cairn demo`: the same over seeded memory with the dev provider, a stub OIDC issuer and scripted assistant under `/demo/`; loopback only, saves nothing.
 - Configuration is a file plus environment overrides; deployment-specific values have no defaults, so a missing one fails startup.
 - The listener sets `TCP_USER_TIMEOUT` to the SSE write stall, with keepalive. A `Host` allowlist (public URL name, plus loopback names on loopback) fronts the whole router before auth. TLS and supervision are the proxy's and host's.
-- The web build is embedded with `rust-embed`; a binary without it refuses to start. Precompressed brotli and gzip forms are served by `Accept-Encoding` with `Vary`. The `web-dir` feature reads `CAIRN_WEB_DIR` at startup instead, so web changes recompile no Rust (the check ladder uses it). Vite dev proxies `/api/`, `/.well-known/`, and `/healthz` to a binary, or runs the in-browser host.
+- The web build is embedded with `rust-embed`; a binary without it refuses to start. Precompressed brotli and gzip forms are served by `Accept-Encoding` with `Vary`. The `web-dir` feature reads `CAIRN_WEB_DIR` at startup instead, so web changes recompile no Rust (the check ladder uses it). Vite dev proxies `/api/`, `/.well-known/`, and `/healthz` to a binary.
 - Releases are git tags; nothing committed changes per release. Minor for a change to the API, MCP tools, file format, or stored data, or a feature; patch otherwise. The crate version is frozen at `0.0.0` (wasm-bindgen hashes it into the glue; a `const` assertion enforces it). The build version comes from `CAIRN_VERSION` (`dev` when unset; non-semver fails), reported by `cairn version`, MCP `serverInfo`, and capabilities, never by the web build. The OpenAPI document is unversioned. `gh workflow run release.yml -f bump=<part>` on main picks the next tag (`scripts/next-version`), requires main's check to have passed, and publishes x86_64 and aarch64 Linux binaries with SHA-256 files.
 
 ## Observability

@@ -27,9 +27,9 @@ export function keysOf(locator: Locator): Promise<string[]> {
   return whenSettled(locator.page(), () => locator.evaluateAll((rows) => rows.map((row) => row.getAttribute("data-node") ?? "")));
 }
 
-/** Starts a journey from `route`'s first version (or with no node, with none) on the in-browser host and opens its Summary. */
+/** Starts a journey from `route`'s first version (or with no node, with none) on cairn demo and opens its Summary. */
 export async function startOnSummary(page: Page, route: string | undefined, name = journeyName("Summary")): Promise<void> {
-  const id = await startJourney(page, "browser", name, route === undefined ? undefined : { route });
+  const id = await startJourney(page, name, route === undefined ? undefined : { route });
   // The journey's bare Summary, with the view state of the walkthrough it opened on left behind.
   await goWithin(page, `/journeys/${id}`);
   await expect(page.getByTestId("summary")).toBeVisible();
@@ -37,7 +37,7 @@ export async function startOnSummary(page: Page, route: string | undefined, name
 
 /** Snoozes every node `nodes` on journey `journey` until after the last due date, so nothing can be acted on, and opens its Summary. */
 export async function stall(page: Page, journey: string, nodes: string[]): Promise<void> {
-  await openAt(page, "browser", journey, "list?frontier=1", { fixedToday: FIXED_TODAY });
+  await openAt(page, journey, "list?frontier=1", { fixedToday: FIXED_TODAY });
   for (const node of nodes) {
     await select(page, node);
   }

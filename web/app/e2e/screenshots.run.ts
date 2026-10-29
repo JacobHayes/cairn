@@ -1,4 +1,4 @@
-// `mise run screenshots`: walks the table in e2e/screenshots.ts on the in-browser host and
+// `mise run screenshots`: walks the table in e2e/screenshots.ts on cairn demo and
 // saves a picture of every state at a desktop and a phone width, in light and dark, to
 // CAIRN_SCREENSHOTS_DIR as `<address>-<state>-<desktop|phone>-<light|dark>.png`, with a
 // `screenshots.json` manifest (file, address, state, viewport, theme, url) beside them.

@@ -4,7 +4,7 @@
 import { expect, type Page } from "@playwright/test";
 
 import { fixtureRoute, journeyName, publishDraft, startJourney } from "./around.ts";
-import { importRoute, open, type HostKind } from "./shell.ts";
+import { importRoute, open } from "./shell.ts";
 
 /** The route's id, and keys the specs reach. */
 export const LARGE = {
@@ -17,15 +17,15 @@ export const LARGE = {
 } as const;
 
 /** Imports the route, publishes it, and starts a journey from it; the journey's id. */
-export async function startLargeProgram(page: Page, host: HostKind): Promise<string> {
-  await importRoute(page, host, fixtureRoute(LARGE.route));
+export async function startLargeProgram(page: Page): Promise<string> {
+  await importRoute(page, fixtureRoute(LARGE.route));
   await expect(page).toHaveURL(/\/routes\/large-program/);
   await publishDraft(page);
-  return startJourney(page, host, journeyName("Large program"), { route: LARGE.route });
+  return startJourney(page, journeyName("Large program"), { route: LARGE.route });
 }
 
 /** The journey's graph at its Actions depth, every card reachable. */
-export async function openLargeGraph(page: Page, host: HostKind, id: string, query = ""): Promise<void> {
-  await open(page, host, `/journeys/${id}?view=graph&depth=actions${query}`);
+export async function openLargeGraph(page: Page, id: string, query = ""): Promise<void> {
+  await open(page, `/journeys/${id}?view=graph&depth=actions${query}`);
   await expect(page.getByTestId("canvas")).toBeVisible();
 }

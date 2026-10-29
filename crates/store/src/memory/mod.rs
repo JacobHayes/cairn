@@ -1,5 +1,5 @@
 //! The memory backend (ARCHITECTURE, Backends): the reference implementation the
-//! conformance suite is written against, used by tests, fixtures, and the in-browser host.
+//! conformance suite is written against, used by tests, fixtures, and cairn demo.
 //! Nothing persists. Every call completes at once, so it needs no runtime.
 //!
 //! A commit stages its writes on a copy of the domains and swaps the copy in only once every

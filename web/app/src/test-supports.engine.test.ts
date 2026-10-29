@@ -5,14 +5,13 @@
 // produce fails here, so a screen is never tested against an answer the derive could not give.
 import type { Schema } from "@cairn/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { InBrowserHost } from "@cairn/wasm";
 
-import { derivedJourney, seeded } from "./authoring/engine.test-support.ts";
+import { derivedJourney, seeded, type Fixtures } from "./authoring/engine.test-support.ts";
 import { canvasView } from "./canvas/canvas.test-support.ts";
 import type { Ready } from "./detail/model.ts";
 import { testView } from "./detail/view.test-support.ts";
 
-let host: InBrowserHost;
+let host: Fixtures;
 beforeAll(async () => {
   host = await seeded();
 });

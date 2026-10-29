@@ -1,8 +1,7 @@
-// The JSON the browser host's calls take and answer (crates/wasm), typed over the schema
-// types the API's OpenAPI document already names (web/client/generated). Each type mirrors
-// one Rust type in crates/wasm, named in its comment; the native and browser agreement tests
-// check that every answer is the server's JSON byte for byte.
-import type { Schema, operations } from "@cairn/client";
+// The JSON the engine's calls take and answer (crates/wasm), typed over the schema types the
+// API's OpenAPI document already names (web/client/generated). Each type mirrors one Rust type
+// in crates/wasm, named in its comment.
+import type { Schema } from "@cairn/client";
 
 /** A node key, `n_...`. */
 export type NodeKey = Schema<"NodeKey">;
@@ -281,32 +280,6 @@ export interface LocalPreview extends PreviewAnswer {
   loaded?: Loaded;
 }
 
-/** `crates/wasm` `ExportRequest`: a route version (or its draft) to export. */
-export interface ExportRequest {
-  route: Schema<"Route">;
-  version?: Schema<"RouteVersion">;
-}
-
-/** `crates/wasm` `ImportRequest`: a route file's text to import. */
-export interface ImportRequest {
-  file: string;
-  base?: Schema<"RouteVersion">;
-  patch_id: Schema<"PatchId">;
-}
-
-/** `crates/wasm` `JourneyIndexQuery`: `GET /api/journeys`'s filters and page (C16) as JSON: the API's own query. */
-export type JourneyIndexQuery = NonNullable<operations["listJourneys"]["parameters"]["query"]>;
-
-/** `crates/wasm` `PatchRequest`, as the API's. */
-export type PatchRequest = Schema<"PatchRequest">;
-
-/** `crates/wasm` `Taken`: what a subscriber of the in-browser root takes (H6). */
-export type Taken =
-  | { take: "current"; ticks: Schema<"Tick">[] }
-  | { take: "ticks"; ticks: Schema<"Tick">[] }
-  | { take: "wait"; until_ms: number }
-  | { take: "empty" };
-
 /**
  * `crates/wasm` `HostError`, plus two of this package's: `aborted`, the module trapped (a
  * panic) and is unusable; `superseded`, the derive worker already holds a newer document of
@@ -317,23 +290,21 @@ export type HostError =
   | { error: "invalid"; violations: Schema<"Violations"> }
   | { error: "rejected"; rejection: Schema<"Rejection"> }
   | { error: "missing"; message: string }
-  | { error: "refused"; message: string }
-  | { error: "failed"; message: string }
   | { error: "aborted"; message: string }
   | { error: "superseded"; held: DerivationKey; posted: DerivationKey };
 
-/** A call the browser host refused, with why. */
+/** A call the engine refused, with why. */
 export class HostFailure extends Error {
   readonly reason: HostError;
 
   constructor(reason: HostError) {
-    super(`browser host: ${reason.error}`);
+    super(`engine: ${reason.error}`);
     this.name = "HostFailure";
     this.reason = reason;
   }
 }
 
-/** Parses JSON the browser host wrote as `T`, the TypeScript mirror of the Rust type it wrote. */
+/** Parses JSON the engine wrote as `T`, the TypeScript mirror of the Rust type it wrote. */
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the module's Rust type fixes T
 export function parsed<T>(text: string): T {
   return JSON.parse(text) as T;

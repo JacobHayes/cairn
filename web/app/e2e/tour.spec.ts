@@ -1,10 +1,10 @@
-// PRD: C20. A guided first run on the in-browser host: the welcome opens on Home
+// PRD: C20. A guided first run on cairn demo: the welcome opens on Home
 // and never over a deep link; a practice journey is made on Start, walked through the ordinary
 // screens under a spotlight, and deleted when the tour ends. What each step says is composed from
 // the state the engine derived (steps.test.ts); here the oracle is the screen: where the hole and
 // the callout are, what stays dim and what lifts after the action, which rows became ready, where
 // the person is.
-import type { Locator, Page } from "@playwright/test";
+import type { BrowserContext, Locator, Page } from "@playwright/test";
 
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
@@ -44,7 +44,7 @@ const holds = (outer: Box, inner: Box, slack = 1): boolean => inner.x >= outer.x
 
 /** Starts the tour from Home and returns the practice journey's id. */
 async function start(page: Page): Promise<string> {
-  await open(page, "browser", "/");
+  await open(page, "/");
   await page.getByTestId("tour-start").click();
   await expect(callout(page)).toHaveAttribute("data-step", "map");
   const match = /\/journeys\/(j_[^/?]+)/.exec(page.url());
@@ -101,14 +101,14 @@ async function walkTo(page: Page, step: "answer" | "frontier" | "finish" | "date
 }
 
 test("the welcome opens on Home and never over a deep link", async ({ page }) => {
-  await visit(page, "browser", "/journeys");
+  await visit(page, "/journeys");
   await expect(page.getByTestId("tour-welcome")).toHaveCount(0);
   // The rail offers it quietly; the link opens the welcome on Home.
   await page.getByTestId("rail-tour").click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByTestId("tour-welcome")).toBeVisible();
   await expect(page.getByTestId("rail-tour")).toHaveCount(0);
-  await visit(page, "browser", "/");
+  await visit(page, "/");
   await expect(page.getByTestId("tour-welcome")).toBeVisible();
   await checkpoint(page);
   // Not now ends the offers; the rail and You still offer the tour.
@@ -122,10 +122,52 @@ test("the welcome opens on Home and never over a deep link", async ({ page }) =>
   await expect(page.getByTestId("tour-welcome")).toBeVisible();
 });
 
-test("the tour walks a practice journey, and the journey is gone at the end", async ({ page }) => {
-  await open(page, "browser", "/journeys?status=any");
+/** A second tab for the same user finds the run waiting, not an offer to start another. */
+async function sharedWithAnotherTab(context: BrowserContext): Promise<void> {
+  const other = await context.newPage();
+  await open(other, "/");
+  await expect(other.getByTestId("tour-continue")).toBeVisible();
+  await expect(other.getByTestId("tour-welcome")).toHaveCount(0);
+  await other.close();
+}
+
+/** The assistant step: its example reply, which fits whole inside the hole (the reply grows the pane, and the hole with it), and Finish. */
+async function showAssistantExample(page: Page): Promise<void> {
+  await expect(page.getByTestId("tour-next")).toHaveAttribute("aria-disabled", "true");
+  await page.getByTestId("tab-assistant").click();
+  const example = page.getByTestId("tour-assistant-example");
+  await example.getByTestId("tour-assistant-show").click();
+  const reply = example.getByTestId("assistant-reply");
+  await expect(reply).toBeVisible();
+  // The reply grows the example's pane, and the hole grows with it: the whole reply is inside it.
+  await expect(callout(page)).toHaveAttribute("data-phase", "reveal");
+  await expect.poll(async () => holds(await settledBox(ring(page)), await settledBox(reply))).toBe(true);
+  await expect(page.getByTestId("tour-next")).toHaveText("Finish the tour");
+}
+
+/** The practice journey `id` is deleted, the journeys are as many as before, and no offer comes back. */
+async function practiceIsGone(page: Page, id: string, journeyCount: number): Promise<void> {
+  // The practice journey is deleted and no offer comes back.
+  await open(page, "/journeys?status=any");
+  await expect(page.locator(`[data-testid="journey-row"][data-journey="${id}"]`)).toHaveCount(0);
+  await expect(page.getByTestId("journey-row")).toHaveCount(journeyCount);
+  await open(page, "/");
+  await expect(page.getByTestId("tour-welcome")).toHaveCount(0);
+  await expect(page.getByTestId("tour-continue")).toHaveCount(0);
+}
+
+test("the tour walks a practice journey, and the journey is gone at the end", async ({ page, context }) => {
+  const assistant: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.endsWith("/assistant")) {
+      assistant.push(request.url());
+    }
+  });
+  await open(page, "/journeys?status=any");
   const journeyCount = await whenSettled(page, () => page.getByTestId("journey-row").count());
   const id = await start(page);
+  await expect(page.getByTestId("tour-label")).toContainText("of 6");
+  await sharedWithAnotherTab(context);
   // Step 1: dimmed but for the decision; Next waits for it to be selected.
   await expectAt(page, "map", "spotlight");
   await expect(page.getByTestId("tour-next")).toHaveAttribute("aria-disabled", "true");
@@ -171,17 +213,18 @@ test("the tour walks a practice journey, and the journey is gone at the end", as
   await expect(page.getByTestId("dates")).toBeVisible();
   await checkpoint(page);
   await page.getByTestId("tour-next").click();
+  // Step 6: the assistant, shown as an example, then the end.
+  await expectAt(page, "assistant", "spotlight");
+  await showAssistantExample(page);
+  await page.getByTestId("tour-next").click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByTestId("tour-end")).toBeVisible();
   await checkpoint(page);
   await page.getByTestId("tour-close").click();
   await expect(page.getByTestId("tour-end")).toHaveCount(0);
-  // The practice journey is deleted and no offer comes back.
-  await open(page, "browser", "/journeys?status=any");
-  await expect(page.locator(`[data-testid="journey-row"][data-journey="${id}"]`)).toHaveCount(0);
-  await expect(page.getByTestId("journey-row")).toHaveCount(journeyCount);
-  await open(page, "browser", "/");
-  await expect(page.getByTestId("tour-welcome")).toHaveCount(0);
+  await practiceIsGone(page, id, journeyCount);
+  // The assistant step is an example: nothing was asked of the journey assistant.
+  expect(assistant).toEqual([]);
 });
 
 test("a press on the dimmed page does nothing, and the editor inside the hole saves", async ({ page }) => {
@@ -321,7 +364,7 @@ test("Skip returns Home and the practice journey is deleted", async ({ page }) =
   await expect(page).toHaveURL(/\/$/);
   await expect(callout(page)).toHaveCount(0);
   await expect(page.getByTestId("tour-end")).toHaveCount(0);
-  await open(page, "browser", "/journeys?status=any");
+  await open(page, "/journeys?status=any");
   await expect(page.locator(`[data-testid="journey-row"][data-journey="${id}"]`)).toHaveCount(0);
 });
 

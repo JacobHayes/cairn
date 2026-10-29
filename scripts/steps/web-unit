@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Step web-unit: the web unit tests (Vitest, one suite per web package with a vitest.config.ts:
-# the browser host's agreement tests run in Node).
-# PRACTICES, The validation ladder. The browser host's tests run in Node and need
-# the module (mise run build:wasm) and the server's answers to compare with (the
-# cairn-wasm-cases binary, which walks the fixtures through the service natively:
-# scripts/agreement-cases); both are build outputs under web/wasm/dist/. The authoring tests
-# check the editors against the module's engine. A suite that runs no test, or any test
-# that fails or is skipped, fails the step.
+# Step web-unit: the web unit tests (Vitest, one suite per web package with a vitest.config.ts).
+# PRACTICES, The validation ladder. The engine package's tests run in Node and need the module
+# (mise run build:wasm), a build output under web/wasm/dist/. The authoring tests check the
+# editors against the module's engine, with the fixtures as a `cairn demo` holds them: the app's
+# suite builds the binary (scripts/demo-binary) and starts a demo from it for each test file
+# that reads the fixtures. A suite that runs no test, or any test that fails or is skipped,
+# fails the step.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_STEP=web-unit
@@ -19,18 +18,10 @@ ladder_require_tool wasm-bindgen wasm-bindgen --version
 ladder_require_tool vitest node_modules/.bin/vitest --version
 export CARGO_TERM_COLOR=never
 
-ladder_run "the browser host's module build" mise run build:wasm
-# The server's answers for web/wasm's tests are made beside the other web unit tests, which do
-# not read them, and only that suite waits for them.
-scripts/agreement-cases &
-cases=$!
-trap 'ladder_exit $?; kill "$cases" 2>/dev/null || true' EXIT
+ladder_run "the engine's module build" mise run build:wasm
 
 for config in web/*/vitest.config.ts; do
   package=$(dirname "$config")
-  if [ "$package" = web/wasm ]; then
-    wait "$cases" || ladder_fail "the server's agreement cases were not written"
-  fi
   report="$PWD/$package/dist/vitest.json"
   mkdir -p "$package/dist"
   rm -f "$report"

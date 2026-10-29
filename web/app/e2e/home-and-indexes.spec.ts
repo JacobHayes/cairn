@@ -1,6 +1,6 @@
 // Home and the two indexes in Chromium (C16, C17): Home's rows open a node and act in place, its
 // bounded groups, the Journeys table at a phone's width, and the Routes type control. What each
-// value is belongs to the models' tests; this is what only a browser shows. In-browser host.
+// value is belongs to the models' tests; this is what only a browser shows. On cairn demo.
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
 
@@ -8,7 +8,7 @@ import { nodeCard, nodePanel, open, readable, whenSettled } from "./shell.ts";
 
 test("C16, C17: Done on a Home row acts in place and the address stays `/`, a row opens its node's address, Home ends with a link to every journey, and the rail leads to Routes, whose Type filter writes ?type=", async ({ page }) => {
   await readable(page);
-  await open(page, "browser", "/");
+  await open(page, "/");
   const group = page.getByTestId("home-journey").first();
   await expect(group).toBeVisible();
   await expect(page.getByTestId("journey-table")).toHaveCount(0);
@@ -30,7 +30,7 @@ test("C16, C17: Done on a Home row acts in place and the address stays `/`, a ro
   await expect(nodePanel(page, opened)).toBeVisible();
   await expect(nodeCard(page, opened)).toBeVisible();
   await checkpoint(page);
-  await open(page, "browser", "/");
+  await open(page, "/");
   await page.getByTestId("home-all-journeys").click();
   await expect(page).toHaveURL(/\/journeys$/);
   await checkpoint(page);
@@ -49,7 +49,7 @@ test("C16, C17: Done on a Home row acts in place and the address stays `/`, a ro
 
 test("C16, C17: the Journeys index at 390px shows both of each row's facts and nothing wider than the window", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await open(page, "browser", "/journeys");
+  await open(page, "/journeys");
   const rows = page.getByTestId("journey-row");
   await expect(rows.first()).toBeVisible();
   await expect(page.getByTestId("row-reading")).toHaveCount(0);

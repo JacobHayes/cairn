@@ -39,12 +39,12 @@ const patchId = () => `p_${crypto.randomUUID().replaceAll("-", "")}`;
 
 const title = (page: Parameters<typeof nodeCard>[0], node: string) => nodeCard(page, node).getByTestId("title");
 
-test("edits to different nodes both land, and edits to one field surface a conflict", { tag: "@server" }, async ({ context }) => {
+test("edits to different nodes both land, and edits to one field surface a conflict", async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await Promise.all([readable(one), readable(two)]);
   const { id } = await ownJourney(context.request, "hiring-loop");
-  await openJourney(one, "server", id);
-  await openJourney(two, "server", id);
+  await openJourney(one, id);
+  await openJourney(two, id);
   // A stale write to another node is retried and lands with no conflict.
   const [offer, screen] = [fresh("Offer"), fresh("Screen")];
   await startRename(two, "n_screen", screen);
@@ -75,13 +75,13 @@ test("edits to different nodes both land, and edits to one field surface a confl
 });
 
 // Serial: it counts the page's fetches of the document, and a deployment tick caused by another test's journey would add one.
-test("a later page shows the edit, and a page on the index shows a journey started elsewhere", { tag: ["@server", "@serial"] }, async ({ context }) => {
+test("a later page shows the edit, and a page on the index shows a journey started elsewhere", async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await Promise.all([readable(one), readable(two)]);
   const { id, name } = await ownJourney(context.request, "product-launch");
   const fetched = countDocumentFetches(two, id);
-  await openJourney(one, "server", id);
-  await openJourney(two, "server", id);
+  await openJourney(one, id);
+  await openJourney(two, id);
   const renamed = fresh("Docs");
   await rename(one, "n_docs", renamed);
   await expect(title(two, "n_docs")).toHaveText(renamed);
@@ -96,7 +96,7 @@ test("a later page shows the edit, and a page on the index shows a journey start
   await live(two);
   const later = await context.newPage();
   await readable(later);
-  await openJourney(later, "server", id);
+  await openJourney(later, id);
   await expect(title(later, "n_docs")).toHaveText(renamed);
   // The page refetched once per newer revision, never for one it already held.
   expect(fetched()).toBe(2);
@@ -138,7 +138,7 @@ async function journeyOwnedBy(request: APIRequestContext, owner: string): Promis
   return id;
 }
 
-test("a deployment tick refetches the deployment context and re-derives: a merge changes the owner another page shows", { tag: ["@server", "@serial"] }, async ({ context }) => {
+test("a deployment tick refetches the deployment context and re-derives: a merge changes the owner another page shows", async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await Promise.all([readable(one), readable(two)]);
   const deploymentFetches: string[] = [];
@@ -147,11 +147,11 @@ test("a deployment tick refetches the deployment context and re-derives: a merge
       deploymentFetches.push(request.url());
     }
   });
-  await open(one, "server", "/identities");
+  await open(one, "/identities");
   const first = await addIdentity(one, fresh("Owner"));
   const second = await addIdentity(one, fresh("Survivor"));
   const journey = await journeyOwnedBy(one.request, first);
-  await openJourney(two, "server", journey);
+  await openJourney(two, journey);
   await live(two);
   const survivor = (await whenSettled(one, () => identityRow(one, second).getByTestId("identity-name").textContent())) ?? "";
   // The card names an owner only when it is the viewer or missing: the node's detail names this one.
@@ -169,7 +169,7 @@ test("a deployment tick refetches the deployment context and re-derives: a merge
 /** An identity with no name is asked for its name on load, and Save names it everywhere it shows: the dev user's own, which is the first of theirs until the sign-in leg gives them a second. */
 async function nameless(page: Page): Promise<void> {
   const key = "who_k3d7qm2xw5tn6pfa";
-  await open(page, "server", `/identities/${key}`);
+  await open(page, `/identities/${key}`);
   const detail = page.getByTestId("identity-detail");
   await expect(detail.getByTestId("yours")).toBeVisible();
   const name = (await whenSettled(page, () => detail.getByTestId("detail-title").textContent())) ?? "";
@@ -192,12 +192,12 @@ async function nameless(page: Page): Promise<void> {
   await expect(page.getByTestId("your-identity").first()).toContainText(name);
 }
 
-test("a nameless identity of the user is asked for its name; signing in with the stub issuer names the identity holding its verified email", { tag: ["@server", "@serial"] }, async ({ page }) => {
+test("a nameless identity of the user is asked for its name; signing in with the stub issuer names the identity holding its verified email", async ({ page }) => {
   await nameless(page);
   const email = `${fresh("linked").replace(/\W/g, "-")}@example.org`;
-  await open(page, "server", "/identities");
+  await open(page, "/identities");
   const identity = await addIdentity(page, fresh("Linked person"), [email]);
-  await open(page, "server", "/me");
+  await open(page, "/me");
   await expect(page.getByTestId("login")).toHaveCount(1);
   await expect(page.locator(`[data-testid="your-identity"][data-identity="${identity}"]`)).toHaveCount(0);
   await page.goto("/api/auth/stub/sign-in?return_to=%2Fme");
@@ -208,12 +208,12 @@ test("a nameless identity of the user is asked for its name; signing in with the
   await expect(page.locator(`[data-testid="your-identity"][data-identity="${identity}"]`)).toBeVisible();
 });
 
-test("a route's canvas keeps its graph while its reads fail, says BEHIND, and catches up once they recover", { tag: "@server" }, async ({ context }) => {
+test("a route's canvas keeps its graph while its reads fail, says BEHIND, and catches up once they recover", async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await Promise.all([readable(one), readable(two)]);
-  const id = await newRoute(one, "server", routeName("Behind"));
+  const id = await newRoute(one, routeName("Behind"));
   await addNode(one, "decision", "First choice");
-  await open(two, "server", `/routes/${id}`);
+  await open(two, `/routes/${id}`);
   await live(two);
   await expect(two.locator("[data-testid=node-card]")).toHaveCount(1);
   // The server cannot answer this route's reads for the page showing it.
@@ -235,10 +235,10 @@ test("a route's canvas keeps its graph while its reads fail, says BEHIND, and ca
   await expect(syncChip(two)).not.toHaveAttribute("data-state", "behind");
 });
 
-test("a failed read or a refused write says what happened in a sentence, and keeps the server's message, ids and all, behind Details", { tag: "@server" }, async ({ page, context }) => {
+test("a failed read or a refused write says what happened in a sentence, and keeps the server's message, ids and all, behind Details", async ({ page, context }) => {
   const raw = "read of j_hiring at revision 4 failed in who_lead";
   await page.route((url) => url.pathname === "/api/journeys", (route) => route.fulfill({ status: 500, body: raw }));
-  await open(page, "server", "/journeys");
+  await open(page, "/journeys");
   const failed = page.getByText("The journeys could not be read.");
   await expect(failed).toBeVisible();
   await expect(page.getByText("j_hiring")).toBeHidden();
@@ -250,7 +250,7 @@ test("a failed read or a refused write says what happened in a sentence, and kee
   await expect(page.getByTestId("failed-message")).toBeHidden();
   // A write the server refuses says the same, on a journey of its own.
   const { id } = await ownJourney(context.request, "hiring-loop");
-  await openJourney(page, "server", id);
+  await openJourney(page, id);
   await page.route("**/api/journeys/*/patches", (route) => route.fulfill({ status: 400, contentType: "text/plain", body: "patch p_abc at revision 4 refused for n_offer" }));
   await startRename(page, "n_offer", fresh("Refused"));
   await save(page, "n_offer");
@@ -263,8 +263,8 @@ test("a failed read or a refused write says what happened in a sentence, and kee
   await expect(problem.getByTestId("failed-message")).toBeHidden();
 });
 
-test("C14: the deployment's open proposals are the Identities inspector's Proposals tab, found at its own address", { tag: ["@server", "@serial"] }, async ({ page }) => {
-  await open(page, "server", "/identities");
+test("C14: the deployment's open proposals are the Identities inspector's Proposals tab, found at its own address", async ({ page }) => {
+  await open(page, "/identities");
   const deployment = (await (await page.request.get("/api/deployment")).json()) as { revision: number };
   const drafted = await page.request.post("/api/deployment/proposals", {
     data: {
@@ -283,9 +283,9 @@ test("C14: the deployment's open proposals are the Identities inspector's Propos
   await expect(page.locator('[data-testid="identity"][data-diff="added"]')).toContainText("Nina Alvarez");
 });
 
-test("C14, G5: a proposal that removes a ticked item and adds one of the same title gives the new item an id of its own, so it starts unticked", { tag: "@server" }, async ({ page, context }) => {
+test("C14, G5: a proposal that removes a ticked item and adds one of the same title gives the new item an id of its own, so it starts unticked", async ({ page, context }) => {
   const { id } = await ownJourney(context.request, "hiring-loop");
-  await openJourney(page, "server", id);
+  await openJourney(page, id);
   const written = await context.request.post(`/api/journeys/${id}/patches`, {
     data: {
       patch: {
@@ -310,7 +310,7 @@ test("C14, G5: a proposal that removes a ticked item and adds one of the same ti
     },
   });
   expect(drafted.ok(), await drafted.text()).toBe(true);
-  await open(page, "server", `/journeys/${id}/proposals/${proposal}/nodes/n_screen?view=graph`);
+  await open(page, `/journeys/${id}/proposals/${proposal}/nodes/n_screen?view=graph`);
   const changes = page.getByTestId("item-changes");
   await changes.getByRole("button", { name: "Edit" }).click();
   await changes.getByLabel("New item", { exact: true }).fill("Alpha");
@@ -323,9 +323,9 @@ test("C14, G5: a proposal that removes a ticked item and adds one of the same ti
   expect(saved).not.toContain('"id":"alpha"');
 });
 
-test("Connect an agent shows this server's address, makes a token that acts as its agent until it is revoked, and is one tap away on a phone", { tag: "@server" }, async ({ page, context, playwright, baseURL }) => {
+test("Connect an agent shows this server's address, makes a token that acts as its agent until it is revoked, and is one tap away on a phone", async ({ page, context, playwright, baseURL }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await open(page, "server", "/");
+  await open(page, "/");
   await page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "Connect an agent" }).click();
   await expect(page.getByRole("heading", { name: "Connect an agent" })).toBeVisible();
   // The address is the one the server says, and Copy puts exactly it on the clipboard.
@@ -379,7 +379,7 @@ test("Connect an agent shows this server's address, makes a token that acts as i
 
   // On a phone the rail is a top bar of four screens: the page is a link in the sync popover.
   await page.setViewportSize({ width: 390, height: 844 });
-  await open(page, "server", "/journeys");
+  await open(page, "/journeys");
   await expect(page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "Connect an agent" })).toBeHidden();
   await syncChip(page).click();
   // Its head names the release the server runs: a build without a release tag says so.

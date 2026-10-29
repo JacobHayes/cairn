@@ -1,5 +1,5 @@
-//! The fixtures the in-browser host is seeded with on every load (ARCHITECTURE, Web UI:
-//! in-browser host; fixtures/README.md), compiled in, and the seeding itself: each fixture's
+//! The fixtures `cairn demo` is seeded with (fixtures/README.md), compiled in, and the
+//! seeding itself: each fixture's
 //! route published as version 1, then its scenario's steps submitted through the service in
 //! order, every fixture into one deployment.
 //!
@@ -241,11 +241,6 @@ async fn submit(
         .map_err(|error| SeedError(format!("{id}: {error:?}")))
 }
 
-/// The email the browser host's local login is verified for: Ana Ruiz's, who is in every
-/// fixture, so the viewer is one identity in every journey (H3) and "mine", the owner factor,
-/// and the ranking for the viewer show her work across all of them.
-pub const LOCAL_EMAIL: &str = "ana@example.org";
-
 /// The users the fixtures' events name (the routes' publisher and the scenarios' actors),
 /// each but the publisher with one login, named for the person and verified for their email,
 /// so a history says who rather than an id.
@@ -289,40 +284,4 @@ pub async fn put_fixture_users(store: &dyn Store, at: Timestamp) -> Result<(), S
         }
     }
     Ok(())
-}
-
-/// Signs in the browser host's one local login on `store`: user `u_local` through the
-/// `local` method, verified for [`LOCAL_EMAIL`]. Who everything in the root is done as.
-///
-/// # Errors
-///
-/// When the store fails.
-pub async fn sign_in_local(store: &dyn Store, at: Timestamp) -> Result<Actor, SeedError> {
-    fn parse<T: std::str::FromStr<Err: std::fmt::Debug>>(text: &str) -> Result<T, SeedError> {
-        text.parse()
-            .map_err(|error| SeedError(format!("{text}: {error:?}")))
-    }
-    let user: cairn_schema::UserId = parse("u_local")?;
-    let failed = |error: cairn_store::StoreError| SeedError(error.to_string());
-    put_fixture_users(store, at).await?;
-    store
-        .put_user(UserRecord {
-            id: user.clone(),
-            created_at: at,
-        })
-        .await
-        .map_err(failed)?;
-    let verified_emails = [parse::<Email>(LOCAL_EMAIL)?].into_iter().collect();
-    store
-        .put_login(LoginRecord {
-            provider: parse("local")?,
-            subject: parse("local")?,
-            user: user.clone(),
-            name: None,
-            verified_emails,
-            linked_at: at,
-        })
-        .await
-        .map_err(failed)?;
-    Ok(Actor { user, agent: None })
 }

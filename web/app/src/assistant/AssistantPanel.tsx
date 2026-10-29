@@ -4,7 +4,7 @@
 // direct change with the nodes it wrote and what it newly caused (D7), linked to those nodes,
 // and a structural change as a proposal to review in
 // proposal review (C14), where applying it is the user's click. Offered only when the host's
-// capabilities say there is an assistant (the in-browser host never has one). The panel opens
+// capabilities say there is an assistant (cairn demo never has one). The panel opens
 // from a toggle in the screen's header or the tab, and stays open across screens in this tab; the message
 // being typed is a draft that survives a reload (ARCHITECTURE, Web UI).
 import { useSelector } from "@xstate/react";

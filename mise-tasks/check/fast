@@ -1,6 +1,6 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE quiet=true
-#MISE description="The inner loop: lint (the Rust half only for a Rust change), the unit tests, and the property and integration tests (the latter when a crate they build changed) and the browser tests (the in-browser host only, unless the server side changed), each only when the change touches its inputs; with FILTER... only the Rust tests, Vitest files or tests, and Playwright spec that match"
+#MISE description="The inner loop: lint (the Rust half only for a Rust change), the unit tests, and the property and integration tests (the latter when a crate they build changed) and the browser tests, each only when the change touches its inputs; with FILTER... only the Rust tests, Vitest files or tests, and Playwright spec that match"
 if [ $# -eq 0 ]; then
   exec scripts/locked scripts/ladder --fast
 fi

@@ -1,4 +1,4 @@
-//! What a browser-host call answers instead of its value. Every export takes and returns JSON
+//! What an engine call answers instead of its value. Every export takes and returns JSON
 //! text; a failure is thrown to JavaScript as the JSON of a [`HostError`], which the
 //! hand-written loader in `web/wasm` parses back into a typed error.
 
@@ -22,26 +22,14 @@ pub enum HostError {
         /// Every violation.
         violations: Violations,
     },
-    /// A write or a local apply was rejected: stale (H5), invalid, or a reused patch id.
+    /// A local apply was rejected: stale (H5), invalid, or a reused patch id.
     Rejected {
         /// The rejection, as the API answers it.
         rejection: Rejection,
     },
-    /// A call names something its document or the root does not hold.
+    /// A call names something its document does not hold.
     Missing {
         /// What is missing.
-        message: String,
-    },
-    /// A call the caller can change but the root cannot carry out as asked: a proposal it
-    /// cannot draft (a journey that follows no route, a version that is not newer, a draft
-    /// too large).
-    Refused {
-        /// Why.
-        message: String,
-    },
-    /// The in-browser root's service or store failed.
-    Failed {
-        /// What failed.
         message: String,
     },
 }

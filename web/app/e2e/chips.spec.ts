@@ -1,6 +1,6 @@
 // The multi-value email field of the identity form on the identities screen (H3): each email a removable chip, taken on
 // Enter, comma, a paste or leaving the field; a bad or repeated one stays under its reason, selected so a paste replaces it;
-// Backspace in the empty input removes the last; it saves the list as chips. On the in-browser host. Splitting a pasted list
+// Backspace in the empty input removes the last; it saves the list as chips. On cairn demo. Splitting a pasted list
 // is ui/chips.test.ts's.
 import type { Page } from "@playwright/test";
 
@@ -14,7 +14,7 @@ const chips = (page: Page) => page.getByTestId("create-identity").getByTestId("c
 
 test("H3: emails are chips taken from the keyboard, refused with a reason, replaced by a paste, and saved as a list, on a desktop and a phone", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await open(page, "browser", "/identities/new");
+  await open(page, "/identities/new");
   await expect(page.getByTestId("create-identity")).toBeAttached();
   await openSheet(page);
   await field(page).fill("Ann@Example.org");
@@ -76,7 +76,7 @@ test("H3: emails are chips taken from the keyboard, refused with a reason, repla
 
 test("H3: what is typed while the engine reads an email is kept, and its answer joins the form as it is then", async ({ page }) => {
   await allowHoldingChecks(page);
-  await open(page, "browser", "/identities/new");
+  await open(page, "/identities/new");
   await expect(page.getByTestId("create-identity")).toBeAttached();
   await openSheet(page);
   await holdChecks(page);
@@ -92,7 +92,7 @@ test("H3: what is typed while the engine reads an email is kept, and its answer 
 });
 
 test("H3: an email is read as it is typed: its reason shows once the typing rests and clears when it is fixed", async ({ page }) => {
-  await open(page, "browser", "/identities/new");
+  await open(page, "/identities/new");
   await expect(page.getByTestId("create-identity")).toBeAttached();
   await openSheet(page);
   // No Enter, separator or blur: the typing alone brings the reason.
@@ -106,7 +106,7 @@ test("H3: an email is read as it is typed: its reason shows once the typing rest
 test("H3: typing asks the engine once the typing rests, not at every key", async ({ page }) => {
   await allowHoldingChecks(page);
   await page.clock.install();
-  await open(page, "browser", "/identities/new");
+  await open(page, "/identities/new");
   await expect(page.getByTestId("create-identity")).toBeAttached();
   await openSheet(page);
   await page.clock.runFor(1000);

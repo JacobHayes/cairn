@@ -8,10 +8,6 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
-[features]
-# The server half of the browser host's agreement cases (crates/wasm).
-server = ["cairn-wasm/server"]
-
 [dev-dependencies]
 async-trait.workspace = true
 axum.workspace = true

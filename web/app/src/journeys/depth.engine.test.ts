@@ -2,10 +2,9 @@
 // into its container and a node that waits on it carries the hidden-prerequisites marker. The
 // tab never hides a node on its own, so the marker holds at every step on every view.
 import type { Schema } from "@cairn/client";
-import type { InBrowserHost } from "@cairn/wasm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { journeyAfter, seeded } from "../authoring/engine.test-support.ts";
+import { journeyAfter, seeded, type Fixtures } from "../authoring/engine.test-support.ts";
 import { collapsedAt, drawnStep } from "../canvas/ladder.ts";
 import { STEPS, type Step } from "../canvas/model.ts";
 import type { GraphNode } from "../detail/model.ts";
@@ -15,7 +14,7 @@ import { DEFAULT_VIEW_STATE } from "./view.ts";
 const JOURNEY = "j_vendor_eval";
 
 describe("the hidden-prerequisites marker at every depth", () => {
-  let host: InBrowserHost;
+  let host: Fixtures;
   let level: (depth: Step, fade: boolean) => Schema<"Level">;
   let free: () => void;
   beforeAll(async () => {

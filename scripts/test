@@ -16,13 +16,9 @@
 #     does, the tests whose name matches one.
 #   - Playwright (web/app/e2e), in Chromium: a spec a filter names (`canvas`, `canvas.spec.ts`)
 #     whole, and a spec whose test titles contain a filter, only those tests. The module is
-#     bound (build:wasm: cargo decides, and the bindings are rebound only if it changed), the
-#     servers start side by side (scripts/e2e-servers), as in the browser step. A spec with @server
-#     tests (the server host's) runs them against `cairn demo`, built with the web build it
-#     embeds, made first if stale; a spec with none starts no binary and builds no web app. The
-#     in-browser tests and the parallel server tests run in one invocation; the @serial ones run
-#     in a second, only when a selected spec holds one, because a project's `dependencies` ignore
-#     a file or title filter and would pull in every parallel server test (playwright.config.ts).
+#     bound (build:wasm: cargo decides, and the bindings are rebound only if it changed) and the
+#     web build is made first if stale; each test starts a `cairn demo` of its own from the
+#     binary (scripts/demo-binary), as in the browser step.
 # No lint. The mise task runs it under the machine-wide lock (scripts/locked).
 # Quiet, like the ladder: one line per part that ran, a failing test's name, output, and
 # rerun command, and the complete log in dist/ladder/filter.log. It fails when nothing matched.
@@ -64,12 +60,9 @@ for config in web/*/vitest.config.ts; do
   fi
   [ ${#selection[@]} -gt 0 ] || continue
   start=$SECONDS
-  # The authoring tests check the editors against the browser host's module: cargo decides
-  # whether it is stale, and the bindings are rebound only when it was.
-  [ -n "$built" ] || { ladder_run "the browser host's module build" mise-tasks/build/wasm; built=yes; }
-  # The browser host's agreement tests compare with the server's answers (made again only
-  # when the crates they come from changed).
-  [ "$package" != web/wasm ] || ladder_run "the server's agreement cases" scripts/agreement-cases
+  # The tests check the engine's module: cargo decides whether it is stale, and the bindings
+  # are rebound only when it was.
+  [ -n "$built" ] || { ladder_run "the engine's module build" mise-tasks/build/wasm; built=yes; }
   report=$PWD/$package/dist/vitest.json
   mkdir -p "$package/dist"
   rm -f "$report"
@@ -102,8 +95,6 @@ playwright=$PWD/node_modules/.bin/playwright
 shopt -s nullglob
 targets=()
 specs=()
-server_files=()
-serial=
 for file in web/app/e2e/*.spec.ts; do
   spec=${file##*/}
   spec=${spec%.spec.ts}
@@ -128,59 +119,40 @@ for file in web/app/e2e/*.spec.ts; do
   else
     for line in "${lines[@]}"; do targets+=("e2e/$spec.spec.ts:$line"); done
   fi
-  grep -q '@server' "$file" && server_files+=("$file")
-  grep -q '@serial' "$file" && serial=1
 done
 if [ ${#specs[@]} -gt 0 ]; then
   [ -x "$playwright" ] || ladder_fail "$playwright is missing: run npm ci"
   start=$SECONDS
-  ladder_run "the browser host's module build" mise-tasks/build/wasm
-  # A spec with a server-host test needs the binary, which serves the web build: build that
-  # when any source it comes from is newer than it (what make would do). Directories count, so
-  # a file removed from one does too, and so do the manifests, for a dependency that changed.
-  # The binary comes from the ladder's one build of the test binaries (scripts/ladder-tests),
-  # which the Rust tests below then reuse.
-  if [ ${#server_files[@]} -gt 0 ]; then
-    build=web/app/dist/build/index.html
-    # The generated paths (ARCHITECTURE owns the list) feed the bundle too: the client's types
-    # and rule tables and the module's bindings.
-    mapfile -t generated < <(scripts/generated-paths)
-    if [ ! -f "$build" ] || [ -n "$(find web/app/src web/app/index.html web/app/vite.config.ts web/app/package.json \
-      web/client/src web/client/package.json web/wasm/src web/wasm/package.json web/wasm/dist/bindgen design \
-      "${generated[@]}" package-lock.json -newer "$build" -print -quit)" ]; then
-      ladder_run "the app's web build" mise-tasks/build/web
-    fi
-    ladder_run "the build of the binary" "$ladder_timed" build cargo test --locked --quiet --workspace --all-features --tests --no-run
-    export CAIRN_E2E_BINARY=1
-  else
-    export CAIRN_E2E_BINARY=0
+  ladder_run "the engine's module build" mise-tasks/build/wasm
+  # The tests' demos serve the web build, which is made when any source it comes from is newer
+  # than it (what make would do). Directories count, so a file removed from one does too, and
+  # so do the manifests, for a dependency that changed. The binary comes from the ladder's one
+  # build of the test binaries (scripts/ladder-tests), which the Rust tests below then reuse.
+  build=web/app/dist/build/index.html
+  # The generated paths (ARCHITECTURE owns the list) feed the bundle too: the client's types
+  # and rule tables and the module's bindings.
+  mapfile -t generated < <(scripts/generated-paths)
+  if [ ! -f "$build" ] || [ -n "$(find web/app/src web/app/index.html web/app/vite.config.ts web/app/package.json \
+    web/client/src web/client/package.json web/wasm/src web/wasm/package.json web/wasm/dist/bindgen design \
+    "${generated[@]}" package-lock.json -newer "$build" -print -quit)" ]; then
+    ladder_run "the app's web build" mise-tasks/build/web
   fi
-  # The tests that change what the whole deployment holds (@serial) run after the rest, by
-  # themselves: Playwright's project dependency would run every parallel server test first
-  # whatever the filters, so the two groups are two runs here.
-  runs=("--project=chromium --project=server")
-  [ -z "$serial" ] || runs+=("--project=server-serial")
-  total=0
-  index=0
-  for projects in "${runs[@]}"; do
-    index=$((index + 1))
-    report=$PWD/web/app/dist/playwright-$index.json
-    rm -f "$report"
-    status=0
-    # The servers Playwright starts must not hold the terminal (descriptor 3) open.
-    # shellcheck disable=SC2086 # the projects are words
-    output=$(cd web/app && PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
-      "$ladder_timed" tests "$playwright" test --reporter=dot,json $projects --no-deps --pass-with-no-tests "${targets[@]}" 3>&- 2>&1) || status=$?
-    printf '%s\n' "$output"
-    [ -f "$report" ] || { ladder_show "$output"; ladder_fail "Playwright wrote no report for ${specs[*]}"; }
-    [ "$status" -eq 0 ] || {
-      ladder_show "$output"
-      node scripts/reruns playwright "$report" | ladder_show
-      ladder_fail "in-browser tests failed in ${specs[*]}"
-    }
-    # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
-    total=$((total + $(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).stats.expected);' "$report")))
-  done
+  ladder_run "the build of the binary" "$ladder_timed" build cargo test --locked --quiet --workspace --all-features --tests --no-run
+  report=$PWD/web/app/dist/playwright.json
+  rm -f "$report"
+  status=0
+  # The demos Playwright's tests start must not hold the terminal (descriptor 3) open.
+  output=$(cd web/app && PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
+    "$ladder_timed" tests "$playwright" test --reporter=dot,json --project=chromium --pass-with-no-tests "${targets[@]}" 3>&- 2>&1) || status=$?
+  printf '%s\n' "$output"
+  [ -f "$report" ] || { ladder_show "$output"; ladder_fail "Playwright wrote no report for ${specs[*]}"; }
+  [ "$status" -eq 0 ] || {
+    ladder_show "$output"
+    node scripts/reruns playwright "$report" | ladder_show
+    ladder_fail "end-to-end tests failed in ${specs[*]}"
+  }
+  # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
+  total=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).stats.expected);' "$report")
   done_line "Playwright ${specs[*]}" "$start" "$total"
   ran=$((ran + total))
   [ "$total" -eq 0 ] || web_matched=1

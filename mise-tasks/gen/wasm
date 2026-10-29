@@ -1,5 +1,5 @@
 #!/usr/bin/env -S bash -euo pipefail
-#MISE description="Regenerate web/wasm/generated/: the wasm-bindgen bindings of crates/wasm"
+#MISE description="Regenerate web/wasm/generated/: the wasm-bindgen bindings of the engine's module (crates/wasm)"
 #MISE depends=["build:wasm"]
 # ARCHITECTURE, Generated artifacts. Copies the JavaScript bindings and type declarations of
 # the module build:wasm built into web/wasm/generated/, each with a header saying so; the

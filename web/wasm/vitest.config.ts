@@ -1,6 +1,5 @@
-// The web-unit step's Node tests of the browser host: Vitest over src/, against the module
-// the build bound (dist/bindgen) and the answers the server walk wrote (dist/cases). The
-// agreement cases run whole groups through the wasm32 module, so a test may take a while.
+// The web-unit step's Node tests of the engine package: Vitest over src/, against the module the
+// build bound (dist/bindgen).
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({

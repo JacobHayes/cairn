@@ -11,7 +11,7 @@ import type { AssistantHost } from "./assistant.ts";
 import type { Answer, Command } from "./edit-command.ts";
 import type { Domain, ProposalHost, ProposalWritten } from "./proposals.ts";
 import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Caller, type AgentTokenHost, type Tour, type TourWrite, type TourWriteRequest } from "./host.ts";
-import { browserTour } from "./browser-tour.ts";
+import { todayIn } from "./today.ts";
 import type { WriteEnv } from "./write-machine.ts";
 
 export interface FakeJourney {
@@ -23,7 +23,6 @@ export interface FakeJourney {
 }
 
 export class FakeHost implements Host {
-  readonly kind = "server" as const;
   readonly journeysHeld = new Map<string, FakeJourney>();
   readonly fetches = new Map<string, number>();
   deploymentRevision = 1;
@@ -132,10 +131,17 @@ export class FakeHost implements Host {
   /** The users asked for, one entry per read. */
   readonly namesAsked: string[][] = [];
 
-  /** The tour record, kept as the in-browser host keeps it (in memory, where there is no storage). */
-  readonly tourRecord = browserTour();
-  tour = (): Promise<Tour> => this.tourRecord.tour();
-  putTour = (write: TourWriteRequest): Promise<TourWrite> => this.tourRecord.putTour(write);
+  /** The tour record, written with the same compare-and-set the server's is. */
+  tourKept: Omit<Tour, "today"> = { state: "none" };
+  tour = (): Promise<Tour> => Promise.resolve({ ...this.tourKept, today: todayIn("UTC", new Date()) });
+  putTour = (write: TourWriteRequest): Promise<TourWrite> => {
+    const expected = write.expect;
+    if (this.tourKept.state !== expected.state || (this.tourKept.practice_journey ?? null) !== (expected.practice_journey ?? null)) {
+      return Promise.resolve({ ok: false, current: { ...this.tourKept, today: todayIn("UTC", new Date()) } });
+    }
+    this.tourKept = write.state === "started" && write.practice_journey != null ? { state: "started", practice_journey: write.practice_journey } : { state: write.state };
+    return Promise.resolve({ ok: true });
+  };
 
   userNames(users: readonly string[]): Promise<{ user: string; name: string }[]> {
     this.namesAsked.push([...users]);
@@ -276,7 +282,7 @@ export class FakeDeriver implements Deriver {
     if (!this.held.has(journey)) {
       return Promise.reject(new Error(`no document for ${journey} is loaded`));
     }
-    return Promise.resolve({ nodes: {}, frontier: [], acting_frontier: [], today: "2026-10-06" });
+    return Promise.resolve({ nodes: {}, frontier: [], acting_frontier: [], today: todayIn("UTC", new Date()) });
   }
 
   project(): Promise<never> {

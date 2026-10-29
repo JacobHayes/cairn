@@ -1,7 +1,7 @@
 // The assistant over the server host (I5; ARCHITECTURE, Assistant): one turn of the caller's
 // conversation about a journey or a route's draft (`POST /api/journeys/{id}/assistant`,
 // `POST /api/routes/{id}/draft/assistant`), and that conversation read back as kept (`GET` on the
-// same paths). The in-browser host has no assistant (ARCHITECTURE, Service layer and
+// same paths). The cairn demo has no assistant (ARCHITECTURE, Service layer and
 // composition: its root assembles none), so it has no `AssistantHost` at all.
 import { answerFailure, networkFailure, type CairnClient, type HttpFailure, type Schema } from "@cairn/client";
 

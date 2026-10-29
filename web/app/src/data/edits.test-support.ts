@@ -78,7 +78,6 @@ export function chipOf(root: SessionRootRef, read: Partial<SyncReading> = {}): S
     syncInputOf(syncOf(root).getSnapshot().context.timing, {
       stream: streamStatus(subscriptionOf(root).getSnapshot()),
       online: true,
-      demo: false,
       skew: snapshot.matches("skewed"),
       revision: undefined,
       count: inFlightOf(writes),

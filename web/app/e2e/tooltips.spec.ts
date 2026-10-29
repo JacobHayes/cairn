@@ -1,7 +1,7 @@
 // The one tooltip (ui/Tip.tsx): it shows after a rest and at once between neighbours, on keyboard
 // focus, stays for a pointer that moves onto it, hides on Esc without anything else happening,
 // stays inside the window, shows a cut title whole and a fitting one not at all, and is
-// reachable by tap and by keyboard where a tip is a fact's only place. On the in-browser host.
+// reachable by tap and by keyboard where a tip is a fact's only place. On cairn demo.
 // The browser's own tooltip is excluded on every page by the invariants (e2e/tips.ts).
 import type { Locator, Page } from "@playwright/test";
 
@@ -30,7 +30,7 @@ const tipWords = async (page: Page): Promise<string> => (await whenSettled(page,
 
 test("a control's tip waits for the pointer to rest, then follows it to a neighbour at once, with its key, and stays for a pointer moving onto it", async ({ page }) => {
   await page.clock.install();
-  await openAt(page, "browser", FIXTURE, "graph");
+  await openAt(page, FIXTURE, "graph");
   const depth = page.getByTestId("depth-button");
   const frontier = page.getByTestId("chip-frontier");
   await depth.hover();
@@ -64,7 +64,7 @@ test("a control's tip waits for the pointer to rest, then follows it to a neighb
 
 test("a tip shows at once on keyboard focus, stays while the focus does, and Esc hides it and nothing else", async ({ page }) => {
   await page.clock.install();
-  await openAt(page, "browser", FIXTURE, "graph", { node: "n_announcement" });
+  await openAt(page, FIXTURE, "graph", { node: "n_announcement" });
   await expect(nodePanel(page, "n_announcement")).toBeVisible();
   const frontier = page.getByTestId("chip-frontier");
   await tabTo(page, frontier);
@@ -82,7 +82,7 @@ test("a tip shows at once on keyboard focus, stays while the focus does, and Esc
 });
 
 test("the inspector's Hide tip keeps clear of the window's right edge", async ({ page }) => {
-  await openAt(page, "browser", FIXTURE, "graph", { node: "n_announcement" });
+  await openAt(page, FIXTURE, "graph", { node: "n_announcement" });
   await page.getByRole("button", { name: "Hide inspector" }).hover();
   await expect(openTip(page)).toBeVisible();
   await expectTipInWindow(page, 8);
@@ -93,7 +93,7 @@ test("a card title cut short shows whole in a tip, promptly; a title that fits s
   await page.clock.install();
   await page.setViewportSize({ width: 4200, height: 3200 });
   const journey = await publishStressJourney(page);
-  await openAt(page, "browser", journey, "graph");
+  await openAt(page, journey, "graph");
   await page.keyboard.press("f");
   await settled(page);
   const opens = page.getByTestId("card-open");
@@ -117,7 +117,7 @@ test("a card title cut short shows whole in a tip, promptly; a title that fits s
 });
 
 test("a graph line shows its words at once when the keyboard focuses it, and they are its accessible name", async ({ page }) => {
-  await openAt(page, "browser", FIXTURE, "graph");
+  await openAt(page, FIXTURE, "graph");
   await page.keyboard.press("Tab");
   const line = page.locator(".react-flow__edge:not(.selectable)").or(page.locator(".react-flow__edge")).first();
   await line.focus();
@@ -129,7 +129,7 @@ test.describe("on a phone", () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
 
   test("a tap on a fact shows it and a tap elsewhere hides it; the same fact is reached by Tab and Enter", async ({ page }) => {
-    await openAt(page, "browser", FIXTURE, "summary");
+    await openAt(page, FIXTURE, "summary");
     const date = page.locator("[data-tip-tap]").first();
     await date.tap();
     await expect(openTip(page)).toBeVisible();
@@ -146,7 +146,7 @@ test.describe("on a phone", () => {
 });
 
 test("a held control takes the focus, says why, and a press does nothing", async ({ page }) => {
-  await openAt(page, "browser", FIXTURE, "walk");
+  await openAt(page, FIXTURE, "walk");
   const frontier = page.getByTestId("chip-frontier");
   await expect(frontier).toHaveAttribute("aria-disabled", "true");
   const before = page.url();
@@ -162,9 +162,9 @@ test("a held control takes the focus, says why, and a press does nothing", async
 
 test("the rail's ? is drawn where the page binds keys, previews them on hover, and opens the key sheet", async ({ page }) => {
   const keys = page.getByRole("button", { name: "Keyboard shortcuts" });
-  await open(page, "browser", "/");
+  await open(page, "/");
   await expect(keys).toHaveCount(0);
-  await openAt(page, "browser", FIXTURE, "graph");
+  await openAt(page, FIXTURE, "graph");
   await expect(keys).toBeVisible();
   await keys.hover();
   await expect(openTip(page)).toBeVisible();
@@ -175,7 +175,7 @@ test("the rail's ? is drawn where the page binds keys, previews them on hover, a
 });
 
 test("a line's tip goes when the view that drew it does, without the pointer moving", async ({ page }) => {
-  await openAt(page, "browser", FIXTURE, "graph");
+  await openAt(page, FIXTURE, "graph");
   await settled(page);
   const at = await pointOn(page.locator(".react-flow__edge").first());
   await page.mouse.move(at.x, at.y);
@@ -188,7 +188,7 @@ test("a line's tip goes when the view that drew it does, without the pointer mov
 test("a timeline title cut short shows whole in a tip that is not itself cut", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 });
   const journey = await publishStressJourney(page);
-  await openAt(page, "browser", journey, "timeline");
+  await openAt(page, journey, "timeline");
   const links = page.locator(".timeline-text a");
   // A title that is cut and already in the window: the pointer goes straight to it, and nothing has to scroll (a scroll under the pointer closes a tip, as it should).
   const cut = await whenSettled(page, () => links.evaluateAll((all) => all.flatMap((each, at) => (each.scrollWidth > each.clientWidth + 1 && each.getBoundingClientRect().top >= 0 && each.getBoundingClientRect().bottom <= window.innerHeight ? [at] : []))));
@@ -202,7 +202,7 @@ test("a timeline title cut short shows whole in a tip that is not itself cut", a
 
 test("a scroll in another scroller does not take a tip from a pointer resting on its control", async ({ page }) => {
   await page.clock.install();
-  await openAt(page, "browser", FIXTURE, "graph");
+  await openAt(page, FIXTURE, "graph");
   await page.getByTestId("chip-frontier").hover();
   await expect(openTip(page)).toHaveCount(0);
   await page.evaluate(() => {

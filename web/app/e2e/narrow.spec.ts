@@ -1,6 +1,6 @@
 // A screen at a phone's width: the list with Frontier on shows its content with nothing off the
 // side of the window, the journey's menus, the View picker, Depth and the Filter open inside it. One representative
-// journey walked across its views: the page never scrolls sideways. On the in-browser host, fresh on every load.
+// journey walked across its views: the page never scrolls sideways. On the cairn demo.
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
@@ -13,7 +13,7 @@ test.use({ viewport: { width: 390, height: 844 } });
 
 /** The journey's menus open inside the window, and the picker shares the title's row with the menu. */
 async function menusFit(page: Page): Promise<void> {
-  await openActing(page, "browser", "j_launch", "list?frontier=1");
+  await openActing(page, "j_launch", "list?frontier=1");
   await frontierKeys(page);
   await expectStructure(page, "the frontier list");
   for (const trigger of ["journey-menu", "view-picker", "controls-button"]) {

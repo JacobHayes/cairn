@@ -1,7 +1,7 @@
 //! The composition root types (ARCHITECTURE, Service layer and composition; Terms:
-//! Composition root, Capabilities document): what each host's root fills in to assemble a
-//! [`Service`](crate::Service). The server binary's root reads them from its
-//! configuration; the browser host's fixes them.
+//! Composition root, Capabilities document): what the root fills in to assemble a
+//! [`Service`](crate::Service). The root reads them from its
+//! configuration.
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -109,7 +109,7 @@ pub struct Capabilities {
     /// Whether the host streams revision ticks over SSE (H6).
     pub sse: bool,
     /// The release this host runs, as the binary reports it (a version, or `dev`); `None`
-    /// where no binary serves the page (the browser host).
+    /// where no binary serves the page.
     pub version: Option<String>,
 }
 
@@ -125,26 +125,6 @@ impl Capabilities {
             mcp: Some(mcp),
             sse: true,
             version: Some(version.to_owned()),
-        }
-    }
-
-    /// The browser host's: one local login, and no assistant, MCP, or SSE (its views
-    /// subscribe to the in-process notifier directly).
-    #[must_use]
-    pub fn browser() -> Self {
-        let local = match "local".parse::<Slug>() {
-            Ok(name) => name,
-            Err(error) => unreachable!("`local` is a slug: {error:?}"),
-        };
-        Self {
-            auth: vec![AuthMethod {
-                name: local,
-                kind: AuthKind::Local,
-            }],
-            assistant: false,
-            mcp: None,
-            sse: false,
-            version: None,
         }
     }
 }
@@ -217,6 +197,4 @@ pub enum AuthKind {
     Tailscale,
     /// Google Cloud Identity-Aware Proxy's signed assertion.
     GcpIap,
-    /// The browser host's single local login.
-    Local,
 }

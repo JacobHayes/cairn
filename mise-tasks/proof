@@ -1,20 +1,16 @@
 #!/usr/bin/env -S bash -euo pipefail
-#MISE description="Take screenshots and video of a change: build the browser host's module, then run the *.proof.ts specs in a directory outside the repository with web/app/playwright.proof.config.ts"
-#MISE depends=["packages", "build:wasm"]
+#MISE description="Take screenshots and video of a change: build the web app, then run the *.proof.ts specs in a directory outside the repository with web/app/playwright.proof.config.ts"
+#MISE depends=["packages", "build:web"]
 # usage: mise run proof <dir> [playwright test args...]
 #   <dir>  the directory holding the *.proof.ts specs: absolute, or from the checkout's root
 # AGENTS, Show a change people can see: nothing here is committed. The spec lives in the
 # change's scratch directory, imports
-# `@playwright/test` (web/app/tsconfig.proof.json maps it to the checkout's copy) and the
-# browser tests' helpers (by their absolute path under web/app/e2e/), and saves its screenshots
-# and video in the scratch directory. Runs on the in-browser host; CAIRN_E2E_BINARY=1 also starts
-# the server host, the binary serving the web build, which is built first.
+# `test` from web/app/e2e/test.ts (by its absolute path; it starts a `cairn demo` for each test
+# and points the page at it), with the browser tests' other helpers beside it, and saves its
+# screenshots and video in the scratch directory.
 cd "$(dirname "$0")/.."
 repo=$PWD
 dir=$(realpath -e "${1:?usage: mise run proof <dir> [playwright test args...]}")
 shift
-if [ "${CAIRN_E2E_BINARY:-0}" != 0 ]; then
-  mise run build:web
-fi
 cd web/app
 CAIRN_PROOF_DIR=$dir exec "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts "$@"

@@ -1,4 +1,4 @@
-// A19, C16, C17: hard deletion on the in-browser host. The journey index's rows are picked with
+// A19, C16, C17: hard deletion on cairn demo. The journey index's rows are picked with
 // their checkboxes, a Cmd-click or a Shift-click range; the inspector lists them and deletes them
 // together once every one is archived, asked once with the count. A route nothing uses is deleted
 // from its `⋯`; one a journey follows offers no delete. What the patches carry is vitest's
@@ -14,14 +14,14 @@ test("A19, C16: picked journeys are deleted together, once every one is archived
   const names = [journeyName("Gone A"), journeyName("Gone B"), journeyName("Kept")] as const;
   const ids: string[] = [];
   for (const name of names) {
-    ids.push(await startJourney(page, "browser", name));
+    ids.push(await startJourney(page, name));
   }
   const [first, second, kept] = ids as [string, string, string];
   for (const id of [first, second]) {
-    await open(page, "browser", `/journeys/${id}?view=graph`);
+    await open(page, `/journeys/${id}?view=graph`);
     await setStatus(page, "archived");
   }
-  await open(page, "browser", "/journeys?status=any");
+  await open(page, "/journeys?status=any");
   const row = (id: string) => page.locator(`[data-testid="journey-row"][data-journey="${id}"]`);
   await row(first).getByRole("checkbox").check();
   await row(kept).getByRole("checkbox").check();
@@ -50,12 +50,12 @@ test("A19, C16: picked journeys are deleted together, once every one is archived
 });
 
 test("A19, C17: a route nothing uses is deleted from its menu, and one a journey follows offers no delete", async ({ page }) => {
-  await openRoute(page, "browser", "vendor-evaluation");
+  await openRoute(page, "vendor-evaluation");
   await page.getByTestId("route-menu").click();
   await expect(page.getByTestId("menu-retire")).toBeVisible();
   await expect(page.getByTestId("menu-delete-route")).toHaveCount(0);
   await page.keyboard.press("Escape");
-  const id = await newRoute(page, "browser", routeName("Unused"));
+  const id = await newRoute(page, routeName("Unused"));
   await page.getByTestId("route-menu").click();
   await page.getByTestId("menu-delete-route").click();
   await page.getByTestId("delete-route-confirmed").click();
@@ -64,7 +64,7 @@ test("A19, C17: a route nothing uses is deleted from its menu, and one a journey
 });
 
 test("C16: a Shift-click picks every journey from the last one picked to the one clicked", async ({ page }) => {
-  await open(page, "browser", "/journeys?status=any");
+  await open(page, "/journeys?status=any");
   const rows = page.getByTestId("journey-row");
   await expect(rows.nth(2)).toBeVisible();
   await rows.nth(0).getByRole("checkbox").check();

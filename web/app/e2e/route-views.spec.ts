@@ -1,6 +1,6 @@
 // A route has a journey's views and view state (C17, C13, C2, C9): the same View picker, Depth
 // and search follow it across Graph, List and Timeline, the version it shows is picked in its
-// header, and its timeline is the earliest schedule from day 0. Run on the in-browser host,
+// header, and its timeline is the earliest schedule from day 0. Run on cairn demo,
 // which reseeds the store on each load, so moves within a test go through links and
 // `goWithin`, never a reload. What the views draw (levels, schedule, rows) is the unit tests'.
 import type { Page } from "@playwright/test";
@@ -44,7 +44,7 @@ async function selectCard(page: Page, key: string): Promise<void> {
 }
 
 test("C17, C2, C9: v cycles a route's views and m does nothing; the depth and the search follow a route across Graph, List and Timeline and the address keeps them; ?mine=1 is written away", async ({ page }) => {
-  await openRoute(page, "browser", "vendor-evaluation");
+  await openRoute(page, "vendor-evaluation");
   await openDraftHere(page);
   await expectAddress(page, "/routes/vendor-evaluation");
   // A route has no map: v cycles its views and m does nothing.
@@ -78,7 +78,7 @@ test("C17, C2, C9: v cycles a route's views and m does nothing; the depth and th
 });
 
 test("C19: a draft opened on a version shows without a version in the address, and a saved link to a version stays that version; the version selector names the graph shown, and picking a version shows its card and keeps the view and the depth", async ({ page }) => {
-  await publishVersionTwo(page, "browser");
+  await publishVersionTwo(page);
   expect(new URL(page.url()).searchParams.get("version")).toBeNull();
   await openDraftHere(page);
   expect(new URL(page.url()).searchParams.get("version")).toBeNull();
@@ -102,7 +102,7 @@ test("C19: a draft opened on a version shows without a version in the address, a
 });
 
 test("C19: discarding a route's only draft leaves the empty route with its header and Retire", async ({ page }) => {
-  await open(page, "browser", "/routes/new");
+  await open(page, "/routes/new");
   await page.getByLabel("Name").fill("Throwaway");
   await page.getByRole("button", { name: /create/i }).click();
   await expect(page.getByTestId("route-header")).toBeVisible();
@@ -134,7 +134,7 @@ async function timelineLaysFromDayZero(page: Page): Promise<void> {
 }
 
 test("C13: the route timeline lays the product launch from day 0, panning its axis moves it and Fit brings the span back; a track opens its node, on a draft and on a version", async ({ page }) => {
-  await openRoute(page, "browser", "product-launch");
+  await openRoute(page, "product-launch");
   await openDraftHere(page);
   await timelineLaysFromDayZero(page);
   const fitted = await firstTickDay(page);
@@ -173,7 +173,7 @@ async function draftTraces(page: Page): Promise<void> {
 
 test("C7: selecting a node on a route draft traces it, as on a journey, through an edit; Reveal and Hide, a hidden-prerequisites marker, and a click on the empty canvas clears it", async ({ page }) => {
   await readable(page);
-  await openRoute(page, "browser", "vendor-evaluation");
+  await openRoute(page, "vendor-evaluation");
   await openDraftHere(page);
   await draftTraces(page);
   // At Stages a folded stage traces what is folded into it; Reveal draws the nodes it reaches and Hide takes them off.
@@ -215,7 +215,7 @@ async function putAwayInspectorReturns(page: Page): Promise<void> {
 
 test("C7, C19: a node of a published version is selected like a draft's: its address keeps the version, its panel is read only, it traces, a search that hides it still draws it on every view, Esc clears it, and a version's node says when it applies", async ({ page }) => {
   await readable(page);
-  await openRoute(page, "browser", "vendor-evaluation", "?version=1");
+  await openRoute(page, "vendor-evaluation", "?version=1");
   await selectCard(page, "n_plan_review");
   await expect(page).toHaveURL(/\/routes\/vendor-evaluation\/nodes\/n_plan_review\?version=1/);
   await expect(page.getByTestId("route-node")).toHaveAttribute("data-node", "n_plan_review");
@@ -256,7 +256,7 @@ async function clickLine(page: Page, from: string, to: string): Promise<void> {
 
 /** On a version a line opens its card: the address keeps the version, the card says no state, a row's link opens the read-only panel, and the empty canvas clears it. */
 async function versionLineOpensCard(page: Page): Promise<void> {
-  await openRoute(page, "browser", "vendor-evaluation", "?version=1&depth=stages");
+  await openRoute(page, "vendor-evaluation", "?version=1&depth=stages");
   await clickLine(page, "n_setup", "n_testing");
   await expect(page).toHaveURL(/\/routes\/vendor-evaluation\/edges\/n_setup~n_testing\?.*version=1/);
   const card = page.getByTestId("edge-card");
@@ -298,7 +298,7 @@ test("C1: a line that stands for many links lists the first of them and shows th
   const needs = (i: number) => `  requires:\n  - a/a${String(i % 3)}\n  - a/a${String((i + 1) % 3)}\n`;
   const nodes = [0, 1, 2].map((i) => leaf("a", i, "")).join("") + Array.from({ length: 30 }, (_, i) => leaf("b", i, needs(i))).join("");
   const file = `format: 1\nroute: many-links\nname: Many links\nnodes:\n- key: n_a\n  id: a\n  kind: group\n  title: Prepare\n- key: n_b\n  id: b\n  kind: group\n  title: Deliver\n${nodes}- key: n_end\n  id: end\n  kind: milestone\n  title: Done\n  final: true\n  requires:\n  - b/b0\n`;
-  await importRoute(page, "browser", { name: "many-links.yaml", mimeType: "text/yaml", buffer: Buffer.from(file) });
+  await importRoute(page, { name: "many-links.yaml", mimeType: "text/yaml", buffer: Buffer.from(file) });
   await expect(versionSelect(page)).toContainText("Draft");
   await goWithin(page, "/routes/many-links/edges/n_a~n_b?depth=stages");
   const rows = page.getByTestId("edge-card").locator("[data-requirement]");

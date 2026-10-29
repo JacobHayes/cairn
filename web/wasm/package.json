@@ -3,7 +3,7 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
-  "description": "The browser host: bindings generated from crates/wasm (generated/), the loader that types them, the derive worker, and the in-browser root.",
+  "description": "The browser's engine: bindings generated from crates/wasm (generated/), the loader that types them, and the derive worker.",
   "exports": {
     ".": "./src/index.ts"
   },

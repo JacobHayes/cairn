@@ -1,13 +1,10 @@
-// Proposals over either host (I6, C14): fetched, created, edited, previewed,
+// Proposals (I6, C14): fetched, created, edited, previewed,
 // applied, discarded, and refreshed by id, and the upgrade, save-as-route, and re-link drafts
 // (B7, B8, B9). The server answers over HTTP (`/api/{domain}/proposals`, `/api/proposals/{id}...`,
-// `/api/journeys/{id}/{upgrade,save-as-route,relink}`); the in-browser host answers the same JSON
-// from its root. Each write names a client patch id (H5) and a client proposal id (I6), so a
+// `/api/journeys/{id}/{upgrade,save-as-route,relink}`). Each write names a client patch id (H5) and a client proposal id (I6), so a
 // lost answer is resubmitted rather than guessed at; nothing retries on its own.
 import { answerFailure, networkFailure, rejectionOf, type CairnClient, type HttpFailure, type Schema } from "@cairn/client";
-import { HostFailure, type InBrowserHost } from "@cairn/wasm";
 
-import { hostFailure } from "./host-failure.ts";
 import { Missing, ReadFailed } from "./host.ts";
 
 export type Proposal = Schema<"Proposal">;
@@ -204,46 +201,4 @@ function serverWrites(client: CairnClient): Omit<ProposalHost, "get" | "list" | 
 /** The server's proposals, through `client`. */
 export function serverProposals(client: CairnClient): ProposalHost {
   return { ...serverReads(client), ...serverWrites(client) };
-}
-
-/** A write to the root, answered as a server's would be. */
-function writtenBy<A>(call: () => A): Promise<ProposalWritten<A>> {
-  try {
-    return Promise.resolve({ outcome: "answered", answer: call() });
-  } catch (thrown) {
-    if (thrown instanceof HostFailure && thrown.reason.error === "rejected") {
-      return Promise.resolve({ outcome: "rejected", rejection: thrown.reason.rejection });
-    }
-    return Promise.resolve({ outcome: "failed", error: hostFailure(thrown) });
-  }
-}
-
-/** A read of the root, in the shape a server read takes. */
-function readBy<T>(what: string, call: () => T): Promise<T> {
-  try {
-    return Promise.resolve(call());
-  } catch (thrown) {
-    if (thrown instanceof HostFailure && thrown.reason.error === "missing") {
-      return Promise.reject(new Missing(what));
-    }
-    return Promise.reject(new ReadFailed(hostFailure(thrown)));
-  }
-}
-
-/** The in-browser root's proposals. */
-export function browserProposals(root: InBrowserHost): ProposalHost {
-  return {
-    get: (destination, id) => readBy(id, () => root.proposal(destination, id)),
-    list: (destination, after) => readBy("proposals", () => root.listProposals({ destination }, after)),
-    listing: (scope, after) => readBy("proposals", () => root.listProposals(scope, after)),
-    create: (destination, request) => writtenBy(() => root.propose(destination, request)),
-    edit: (destination, id, request) => writtenBy(() => root.editProposal(destination, id, request)),
-    discard: (destination, id, request) => writtenBy(() => root.discardProposal(destination, id, request)),
-    refresh: (destination, id, request) => writtenBy(() => root.refreshProposal(destination, id, request)),
-    preview: (destination, id) => readBy(id, () => root.previewProposal(destination, id)),
-    apply: (destination, id, request) => writtenBy(() => root.applyProposal(destination, id, request)),
-    upgrade: (journey, request) => writtenBy(() => root.proposeUpgrade(journey, request)),
-    saveAsRoute: (journey, request) => writtenBy(() => root.proposeSaveAsRoute(journey, request)),
-    relink: (journey, request) => writtenBy(() => root.proposeRelink(journey, request)),
-  };
 }

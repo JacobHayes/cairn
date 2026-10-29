@@ -1,5 +1,5 @@
 //! Journey scenarios (fixtures/): a journey built step by step from patches at a fixed
-//! clock, the shared input for engine scenario tests, the in-browser host, and server
+//! clock, the shared input for engine scenario tests, cairn demo, and server
 //! integration tests (ARCHITECTURE, Testing the engine).
 
 use schemars::JsonSchema;

@@ -1,4 +1,4 @@
-// Authoring on the in-browser host, seeded from the fixtures on each load: a small route
+// Authoring on cairn demo: a small route
 // authored by hand from an empty draft, with an edge drawn on the canvas and a refusal (A3), a notice cleared by a requirement (A20),
 // published, exported, and imported back to the same graph (A12, A1a, A13); and, on a fixture
 // journey, a local node added and a route-copied title edited and reset (B4). The forms'
@@ -52,7 +52,7 @@ async function authorRoute(page: Page): Promise<Record<string, string>> {
 }
 
 test("A12, A1a: a route authored by hand from an empty draft, published, exported, and imported back to the same graph", async ({ page }) => {
-  const route = await newRoute(page, "browser", routeName("Onboarding"));
+  const route = await newRoute(page, routeName("Onboarding"));
   const keys = await authorRoute(page);
   await expect(nodeCard(page, keys["Training plan"] ?? "")).toBeVisible();
   // A requirement is drawn on the canvas by clicking cards, and one on its own container is refused with the engine's reason (A3).
@@ -74,7 +74,7 @@ test("A12, A1a: a route authored by hand from an empty draft, published, exporte
   await edges.getByRole("button", { name: "Add the requirement" }).click();
   await expect(nodeCard(page, handbook).getByTestId("card-notice")).toHaveCount(0);
   await expect(nodeCard(page, accounts).getByTestId("card-notice")).toHaveCount(0);
-  await openRoute(page, "browser", route);
+  await openRoute(page, route);
   await publishDraft(page);
   const exported = await savedText(page, () => routeMenuItem(page, "menu-export"));
   expect(exported).toContain(`route: ${route}`);
@@ -87,7 +87,7 @@ test("A12, A1a: a route authored by hand from an empty draft, published, exporte
 
 test("B4: on a fixture journey, a local node added, a route-copied title edited and reset to the route", async ({ page }) => {
   await readable(page);
-  await openEditing(page, "browser", "j_vendor_eval");
+  await openEditing(page, "j_vendor_eval");
   const local = await addNode(page, "action", "Order the test data", "Setup");
   await expect((await section(page, "author-local-edits")).getByTestId("local-edits")).toHaveAttribute("data-status", "local");
   await expect(nodeCard(page, local)).toBeVisible();
@@ -112,7 +112,7 @@ test("A3: Edit is one state entered from the journey menu, with the name editor 
     await (await section(page, "author-edges")).getByRole("button", { name: "Draw it on the canvas" }).click();
     await expect(banner).toHaveAttribute("data-from", "n_access");
   };
-  await openJourney(page, "browser", "j_vendor_eval");
+  await openJourney(page, "j_vendor_eval");
   await expect(page.getByTestId("authoring-bar")).toHaveCount(0);
   await page.getByTestId("journey-menu").click();
   await page.getByTestId("menu-edit").click();
@@ -144,13 +144,13 @@ test("A3: Edit is one state entered from the journey menu, with the name editor 
   await expect(page.getByTestId("authoring-bar")).toBeVisible();
   await expect(banner).toHaveCount(0);
   await draw();
-  await open(page, "browser", "/journeys/j_launch?view=graph&edit=on");
+  await open(page, "/journeys/j_launch?view=graph&edit=on");
   await expect(page.getByTestId("authoring-bar")).toBeVisible();
   await expect(banner).toHaveCount(0);
 });
 
 test("A1a, A15: Publish waits for every form holding input not yet sent, a blank offset is refused rather than read as 0, and a violation at a field is reachable from its control", async ({ page }) => {
-  const route = await newRoute(page, "browser", routeName("Waits"));
+  const route = await newRoute(page, routeName("Waits"));
   const first = await addNode(page, "milestone", "Kickoff");
   const report = await addNode(page, "deliverable", "Report");
   const publish = page.getByTestId("publish-draft");
@@ -221,7 +221,7 @@ test("A1a, A15: Publish waits for every form holding input not yet sent, a blank
 });
 
 test("A6: a role's id follows its label until the author types over it, and an unsent form is not lost to another role's Edit", async ({ page }) => {
-  await newRoute(page, "browser", routeName("Roles"));
+  await newRoute(page, routeName("Roles"));
   await addRole(page, "Lead");
   const roles = page.getByTestId("roles-and-kinds").getByTestId("roles");
   await roles.getByRole("button", { name: "Add a role" }).click();

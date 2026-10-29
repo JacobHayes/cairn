@@ -5,7 +5,7 @@
 // reconcile it raises). Views watch with their own actor ref and are sent every tick and
 // every open; each compares a tick with the revision it holds (tracker.ts), and the stream's
 // opening is when each forgets what it asked for. The transport is Server-Sent Events from the
-// API (`eventSourceTicks`) or the in-browser host's subscriptions, behind `OpenTicks`.
+// API (`eventSourceTicks`) or cairn demo's subscriptions, behind `OpenTicks`.
 import { assign, enqueueActions, fromCallback, setup, type ActorRefFrom, type AnyActorRef, type SnapshotFrom } from "xstate";
 
 import { SSE_COALESCING_INTERVAL_MS, SSE_WRITE_STALL_MS } from "../generated/rules.ts";
@@ -82,7 +82,7 @@ export const subscription = setup({
     input: {} as { open: OpenTicks },
   },
   actors: {
-    // A transport that refuses to open (the in-browser host throws for a name it cannot watch)
+    // A transport that refuses to open (cairn demo throws for a name it cannot watch)
     // is a closed stream: tried again after the wait, never an uncaught error. Stopping the
     // callback closes the transport, and what it sends after that is dropped.
     stream: fromCallback<Internal, { open: OpenTicks; watching: readonly string[] }>(({ sendBack, input }) => {

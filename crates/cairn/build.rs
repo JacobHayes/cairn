@@ -8,12 +8,19 @@
 //! digest of the folder in `CAIRN_WEB_BUILD_DIGEST`, which `src/assets.rs` reads with
 //! `env!`: a different web build is then a different compile for Cargo and the cache alike.
 //!
+//! The script also writes `fixtures.rs` into the build directory: one `Fixture` for each
+//! directory under `fixtures/` that holds a `journey.yaml`, in name order, with its
+//! `route.yaml` when it has one. The directory is the list's one owner: a fixture added there
+//! is seeded with no edit here, and a directory with no scenario (a lone segment) is not a
+//! fixture.
+//!
 //! The script also hands the compile the version the binary reports, in
 //! `CAIRN_BUILD_VERSION`: the release tag in `CAIRN_VERSION` (`v1.2.3`), or `dev` when it is
 //! unset, and a build error when it is not a semantic version. The crate version stays
 //! `0.0.0`; a release takes its version from its tag (ARCHITECTURE, Build, run, deploy).
 
 use std::env::VarError;
+use std::fmt::Write as _;
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
@@ -25,7 +32,8 @@ mod version;
 /// The web build the binary embeds, relative to this crate.
 const WEB_BUILD: &str = "../../web/app/dist/build";
 
-fn main() -> io::Result<()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    write_fixtures()?;
     println!("cargo::rerun-if-env-changed=CAIRN_VERSION");
     let tag = match std::env::var("CAIRN_VERSION") {
         Ok(tag) => Some(tag),
@@ -76,5 +84,46 @@ fn hash_files(directory: &Path, prefix: &str, hasher: &mut DefaultHasher) -> io:
             bytes.hash(hasher);
         }
     }
+    Ok(())
+}
+
+/// Writes `fixtures.rs` (`src/fixtures.rs` includes it).
+fn write_fixtures() -> Result<(), Box<dyn std::error::Error>> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures");
+    println!("cargo::rerun-if-changed={}", root.display());
+    let mut names = Vec::new();
+    for entry in fs::read_dir(&root)? {
+        let path = entry?.path();
+        if path.join("journey.yaml").exists() {
+            names.push(
+                path.file_name()
+                    .ok_or("a directory has a name")?
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+    }
+    names.sort();
+    let mut out = format!(
+        "/// Every fixture, in name order (the order they are seeded).\npub const FIXTURES: [Fixture; {}] = [\n",
+        names.len()
+    );
+    for name in &names {
+        let directory = root.join(name);
+        let file = |file: &str| format!("{}/{file}", directory.display());
+        let route = if directory.join("route.yaml").exists() {
+            format!("Some(include_str!({:?}))", file("route.yaml"))
+        } else {
+            "None".to_owned()
+        };
+        writeln!(
+            out,
+            "    Fixture {{ name: {name:?}, route: {route}, journey: include_str!({:?}) }},",
+            file("journey.yaml")
+        )?;
+    }
+    out.push_str("];\n");
+    let target = Path::new(&std::env::var("OUT_DIR")?).join("fixtures.rs");
+    fs::write(target, out)?;
     Ok(())
 }

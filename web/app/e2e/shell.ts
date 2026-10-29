@@ -2,34 +2,26 @@
 // journey page the way a person does: a node's card on the canvas, its detail beside it.
 import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
-export type HostKind = "server" | "browser";
-
-/** The in-browser host's demo site (playwright.config.ts); the server host is the project's own. */
-const DEMO = `http://127.0.0.1:${process.env["CAIRN_DEMO_PORT"] ?? ""}`;
-
 /**
- * Opens the screen at `path` (`/journeys/<id>?view=...`) on `host`, once the shell is up:
- * within the page when it already runs on `host`, as a link would, so the in-browser host's
- * store (which lives only as long as the page) is kept; by loading the page otherwise. The
- * sync chip says which host it is on (`data-host`). Returns once the page has settled.
+ * Opens the screen at `path` (`/journeys/<id>?view=...`) once the shell is up: within the page
+ * when it already runs the app, as a link would; by loading the page otherwise. Returns once the
+ * page has settled.
  */
-export async function open(page: Page, host: HostKind, path: string): Promise<void> {
+export async function open(page: Page, path: string): Promise<void> {
   const nav = page.getByRole("navigation", { name: "Screens", exact: true });
-  const onDemo = page.url().startsWith(`${DEMO}/`);
   // eslint-disable-next-line e2e/settled-reads -- whether the app runs in this tab at all: a blank tab has nothing to settle
-  if ((await nav.count()) === 1 && onDemo === (host === "browser")) {
+  if ((await nav.count()) === 1) {
     await goWithin(page, path);
   } else {
-    await page.goto(host === "browser" ? `${DEMO}${path}` : path);
+    await page.goto(path);
   }
   await expect(nav).toBeVisible();
-  await expect(syncChip(page)).toHaveAttribute("data-host", host);
   await settled(page);
 }
 
 /** From the new-route form (`/routes/new`), imports a route file: a new route, or a new draft of the one it names. */
-export async function importRoute(page: Page, host: HostKind, file: string | { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
-  await open(page, host, "/routes/new");
+export async function importRoute(page: Page, file: string | { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
+  await open(page, "/routes/new");
   await page.getByLabel("Import a file…").setInputFiles(file);
 }
 
@@ -105,9 +97,9 @@ export async function recentSaves(page: Page): Promise<string[]> {
   return saves;
 }
 
-/** Loads the screen at `path` afresh on `host`, as a bookmark or a posted link does, and returns once the shell is up and the page has settled. */
-export async function visit(page: Page, host: HostKind, path: string): Promise<void> {
-  await page.goto(host === "browser" ? `${DEMO}${path}` : path);
+/** Loads the screen at `path` afresh, as a bookmark or a posted link does, and returns once the shell is up and the page has settled. */
+export async function visit(page: Page, path: string): Promise<void> {
+  await page.goto(path);
   await expect(page.getByRole("navigation", { name: "Screens", exact: true })).toBeVisible();
   await settled(page);
 }
@@ -149,8 +141,8 @@ function screenOf(address: string): string {
  * depth unless `query` says otherwise, so every node has a card to reach (it opens at Stages, with
  * most stages folded, for a person).
  */
-export async function openJourney(page: Page, host: HostKind, journey: string, query = "?depth=actions"): Promise<void> {
-  await open(page, host, `/journeys/${journey}?view=graph${query === "" ? "" : `&${query.replace(/^\?/, "")}`}`);
+export async function openJourney(page: Page, journey: string, query = "?depth=actions"): Promise<void> {
+  await open(page, `/journeys/${journey}?view=graph${query === "" ? "" : `&${query.replace(/^\?/, "")}`}`);
   await derived(page);
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   // Once the opening fit has moved the viewport off its start, so it cannot land after what the spec does next.
@@ -174,18 +166,37 @@ export function journeyAddress(journey: string, address: string, node?: string):
 }
 
 /**
- * Opens journey `journey`'s page at `address` (`list?frontier=1`, `timeline`, `summary`, with a
- * query), with node `node`'s detail beside it when given, once derived. On the browser host the
- * page's clock is held at noon UTC on `fixedToday` first, so the host derives with that today.
+ * Holds the page on the day `day`: its clock at noon UTC, and the documents the server sends
+ * derived for that day (the server reads its own clock, which the fixtures' dates are not
+ * written for). Call it before the page loads.
  */
-export async function openAt(page: Page, host: HostKind, journey: string, address: string, options: { node?: string; fixedToday?: string } = {}): Promise<void> {
-  if (host === "browser" && options.fixedToday !== undefined) {
-    await page.clock.setFixedTime(new Date(`${options.fixedToday}T12:00:00Z`));
+export async function holdToday(page: Page, day: string): Promise<void> {
+  await page.clock.setFixedTime(new Date(`${day}T12:00:00Z`));
+  await page.route("**/api/journeys/*/document", async (route) => {
+    const response = await route.fetch();
+    const document = (await response.json()) as { inputs?: { today: string } };
+    if (document.inputs === undefined) {
+      await route.fulfill({ response, json: document });
+      return;
+    }
+    document.inputs.today = day;
+    await route.fulfill({ response, json: document });
+  });
+}
+
+/**
+ * Opens journey `journey`'s page at `address` (`list?frontier=1`, `timeline`, `summary`, with a
+ * query), with node `node`'s detail beside it when given, once derived. With `fixedToday` the
+ * page is held on that day first (holdToday), so the journey derives with that today.
+ */
+export async function openAt(page: Page, journey: string, address: string, options: { node?: string; fixedToday?: string } = {}): Promise<void> {
+  if (options.fixedToday !== undefined) {
+    await holdToday(page, options.fixedToday);
   }
-  await open(page, host, journeyAddress(journey, address, options.node));
+  await open(page, journeyAddress(journey, address, options.node));
   await expect(page.getByTestId("journey-frame")).toBeVisible();
   await derived(page);
-  if (host === "browser" && options.fixedToday !== undefined) {
+  if (options.fixedToday !== undefined) {
     await expect(syncChip(page)).toHaveAttribute("data-today", options.fixedToday);
   }
 }

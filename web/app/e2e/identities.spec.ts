@@ -11,7 +11,7 @@ const ANA = "who_k3d7qm2xw5tn6pfa";
 const DARA = "who_d4m6uk2eqf5rbhzs";
 
 test("E6: a row opens that identity alone, the checkboxes make a set the inspector merges, and the search keeps the identities whose name or email holds it", async ({ page }) => {
-  await open(page, "browser", "/identities");
+  await open(page, "/identities");
   // The search keeps the identities whose name or email holds it, and says how many.
   await expect(page.getByTestId("identity").first()).toBeVisible();
   const all = await whenSettled(page, () => page.getByTestId("identity").count());
@@ -45,7 +45,7 @@ test("E6: a row opens that identity alone, the checkboxes make a set the inspect
   await expect(identityRow(page, second)).toHaveAttribute("data-selected", "false");
   await checkpoint(page);
   // Merging two selected identities leaves one row, which now carries the journeys of the other.
-  await open(page, "browser", `/identities/${DARA}`);
+  await open(page, `/identities/${DARA}`);
   await expect(page.getByTestId("identity-detail")).toBeAttached();
   await openSheet(page);
   const references = page.locator("[data-rows-panel]").first();
@@ -61,7 +61,7 @@ test("E6: a row opens that identity alone, the checkboxes make a set the inspect
 });
 
 test("E6: an identity nothing names is deleted from its inspector, one a journey names cannot be, and Delete over several waits for every one's read", async ({ page }) => {
-  await open(page, "browser", "/identities");
+  await open(page, "/identities");
   const spare = await addIdentity(page, fresh("Spare"));
   await expect(page.getByTestId("delete-identities")).toHaveAttribute("data-deletion", "allowed");
   await page.getByTestId("delete-identities").getByRole("button", { name: "Delete", exact: true }).click();
@@ -91,7 +91,7 @@ test("E6: an identity nothing names is deleted from its inspector, one a journey
 test("E6: on a phone a row opens its identity, and the form's fields and Save stay reachable with the keyboard up", async ({ page }) => {
   // A window as short as a phone with its keyboard open.
   await page.setViewportSize({ width: 390, height: 460 });
-  await open(page, "browser", "/identities");
+  await open(page, "/identities");
   const key = await addIdentity(page, fresh("Phone person"));
   await expect(page.getByTestId("identity-detail")).toBeVisible();
   await openSheet(page);

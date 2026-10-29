@@ -1,18 +1,13 @@
 #!/usr/bin/env bash
-# Step browser: the binary with its web build served, and in-browser end-to-end of the app
-# against the wasm host and the binary (Playwright in Chromium, one suite per web package with
-# a playwright.config.ts).
+# Step browser: end-to-end tests of the app against `cairn demo` (Playwright in Chromium, one
+# suite per web package with a playwright.config.ts).
 # PRACTICES, The validation ladder. The binary serves the app's build
 # (web/app/dist/build/): its own tests that start it (`mod binary` in
-# crates/cairn/tests/integration/binary.rs, so `binary::binary::`) are a suite here, and the
-# app's server-host tests run against `cairn demo`, the same binary over the fixtures in
-# memory (the `server` project of web/app/playwright.config.ts). The app's tests
-# need the module and the binary. A suite that runs no test, or any test that fails or is
-# skipped, fails the step. The browsers are Playwright's own, pinned with @playwright/test:
+# crates/cairn/tests/integration/binary.rs, so `binary::binary::`) are a suite here, and each of
+# the app's tests starts a `cairn demo` of its own, the same binary over the fixtures in memory
+# (web/app/e2e/test.ts). A suite that runs no test, or any test that fails or is skipped, fails
+# the step. The browsers are Playwright's own, pinned with @playwright/test:
 # `npx playwright install chromium` once per machine.
-# With LADDER_SERVER=0 (`mise run check:fast` for a change that leaves the server side of the
-# web app alone, scripts/changed) only the in-browser host's tests run, on the demo site that the run builds once
-# (scripts/e2e-servers): no server binary built or tested.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_STEP=browser
@@ -26,19 +21,12 @@ export CARGO_TERM_COLOR=never
 
 # The module and the web build the binary serves were built before this step (scripts/ladder),
 # and so were the test binaries, whose build links the binary too: the binary's tests run it,
-# and Playwright's start of it (the app's server-host tests start it as `cairn demo`,
-# scripts/e2e-servers) is a run, not a build.
+# and the tests' demos start it (scripts/demo-binary builds it once, a no-op here).
 # The walks (every screen state's structural checks, and the same over the breakpoints) are
 # projects of the same run, so one report covers them (`mise run screenshots`, `mise run sweep`).
 projects=(--project=chromium --project=screenshots --project=sweep)
-if [ "${LADDER_SERVER:-1}" = 1 ]; then
-  ladder_cargo_test --test integration -- "${ladder_binary_modules[@]}" || ladder_fail "the binary's tests failed"
-  ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
-  projects+=(--project=server --project=server-serial)
-  export CAIRN_E2E_BINARY=1
-else
-  export CAIRN_E2E_BINARY=0
-fi
+ladder_cargo_test --test integration -- "${ladder_binary_modules[@]}" || ladder_fail "the binary's tests failed"
+ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
 
 # One Playwright run of `config` in `package`, its counts checked: a run that passes nothing, or
 # any test that fails or is skipped, fails the step. The rest of the arguments select projects.
@@ -67,7 +55,7 @@ run_playwright() {
 }
 
 for config in web/*/playwright.config.ts; do
-  run_playwright "$(dirname "$config")" playwright.config.ts "in-browser end-to-end tests" "${projects[@]}"
+  run_playwright "$(dirname "$config")" playwright.config.ts "end-to-end tests" "${projects[@]}"
 done
 
 ladder_step_end

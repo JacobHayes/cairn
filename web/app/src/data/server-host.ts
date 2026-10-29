@@ -146,7 +146,6 @@ async function putTourOver(client: CairnClient, write: TourWriteRequest): Promis
 export function serverHost(origin: string, build: string | undefined): Host {
   const client: CairnClient = createCairnClient(origin);
   return {
-    kind: "server",
     capabilities: () => answered("the capabilities", () => client.GET("/api/capabilities")),
     journeys: (query) => answered("the journey index", () => client.GET("/api/journeys", { params: { query: indexParams(query) } })),
     routes: (after, kind) => answered("the route index", () => client.GET("/api/routes", { params: { query: { ...(after === undefined ? {} : { after }), ...(kind === undefined ? {} : { kind }) } } })),

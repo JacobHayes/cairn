@@ -66,8 +66,8 @@ async function deletionStates(page: Page): Promise<() => Promise<string[]>> {
 const referencesOf = (key: string) => `/api/deployment/identities/${key}/references`;
 const ANA = "who_k3d7qm2xw5tn6pfa";
 
-test("E6: a references read still out for one identity never speaks for the next, and one out while the selection grows keeps Delete off until the whole set has answered", { tag: ["@server", "@serial"] }, async ({ page }) => {
-  await open(page, "server", "/identities");
+test("E6: a references read still out for one identity never speaks for the next, and one out while the selection grows keeps Delete off until the whole set has answered", async ({ page }) => {
+  await open(page, "/identities");
   const spare = await addIdentity(page, fresh("Spare"));
   await expect(page.getByTestId("delete-identities")).toHaveAttribute("data-deletion", "allowed");
   // A, nothing names it, is read slowly; B, which journeys name, is read slowly too.
@@ -115,8 +115,8 @@ test("E6: a references read still out for one identity never speaks for the next
   expect(await shownForPair()).toEqual(["checking", "referenced"]);
 });
 
-test("E6: a merge whose reply comes after the deployment has moved settles on the server's state: the survivor open alone, the count down by one", { tag: ["@server", "@serial"] }, async ({ page }) => {
-  await open(page, "server", "/identities");
+test("E6: a merge whose reply comes after the deployment has moved settles on the server's state: the survivor open alone, the count down by one", async ({ page }) => {
+  await open(page, "/identities");
   const first = await addIdentity(page, fresh("Early"));
   const second = await addIdentity(page, fresh("Late"));
   const shown = page.getByTestId("identities-count");

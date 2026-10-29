@@ -23,7 +23,7 @@ export interface Walk {
 
 /** Reaches the state again from Home: reaching the same address from itself would leave the frame as a walk left it. */
 async function reachAgain(page: Page, walk: Walk): Promise<void> {
-  await open(page, "browser", "/");
+  await open(page, "/");
   await walk.reach();
 }
 

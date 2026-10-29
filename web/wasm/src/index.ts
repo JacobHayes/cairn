@@ -1,7 +1,5 @@
-// The browser host's package (ARCHITECTURE, Repository layout: web/wasm): the engine's calls
-// for every host, the derive worker, and the in-browser root. The client wrapper and app
-// shell build on these.
+// The browser's engine package (ARCHITECTURE, Repository layout: web/wasm): the engine's calls
+// the app makes locally, and the derive worker that holds each journey's derivation.
 export { DerivedDocument, Engine, compileEngine, loadEngine, type WasmModule } from "./engine.ts";
 export { DeriveWorker } from "./derive-worker.ts";
-export { InBrowserHost, type Clock, type ProposalListScope, type TickListener } from "./root.ts";
 export * from "./types.ts";

@@ -1,15 +1,14 @@
 // A8 and F4 against the engine: every source a date rule editor offers is one the engine
 // measures from, a rule round-trips through its parts, and a stage's bounds are offered from
 // the milestones outside it.
-import type { InBrowserHost } from "@cairn/wasm";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { boundOptions, CREATED_AT, partsOf, ruleOf, sourceOptions } from "./dates.ts";
-import { applyToDraft, seeded } from "./engine.test-support.ts";
+import { applyToDraft, seeded, type Fixtures } from "./engine.test-support.ts";
 import { treeOf, type Graph, type GraphNode } from "./graph.ts";
 
 describe("date rules (A8)", () => {
-  let host: InBrowserHost;
+  let host: Fixtures;
   let graph: Graph;
   beforeAll(async () => {
     host = await seeded();
