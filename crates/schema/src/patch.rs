@@ -251,7 +251,7 @@ pub enum Transition {
     /// `active` to `todo`.
     Stop,
     /// To `done` (deliverable, action, milestone). A guard's evidence must exist once the
-    /// patch applies: add the note or ticks in the same patch.
+    /// patch applies: add the note (on this node itself) or ticks in the same patch.
     #[schemars(extend("x-sketch" = true))]
     Complete,
     // PRD: D4.
@@ -685,7 +685,8 @@ pub enum Mutation {
     Snooze {
         /// The node.
         node: NodeKey,
-        /// Until a date or another node is done; no plan date changes. On a container it sets
+        /// Until a date or another node is done: a person setting work aside, not the plan's own
+        /// `not_before`. On a container it sets
         /// the whole subtree aside, still blocking and counting for priority; any transition
         /// on the container clears it.
         #[schemars(extend("x-sketch" = true))]
@@ -831,7 +832,7 @@ pub enum Mutation {
     DeleteJourney {
         /// The journey.
         journey: JourneyId,
-        /// The journey's revision, as read.
+        /// The journey's revision, from `get_snapshot`.
         revision: Revision,
     },
     // PRD: A19.

@@ -1375,7 +1375,8 @@ struct NodeWire<R: References> {
     requires: Requires<R>,
     #[serde(skip_serializing_if = "Option::is_none")]
     relevant_when: Option<Condition<R>>,
-    /// The latest finish: a deadline only, it never holds work back.
+    /// The latest finish, a node or the journey's creation (a fixed date is a pinned milestone);
+    /// a deadline only, it never holds work back.
     #[schemars(extend("x-sketch" = true))]
     #[serde(skip_serializing_if = "Option::is_none")]
     due_by: Option<DateRule<R>>,

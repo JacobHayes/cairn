@@ -803,13 +803,11 @@
         },
         "auto_done": {
           "description": "A milestone reads `scheduled` until its date, then ready to mark done; with this it is done\nby itself. Marking it done early records when.",
-          "type": "boolean",
-          "x-sketch": true
+          "type": "boolean"
         },
         "checklist": {
           "$ref": "#/$defs/Checklist",
-          "description": "Setting it replaces the whole list.",
-          "x-sketch": true
+          "description": "Setting it replaces the whole list."
         },
         "choices": {
           "$ref": "#/$defs/Choices"
@@ -819,8 +817,7 @@
         },
         "closes_at": {
           "$ref": "#/$defs/Path",
-          "description": "The milestone that closes the stage: it bounds the group's finish and its contents' due\ndates unless `closes` is false. Consecutive stages share one.",
-          "x-sketch": true
+          "description": "The milestone that closes the stage: it bounds the group's finish and its contents' due\ndates unless `closes` is false. Consecutive stages share one."
         },
         "description": {
           "anyOf": [
@@ -841,8 +838,7 @@
               "type": "null"
             }
           ],
-          "description": "The latest finish: a deadline only, it never holds work back.",
-          "x-sketch": true
+          "description": "The latest finish, a node or the journey's creation (a fixed date is a pinned milestone);\na deadline only, it never holds work back."
         },
         "estimate": {
           "$ref": "#/$defs/Days"
@@ -858,8 +854,7 @@
         },
         "gates": {
           "description": "False lets the contents be done before the opening milestone. A stage holds the work done\nduring it; work that can as well be done ahead goes in a stage with this false; prep that\nmust come first sits outside, due before the opening milestone.",
-          "type": "boolean",
-          "x-sketch": true
+          "type": "boolean"
         },
         "help": {
           "$ref": "#/$defs/Markdown"
@@ -889,13 +884,11 @@
               "type": "null"
             }
           ],
-          "description": "The earliest start: until then the node reads `scheduled` and stays off the next list, yet\ncan be started early. What waits on it is `blocked`, its `waits_on` carrying the date.",
-          "x-sketch": true
+          "description": "The earliest start: until then the node reads `scheduled` and stays off the next list, yet\ncan be started early. What waits on it is `blocked`, its `waits_on` carrying the date."
         },
         "opens_at": {
           "$ref": "#/$defs/Path",
-          "description": "The milestone that opens the stage: the contents wait for it unless `gates` is false.",
-          "x-sketch": true
+          "description": "The milestone that opens the stage: the contents wait for it unless `gates` is false."
         },
         "parent": {
           "anyOf": [
@@ -939,13 +932,11 @@
         },
         "requires_checklist": {
           "description": "Completing needs every checklist item ticked.",
-          "type": "boolean",
-          "x-sketch": true
+          "type": "boolean"
         },
         "requires_note": {
           "description": "Completing needs a note on the node itself, not a child's or the journey's.",
-          "type": "boolean",
-          "x-sketch": true
+          "type": "boolean"
         },
         "resources": {
           "items": {

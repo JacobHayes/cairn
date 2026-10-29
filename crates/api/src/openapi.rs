@@ -617,7 +617,12 @@ pub fn document_text() -> String {
 #[must_use]
 pub fn document() -> Value {
     let mut generator = SchemaSettings::draft2020_12()
-        .with(|settings| settings.definitions_path = "/components/schemas".into())
+        .with(|settings| {
+            settings.definitions_path = "/components/schemas".into();
+            settings
+                .transforms
+                .push(Box::new(cairn_schema::json_schema::without_sketch_marks()));
+        })
         .into_generator();
     let problem = generator.subschema_for::<Problem>();
     let rejection = generator.subschema_for::<Rejection>();

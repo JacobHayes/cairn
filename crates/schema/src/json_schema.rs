@@ -13,6 +13,14 @@ pub fn generated_files() -> Vec<(&'static str, String)> {
     vec![("route-file.schema.json", route_file())]
 }
 
+/// The transform that drops the `x-sketch` mark, which only the mutation sketch reads.
+#[must_use]
+pub fn without_sketch_marks() -> impl schemars::transform::Transform + Clone + 'static {
+    schemars::transform::RecursiveTransform(|schema: &mut schemars::Schema| {
+        schema.remove("x-sketch");
+    })
+}
+
 /// The route file's JSON Schema (draft 2020-12), pretty-printed with a trailing newline.
 ///
 /// # Panics
@@ -20,7 +28,9 @@ pub fn generated_files() -> Vec<(&'static str, String)> {
 /// Never: a schema always serializes.
 #[must_use]
 pub fn route_file() -> String {
-    let generator = SchemaSettings::draft2020_12().into_generator();
+    let generator = SchemaSettings::draft2020_12()
+        .with(|settings| settings.transforms.push(Box::new(without_sketch_marks())))
+        .into_generator();
     let schema = generator.into_root_schema_for::<RouteFile>();
     let mut value = schema.to_value();
     if let Value::Object(map) = &mut value {

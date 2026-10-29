@@ -767,11 +767,11 @@ pub enum ListFlag {
     Unassigned,
     /// On the acting frontier.
     NextUp,
-    /// A decision that can be answered now.
+    /// An open decision nothing blocks: answerable now.
     DecisionsNeeded,
     // PRD: B2.
-    /// A decision still open: undecided and not closed by a skip or a date, whether or not it
-    /// waits on anything (an open decision may be answered ahead of what it waits on).
+    /// An open decision, blocked or not (it may be answered ahead of what it waits on); counted
+    /// in the snapshot.
     OpenDecision,
     // PRD: B10.
     /// Placeholders that still need to be broken down.

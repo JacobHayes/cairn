@@ -3352,7 +3352,8 @@ export interface components {
             /** @constant */
             op: "snooze";
             /**
-             * @description Until a date or another node is done; no plan date changes. On a container it sets
+             * @description Until a date or another node is done: a person setting work aside, not the plan's own
+             *     `not_before`. On a container it sets
              *     the whole subtree aside, still blocking and counting for priority; any transition
              *     on the container clears it.
              */
@@ -3470,7 +3471,7 @@ export interface components {
             journey: components["schemas"]["JourneyId"];
             /** @constant */
             op: "delete_journey";
-            /** @description The journey's revision, as read. */
+            /** @description The journey's revision, from `get_snapshot`. */
             revision: components["schemas"]["Revision"];
         } | {
             /** @constant */
@@ -3536,7 +3537,10 @@ export interface components {
              */
             closes_at?: components["schemas"]["NodeKey"];
             description?: components["schemas"]["Markdown"] | null;
-            /** @description The latest finish: a deadline only, it never holds work back. */
+            /**
+             * @description The latest finish, a node or the journey's creation (a fixed date is a pinned milestone);
+             *     a deadline only, it never holds work back.
+             */
             due_by?: components["schemas"]["DateRule"] | null;
             estimate?: components["schemas"]["Days"];
             feeds_milestone?: components["schemas"]["NodeKey"];
@@ -3592,7 +3596,10 @@ export interface components {
              */
             closes_at?: components["schemas"]["Path"];
             description?: components["schemas"]["Markdown"] | null;
-            /** @description The latest finish: a deadline only, it never holds work back. */
+            /**
+             * @description The latest finish, a node or the journey's creation (a fixed date is a pinned milestone);
+             *     a deadline only, it never holds work back.
+             */
             due_by?: components["schemas"]["DateRule2"] | null;
             estimate?: components["schemas"]["Days"];
             feeds_milestone?: components["schemas"]["Path"];
