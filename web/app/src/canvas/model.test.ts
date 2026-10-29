@@ -345,3 +345,21 @@ describe("C2: what the rest of a card says", () => {
     expect(card(model(wholeLevel(), [], [], late(false)), "n_build").journey?.foot).toBeUndefined();
   });
 });
+
+describe("only a top-level group is a stage, whose zoomed-out head carries the state chip", () => {
+  test("a group nested inside another group, however deep, is not a stage; the group at the top is", () => {
+    const nodes = [
+      { key: "n_outer", id: "outer", kind: "group", title: "Outer" },
+      { key: "n_middle", id: "middle", kind: "group", title: "Middle", parent: "n_outer" },
+      { key: "n_inner", id: "inner", kind: "group", title: "Inner", parent: "n_middle" },
+      { key: "n_work", id: "work", kind: "action", title: "Work", parent: "n_inner" },
+    ] as typeof graph;
+    const level: Level = { nodes: nodes.map((node) => ({ key: node.key, parent: node.parent })) } as Level;
+    expect(cardsOf(level, nodes).map((each) => [each.key, each.stage])).toEqual([
+      ["n_outer", true],
+      ["n_middle", false],
+      ["n_inner", false],
+      ["n_work", false],
+    ]);
+  });
+});
