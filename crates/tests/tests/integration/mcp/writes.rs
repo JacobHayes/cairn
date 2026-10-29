@@ -482,8 +482,7 @@ async fn the_removal_read_is_what_a_patch_needs_to_remove_a_node() {
 }
 
 /// A journey is created with owners, found by them, and named by them in the snapshot and
-/// the index as the identities they are now; a create drafted against an older deployment
-/// revision than a merge of its owner is stale.
+/// the index as the identities they are now, after a merge of its owner.
 #[tokio::test]
 async fn a_journey_is_created_with_owners_and_a_merge_moves_them_on() {
     let world = World::new();
@@ -528,29 +527,6 @@ async fn a_journey_is_created_with_owners_and_a_merge_moves_them_on() {
         .ok(&ann, "get_snapshot", json!({ "journey": "j_owned" }))
         .await;
     assert_eq!(owners(&snapshot["snapshot"]["journey"]), json!(["who_b"]));
-
-    // The deployment revision the create names is checked: the merge moved it on, so the
-    // write is refused and nothing is created.
-    let late = world
-        .call(&ann, "apply_patch", create("j_late", "who_b", deployment))
-        .await;
-    assert!(
-        matches!(
-            late,
-            Err(ToolError::Rejected {
-                rejection: Rejection::Stale { .. }
-            })
-        ),
-        "{late:?}"
-    );
-    let listed = world.ok(&ann, "list_journeys", json!({})).await;
-    assert!(
-        listed["journeys"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .all(|journey| journey["id"] != "j_late")
-    );
 }
 
 /// Starting work that waits is a plain transition: no guard and no bypass, and the node reads

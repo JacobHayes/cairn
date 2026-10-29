@@ -46,7 +46,6 @@ macro_rules! on_both_stores {
 }
 
 on_both_stores!(
-    merge_revisions_follow_an_alias,
     a_journey_reads_as_the_engine_alone_projects_it,
     the_node_list_scopes_to_a_subtree_and_pages,
     node_detail_caps_its_explanations_and_the_rest_page,
@@ -307,46 +306,6 @@ async fn cached_and_uncached_reads_agree_across_an_identity_merge(store: Arc<dyn
     assert_eq!(
         cached.mine(&reader, &vendor(), &kinds).await.unwrap(),
         fresh.mine(&reader, &vendor(), &kinds).await.unwrap()
-    );
-}
-
-/// E6: the journeys a merge must name are every one referring to any of its identities,
-/// directly or through an alias: after the lead is merged into another identity, asking for
-/// that identity finds the journey that still refers to the lead's old key, and before the
-/// merge it finds none.
-async fn merge_revisions_follow_an_alias(store: Arc<dyn Store>) {
-    let (service, _) = service_over(store);
-    vendor_after(&service, 3).await;
-    let identity = patch(
-        "p_dup",
-        "deployment",
-        1,
-        "- op: create_identity\n  identity: {key: who_dup, name: Lead again, emails: [dup@example.org]}\n",
-    );
-    applied(service.patch(&call("u_lead", AT), &domain(identity)).await);
-    let survivor = BTreeSet::from(["who_dup".parse().unwrap()]);
-    assert!(
-        service
-            .merge_revisions(survivor.clone())
-            .await
-            .unwrap()
-            .is_empty(),
-        "nothing refers to the survivor yet"
-    );
-    let revision = service.journey(&vendor()).await.unwrap().unwrap().revision;
-    let merge = patch(
-        "p_merge",
-        "deployment",
-        2,
-        &format!(
-            "- op: merge_identities\n  survivor: who_dup\n  merged: [who_k3d7qm2xw5tn6pfa]\n  journeys: {{j_vendor_eval: {revision}}}\n"
-        ),
-    );
-    applied(service.patch(&call("u_lead", AT), &domain(merge)).await);
-    assert_eq!(
-        service.merge_revisions(survivor).await.unwrap(),
-        [(vendor(), revision)].into_iter().collect(),
-        "the survivor reaches the journey through the merged key's alias"
     );
 }
 

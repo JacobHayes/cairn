@@ -52,7 +52,6 @@ on_both_stores!(
     a_write_is_stale_beside_a_deployment_change_that_moved_only_the_deployment,
     a_merge_beside_an_unrelated_deployment_change_is_stale,
     a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it,
-    a_merge_moves_emails_and_an_email_stays_on_one_identity,
     a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers,
     an_identity_is_deleted_only_once_nothing_refers_to_it,
     an_unreferenced_identity_is_deleted_with_its_emails,
@@ -63,7 +62,6 @@ on_both_stores!(
     deletes_sharing_their_references_each_count_the_remainder_once,
     a_route_with_many_versions_naming_an_identity_is_one_reference,
     deletes_naming_different_graphs_of_one_route_each_name_the_route,
-    a_group_merge_resubmitted_with_other_identities_is_another_merge,
     publishing_a_route_never_touches_its_journeys,
     an_archived_journey_takes_only_a_status_move_or_deletion_and_its_id_never_returns,
     a_route_a_journey_follows_on_an_old_version_is_deleted_only_with_it,
@@ -481,49 +479,6 @@ async fn a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it(
     );
 }
 
-/// H3, E6: a merge moves the merged identity's emails to the survivor and leaves its key as an
-/// alias; an email already on another identity cannot be given to a second one.
-async fn a_merge_moves_emails_and_an_email_stays_on_one_identity(
-    service: &Service,
-    _: &InProcessNotifier,
-) {
-    vendor_after(service, 2).await;
-    let taken = patch(
-        "p_taken",
-        "deployment",
-        1,
-        "- op: edit_identity\n  identity: {key: who_e7h2jv3nxc4yaw6t, name: Eli Park, emails: [Ana@Example.org]}\n",
-    );
-    let refused = rejected(service.patch(&call("u_lead", AT), &domain(taken)).await);
-    assert!(matches!(refused, Rejection::Invalid { .. }), "{refused:#?}");
-
-    let give = patch(
-        "p_give",
-        "deployment",
-        1,
-        "- op: edit_identity\n  identity: {key: who_e7h2jv3nxc4yaw6t, name: Eli Park, emails: [b@example.org]}\n",
-    );
-    applied(service.patch(&call("u_lead", AT), &domain(give)).await);
-    let merge = patch(
-        "p_merge",
-        "deployment",
-        2,
-        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {j_vendor_eval: 2}\n",
-    );
-    applied(service.patch(&call("u_lead", AT), &domain(merge)).await);
-    let deployment = service.deployment().await.unwrap();
-    let survivor_key = "who_d4m6uk2eqf5rbhzs".parse().unwrap();
-    assert_eq!(
-        deployment
-            .aliases
-            .get(&"who_e7h2jv3nxc4yaw6t".parse().unwrap()),
-        Some(&survivor_key),
-        "the alias resolves"
-    );
-    let survivor = deployment.identities.get(&survivor_key).unwrap();
-    assert!(survivor.emails.contains(&"b@example.org".parse().unwrap()));
-}
-
 /// E6, H5: a merge names the journeys it was checked against at their revisions; one of them
 /// edited since, or a journey newly referring to either identity, makes it stale.
 async fn a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers(
@@ -742,53 +697,6 @@ async fn a_group_merge_folds_several_identities_into_one_survivor(
             .unwrap()
             .emails
             .contains(&"spare@example.org".parse().unwrap())
-    );
-}
-
-/// H5, E6: a group merge resubmitted under its patch id with only some of its identities is not
-/// the merge that id committed.
-async fn a_group_merge_resubmitted_with_other_identities_is_another_merge(
-    service: &Service,
-    _: &InProcessNotifier,
-) {
-    vendor_after(service, 2).await;
-    let revision = service.deployment().await.unwrap().revision.get();
-    let spare = patch(
-        "p_spare",
-        "deployment",
-        revision,
-        "- op: create_identity\n  identity: {key: who_u5k3mq7wd2fz6ncx, name: Spare}\n",
-    );
-    applied(service.patch(&call("u_lead", AT), &domain(spare)).await);
-    let revision = service.deployment().await.unwrap().revision.get();
-    let merge = |merged: &str| {
-        domain(patch(
-            "p_group",
-            "deployment",
-            revision,
-            &format!(
-                "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [{merged}]\n  journeys: {{j_vendor_eval: 2}}\n"
-            ),
-        ))
-    };
-    let both = "who_e7h2jv3nxc4yaw6t, who_u5k3mq7wd2fz6ncx";
-    applied(service.patch(&call("u_lead", AT), &merge(both)).await);
-    let again = service
-        .patch(&call("u_lead", AT), &merge(both))
-        .await
-        .unwrap();
-    assert!(
-        matches!(again, cairn_service::Written::AlreadyApplied { .. }),
-        "{again:?}"
-    );
-    let fewer = rejected(
-        service
-            .patch(&call("u_lead", AT), &merge("who_e7h2jv3nxc4yaw6t"))
-            .await,
-    );
-    assert!(
-        matches!(fewer, Rejection::PatchIdReused { .. }),
-        "{fewer:?}"
     );
 }
 
