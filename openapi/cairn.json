@@ -6094,11 +6094,6 @@
             "type": "string"
           },
           {
-            "const": "decisions_needed",
-            "description": "An open decision nothing blocks: answerable now.",
-            "type": "string"
-          },
-          {
             "const": "open_decision",
             "description": "An open decision, blocked or not (it may be answered ahead of what it waits on); counted\nin the snapshot.",
             "type": "string"

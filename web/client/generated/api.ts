@@ -2979,7 +2979,7 @@ export interface components {
             verified_emails: components["schemas"]["Email"][];
         };
         /** @description A list filter that needs no argument. */
-        ListFlag: "mine" | "unassigned" | "next_up" | "decisions_needed" | "open_decision" | "needs_breakdown" | "active" | "blocked" | "overdue" | "stale" | "snoozed" | "snoozed_and_overdue" | "shortfall" | "stalled";
+        ListFlag: "mine" | "unassigned" | "next_up" | "open_decision" | "needs_breakdown" | "active" | "blocked" | "overdue" | "stale" | "snoozed" | "snoozed_and_overdue" | "shortfall" | "stalled";
         /** @description A page of the list. */
         ListPage: {
             /** @description Where the next page starts, when there is one. */

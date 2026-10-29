@@ -332,7 +332,7 @@ mod mcp_in_process {
     }
 
     /// The PRD's success criterion, as an agent session through the endpoint: over the
-    /// vendor evaluation, the agent reads the snapshot first, lists the decisions needed,
+    /// vendor evaluation, the agent reads the snapshot first, lists the open decisions,
     /// answers each, is refused a patch with every violation, proposes a breakdown for the
     /// placeholder, and applies it; its acting frontier is then 2.6's next list (I3, I6,
     /// A15, B10, C10).
@@ -369,13 +369,18 @@ mod mcp_in_process {
             expected,
             "the frontier is the next list"
         );
-        let needed = json!({ "journey": JOURNEY, "filters": ["decisions_needed"] });
-        let needed = agent.ok("list_nodes", needed).await;
-        assert_eq!(needed["total"], 0, "every decision that can be answered is");
+        let open = json!({ "journey": JOURNEY, "filters": ["open_decision"] });
+        let open = keys(&agent.ok("list_nodes", open).await["items"]);
+        let answers = scenario_answers();
+        assert!(
+            open.iter()
+                .all(|key| !answers.iter().any(|(answered, _)| answered == key)),
+            "every decision the scenario answers is answered"
+        );
     }
 
-    /// Reads the snapshot first, lists the decisions needed, and answers each in rank order
-    /// with the scenario's answer; the journey's revision after.
+    /// Reads the snapshot first, lists the open decisions, and answers each the scenario has an
+    /// answer for, in rank order; the journey's revision after.
     async fn answer_what_is_needed(agent: &Agent) -> u64 {
         let snapshot = json!({ "journey": JOURNEY });
         let snapshot = agent.ok("get_snapshot", snapshot).await;
@@ -385,13 +390,11 @@ mod mcp_in_process {
             snapshot["snapshot"]["counts"]["open_decisions"], open["total"],
             "the count is the filter's total"
         );
-        let open: Vec<String> = keys(&open["items"]);
-        let needed = json!({ "journey": JOURNEY, "filters": ["decisions_needed"] });
-        let needed = keys(&agent.ok("list_nodes", needed).await["items"]);
-        let ranked: Vec<&String> = open.iter().filter(|key| needed.contains(key)).collect();
-        assert_eq!(ranked, needed.iter().collect::<Vec<_>>(), "in rank order");
-
         let answers = scenario_answers();
+        let needed: Vec<String> = keys(&open["items"])
+            .into_iter()
+            .filter(|key| answers.iter().any(|(answered, _)| answered == key))
+            .collect();
         let mut revision = snapshot["revision"].as_u64().unwrap();
         for decision in &needed {
             let (_, value) = answers.iter().find(|(key, _)| key == decision).unwrap();

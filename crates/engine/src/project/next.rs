@@ -250,7 +250,6 @@ impl<'a> DerivedJourney<'a> {
             ListFlag::Mine => !self.kinds_held(key, viewer).is_empty(),
             ListFlag::Unassigned => derived.is_unassigned(self.graph, key),
             ListFlag::NextUp => next_up.contains(key),
-            ListFlag::DecisionsNeeded => blocking.decision_needed(self.node(key).kind(), key),
             ListFlag::OpenDecision => self.open_decision(key),
             ListFlag::NeedsBreakdown => blocking.needs_breakdown(key),
             ListFlag::Active => self.state(key) == State::Active,
