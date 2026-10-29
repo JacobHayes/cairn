@@ -11,6 +11,7 @@
 
 #![forbid(unsafe_code)]
 
+mod context;
 pub mod conversation;
 pub mod limits;
 pub mod protocol;

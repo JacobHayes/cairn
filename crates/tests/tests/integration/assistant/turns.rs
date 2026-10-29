@@ -436,6 +436,51 @@ async fn a_turn_ends_at_its_iteration_and_duration_limits() {
     );
 }
 
+/// I5: a turn opens with its journey's essentials only; the assistant's own tools are what
+/// reach a node's details, and the context states the journey's counts and revision.
+#[tokio::test]
+async fn a_turn_opens_with_essentials_and_nodes_are_read_with_tools() {
+    let world = World::new();
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    let read = world
+        .ok(&lead, "get_snapshot", json!({ "journey": "j_vendor_eval" }))
+        .await;
+    let snapshot = &read["snapshot"];
+    let node = snapshot["acting_frontier"][0]["key"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    world.script([
+        Step::call(
+            "get_node",
+            json!({ "journey": "j_vendor_eval", "node": node }),
+        ),
+        Step::say("Read it."),
+    ]);
+    let turn = world.turn(&lead, &vendor_target(), "What is next?").await;
+    assert_eq!(turn.ended, Ended::Replied);
+
+    let exchanges = world.provider.exchanges();
+    let Message::User { text: context } = &exchanges[0].messages[0] else {
+        panic!("{:?}", exchanges[0].messages);
+    };
+    assert!(
+        !context.contains(&node),
+        "the frontier is not in the context: {context}"
+    );
+    assert!(context.contains(snapshot["journey"]["name"].as_str().unwrap()));
+    assert!(context.contains(&format!("\"revision\":{}", read["revision"])));
+    assert!(context.contains("\"in_scope\""));
+
+    let results = results_of(&exchanges[1].messages);
+    assert!(
+        results[0].content.contains(&node) && !results[0].is_error,
+        "get_node answers with the node: {}",
+        results[0].content
+    );
+}
+
 /// PRACTICES, Explicit limits: past the turns in flight, a turn is refused at once.
 #[tokio::test(start_paused = true)]
 async fn turns_past_the_in_flight_limit_are_refused() {
@@ -1057,7 +1102,7 @@ async fn provider_usage_and_refusals_are_counted() {
     assert!(has("provider_failed", "4xx"), "{ended:?}");
 }
 
-/// I4: the system prompt names every workflow with what it is for and leaves its steps to
+/// I4: the system prompt names every workflow once, through the guide, and leaves its steps to
 /// `get_workflow`, the same text on every request so a provider can cache it.
 #[tokio::test]
 async fn the_system_prompt_names_every_workflow_and_stays_the_same() {
@@ -1073,8 +1118,7 @@ async fn the_system_prompt_names_every_workflow_and_stays_the_same() {
     };
     assert_eq!(first.system, second.system);
     for workflow in cairn_mcp::instructions::workflows() {
-        let named = format!("{}: {}", workflow.name, workflow.description);
-        assert!(first.system.contains(&named), "{named}");
+        assert!(first.system.contains(workflow.name), "{}", workflow.name);
         assert!(!first.system.contains(workflow.text), "{}", workflow.name);
     }
 }

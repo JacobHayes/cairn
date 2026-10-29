@@ -11,8 +11,8 @@ use std::time::Duration;
 
 use cairn_auth::Clock;
 use cairn_mcp::{ToolError, ToolSet, instructions};
-use cairn_schema::{Actor, AgentId, ChangeClass, ConversationId, Markdown};
-use cairn_service::Service;
+use cairn_schema::{Actor, AgentId, ChangeClass, ConversationId, Markdown, SnapshotScope};
+use cairn_service::{Call, ReadError, Service};
 use cairn_store::{ConversationMessage, ConversationRecord, MessageAuthor, Store};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -20,6 +20,7 @@ use serde_json::{Value, json};
 use tokio::sync::Semaphore;
 use tokio::time::Instant;
 
+use crate::context::{JourneyEssentials, RouteDraftEssentials};
 use crate::conversation::{self, Target};
 use crate::limits::{
     DIALOGUE_REPLAY_BYTES_MAX, PROVIDER_CALL_DURATION_MAX, TOOL_CALL_COUNT_PER_REPLY_MAX,
@@ -140,6 +141,7 @@ impl std::error::Error for TurnError {}
 #[derive(Clone)]
 pub struct Assistant {
     tools: ToolSet,
+    service: Service,
     store: Arc<dyn Store>,
     provider: Arc<dyn Provider>,
     clock: Clock,
@@ -160,7 +162,8 @@ impl Assistant {
         provider: Arc<dyn Provider>,
     ) -> Self {
         Self {
-            tools: ToolSet::new(service, clock.clone()),
+            tools: ToolSet::new(service.clone(), clock.clone()),
+            service,
             store,
             provider,
             clock,
@@ -457,33 +460,44 @@ impl Assistant {
         }
     }
 
-    /// The turn's context (I5: the assistant reads its target): the journey's snapshot (I3),
-    /// or the route's draft, read as the user.
+    /// The turn's context (I5: the assistant reads its target): the essentials of the
+    /// journey's snapshot (I3), or of the route's draft, read as the user. Anything more is
+    /// the assistant's to read with its tools.
     async fn context(&self, user: &Actor, target: &Target) -> Result<(Value, bool), TurnError> {
-        let read = match target {
+        let call = Call {
+            actor: user.clone(),
+            now: self.clock.now(),
+        };
+        let essentials = match target {
             Target::Journey(journey) => {
-                self.tools
-                    .call(user, "get_snapshot", json!({ "journey": journey }))
-                    .await
+                let read = self
+                    .service
+                    .snapshot(&call, journey, &SnapshotScope::default())
+                    .await;
+                match read {
+                    Ok(read) => serde_json::to_value(JourneyEssentials::of(journey, read)),
+                    Err(ReadError::JourneyMissing(_)) => {
+                        return Err(TurnError::TargetMissing(target.clone()));
+                    }
+                    Err(error) => return Err(TurnError::Failed(format!("{error:?}"))),
+                }
             }
             Target::RouteDraft(route) => {
-                self.tools
-                    .call(user, "get_route", json!({ "route": route }))
-                    .await
+                let read = self.service.route(route).await;
+                match read {
+                    Ok(Some(read)) => serde_json::to_value(RouteDraftEssentials::of(read)),
+                    // A route authored in conversation may not exist yet, or have no draft
+                    // open: its first proposal creates them (A12).
+                    Ok(None) => {
+                        let message = format!("route {route} not found");
+                        return Ok((json!({ "not_found": message }), false));
+                    }
+                    Err(error) => return Err(TurnError::Failed(error.to_string())),
+                }
             }
         };
-        match (read, target) {
-            (Ok(context), _) => Ok((context, true)),
-            (Err(ToolError::NotFound { .. }), Target::Journey(_)) => {
-                Err(TurnError::TargetMissing(target.clone()))
-            }
-            // A route authored in conversation may not exist yet, or have no draft open: its
-            // first proposal creates them (A12).
-            (Err(ToolError::NotFound { message }), Target::RouteDraft(_)) => {
-                Ok((json!({ "not_found": message }), false))
-            }
-            (Err(error), _) => Err(TurnError::Failed(error.to_string())),
-        }
+        let essentials = essentials.map_err(|error| TurnError::Failed(error.to_string()))?;
+        Ok((essentials, true))
     }
 }
 
@@ -520,7 +534,7 @@ fn tool_specs() -> Vec<ToolSpec> {
 }
 
 /// The system prompt, the same on every request (so a provider can cache it): the write
-/// policy, the shipped guide, and the workflows by name and purpose, each read with
+/// policy, and the shipped guide, which lists the workflows, each read with
 /// `get_workflow` when its job comes up (I4, I5: the same instructions as external agents).
 /// Who the assistant works for and on what, and the target as read, are [`turn_context`],
 /// which goes after it.
@@ -549,13 +563,9 @@ fn system() -> String {
     }
     let _ = write!(
         prompt,
-        "\n# Guide\n\n{guide}\n\n# Workflows\n\nBefore a job one of these covers, read \
-         it with get_workflow:\n\n",
+        "\n# Guide\n\n{guide}\n",
         guide = instructions::guide()
     );
-    for workflow in instructions::workflows() {
-        let _ = writeln!(prompt, "- {}: {}", workflow.name, workflow.description);
-    }
     prompt
 }
 
@@ -563,8 +573,10 @@ fn system() -> String {
 /// target as read at the start of the turn. It leads the turn's user message.
 fn turn_context(user: &Actor, target: &Target, context: &Value) -> String {
     format!(
-        "# Context\n\nYou are working for user {user} on {target}, as read at the start of \
-         this turn:\n\n```json\n{context}\n```\n\n# Message\n\n",
+        "# Context\n\nYou are working for user {user} on {target}. Its essentials as read at \
+         the start of this turn follow. Everything else (the ranked frontier, open \
+         decisions, a node's detail, a draft's nodes) you read with your tools, \
+         get_snapshot, list_nodes, get_node and get_route, when the message needs it:\n\n```json\n{context}\n```\n\n# Message\n\n",
         user = user.user,
     )
 }
