@@ -11,7 +11,7 @@
 import { assign, enqueueActions, fromPromise, setup } from "xstate";
 
 import { aboutOf, deliverWrite, type EditsRef } from "../data/edit-manager.ts";
-import type { Answer, Command } from "../data/edit-record.ts";
+import type { Answer, Command } from "../data/edit-command.ts";
 import type { IdentityReferences } from "../data/host.ts";
 import { currentAddress } from "../data/session.ts";
 import { newPatchId, patchOf } from "../data/writes.ts";

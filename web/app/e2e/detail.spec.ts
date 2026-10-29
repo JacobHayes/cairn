@@ -1,6 +1,6 @@
 // The inspector's one write path that no unit test reaches, over the
 // in-browser host (each page load seeds the fixtures afresh): a date pin the chain rejects
-// (F5), with the rejection and an unsent bypass reason surviving a reload (D4), counted by the
+// (F5), with the rejection and an unsent bypass reason (D4), counted by the
 // sync chip wherever you go, and resolved with a listed move. A node's actions hold one open
 // form, which a reload brings back (D1, B6). The inspector's sections, forms and offers are
 // vitest's.
@@ -16,36 +16,29 @@ import { fresh, goTo, goWithin, menuItem, nodeCard, nodePanel, openAt, openFromC
 
 async function discardClearsRejection(page: Page) {
   const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
-  // Discard on the chip clears a section's rejection on its screen, and it does not come back after a reload.
+  // Discard on the chip clears a section's rejection on its screen.
   await pin(panel, "2026-11-25");
   await expect(panel.getByTestId("date-conflict")).toBeVisible();
   await syncChip(page).click();
   await page.getByTestId("sync-popover").getByTestId("sync-problem").getByRole("button", { name: "Discard" }).click();
   await expect(panel.getByTestId("date-conflict")).toHaveCount(0);
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
-  await page.reload();
-  await expect(page.getByTestId("node-detail")).toBeVisible();
-  await expect(page.getByTestId("date-conflict")).toHaveCount(0);
-  await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
   await checkpoint(page);
 }
 
-async function rejectionSurvivesAndResolves(page: Page) {
-  let panel = page.getByTestId("node-detail");
+async function rejectionStaysAndResolves(page: Page) {
+  const panel = page.getByTestId("node-detail");
   await pin(panel, "2026-11-25");
-  let conflict = panel.getByTestId("date-conflict");
+  const conflict = panel.getByTestId("date-conflict");
   await expect(conflict).toBeVisible();
   await conflict.getByText("Why it is short").click();
   await expect(conflict.getByTestId("chain")).toBeVisible();
   await expect(syncChip(page)).toHaveAttribute("data-state", "not-saved");
   await expect(panel.locator('[data-testid="date"][data-label="Due"]')).toContainText("Nov 2");
-  // The rejection and a reason typed meanwhile are kept per tab, so a reload loses neither.
+  // A reason typed meanwhile does not clear the rejection.
   await menuItem(panel, "skip");
   const reason = fresh("Covered elsewhere");
   await panel.getByTestId("skip-form").getByLabel("Why skip it").fill(reason);
-  await page.reload();
-  panel = page.getByTestId("node-detail");
-  conflict = panel.getByTestId("date-conflict");
   await expect(conflict).toBeVisible();
   await expect(panel.getByTestId("skip-form").getByLabel("Why skip it")).toHaveValue(reason);
   // Away from the control it is still counted, and Go to it comes back to it.
@@ -117,10 +110,10 @@ async function markDoneKeepsTypedText(page: Page) {
   await expect(docs.getByLabel("Artifact link")).toHaveValue(typed);
 }
 
-test("a later pin is rejected with its chain, kept across a reload and counted away from it, discarded or resolved with a listed move (F5); a node's actions hold one open form; its history says who did what", async ({ page }) => {
+test("a later pin is rejected with its chain, counted away from it, discarded or resolved with a listed move (F5); a node's actions hold one open form; its history says who did what", async ({ page }) => {
   await readable(page);
   await discardClearsRejection(page);
-  await rejectionSurvivesAndResolves(page);
+  await rejectionStaysAndResolves(page);
   await oneOpenFormSurvivesReload(page);
   await historyNamesWhoDidWhat(page);
   await markDoneKeepsTypedText(page);

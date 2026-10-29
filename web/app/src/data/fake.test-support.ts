@@ -8,7 +8,7 @@ import { SimulatedClock } from "xstate";
 import type { KeptTurn } from "../assistant/model.ts";
 import type { KeptTurns } from "../assistant/conversation.ts";
 import type { AssistantHost } from "./assistant.ts";
-import type { Answer, Command } from "./edit-record.ts";
+import type { Answer, Command } from "./edit-command.ts";
 import type { Domain, ProposalHost, ProposalWritten } from "./proposals.ts";
 import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Caller, type AgentTokenHost, type Tour, type TourWrite, type TourWriteRequest } from "./host.ts";
 import { browserTour } from "./browser-tour.ts";

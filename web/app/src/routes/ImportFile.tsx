@@ -4,7 +4,7 @@
 // another draft is open the import is refused, with the option to discard that draft. The
 // reading, the discarding and the importing are a workflow (import.ts) over the edit manager's
 // writes: the control reads its writes by its edit key, so a refusal stays with its file across
-// leaving the screen and a reload.
+// leaving the screen.
 import { useActorRef, useSelector } from "@xstate/react";
 import type { ActorRefFrom } from "xstate";
 import { useCallback, useEffect } from "react";
@@ -76,14 +76,14 @@ export function ImportFile({ edit, label = "Import a route file", onImported }: 
   return <ImportControl flow={flow} edit={edit} label={label} />;
 }
 
-/** The control over `flow`: the file chooser, the refusal that stays with its file across a reload, and the discard's state; `menu` draws the chooser as one of a menu's items. */
+/** The control over `flow`: the file chooser, the refusal that stays with its file, and the discard's state; `menu` draws the chooser as one of a menu's items. */
 export function ImportControl({ flow, edit, label = "Import a route file", menu = false }: { flow: ImportFlow; edit: string; label?: string; menu?: boolean }) {
   const skew = useSkew();
   const working = useSelector(flow, (snapshot) => snapshot.hasTag("busy"));
   const unreadable = useSelector(flow, (snapshot) => snapshot.context.unreadable);
   const importing = useEdit(edit);
   const discarding = useEdit(`${edit}:discard`);
-  // The file lives in the refused import write, so importing over the open draft works after a reload.
+  // The file lives in the refused import write, so importing over the open draft works after leaving the screen.
   const refused = importing.rejection === undefined || importing.write?.command.kind !== "import" ? undefined : importing.write.command.request.file;
   return (
     <div className="stack" data-testid="import">

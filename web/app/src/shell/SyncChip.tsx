@@ -171,7 +171,7 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
         ) : null}
         {skew && (
           <p className="stack" data-testid="sync-skew">
-            <span>Cairn was updated. Reload to keep saving; your unsent edits are kept.</span>
+            <span>Cairn was updated. Reload to keep saving.</span>
             <span className="row">
               <Button
                 primary

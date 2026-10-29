@@ -8,8 +8,7 @@ import { createActor, waitFor, type ActorOptions, type Subscription } from "xsta
 
 import { draftTurns } from "../assistant/conversation.ts";
 import type { TitleOf } from "./activity.ts";
-import type { EditsRef } from "./edit-manager.ts";
-import { tabEditStore, type EditStore } from "./edit-record.ts";
+import { pendingOf, type EditsRef } from "./edit-manager.ts";
 import type { Capabilities, Deriver, Host } from "./host.ts";
 import { People } from "./people.ts";
 import { journeyView, lagOf, type JourneysRef } from "./journeys.ts";
@@ -34,7 +33,6 @@ import {
 } from "./session-root.ts";
 import { todayIn } from "./today.ts";
 
-import { plural } from "../ui/words.ts";
 import { nodeTitle } from "../ui/gone.ts";
 
 /** The clock the session root's delays run on. */
@@ -49,8 +47,6 @@ export interface SessionParts {
   monotonic?: () => number;
   /** The clock the session root's delays run on (a test passes a simulated one). */
   clock?: Clock;
-  /** Where the tab keeps its edit records. */
-  store?: EditStore;
 }
 
 /** The page, when there is one: the unit tests run without a window, so no online or offline events. */
@@ -96,6 +92,12 @@ export class Session {
   readonly #wake = (): void => {
     this.root.send({ type: "wake" });
   };
+  /** Leaving the tab while a write is busy asks the browser's own question; nothing is said in the app. */
+  readonly #leaving = (event: BeforeUnloadEvent): void => {
+    if (pendingOf(this.edits.getSnapshot().context.writes)) {
+      event.preventDefault();
+    }
+  };
   readonly #unsubscribe: (() => void)[] = [];
 
   private constructor(parts: SessionParts, capabilities: Capabilities) {
@@ -116,8 +118,6 @@ export class Session {
     this.toasts = toastsOf(this.root);
     this.conversations = conversationsOf(this.root);
     this.#feedSync();
-    // Last: the kept edits start on the running root, and the chip and the stream are already listening.
-    this.root.send({ type: "restore" });
   }
 
   /** Starts a session over `parts.host`: its capabilities and deployment context first. */
@@ -155,6 +155,7 @@ export class Session {
     }
     page?.removeEventListener("online", this.#wake);
     page?.removeEventListener("offline", this.#wake);
+    page?.removeEventListener("beforeunload", this.#leaving);
   }
 
   /**
@@ -178,7 +179,6 @@ export class Session {
         now: this.#monotonic,
         conversations: { assistant: parts.host.assistant, turns: draftTurns },
         edits: {
-          store: parts.store ?? tabEditStore(),
           env: {
             host: parts.host,
             began: this.begin,
@@ -188,14 +188,6 @@ export class Session {
               }
             },
             connected: () => (page?.navigator.onLine ?? true) && streamStatus(this.subscription.getSnapshot()) === "live",
-          },
-          notes: {
-            dropped: (count) => {
-              this.toasts.send({ type: "show", text: `${plural(count, "unsent edit")} from an earlier version of Cairn could not be kept.`, tone: "problem" });
-            },
-            unstored: () => {
-              this.toasts.send({ type: "show", text: "Your unsent edits are kept only until reload: this tab cannot store them.", tone: "problem" });
-            },
           },
         },
       },
@@ -250,5 +242,6 @@ export class Session {
     });
     page?.addEventListener("online", this.#wake);
     page?.addEventListener("offline", this.#wake);
+    page?.addEventListener("beforeunload", this.#leaving);
   }
 }

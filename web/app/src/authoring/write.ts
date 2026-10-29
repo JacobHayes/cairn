@@ -9,7 +9,7 @@
 import type { Schema } from "@cairn/client";
 import { HostFailure } from "@cairn/wasm";
 
-import type { Command } from "../data/edit-record.ts";
+import type { Command } from "../data/edit-command.ts";
 import { unansweredOf } from "../data/edit-manager.ts";
 import type { Deriver, Host } from "../data/host.ts";
 import { Skewed } from "../data/host.ts";

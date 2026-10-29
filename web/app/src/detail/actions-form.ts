@@ -17,7 +17,7 @@ import { assign, fromCallback, setup, type EventObject, type SnapshotFrom } from
 
 import type { EvidenceDraft } from "../acting/acts.ts";
 import { readDraft, writeDraft } from "../data/drafts.ts";
-import type { OperationId } from "../data/edit-record.ts";
+import type { OperationId } from "../data/edit-command.ts";
 import type { EditsRef } from "../data/session-root.ts";
 import { UNTIL_OPTIONS, type SnoozeDraft } from "./snooze.ts";
 import type { Seen } from "./write.ts";
@@ -181,7 +181,7 @@ export function changing<K extends FormCase>(kind: K, value: FormValues[K]): Act
 
 /**
  * Reports when the write `id` ends. A write the manager does not hold ended while the form was
- * away (a reload, another screen), or its record was dropped on restore: its end is `unknown`.
+ * away (a reload, another screen): its end is `unknown`.
  * Only a write's own end counts: a write the manager replaces by a resubmit is stopped, which
  * is not an end, and the control tells the form with `resent`.
  */

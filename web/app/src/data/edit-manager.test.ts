@@ -1,13 +1,12 @@
 // H5, H6: every write the tab sends is owned by the edit manager by its patch id, so writes
 // from different views meet only through H5: one busy write per edit, an unrelated save leaves
-// another write's problem alone, and a rejection waits to be dealt with across a reload.
+// another write's problem alone, and a rejection waits to be dealt with.
 import type { Answered, HttpFailure, Rejection } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
 import { aboutNode, renaming, startRoot } from "./edits.test-support.ts";
-import { inFlightOf, problemsOf, submitWrite, unansweredOf, unlandedWords, type Sent } from "./edit-manager.ts";
-import { EDIT_RECORD_VERSION, type EditRecord } from "./edit-record.ts";
-import { CountingClock, FakeHost, deferred, memoryStorage, settled } from "./fake.test-support.ts";
+import { inFlightOf, pendingOf, problemsOf, submitWrite, unansweredOf, unlandedWords, type Sent } from "./edit-manager.ts";
+import { CountingClock, FakeHost, deferred, settled } from "./fake.test-support.ts";
 import { RESEND_COUNT_MAX, writeView, type WriteSnapshot } from "./write-machine.ts";
 import { patchOf } from "./writes.ts";
 
@@ -37,7 +36,7 @@ describe("one busy write per edit", () => {
   });
 
   it("lets a new submit replace a write that was refused, and keeps none of the old", async () => {
-    const { host, storage, submit, writes } = await startRoot();
+    const { host, submit, writes } = await startRoot();
     host.answers = [refusal(invalid), applied];
     submit(renaming("p_old"));
     await settled();
@@ -46,7 +45,6 @@ describe("one busy write per edit", () => {
     await settled();
     expect(host.sent.map((patch) => patch.id)).toEqual(["p_old", "p_new"]);
     expect(writes()).toEqual({});
-    expect(storage.length).toBe(0);
   });
 });
 
@@ -76,7 +74,7 @@ describe("a write with no answer", () => {
   });
 });
 
-describe("a rejection that arrives after the control is gone, then a reload", () => {
+describe("a rejection that arrives after the control is gone", () => {
   it("waits on the chip with its label and address, and is dropped for good by Discard", async () => {
     const held = deferred<Answered<HttpFailure>>();
     const first = await startRoot();
@@ -86,17 +84,13 @@ describe("a rejection that arrives after the control is gone, then a reload", ()
     // The control is long gone by the time the answer comes.
     held.resolve(refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [], touched: [] }));
     await settled();
-    first.root.stop();
-
-    const second = await startRoot({ storage: first.storage });
-    expect(problemsOf(second.writes(), false)).toEqual([
+    expect(problemsOf(first.writes(), false)).toEqual([
       { id: "p_a", kind: "rejected", message: expect.stringMatching(/deleted/) as string, label: "Step n_a", address: undefined, retry: false },
     ]);
-    expect(second.host.sent).toEqual([]);
-    second.edits.send({ type: "discard", id: "p_a" });
+    expect(first.host.sent).toHaveLength(1);
+    first.edits.send({ type: "discard", id: "p_a" });
     await settled();
-    expect(problemsOf(second.writes(), false)).toEqual([]);
-    expect(first.storage.length).toBe(0);
+    expect(problemsOf(first.writes(), false)).toEqual([]);
   });
 
   it("keeps a stale rejection with where it happened, as a conflict", async () => {
@@ -105,98 +99,9 @@ describe("a rejection that arrives after the control is gone, then a reload", ()
     first.host.answers = [refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 4 }], intervening: [], touched: [] })];
     first.submit(renaming("p_a"));
     await settled();
-    first.root.stop();
-    const second = await startRoot({ storage: first.storage });
-    expect(problemsOf(second.writes(), false)).toEqual([
+    expect(problemsOf(first.writes(), false)).toEqual([
       expect.objectContaining({ id: "p_a", kind: "conflict", label: "Step n_a", address: "/journeys/j_one/n_a", retry: false }),
     ]);
-  });
-});
-
-describe("the kept records", () => {
-  const stored = (id: string): EditRecord => ({
-    version: EDIT_RECORD_VERSION,
-    id,
-    command: { kind: "patch", patch: renaming(id) },
-    about: aboutNode(),
-    delivery: { state: "rejected", rejection: invalid },
-  });
-
-  it("are dropped with one note when they are of another version, and nothing is started from them", async () => {
-    const storage = memoryStorage();
-    storage.setItem("cairn:edit:p_old", JSON.stringify({ ...stored("p_old"), version: EDIT_RECORD_VERSION + 1 }));
-    const { notes, writes, host } = await startRoot({ storage });
-    expect(notes.dropped).toEqual([1]);
-    expect(writes()).toEqual({});
-    expect(host.sent).toEqual([]);
-    expect(storage.length).toBe(0);
-  });
-
-  it("make the tab say once that edits are kept only until reload when storage refuses them", async () => {
-    const refusing = Object.assign(memoryStorage(), {
-      setItem: () => {
-        throw new DOMException("full", "QuotaExceededError");
-      },
-    });
-    const { notes, host, submit } = await startRoot({ storage: refusing });
-    host.answers = [refusal(invalid), refusal(invalid)];
-    submit(renaming("p_a", "n_a"), aboutNode("n_a"));
-    submit(renaming("p_b", "n_b"), aboutNode("n_b"));
-    await settled();
-    expect(notes.unstored).toBe(1);
-  });
-
-  it("are not written back by a snapshot a write relays after it was discarded", async () => {
-    const { host, storage, edits, submit, writes } = await startRoot();
-    host.answers = [refusal(invalid)];
-    submit(renaming("p_a"));
-    await settled();
-    const relayed: WriteSnapshot = writes().p_a?.snapshot as WriteSnapshot;
-    expect(storage.length).toBe(1);
-    edits.send({ type: "discard", id: "p_a" });
-    await settled();
-    expect(storage.length).toBe(0);
-    edits.send({ type: "xstate.snapshot.p_a", snapshot: relayed });
-    await settled();
-    expect(storage.length).toBe(0);
-    expect(writes()).toEqual({});
-  });
-
-  it("are put back once, however often restore is asked", async () => {
-    const storage = memoryStorage();
-    storage.setItem("cairn:edit:p_a", JSON.stringify(stored("p_a")));
-    const { edits, root, writes } = await startRoot({ storage });
-    expect(Object.keys(writes())).toEqual(["p_a"]);
-    const before = writes().p_a;
-    root.send({ type: "restore" });
-    edits.send({ type: "restore" });
-    await settled();
-    expect(writes().p_a).toBe(before);
-  });
-});
-
-describe("storage that refuses a record a write relays", () => {
-  it("say so once when storage refuses a record a write relays after it accepted the first", async () => {
-    let refusing = false;
-    const base = memoryStorage();
-    const keep = base.setItem.bind(base);
-    const flaky = Object.assign(base, {
-      setItem: (key: string, value: string) => {
-        if (refusing) {
-          throw new DOMException("full", "QuotaExceededError");
-        }
-        keep(key, value);
-      },
-    });
-    const { notes, host, submit } = await startRoot({ storage: flaky });
-    host.answers = [refusal(invalid), refusal(invalid)];
-    submit(renaming("p_a", "n_a"), aboutNode("n_a"));
-    refusing = true;
-    await settled();
-    expect(notes.unstored).toBe(1);
-    submit(renaming("p_b", "n_b"), aboutNode("n_b"));
-    await settled();
-    expect(notes.unstored).toBe(1);
   });
 });
 
@@ -214,8 +119,8 @@ describe("what the chip says of a write", () => {
     expect(words({ ...base, state: "gone", removed: { node: "n_a" } })).toEqual(["rejected", false]);
     expect(words({ ...base, state: "stopped", failure: undefined }, true)).toEqual(["failed", true]);
     expect(words({ ...base, state: "stopped", failure: { status: 401, message: "sign in" } })).toEqual(["failed", true]);
-    expect(words({ ...base, state: "unconfirmed", failure: undefined, retrying: false })).toEqual(["failed", true]);
-    expect(words({ ...base, state: "unconfirmed", failure: undefined, retrying: true })).toBeUndefined();
+    expect(words({ ...base, state: "unconfirmed", failure: { status: 0, message: "down" }, retrying: false })).toEqual(["failed", true]);
+    expect(words({ ...base, state: "unconfirmed", failure: { status: 0, message: "down" }, retrying: true })).toBeUndefined();
     expect(words({ ...base, state: "sending" })).toBeUndefined();
   });
 
@@ -239,24 +144,6 @@ describe("what the chip says of a write", () => {
   });
 });
 
-describe("a new write's record", () => {
-  it("is kept by the time its request goes out", async () => {
-    const { host, storage, submit } = await startRoot();
-    const kept: string[][] = [];
-    const answer = deferred<Answered<HttpFailure>>();
-    host.answers = [answer.promise];
-    const send = host.send.bind(host);
-    host.send = (patch, ...rest) => {
-      kept.push(Array.from({ length: storage.length }, (_, at) => storage.key(at) ?? ""));
-      return send(patch, ...rest);
-    };
-    submit(renaming("p_a"));
-    await settled();
-    expect(kept).toEqual([["cairn:edit:p_a"]]);
-    answer.resolve(applied);
-  });
-});
-
 /** The write of `patch`, as a workflow or a control sends it. */
 const sentOf = (patch: ReturnType<typeof renaming>, about = aboutNode(), check?: Sent["check"]): Sent => ({
   id: patch.id,
@@ -273,11 +160,10 @@ describe("waiting on a write", () => {
   });
 
   it("is answered none for a rejection, which the manager keeps for the person", async () => {
-    const { host, edits, writes, storage } = await startRoot();
+    const { host, edits, writes } = await startRoot();
     host.answers = [refusal(invalid)];
     expect(await submitWrite(edits, sentOf(renaming("p_a")))).toBeUndefined();
     expect(Object.keys(writes())).toEqual(["p_a"]);
-    expect(storage.length).toBe(1);
   });
 
   it("is answered none, without sending, when another write of the edit is out", async () => {
@@ -361,17 +247,15 @@ describe("a check before the write is sent", () => {
     expect(host.sent.map((patch) => patch.id)).toEqual(["p_old"]);
   });
 
-  it("is kept across a reload as the rejection, and a new root does not run it or send the write", async () => {
+  it("is kept as the rejection, and the write is not sent", async () => {
     const first = await startRoot();
     await submitWrite(first.edits, sentOf(renaming("p_a"), aboutNode(), () => Promise.resolve(invalid)));
-    first.root.stop();
-    const second = await startRoot({ storage: first.storage });
-    expect(problemsOf(second.writes(), false)).toEqual([expect.objectContaining({ id: "p_a", kind: "rejected", label: "Step n_a" })]);
-    expect(second.host.sent).toEqual([]);
+    expect(problemsOf(first.writes(), false)).toEqual([expect.objectContaining({ id: "p_a", kind: "rejected", label: "Step n_a" })]);
+    expect(first.host.sent).toEqual([]);
   });
 });
 
-describe("the kept writes of the other kinds", () => {
+describe("the writes of the other kinds", () => {
   const apply = (id: string): Sent => ({
     id,
     command: { kind: "proposal", call: { op: "apply", destination: { journey: "j_one" }, proposal: "pr_one", request: { patch_id: id, reviewed_revision: 4 } } },
@@ -383,34 +267,42 @@ describe("the kept writes of the other kinds", () => {
     about: { edit: "import:new-route", label: "One.yaml" },
   };
 
-  it("hold a rejected proposal or import across a reload, with the command it tried, and send neither again", async () => {
+  it("hold a rejected proposal or import with the command it tried", async () => {
     const first = await startRoot();
     first.host.proposed = [{ outcome: "rejected", rejection: invalid }];
     first.host.imports = [refusal(invalid)];
     await submitWrite(first.edits, apply("p_a"));
     await submitWrite(first.edits, upload);
-    first.root.stop();
-    const second = await startRoot({ storage: first.storage });
-    expect(problemsOf(second.writes(), false).map((problem) => [problem.id, problem.kind])).toEqual([["p_a", "rejected"], ["p_i", "rejected"]]);
-    expect(second.writes().p_i?.snapshot.context.command).toEqual(upload.command);
-    expect(second.writes().p_a?.snapshot.context.command).toEqual(apply("p_a").command);
-    expect(second.host.called).toEqual([]);
-    expect(second.host.imported).toEqual([]);
+    expect(problemsOf(first.writes(), false).map((problem) => [problem.id, problem.kind])).toEqual([["p_a", "rejected"], ["p_i", "rejected"]]);
+    expect(first.writes().p_i?.snapshot.context.command).toEqual(upload.command);
+    expect(first.writes().p_a?.snapshot.context.command).toEqual(apply("p_a").command);
   });
 
-  it("resend a proposal write that was out when the tab went, as the same request, and discard its record when it lands", async () => {
-    const first = await startRoot();
-    first.host.proposed = [deferred<never>().promise];
-    void submitWrite(first.edits, apply("p_a"));
+});
+
+describe("whether leaving the tab should ask", () => {
+  it("holds while a write is out or may have committed, and not once everything is answered", async () => {
+    const { host, submit, advance, writes } = await startRoot();
+    expect(pendingOf(writes())).toBe(false);
+    const held = deferred<Answered<HttpFailure>>();
+    host.answers = [held.promise];
+    submit(renaming("p_a", "n_a"), aboutNode("n_a"));
     await settled();
-    first.root.stop();
-    // The restored write resends as the root starts, so the new host is scripted first.
-    const host = new FakeHost();
-    host.proposed = [{ outcome: "answered", answer: { outcome: "already_saved" } as never }];
-    const second = await startRoot({ storage: first.storage, host });
-    expect(second.host.called).toEqual(["apply"]);
-    expect(second.writes()).toEqual({});
-    expect(second.storage.length).toBe(0);
+    expect(pendingOf(writes())).toBe(true);
+    held.resolve(lost);
+    await settled();
+    expect(pendingOf(writes())).toBe(true);
+    host.answers = [applied];
+    await advance(15_000);
+    expect(pendingOf(writes())).toBe(false);
+  });
+
+  it("does not hold for a write known not to have committed", async () => {
+    const { host, submit, writes } = await startRoot();
+    host.answers = [refusal(invalid)];
+    submit(renaming("p_a"));
+    await settled();
+    expect(pendingOf(writes())).toBe(false);
   });
 });
 

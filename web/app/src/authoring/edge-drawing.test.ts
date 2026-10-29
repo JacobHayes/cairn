@@ -409,7 +409,6 @@ describe("version skew (H5)", () => {
     const id = d.sentId();
     expect(d.view()).toMatchObject({ state: "choosing", sent: { to: "n_c" } });
     expect(writeView(d.writes()[id]?.snapshot ?? failed("gone"))).toMatchObject({ state: "stopped" });
-    expect(d.storage.length).toBe(1);
   });
 });
 

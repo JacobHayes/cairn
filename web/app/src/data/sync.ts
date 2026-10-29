@@ -153,7 +153,7 @@ export function syncWords(shown: SyncCase): SyncSummary {
     case "not-saved":
       return { state: "not-saved", label: `NOT SAVED · ${String(shown.count)}`, tone: "act", sentence: reason(shown.first), announce: "assertive" };
     case "new-version":
-      return { state: "new-version", label: "NEW VERSION · RELOAD", tone: "wait", sentence: "Cairn was updated. Reload to keep saving. Your unsent edits are kept.", announce: "polite" };
+      return { state: "new-version", label: "NEW VERSION · RELOAD", tone: "wait", sentence: "Cairn was updated. Reload to keep saving.", announce: "polite" };
     case "offline":
       return { state: "offline", label: "OFFLINE", tone: "wait", sentence: "You are offline. Changes cannot be saved until you are back.", announce: "polite" };
     case "reconnecting":

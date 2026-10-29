@@ -6,7 +6,7 @@ import { createActor } from "xstate";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { aboutNode, renaming, startRoot, type StartOptions } from "../data/edits.test-support.ts";
-import { held as managerHolds, submitPatch } from "../data/edit-manager.ts";
+import { submitPatch } from "../data/edit-manager.ts";
 import { RESEND_COUNT_MAX } from "../data/write-machine.ts";
 import { deferred, memoryStorage, settled } from "../data/fake.test-support.ts";
 import { readDraft, writeDraft } from "../data/drafts.ts";
@@ -351,25 +351,6 @@ describe("a form restored after a reload", () => {
     expect(drafted(actor).sent).toBeUndefined();
     expect(drafted(actor).kept).toBeUndefined();
     expect(last()).toMatchObject({ case: "skip", version: 2 });
-  });
-
-  it("stays with the write a new root restored as rejected, and closes when it is discarded", async () => {
-    const first = await started();
-    first.host.answers = [Promise.resolve(refusal)];
-    first.actor.send({ type: "open", opened: opening("skip", "", SEEN) });
-    first.actor.send({ type: "change", case: "skip", value: "Waiting" });
-    first.submit("p_1");
-    await settled();
-    const kept = readOpened(JSON.parse(JSON.stringify(first.last())));
-    first.root.stop();
-
-    const second = await started({ storage: first.storage, restored: kept });
-    await settled();
-    expect(managerHolds(second.edits, "p_1")).toBe(true);
-    expect(formView(second.actor.getSnapshot())).toMatchObject({ state: "sending", sent: { id: "p_1" } });
-    second.edits.send({ type: "discard", id: "p_1" });
-    await settled();
-    expect(formView(second.actor.getSnapshot())).toEqual({ state: "closed" });
   });
 
   it("watches again when the form is stopped and started from its saved draft", async () => {

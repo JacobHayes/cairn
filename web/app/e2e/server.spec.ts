@@ -63,9 +63,8 @@ test("edits to different nodes both land, and edits to one field surface a confl
   await expect(syncChip(two)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
   await expect(renameOf(two, "n_onsite").getByRole("textbox")).toHaveValue(mine);
   await expect(title(one, "n_onsite")).toHaveText(theirs);
-  // What is typed after the conflict is kept across a reload.
+  // What is typed after the conflict stays.
   await renameOf(two, "n_onsite").getByRole("textbox").fill(later);
-  await two.reload();
   await expect(two.locator('[data-testid="refused"][data-rejection="stale"]')).toBeVisible();
   await expect(renameOf(two, "n_onsite").getByRole("textbox")).toHaveValue(later);
   await two.getByRole("button", { name: "Keep my edit on the current version" }).click();

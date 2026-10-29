@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { proposalAddress } from "../address.ts";
-import { destinationOf } from "../data/edit-record.ts";
+import { destinationOf } from "../data/edit-command.ts";
 import { breakdownMutations, PieceRows, type Piece } from "../authoring/StructureEditors.tsx";
 import { slugOf } from "../authoring/keys.ts";
 import { Picker } from "../authoring/parts.tsx";

@@ -1,10 +1,10 @@
 // Node detail's writes: each action one patch through the edit manager (the safe retry,
 // D7's consequences notice, nothing sent under version skew), drafted against the revision its
 // author saw. The write is the manager's, found again by the section's edit key: a rejection
-// waits there across a screen left and a reload, and the section shows it inline when it is on
+// waits there across a screen left, and the section shows it inline when it is on
 // screen (A15) and the sync chip counts it wherever the person is. Each section holds its own.
 import { useDraft } from "../data/drafts.ts";
-import type { Command, OperationId } from "../data/edit-record.ts";
+import type { Command, OperationId } from "../data/edit-command.ts";
 import { held } from "../data/edit-manager.ts";
 import { useSession, useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
@@ -95,7 +95,7 @@ export function attemptOf(command: Command, deployment: number): Attempt | undef
 /**
  * A section's write path for the journey `view` shows, as the edit `scope` (the section and
  * its node) names. Its writes are the edit manager's, so a rejection and the resolution being
- * chosen survive leaving the screen and a reload, and the sync chip counts it, named by
+ * chosen survive leaving the screen, and the sync chip counts it, named by
  * `node`'s title (the one the section is about), wherever the person is.
  */
 export function useNodeWrite(view: Ready, scope: string, node?: string): NodeWrite {

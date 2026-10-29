@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 
 import { consequenceLines, warningOf } from "./activity.ts";
-import type { Command } from "./edit-record.ts";
+import type { Command } from "./edit-command.ts";
 import { landedWarning, newPatchId, patchOf, saveOf, subjectOf, unlockedOf, type Mutation, type WriteIntent } from "./writes.ts";
 
 const intent: WriteIntent = {

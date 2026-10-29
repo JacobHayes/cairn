@@ -1,15 +1,15 @@
 // H5: a write is delivered once however many times it is sent, and resent with its patch id
 // until it is answered. The write's states, its resends (the backoff, the wait for the
-// connection, the limit, the restore), and what each answer makes of it (A18, A19).
+// connection, the limit), and what each answer makes of it (A18, A19).
 import { backoffDelayMs, type Answered, type HttpFailure, type Patch, type PatchAnswer, type Rejection } from "@cairn/client";
 import { HostFailure } from "@cairn/wasm";
 import { SimulatedClock, createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
-import type { Command, Delivery } from "./edit-record.ts";
+import type { Command } from "./edit-command.ts";
 import { hostFailure } from "./host-failure.ts";
 import { FakeHost, deferred, settled, writeEnv } from "./fake.test-support.ts";
-import { RESEND_COUNT_MAX, recordOf, writeMachine, writeView, type WriteView } from "./write-machine.ts";
+import { RESEND_COUNT_MAX, writeMachine, writeView, type WriteView } from "./write-machine.ts";
 import { patchOf } from "./writes.ts";
 
 const receipt = { patch_id: "p_x", domain: { journey: "j_one" }, content_hash: "h", revision: 4 };
@@ -26,13 +26,13 @@ const stale = (current: number): Answered<HttpFailure> => ({
 const patch: Patch = patchOf({ target: { journey: "j_one" }, baseRevision: 3, mutations: [{ op: "set_node_field", node: "n_a", value: { title: "Renamed" } }] }, "p_one");
 const about = { edit: "title:j_one:n_a", label: "Draft the plan", address: "/journeys/j_one/n_a" };
 
-/** A write over a fake host and a simulated clock, started with `restored` when given. */
-function setup(restored?: { delivery: Delivery }, answers: Answered<HttpFailure>[] = [], command: Command = { kind: "patch", patch }) {
+/** A write over a fake host and a simulated clock, . */
+function setup(answers: Answered<HttpFailure>[] = [], command: Command = { kind: "patch", patch }) {
   const host = new FakeHost();
   host.answers = answers;
   const { env, switches, saves } = writeEnv(host);
   const clock = new SimulatedClock();
-  const actor = createActor(writeMachine, { input: { id: patch.id, command, about, env, restored }, clock });
+  const actor = createActor(writeMachine, { input: { id: patch.id, command, about, env }, clock });
   actor.start();
   const view = (): WriteView => writeView(actor.getSnapshot());
   /** Advances the clock, then lets the answers that came back run. */
@@ -140,39 +140,6 @@ describe("a write waiting for the connection", () => {
   });
 });
 
-describe("a write restored after a reload", () => {
-  it("resends what may have committed at once, with the id and content it kept", async () => {
-    for (const delivery of [{ state: "sending" }, { state: "unconfirmed", failure: { status: 0, message: "down" } }] as const) {
-      const { host, view } = setup({ delivery }, [alreadyApplied]);
-      await settled();
-      expect(host.sent).toEqual([patch]);
-      expect(view().state).toBe("landed");
-    }
-  });
-
-  it("holds a rejection and a stop without sending anything", async () => {
-    const rejection: Rejection = { rejection: "invalid", violations: [] };
-    const held = setup({ delivery: { state: "rejected", rejection } });
-    await held.advance(60_000);
-    expect(held.view()).toMatchObject({ state: "rejected", rejection });
-    const stopped = setup({ delivery: { state: "stopped" } });
-    await stopped.advance(60_000);
-    expect(stopped.view().state).toBe("stopped");
-    expect(held.host.sent.length + stopped.host.sent.length).toBe(0);
-  });
-
-  it("keeps what it needs to be restored again: a record of each state that may matter", async () => {
-    const { host, actor, view } = setup();
-    expect(recordOf(view())).toBeUndefined();
-    host.answers = [{ outcome: "rejected", rejection: { rejection: "patch_id_reused", patch_id: "p_one" } }];
-    actor.send({ type: "submit" });
-    await settled();
-    expect(recordOf(view())).toMatchObject({ id: "p_one", about, delivery: { state: "rejected", rejection: { rejection: "patch_id_reused" } } });
-    actor.send({ type: "discard" });
-    expect(recordOf(view())).toBeUndefined();
-  });
-});
-
 describe("what an answer makes of a write", () => {
   it("stops a write the in-browser root refused, as it stops one the server refused", async () => {
     const { host, actor, view, advance } = setup();
@@ -218,7 +185,6 @@ describe("what an answer makes of a write", () => {
     await settled();
     await advance(backoffDelayMs(0));
     expect(view()).toMatchObject({ state: "unconfirmed", retrying: false, failure: { status: 401 } });
-    expect(recordOf(view())?.delivery.state).toBe("unconfirmed");
   });
 
   it("keeps a rejection with what it tried to send, until it is discarded", async () => {
@@ -295,7 +261,7 @@ const proposalLanded = { outcome: "answered", answer: saved } as const;
 
 describe("a proposal write or an import", () => {
   it("is sent once: a stale answer is a rejection, for a person to review again", async () => {
-    const { host, actor, view } = setup(undefined, [], applyCommand);
+    const { host, actor, view } = setup([], applyCommand);
     host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [], intervening: [], touched: [] } }];
     actor.send({ type: "submit" });
     await settled();
@@ -307,7 +273,7 @@ describe("a proposal write or an import", () => {
   });
 
   it("is resent as the same request when its answer was lost, and settles on the answer it gets then", async () => {
-    const { host, actor, view, advance } = setup(undefined, [], createCommand);
+    const { host, actor, view, advance } = setup([], createCommand);
     host.proposed = [lost, proposalLanded];
     actor.send({ type: "submit" });
     await settled();
@@ -318,7 +284,7 @@ describe("a proposal write or an import", () => {
   });
 
   it("sends an import once, resends it when lost, and stops on a refusal before anything committed", async () => {
-    const resent = setup(undefined, [], importCommand);
+    const resent = setup([], importCommand);
     resent.host.imports = [lost, alreadyApplied];
     resent.actor.send({ type: "submit" });
     await settled();
@@ -326,7 +292,7 @@ describe("a proposal write or an import", () => {
     expect(resent.host.imported.map((each) => each.patch_id)).toEqual(["p_one", "p_one"]);
     expect(resent.view().state).toBe("landed");
 
-    const refused = setup(undefined, [], importCommand);
+    const refused = setup([], importCommand);
     refused.host.imports = [unauthorized];
     refused.actor.send({ type: "submit" });
     await settled();
@@ -336,7 +302,7 @@ describe("a proposal write or an import", () => {
   });
 
   it("is not a patch: it sends nothing through the patch call and keeps what it was asked", async () => {
-    const { host, actor, view } = setup(undefined, [], importCommand);
+    const { host, actor, view } = setup([], importCommand);
     host.imports = [{ outcome: "rejected", rejection: { rejection: "invalid", violations: [] } }];
     actor.send({ type: "submit" });
     await settled();
@@ -354,7 +320,6 @@ describe("a check before the first send", () => {
     await settled();
     expect(host.sent).toEqual([]);
     expect(view()).toMatchObject({ state: "rejected", rejection: refusal, command: { patch } });
-    expect(recordOf(view())?.delivery).toEqual({ state: "rejected", rejection: refusal });
   });
 
   it("says the subject is gone when the check's refusal is the shape of a missing one", async () => {

@@ -10,7 +10,7 @@ import { heldValue, keyedRead, readView, valueOf, type ReadError, type ReadKey, 
 import { liveSource, type LiveSpec } from "./live.ts";
 import type { SaveEvent } from "./activity.ts";
 import { aboutOf, inFlightOf, problemsOf, submitWrite, writeOf } from "./edit-manager.ts";
-import { idOf, type Answer, type Command, type OperationId } from "./edit-record.ts";
+import { idOf, type Answer, type Command, type OperationId } from "./edit-command.ts";
 import { currentAddress, type Session } from "./session.ts";
 import { savedAnnouncement, settled, syncInputOf, syncSummary, type Problem, type SyncSummary } from "./sync.ts";
 import { writeView, type Check, type WriteSnapshot, type WriteView } from "./write-machine.ts";
@@ -324,7 +324,7 @@ export interface Edit {
 /**
  * The control's way to an edit (ARCHITECTURE, Web UI: edits): every write is the edit
  * manager's, found again by `edit`, a key that is stable for the control, so a control that
- * remounts after navigation or a reload shows its write's rejection or status where it was.
+ * remounts after navigation shows its write's rejection or status where it was.
  */
 export function useEdit(edit: string): Edit {
   const { edits } = useSession();

@@ -47,7 +47,7 @@ export function byPlace(violations: readonly Violation[], node: string | undefin
  * Where each mutation of a patch shows when the engine rejects it (A15), by position: the field
  * a `set_node_field` writes, the answer type a node replacement changes, a node's requirements
  * for an edge; none for the rest. Worked out from the
- * patch itself, so a rejection restored after a reload lands at the same fields.
+ * patch itself, so a rejection shown again lands at the same fields.
  */
 export function placesOf(mutations: readonly Mutation[]): (Place | undefined)[] {
   return mutations.map((mutation): Place | undefined => {

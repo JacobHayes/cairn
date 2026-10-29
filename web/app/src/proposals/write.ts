@@ -2,9 +2,9 @@
 // (a write to a proposal, or one that drafts it), named by a fresh patch id (H5) and refused
 // before anything is sent under version skew (ARCHITECTURE, Web UI). An apply records a save
 // with what it caused (D7). The write is the manager's, found again by the control's edit key,
-// so its rejection survives leaving the screen and a reload. A stale proposal is never rebased
+// so its rejection survives leaving the screen. A stale proposal is never rebased
 // behind a person's back: it is rejected, and refreshed and reviewed again by them.
-import type { Answer, ProposalCall, ProposalCommand } from "../data/edit-record.ts";
+import type { Answer, ProposalCall, ProposalCommand } from "../data/edit-command.ts";
 import { useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
 import { newPatchId, type Rejection } from "../data/writes.ts";

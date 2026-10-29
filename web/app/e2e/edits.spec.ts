@@ -1,6 +1,6 @@
 // The edit manager on the server host, against `cairn demo` (the `server` project of
 // playwright.config.ts): a write belongs to the tab, not to the control that sent it. A rename
-// whose answer comes after its screen was left stays on the chip across a reload until it is
+// whose answer comes after its screen was left stays on the chip until it is
 // dealt with (H5, H6), and one whose answer was lost is resent with its patch id and lands once.
 // A node's actions form that sent its write stays until that write ends: text typed since is
 // never lost to the landing, closing it never drops the write, and a rejection that came after
@@ -14,7 +14,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
 
-import { importIntoDraft, openRoute, openRouteMenu, versionSelect } from "./around.ts";
+import { importIntoDraft, openRoute, versionSelect } from "./around.ts";
 import { addNode, formField, newRoute, nodeForm, routeName, saveForm, structure } from "./authoring.ts";
 import { fresh, goWithin, menuItem, nodeCard, nodePanel, open, openFromCanvas, openJourney, ownJourney, readable, recentSaves, rename, renameOf, save, startRename, syncChip } from "./shell.ts";
 
@@ -35,7 +35,7 @@ async function conflicting(context: BrowserContext, node: string) {
 
 const problems = (page: Page) => page.getByTestId("sync-popover").getByTestId("sync-problem");
 
-test("a rename rejected after its screen was left stays until discarded, across a reload", { tag: "@server" }, async ({ context }) => {
+test("a rename rejected after its screen was left stays until discarded", { tag: "@server" }, async ({ context }) => {
   const { two, mine } = await conflicting(context, "n_onsite");
   // The rename form's own limit stops a title that is too long, with the reason, before anything is sent.
   await renameOf(two, "n_onsite").getByRole("textbox").fill("x".repeat(300));
@@ -58,9 +58,7 @@ test("a rename rejected after its screen was left stays until discarded, across 
   await expect(two.getByTestId("node-detail")).toHaveCount(0);
   release();
   await expect(syncChip(two)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
-  // Reloading keeps it, and Go to it brings the rename back with what was typed and what was refused.
-  await two.reload();
-  await expect(syncChip(two)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
+  // Go to it brings the rename back with what was typed and what was refused.
   await syncChip(two).click();
   await expect(problems(two)).toHaveAttribute("data-kind", "conflict");
   await problems(two).getByRole("button", { name: "Go to it" }).click();
@@ -184,7 +182,7 @@ test("a form that sent its write keeps text typed since when the send lands, and
   await expect(nodeCard(page, "n_retro")).toBeVisible();
 });
 
-test("a node action rejected after its screen was left waits under its form, across a reload", { tag: "@server" }, async ({ context }) => {
+test("a node action rejected after its screen was left waits under its form", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await Promise.all([readable(one), readable(two)]);
   const { id } = await ownJourney(context.request, "product-launch");
@@ -206,8 +204,6 @@ test("a node action rejected after its screen was left waits under its form, acr
   await expect(two.getByTestId("node-detail")).toHaveCount(0);
   release();
   await expect(syncChip(two)).toHaveAttribute("aria-label", /^(CONFLICT|NOT SAVED) · 1\./);
-  await two.reload();
-  await expect(syncChip(two)).toHaveAttribute("aria-label", /^(CONFLICT|NOT SAVED) · 1\./);
   await syncChip(two).click();
   await two.getByTestId("sync-popover").getByTestId("sync-problem").getByRole("button", { name: "Go to it" }).click();
   // The form is back with what was typed, and the refusal under it.
@@ -224,19 +220,14 @@ async function refusedNewRoute(page: Page) {
   await form.getByTestId("new-create").click();
   await expect(form.getByTestId("refused")).toBeVisible();
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
-  // Away from the control it is still counted, and a reload keeps it under the control.
+  // Away from the control it is still counted, and back at it the refusal is under the control.
   await goWithin(page, "/");
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
   await goWithin(page, "/routes/new");
   await expect(form.getByTestId("refused")).toBeVisible();
-  await page.reload();
-  await expect(form.getByTestId("refused")).toBeVisible();
-  await expect(syncChip(page)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
-  // Discard on the chip clears it here too, and it does not come back.
+  // Discard on the chip clears it here too.
   await syncChip(page).click();
   await problems(page).getByRole("button", { name: "Discard" }).click();
-  await expect(form.getByTestId("refused")).toHaveCount(0);
-  await page.reload();
   await expect(form.getByTestId("refused")).toHaveCount(0);
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
 }
@@ -255,11 +246,8 @@ async function refusedImport(page: Page) {
   await importing.getByRole("button", { name: "Discard the open draft and import" }).click();
   await expect(importing.getByTestId("refused")).toHaveCount(0);
   await expect(versionSelect(page)).toContainText("Draft");
-  // Refused again, the file is kept with the refusal across a reload, which also drops the draft the page held.
+  // Refused again, the file is kept with the refusal.
   await choose();
-  await expect(importing.getByTestId("refused")).toBeVisible();
-  await page.reload();
-  await openRouteMenu(page);
   await expect(importing.getByTestId("refused")).toBeVisible();
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
   await importing.getByRole("button", { name: "Discard the open draft and import" }).click();
@@ -268,12 +256,12 @@ async function refusedImport(page: Page) {
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
 }
 
-test("a new route refused for an id in use, and an import refused for an open draft, stay under their control and on the chip, across a reload, until discarded", async ({ page }) => {
+test("a new route refused for an id in use, and an import refused for an open draft, stay under their control and on the chip until discarded", async ({ page }) => {
   await refusedNewRoute(page);
   await refusedImport(page);
 });
 
-test("an authoring edit the engine refuses stays at its field across a reload, until discarded", { tag: "@server" }, async ({ page }) => {
+test("an authoring edit the engine refuses stays at its field until discarded", { tag: "@server" }, async ({ page }) => {
   await newRoute(page, "server", routeName("Refusal"));
   const first = await addNode(page, "milestone", "Kickoff");
   await addNode(page, "milestone", "Launch");
@@ -286,8 +274,6 @@ test("an authoring edit the engine refuses stays at its field across a reload, u
   await nodeForm(page).getByTestId("node-form-save").click();
   const refused = formField(page, "final").locator('[data-testid="violation"][data-code="several_final_milestones"]');
   await expect(refused).toBeVisible();
-  await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
-  await page.reload();
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
   await expect(structure(page)).toHaveAttribute("data-node", first);
   await expect(refused).toBeVisible();

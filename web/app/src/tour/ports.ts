@@ -4,7 +4,7 @@
 import type { Session } from "../data/session.ts";
 import { Missing } from "../data/host.ts";
 import { submitWrite, aboutOf } from "../data/edit-manager.ts";
-import { idOf, type Answer } from "../data/edit-record.ts";
+import { idOf, type Answer } from "../data/edit-command.ts";
 import { isPatchAnswer, newPatchId } from "../data/writes.ts";
 import { newJourneyId } from "../journeys/lifecycle.ts";
 import { screenCommand } from "../screens/write.ts";

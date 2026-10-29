@@ -4,16 +4,14 @@ import { backoffDelayMs, type Answered, type HttpFailure, type Rejection, type R
 import { SimulatedClock, createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
-import { aboutNode, chipOf, renaming } from "./edits.test-support.ts";
+import { aboutNode, chipOf } from "./edits.test-support.ts";
 import { problemsOf, submitWrite } from "./edit-manager.ts";
-import { EDIT_RECORD_VERSION, tabEditStore } from "./edit-record.ts";
 import { HandHost, replied, target } from "../assistant/hand-host.test-support.ts";
 import { sendTurn } from "../assistant/conversation.ts";
-import { CountingClock, FakeDeriver, FakeHost, deferred, memoryStorage, settled } from "./fake.test-support.ts";
+import { CountingClock, FakeDeriver, FakeHost, deferred, settled } from "./fake.test-support.ts";
 import { ReadFailed } from "./host.ts";
 import { HOST_READ, keyedRead, type ReadSource } from "./keyed-read.ts";
 import { Session } from "./session.ts";
-import { toastOf } from "./toasts.ts";
 import { RESEND_COUNT_MAX } from "./write-machine.ts";
 import { landedWarning, patchOf, type WriteIntent } from "./writes.ts";
 
@@ -28,11 +26,11 @@ const intent: WriteIntent = {
   mutations: [{ op: "set_node_field", node: "n_a", value: { title: "Renamed" } }],
 };
 
-async function started(storage = memoryStorage()) {
+async function started() {
   const host = new FakeHost();
   host.journeysHeld.set("j_one", { revision: 3, deployment: 1, today: "2026-10-06" });
   const clock = new SimulatedClock();
-  const session = await Session.start({ host, deriver: new FakeDeriver(), clock, monotonic: () => clock.now(), store: tabEditStore(() => storage) });
+  const session = await Session.start({ host, deriver: new FakeDeriver(), clock, monotonic: () => clock.now() });
   // The stream opens once the batch of watches is reconciled.
   clock.increment(0);
   host.open();
@@ -41,7 +39,7 @@ async function started(storage = memoryStorage()) {
     clock.increment(ms);
     await settled();
   };
-  return { host, session, storage, advance };
+  return { host, session, advance };
 }
 
 const problems = (session: Session) => problemsOf(session.edits.getSnapshot().context.writes, session.skewed);
@@ -76,15 +74,14 @@ describe("a control waiting on its write", () => {
     expect(session.edits.getSnapshot().context.writes).toEqual({});
   });
 
-  it("is answered none for a rejection, which the manager keeps, counts on the chip, and stores", async () => {
-    const { host, session, storage } = await started();
+  it("is answered none for a rejection, which the manager keeps, and counts on the chip", async () => {
+    const { host, session } = await started();
     const rejection: Rejection = { rejection: "invalid", violations: [] };
     host.answers = [{ outcome: "rejected", rejection }];
     expect(await send(session)).toBeUndefined();
     await settled();
     expect(Object.keys(session.edits.getSnapshot().context.writes)).toEqual(["p_one"]);
     expect(problems(session)).toEqual([expect.objectContaining({ id: "p_one", kind: "rejected" })]);
-    expect(storage.length).toBe(1);
     expect(chipOf(session.root).state).toBe("not-saved");
   });
 
@@ -118,29 +115,6 @@ describe("a control waiting on its write", () => {
 });
 
 describe("the connection", () => {
-  it("lets a restored write wait until the stream is open, then resends it", async () => {
-    const storage = memoryStorage();
-    tabEditStore(() => storage).keep({
-      version: EDIT_RECORD_VERSION,
-      id: "p_kept",
-      command: { kind: "patch", patch: renaming("p_kept") },
-      about: aboutNode(),
-      delivery: { state: "sending" },
-    });
-    const host = new FakeHost();
-    host.answers = [alreadyApplied];
-    const clock = new SimulatedClock();
-    const session = await Session.start({ host, deriver: new FakeDeriver(), clock, monotonic: () => clock.now(), store: tabEditStore(() => storage) });
-    clock.increment(0);
-    await settled();
-    expect(host.sent).toEqual([]);
-    host.open();
-    await settled();
-    expect(host.sent.map((patch) => patch.id)).toEqual(["p_kept"]);
-    expect(storage.length).toBe(0);
-    expect(session.root.getSnapshot().context.recent.saves).toHaveLength(1);
-  });
-
   it("is not listened to once the session is closed", async () => {
     const held = deferred<Answered<HttpFailure>>();
     const { host, session, advance } = await started();
@@ -220,7 +194,7 @@ describe("the caller", () => {
     const host = new FakeHost();
     host.deploymentFails = true;
     const clock = new SimulatedClock();
-    const session = await Session.start({ host, deriver: new FakeDeriver(), clock, monotonic: () => clock.now(), store: tabEditStore(() => memoryStorage()) });
+    const session = await Session.start({ host, deriver: new FakeDeriver(), clock, monotonic: () => clock.now() });
     clock.increment(0);
     host.open();
     await settled();
@@ -248,13 +222,6 @@ describe("the chip and the toast", () => {
     expect(chipOf(session.root).state).toBe("new-version");
   });
 
-  it("raises a problem toast for the unsent edits of an earlier version it could not keep", async () => {
-    const storage = memoryStorage();
-    storage.setItem("cairn:edit:p_old", JSON.stringify({ version: EDIT_RECORD_VERSION + 1, id: "p_old" }));
-    const { session } = await started(storage);
-    expect(toastOf(session.toasts.getSnapshot())).toMatchObject({ tone: "problem", text: expect.stringContaining("unsent edit") as string });
-  });
-
   it("leaves no timer or turn running once closed: a toast shown, SAVED pending, and a turn out", async () => {
     const assistant = new HandHost();
     const host = new FakeHost();
@@ -262,8 +229,7 @@ describe("the chip and the toast", () => {
     host.offersAssistant = true;
     host.assistant = assistant;
     const clock = new CountingClock();
-    const storage = memoryStorage();
-    const session = await Session.start({ host, deriver: new FakeDeriver(), clock, monotonic: () => clock.now(), store: tabEditStore(() => storage) });
+    const session = await Session.start({ host, deriver: new FakeDeriver(), clock, monotonic: () => clock.now() });
     clock.increment(0);
     host.open();
     await settled();

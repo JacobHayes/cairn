@@ -1,11 +1,10 @@
 // A session root over a fake host for the edit tests: the real root and manager on a simulated
-// clock, a tab's storage in memory, and the notes the manager made.
+// clock.
 import { streamStatus, type Patch } from "@cairn/client";
 import { SimulatedClock, createActor } from "xstate";
 
-import type { About } from "./edit-record.ts";
-import { tabEditStore } from "./edit-record.ts";
-import { FakeDeriver, FakeHost, memoryStorage, memoryTurns, settled, writeEnv } from "./fake.test-support.ts";
+import type { About } from "./edit-command.ts";
+import { FakeDeriver, FakeHost, memoryTurns, settled, writeEnv } from "./fake.test-support.ts";
 import { editsOf, landedEvents, sessionRoot, subscriptionOf, syncOf, type SessionRootRef } from "./session-root.ts";
 import { inFlightOf, problemsOf } from "./edit-manager.ts";
 import { syncInputOf, syncSummary, type SyncReading, type SyncSummary } from "./sync.ts";
@@ -23,19 +22,14 @@ export function aboutNode(node = "n_a"): About {
 
 export interface StartOptions {
   host?: FakeHost;
-  storage?: Storage;
   clock?: SimulatedClock;
-  /** Whether to send `restore` after the root starts (the session does). */
-  restore?: boolean;
 }
 
 /** A running root over a fake host; `edits` is its manager. */
 export async function startRoot(options: StartOptions = {}) {
   const host = options.host ?? new FakeHost();
-  const storage = options.storage ?? memoryStorage();
   const clock = options.clock ?? new SimulatedClock();
   const { parts, switches, saves } = writeEnv(host);
-  const notes = { dropped: [] as number[], unstored: 0 };
   const root = createActor(sessionRoot, {
     clock,
     input: {
@@ -46,7 +40,6 @@ export async function startRoot(options: StartOptions = {}) {
       now: () => clock.now(),
       conversations: { assistant: undefined, turns: memoryTurns() },
       edits: {
-        store: tabEditStore(() => storage),
         // A landed write is logged, and told to the root as the session does.
         env: {
           ...parts,
@@ -57,21 +50,12 @@ export async function startRoot(options: StartOptions = {}) {
             }
           },
         },
-        notes: {
-          dropped: (count) => notes.dropped.push(count),
-          unstored: () => {
-            notes.unstored += 1;
-          },
-        },
       },
     },
   });
   root.start();
   const edits = editsOf(root);
-  if (options.restore !== false) {
-    root.send({ type: "restore" });
-    await settled();
-  }
+  await settled();
   const submit = (patch: Patch, about: About = aboutNode()) => {
     edits.send({ type: "submit", id: patch.id, command: { kind: "patch", patch }, about });
   };
@@ -79,7 +63,7 @@ export async function startRoot(options: StartOptions = {}) {
     clock.increment(ms);
     await settled();
   };
-  return { host, storage, clock, switches, saves, notes, root, edits, submit, advance, writes: () => edits.getSnapshot().context.writes };
+  return { host, clock, switches, saves, root, edits, submit, advance, writes: () => edits.getSnapshot().context.writes };
 }
 
 /**

@@ -1,7 +1,7 @@
 // H5, H6: every write path (a section, authoring, a screen, a proposal review, drafting a
 // proposal and opening it, an insertion, an import, a merge) hands the edit manager a command
 // under a stable edit key, so a refusal of any of them is held, listed once on the chip, kept
-// across a reload with the command that was refused, and dropped by Discard or by the edit's
+// with the command that was refused, and dropped by Discard or by the edit's
 // next write, one way for all of them.
 import type { Answered, HttpFailure, Rejection } from "@cairn/client";
 import { describe, expect, it } from "vitest";
@@ -14,12 +14,12 @@ import { proposalCommand } from "../proposals/write.ts";
 import { discardCommand, importCommand } from "../routes/import.ts";
 import { screenCommand } from "../screens/write.ts";
 import { aboutOf, problemsOf, submitWrite, type Sent } from "./edit-manager.ts";
-import type { Command } from "./edit-record.ts";
+import type { Command } from "./edit-command.ts";
 import { startRoot } from "./edits.test-support.ts";
 import { FakeHost, settled } from "./fake.test-support.ts";
 import type { RouteFile } from "./host.ts";
 import type { WriteSnapshot } from "./write-machine.ts";
-import { idOf } from "./edit-record.ts";
+import { idOf } from "./edit-command.ts";
 
 const invalid: Rejection = { rejection: "invalid", violations: [{ at: {}, code: "limit_exceeded", message: "Too long" }] };
 const refusal: Answered<HttpFailure> = { outcome: "rejected", rejection: invalid };
@@ -102,35 +102,21 @@ const sentOf = (path: Path, id: string): Sent => {
 
 describe.each(paths)("$name", (path) => {
   it("is held when refused, listed once on the chip with its label and address, and keeps the command refused", async () => {
-    const { host, edits, writes, storage } = await startRoot();
+    const { host, edits, writes } = await startRoot();
     path.refuse(host);
     const sent = sentOf(path, "p_a");
     expect(await submitWrite(edits, sent)).toBeUndefined();
     expect(problemsOf(writes(), false)).toEqual([{ id: "p_a", kind: "rejected", message: expect.any(String) as string, label: "Draft the plan", address: `/at/${path.edit}`, retry: false }]);
     expect((writes().p_a?.snapshot as WriteSnapshot).context.command).toEqual(sent.command);
-    expect(storage.length).toBe(1);
   });
 
-  it("is still there, with the same command, in a new root over the same storage, and nothing is sent again", async () => {
-    const first = await startRoot();
-    path.refuse(first.host);
-    const sent = sentOf(path, "p_a");
-    await submitWrite(first.edits, sent);
-    first.root.stop();
-    const second = await startRoot({ storage: first.storage });
-    expect(problemsOf(second.writes(), false).map((problem) => [problem.id, problem.kind])).toEqual([["p_a", "rejected"]]);
-    expect((second.writes().p_a?.snapshot as WriteSnapshot).context.command).toEqual(sent.command);
-    expect([second.host.sent, second.host.called, second.host.imported]).toEqual([[], [], []]);
-  });
-
-  it("is dropped, record and all, by Discard", async () => {
-    const { host, edits, writes, storage } = await startRoot();
+  it("is dropped by Discard", async () => {
+    const { host, edits, writes } = await startRoot();
     path.refuse(host);
     await submitWrite(edits, sentOf(path, "p_a"));
     edits.send({ type: "discard", id: "p_a" });
     await settled();
     expect(writes()).toEqual({});
-    expect(storage.length).toBe(0);
   });
 
   it("gives way to the edit's next write, which is sent as itself, and not to a write of another edit", async () => {

@@ -13,19 +13,18 @@
 //                   -> stopped                    refused or not sent: known not committed
 //                   -> unconfirmed                no answer: it may have committed
 //
-// `unconfirmed` resends itself with the same patch id and the last patch it sent, which is
-// safe because the API is idempotent on the patch id (H5): `already_applied` settles it as
-// landed, and a normal answer settles it either way. It resends at once on restore after a
-// reload, and otherwise after a backoff; each attempt waits for the connection, so time
-// offline uses none; it stops after `RESEND_COUNT_MAX` attempts and asks the person to
-// Retry. Version skew stops it, as it stops all new work. A patch is sent as it is: the server
+// `unconfirmed` resends itself, in memory only, with the same patch id and the last patch it
+// sent, which is safe because the API is idempotent on the patch id (H5): `already_applied`
+// settles it as landed, and a normal answer settles it either way. It resends after a backoff;
+// each attempt waits for the connection, so time offline uses none; it stops after
+// `RESEND_COUNT_MAX` attempts and asks the person to Retry. A reload loses it, and the browser
+// asks before one while a write is busy. Version skew stops it, as it stops all new work. A patch is sent as it is: the server
 // applies a stale one past what intervened when that is safe, and answers it stale otherwise,
 // as it does a proposal or an import that goes stale, for a person to review again.
 import { backoffDelayMs, networkFailure, sameDomain, targetDomain, type HttpFailure, type Patch, type Rejection } from "@cairn/client";
 import { and, assign, fromPromise, setup, type ActorRefFrom, type SnapshotFrom } from "xstate";
 
-import type { About, Answer, Command, Delivery, EditRecord, OperationId, ProposalCall, Removed } from "./edit-record.ts";
-import { EDIT_RECORD_VERSION } from "./edit-record.ts";
+import type { About, Answer, Command, OperationId, ProposalCall, Removed } from "./edit-command.ts";
 import type { Host } from "./host.ts";
 import type { ProposalHost, ProposalWritten } from "./proposals.ts";
 import { subjectOf } from "./writes.ts";
@@ -64,8 +63,6 @@ export interface WriteInput {
   command: Command;
   about: About;
   env: WriteEnv;
-  /** What a kept record says, when the write is restored after a reload. */
-  restored: { delivery: Delivery } | undefined;
 }
 
 interface WriteContext {
@@ -77,7 +74,6 @@ interface WriteContext {
   began: number | undefined;
   /** Automatic resends so far in this stretch of uncertainty. */
   resent: number;
-  restored: Delivery["state"] | undefined;
   rejection: Rejection | undefined;
   failure: HttpFailure | undefined;
   removed: Removed | undefined;
@@ -223,7 +219,6 @@ export const writeMachine = setup({
     incompatible: ({ context }) => !context.env.compatible(),
     connected: ({ context }) => context.env.connected(),
     exhausted: ({ context }) => context.resent >= RESEND_COUNT_MAX,
-    restoredAs: ({ context }, state: Delivery["state"]) => context.restored === state,
     landed: (_, outcome: Outcome) => outcome.outcome === "landed",
     gone: ({ context }, outcome: Outcome) => outcome.outcome === "rejected" && removedBy(context.command, outcome.rejection) !== undefined,
     rejected: (_, outcome: Outcome) => outcome.outcome === "rejected",
@@ -268,26 +263,14 @@ export const writeMachine = setup({
     env: input.env,
     began: undefined,
     resent: 0,
-    restored: input.restored?.delivery.state,
-    rejection: input.restored?.delivery.state === "rejected" ? input.restored.delivery.rejection : undefined,
-    failure: input.restored?.delivery.state === "unconfirmed" || input.restored?.delivery.state === "stopped" ? input.restored.delivery.failure : undefined,
-    removed: input.restored?.delivery.state === "gone" ? input.restored.delivery.removed : undefined,
+    rejection: undefined,
+    failure: undefined,
+    removed: undefined,
     answer: undefined,
     check: undefined,
   }),
-  initial: "start",
+  initial: "idle",
   states: {
-    start: {
-      always: [
-        // What may have committed is resent at once: the reload is the person's retry.
-        { guard: { type: "restoredAs", params: "sending" }, target: "unconfirmed.ready" },
-        { guard: { type: "restoredAs", params: "unconfirmed" }, target: "unconfirmed.ready" },
-        { guard: { type: "restoredAs", params: "rejected" }, target: "rejected" },
-        { guard: { type: "restoredAs", params: "stopped" }, target: "stopped" },
-        { guard: { type: "restoredAs", params: "gone" }, target: "gone" },
-        { target: "idle" },
-      ],
-    },
     idle: {
       on: {
         submit: [
@@ -298,7 +281,7 @@ export const writeMachine = setup({
       },
     },
     // The control's pre-send check runs first. A busy write does not accept a second submit,
-    // and a refusal is a rejection like the server's: kept, on the chip, across a reload.
+    // and a refusal is a rejection like the server's: on the chip.
     checking: {
       tags: ["busy"],
       exit: "dropCheck",
@@ -405,7 +388,7 @@ export type WriteView = {
 } & (
   | { state: "idle" | "sending" | "discarded" }
   | { state: "gone"; removed: Removed }
-  | { state: "unconfirmed"; failure: HttpFailure | undefined; retrying: boolean }
+  | { state: "unconfirmed"; failure: HttpFailure; retrying: boolean }
   | { state: "rejected"; rejection: Rejection }
   | { state: "stopped"; failure: HttpFailure | undefined }
   | { state: "landed"; answer: Answer }
@@ -415,11 +398,11 @@ export type WriteView = {
 export function writeView(snapshot: WriteSnapshot): WriteView {
   const { context } = snapshot;
   const common = { id: context.id, about: context.about, command: context.command };
-  // A write in its pre-send check is out as far as a control or a reload is concerned.
+  // A write in its pre-send check is out as far as a control is concerned.
   if (snapshot.matches("sending") || snapshot.matches("checking")) {
     return { ...common, state: "sending" };
   }
-  if (snapshot.matches("unconfirmed")) {
+  if (snapshot.matches("unconfirmed") && context.failure !== undefined) {
     return { ...common, state: "unconfirmed", failure: context.failure, retrying: !snapshot.matches({ unconfirmed: "manual" }) };
   }
   if (snapshot.matches("rejected") && context.rejection !== undefined) {
@@ -435,25 +418,4 @@ export function writeView(snapshot: WriteSnapshot): WriteView {
     return { ...common, state: "landed", answer: context.answer };
   }
   return { ...common, state: snapshot.matches("discarded") ? "discarded" : "idle" };
-}
-
-/** What the tab keeps of a write: nothing for one that has not been sent, has landed or is discarded. */
-export function recordOf(view: WriteView): EditRecord | undefined {
-  const base: Omit<EditRecord, "delivery"> = { version: EDIT_RECORD_VERSION, id: view.id, command: view.command, about: view.about };
-  switch (view.state) {
-    case "sending":
-      return { ...base, delivery: { state: "sending" } };
-    case "unconfirmed":
-      return { ...base, delivery: view.failure === undefined ? { state: "unconfirmed" } : { state: "unconfirmed", failure: view.failure } };
-    case "rejected":
-      return { ...base, delivery: { state: "rejected", rejection: view.rejection } };
-    case "stopped":
-      return { ...base, delivery: view.failure === undefined ? { state: "stopped" } : { state: "stopped", failure: view.failure } };
-    case "gone":
-      return { ...base, delivery: { state: "gone", removed: view.removed } };
-    case "idle":
-    case "landed":
-    case "discarded":
-      return undefined;
-  }
 }

@@ -6,7 +6,7 @@ import type { Schema } from "@cairn/client";
 import { useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
-import type { OperationId } from "../data/edit-record.ts";
+import type { OperationId } from "../data/edit-command.ts";
 import { newPatchId, violationNode, type Rejection, type Violation } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";

@@ -1,15 +1,14 @@
-// ARCHITECTURE, Web UI: the session root. Restoring the kept edits once it runs, version skew
+// ARCHITECTURE, Web UI: the session root. Version skew
 // stopping new work, what the sync chip is told (the saves, the writes in flight), and shutdown
 // leaving nothing running.
-import { backoffDelayMs, type Answered, type HttpFailure, type Rejection, type StreamEvent } from "@cairn/client";
+import { backoffDelayMs, type Answered, type HttpFailure, type StreamEvent } from "@cairn/client";
 import { createActor, fromCallback } from "xstate";
 import { describe, expect, it } from "vitest";
 
 import { SAVE_COUNT_MAX } from "./activity.ts";
 import { aboutNode, chipOf, renaming, startRoot } from "./edits.test-support.ts";
 import { problemsOf } from "./edit-manager.ts";
-import { EDIT_RECORD_VERSION, tabEditStore, type EditRecord } from "./edit-record.ts";
-import { FakeHost, deferred, memoryStorage, settled } from "./fake.test-support.ts";
+import { FakeHost, deferred, settled } from "./fake.test-support.ts";
 import { syncOf } from "./session-root.ts";
 import { SYNC_SAVED_MS, SYNC_SHOW_AFTER_MS } from "./sync.ts";
 import { writeView, type WriteSnapshot } from "./write-machine.ts";
@@ -17,37 +16,7 @@ import { writeView, type WriteSnapshot } from "./write-machine.ts";
 const receipt = { patch_id: "p_x", domain: { journey: "j_one" }, content_hash: "h", revision: 4 };
 const applied: Answered<HttpFailure> = { outcome: "answered", answer: { outcome: "applied", receipt, consequences: {} } };
 const lost: Answered<HttpFailure> = { outcome: "failed", error: { status: 0, message: "network down" } };
-const invalid: Rejection = { rejection: "invalid", violations: [] };
 const stale: Answered<HttpFailure> = { outcome: "rejected", rejection: { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 5 }], intervening: [], touched: [] } };
-
-const record = (id: string, delivery: EditRecord["delivery"], node = "n_a"): EditRecord => ({
-  version: EDIT_RECORD_VERSION,
-  id,
-  command: { kind: "patch", patch: renaming(id, node) },
-  about: aboutNode(node),
-  delivery,
-});
-
-describe("restoring the kept edits", () => {
-  it("resends what may have committed at once and holds a rejection, once the root is running", async () => {
-    const storage = memoryStorage();
-    const store = tabEditStore(() => storage);
-    store.keep(record("p_sent", { state: "sending" }, "n_a"));
-    store.keep(record("p_refused", { state: "rejected", rejection: invalid }, "n_b"));
-    const fake = new FakeHost();
-    fake.answers = [{ outcome: "answered", answer: { outcome: "already_applied", receipt } }];
-    const { writes, root, saves } = await startRoot({ host: fake, storage, restore: false });
-    // Nothing is started before the restore event: a write reads the root as it starts.
-    expect(writes()).toEqual({});
-    root.send({ type: "restore" });
-    await settled();
-    expect(fake.sent.map((patch) => patch.id)).toEqual(["p_sent"]);
-    expect(saves).toHaveLength(1);
-    expect(Object.keys(writes())).toEqual(["p_refused"]);
-    expect(problemsOf(writes(), false).map((problem) => problem.id)).toEqual(["p_refused"]);
-    expect(store.read().records.map((each) => each.id)).toEqual(["p_refused"]);
-  });
-});
 
 describe("version skew", () => {
   it("stops a new write before it is sent, and says so", async () => {
@@ -57,7 +26,7 @@ describe("version skew", () => {
     await settled();
     expect(host.sent).toEqual([]);
     expect(writeView(writes().p_a?.snapshot as WriteSnapshot)).toMatchObject({ state: "stopped", failure: undefined });
-    expect(problemsOf(writes(), true)).toEqual([expect.objectContaining({ id: "p_a", kind: "failed", retry: true, message: expect.stringContaining("Reload") as string })]);
+    expect(problemsOf(writes(), true)).toEqual([expect.objectContaining({ id: "p_a", kind: "failed", retry: true })]);
   });
 
   it("gives up on a write waiting for the connection at once, without advancing time", async () => {
@@ -148,21 +117,6 @@ describe("the writes in flight the sync chip is told of", () => {
     await advance(SYNC_SHOW_AFTER_MS - 1);
     // Counted from the first write's start it would show SAVING by now.
     expect(chipOf(root).state).toBe("saved");
-    await advance(1);
-    expect(chipOf(root).state).toBe("saving");
-  });
-
-  it("counts a write restored in flight from the restore", async () => {
-    const storage = memoryStorage();
-    tabEditStore(() => storage).keep(record("p_sent", { state: "sending" }));
-    const fake = new FakeHost();
-    fake.answers = [deferred<Answered<HttpFailure>>().promise];
-    const { root, advance } = await startRoot({ host: fake, storage, restore: false });
-    await advance(1000);
-    root.send({ type: "restore" });
-    await settled();
-    await advance(SYNC_SHOW_AFTER_MS - 1);
-    expect(chipOf(root).state).toBe("in-sync");
     await advance(1);
     expect(chipOf(root).state).toBe("saving");
   });

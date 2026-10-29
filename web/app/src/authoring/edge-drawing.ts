@@ -16,7 +16,7 @@
 import { assign, fromCallback, fromPromise, setup, type SnapshotFrom } from "xstate";
 
 import type { EditsRef } from "../data/session-root.ts";
-import type { About, OperationId, PatchCommand } from "../data/edit-record.ts";
+import type { About, OperationId, PatchCommand } from "../data/edit-command.ts";
 import type { Rejection } from "../data/writes.ts";
 import { titleIn, type Mutation } from "./graph.ts";
 import type { Authored } from "./target.ts";

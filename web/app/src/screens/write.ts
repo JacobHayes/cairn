@@ -6,7 +6,7 @@
 import type { Schema } from "@cairn/client";
 
 import { noticesOf } from "../data/activity.ts";
-import type { Command } from "../data/edit-record.ts";
+import type { Command } from "../data/edit-command.ts";
 import { useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
 import { isPatchAnswer, newPatchId, patchOf, type Rejection, type WriteIntent } from "../data/writes.ts";

@@ -1,9 +1,8 @@
 // ARCHITECTURE, Web UI: edits. The edit manager owns every write the tab has sent: one write
 // actor per operation id (the patch id, H5), started by the control that sent it but never
 // owned by it, so a control that goes away drops its view of the write and never the write.
-// It keeps a versioned record of each write that may still matter in session storage, so a
-// reload loses nothing that may have committed, and puts the records back as writes on
-// restore. The sync chip reads what did not land from here; Discard is an event sent to the
+// A write lives in memory only: a reload loses it, and the browser asks first while any write
+// is busy (`pendingOf`). The sync chip reads what did not land from here; Discard is an event sent to the
 // write that owns the problem, and an unrelated save never resolves another write's.
 //
 // Nothing is discovered through XState's system registry: the writes are an explicit keyed
@@ -12,24 +11,14 @@
 import type { HttpFailure } from "@cairn/client";
 import { assign, enqueueActions, fromPromise, sendTo, setup, waitFor, type ActorRefFrom } from "xstate";
 
-import { EDIT_RECORD_VERSION, idOf, type About, type Answer, type Command, type EditStore, type OperationId } from "./edit-record.ts";
+import { idOf, type About, type Answer, type Command, type OperationId } from "./edit-command.ts";
 import type { Markdown, Patch } from "./host.ts";
 import type { Problem } from "./sync.ts";
-import { writeMachine, writeView, recordOf, type Check, type WriteEnv, type WriteRef, type WriteSnapshot, type WriteView } from "./write-machine.ts";
+import { writeMachine, writeView, type Check, type WriteEnv, type WriteRef, type WriteSnapshot, type WriteView } from "./write-machine.ts";
 import { reasonOf } from "./writes.ts";
 
-/** What the manager tells the person about the records, in words the session supplies. */
-export interface EditNotes {
-  /** Records of another version, or unreadable ones, were dropped on restore. */
-  dropped(count: number): void;
-  /** Storage refused a record: the edits are kept only until reload. */
-  unstored(): void;
-}
-
 export interface EditsInput {
-  store: EditStore;
   env: WriteEnv;
-  notes: EditNotes;
 }
 
 /** A write and the last snapshot it relayed. */
@@ -40,15 +29,9 @@ export interface Entry {
 
 export interface EditsContext extends EditsInput {
   writes: Record<OperationId, Entry>;
-  /** Whether storage has refused a record (said once). */
-  unstored: boolean;
-  /** Whether the kept records have been put back: once per manager. */
-  restored: boolean;
 }
 
 export type EditsEvent =
-  /** Puts the kept records back as writes. Sent once, after the session root has started. */
-  | { type: "restore" }
   | { type: "submit"; id: OperationId; command: Command; about: About; check?: Check }
   | { type: "discard"; id: string }
   | { type: "retry"; id: OperationId }
@@ -80,28 +63,8 @@ export const editManager = setup({
         !Object.values(context.writes).some((entry) => entry.snapshot.context.about.edit === sent.about.edit && busy(entry))
       );
     },
-    notRestored: ({ context }) => !context.restored,
   },
   actions: {
-    // The kept records come back as writes. Reading the store and saying what it dropped are
-    // effects of this one step. The writes read the session root as they start, so this runs
-    // on an event after the root has started, never in the manager's initial context.
-    restoreWrites: assign(({ context, spawn }) => {
-      const { records, dropped } = context.store.read();
-      if (dropped > 0) {
-        context.notes.dropped(dropped);
-      }
-      const writes: Record<OperationId, Entry> = {};
-      for (const record of records) {
-        const ref = spawn("write", {
-          id: record.id,
-          syncSnapshot: true,
-          input: { id: record.id, command: record.command, about: record.about, env: context.env, restored: { delivery: record.delivery } },
-        });
-        writes[record.id] = { ref, snapshot: ref.getSnapshot() };
-      }
-      return { writes, restored: true };
-    }),
     // A settled write of the same edit (rejected, stopped, gone) gives way to the new one.
     dropSettled: enqueueActions(({ context, event, enqueue }) => {
       const sent = event as Extract<EditsEvent, { type: "submit" }>;
@@ -109,7 +72,6 @@ export const editManager = setup({
       for (const [id, entry] of Object.entries(context.writes)) {
         if (entry.snapshot.context.about.edit === sent.about.edit) {
           enqueue.stopChild(entry.ref);
-          context.store.forget(id);
           writes = without(writes, id);
         }
       }
@@ -117,31 +79,16 @@ export const editManager = setup({
     }),
     startWrite: assign(({ context, event, spawn }) => {
       const sent = event as Extract<EditsEvent, { type: "submit" }>;
-      // The record is kept before the request goes out (the write sends it on the submit that
-      // follows), or a crash between the two would lose the id of an edit that may have committed.
-      const kept = context.store.keep({ version: EDIT_RECORD_VERSION, id: sent.id, command: sent.command, about: sent.about, delivery: { state: "sending" } });
-      const ref = spawn("write", { id: sent.id, syncSnapshot: true, input: { id: sent.id, command: sent.command, about: sent.about, env: context.env, restored: undefined } });
-      if (!kept && !context.unstored) {
-        context.notes.unstored();
-      }
-      return { writes: { ...context.writes, [sent.id]: { ref, snapshot: ref.getSnapshot() } }, unstored: context.unstored || !kept };
+      const ref = spawn("write", { id: sent.id, syncSnapshot: true, input: { id: sent.id, command: sent.command, about: sent.about, env: context.env } });
+      return { writes: { ...context.writes, [sent.id]: { ref, snapshot: ref.getSnapshot() } } };
     }),
-    // What a write relays is kept as its record when it is one worth keeping. A relay that
-    // arrives after the write ended is ignored, or the record would come back on reload.
+    // What a write relays is the snapshot the manager reads. A relay that arrives after the
+    // write ended is ignored.
     relay: assign(({ context, event }) => {
       const relayed = event as Extract<EditsEvent, { type: `xstate.snapshot.${string}` }>;
       const id = relayed.type.slice(SNAPSHOT_PREFIX.length);
       const entry = context.writes[id];
-      if (entry === undefined) {
-        return {};
-      }
-      const record = recordOf(writeView(relayed.snapshot));
-      let { unstored } = context;
-      if (record !== undefined && !context.store.keep(record) && !unstored) {
-        context.notes.unstored();
-        unstored = true;
-      }
-      return { writes: { ...context.writes, [id]: { ref: entry.ref, snapshot: relayed.snapshot } }, unstored };
+      return entry === undefined ? {} : { writes: { ...context.writes, [id]: { ref: entry.ref, snapshot: relayed.snapshot } } };
     }),
     finish: enqueueActions(({ context, event, enqueue }) => {
       const id = event.type.slice(DONE_PREFIX.length);
@@ -150,7 +97,6 @@ export const editManager = setup({
         enqueue.stopChild(entry.ref);
         enqueue.assign({ writes: without(context.writes, id) });
       }
-      context.store.forget(id);
     }),
     startSent: sendTo(({ context, event }) => {
       const sent = event as Extract<EditsEvent, { type: "submit" }>;
@@ -185,9 +131,8 @@ export const editManager = setup({
   },
 }).createMachine({
   id: "edits",
-  context: ({ input }) => ({ ...input, writes: {}, unstored: false, restored: false }),
+  context: ({ input }) => ({ ...input, writes: {} }),
   on: {
-    restore: { guard: "notRestored", actions: "restoreWrites" },
     submit: { guard: "free", actions: ["dropSettled", "startWrite", "startSent"] },
     discard: { actions: "forwardDiscard" },
     retry: { actions: "forwardRetry" },
@@ -219,6 +164,11 @@ export function writeOf(writes: EditsContext["writes"], edit: string): Entry | u
   return Object.values(writes).find((entry) => entry.snapshot.context.about.edit === edit);
 }
 
+/** Whether any write is out or may have committed and is being resent or waiting for a Retry: what the browser asks about before the tab is left. */
+export function pendingOf(writes: EditsContext["writes"]): boolean {
+  return Object.values(writes).some(({ snapshot }) => snapshot.hasTag("busy"));
+}
+
 /** Writes out or being resent: what the chip counts as saving. A write that stopped resending needs the person instead. */
 export function inFlightOf(writes: EditsContext["writes"]): number {
   return Object.values(writes).filter(({ snapshot }) => snapshot.hasTag("busy") && !snapshot.hasTag("needsYou")).length;
@@ -235,7 +185,7 @@ const removedWords = (view: Extract<WriteView, { state: "gone" }>): string => {
  * What the chip says of a write that needs the person, or none for one that does not (out, or
  * still resending, which the chip counts as saving). `skewed`: the tab is in version skew now.
  */
-export function unlandedWords(view: WriteView, skewed: boolean): { kind: Problem["kind"]; message: string; detail?: HttpFailure; retry: boolean } | undefined {
+export function unlandedWords(view: WriteView, skewed: boolean): { kind: Problem["kind"]; message: string; detail?: HttpFailure | undefined; retry: boolean } | undefined {
   switch (view.state) {
     case "rejected":
       return { kind: view.rejection.rejection === "stale" ? "conflict" : "rejected", message: reasonOf(view.rejection), retry: false };
@@ -244,16 +194,14 @@ export function unlandedWords(view: WriteView, skewed: boolean): { kind: Problem
     case "unconfirmed":
       return view.retrying
         ? undefined
-        : view.failure === undefined
-          ? { kind: "failed", message: "Could not confirm the save: the page reloaded before the answer came.", retry: true }
-          : { kind: "failed", message: "Could not confirm the save; it may have landed.", detail: view.failure, retry: true };
+        : { kind: "failed", message: "Could not confirm the save; it may have landed.", detail: view.failure, retry: true };
     case "stopped":
       if (view.failure !== undefined) {
         return { kind: "failed", message: "Not saved.", detail: view.failure, retry: true };
       }
       return {
         kind: "failed",
-        message: skewed ? "Cairn was updated, so this change was not sent. Reload; your unsent edits are kept." : "Not sent: Cairn was updated before it went out.",
+        message: skewed ? "Cairn was updated, so this change was not sent." : "Not sent: Cairn was updated before it went out.",
         retry: true,
       };
     case "idle":

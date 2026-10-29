@@ -7,7 +7,7 @@ import type { Schema, Tick } from "@cairn/client";
 
 import type { Markdown, Patch } from "./host.ts";
 import { consequenceLines, warningOf, type ConsequenceLine, type SaveEvent, type TitleOf, type Unlocked } from "./activity.ts";
-import { destinationOf, proposalIdOf, type Answer, type Command } from "./edit-record.ts";
+import { destinationOf, proposalIdOf, type Answer, type Command } from "./edit-command.ts";
 import { proposalAddress } from "../address.ts";
 import { moveOf } from "../detail/model.ts";
 

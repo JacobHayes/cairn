@@ -12,9 +12,8 @@
 // this tab made, so the reads fetch it without waiting for the server's tick.
 //
 // Skew never lifts, so `skewed` is not final: a final root would stop its children, and the
-// kept writes with them. In skew the tab derives, previews, writes and retries nothing (the
-// old engine's overlap check may be wrong) and asks for a reload; unsent edits are records in
-// session storage, so the reload keeps them. Stopping the root stops every child: the stream
+// writes with them. In skew the tab derives, previews, writes and retries nothing (the
+// old engine's overlap check may be wrong) and asks for a reload. Stopping the root stops every child: the stream
 // closes, the timers cancel, and the derivations held are released.
 import { streamStatus, subscription, type OpenTicks, type StreamStatus, type SubscriptionEvent, type Tick } from "@cairn/client";
 import { assign, enqueueActions, sendTo, setup, type ActorRefFrom, type AnyActorRef } from "xstate";
@@ -28,7 +27,7 @@ import { keyedRead, type ReadEnv, type WorkEvent } from "./keyed-read.ts";
 import { DEPLOYMENT_KEY, deploymentSource, callerKey, callerSource } from "./session-reads.ts";
 import { syncMachine, type SyncRef } from "./sync.ts";
 import { toastMachine, type ToastsRef } from "./toasts.ts";
-import type { Answer, Command } from "./edit-record.ts";
+import type { Answer, Command } from "./edit-command.ts";
 import type { WriteEnv } from "./write-machine.ts";
 import { committedTick, saveEventOf, saveOf } from "./writes.ts";
 
@@ -60,8 +59,6 @@ export type RootEvent =
   | { type: "skew" }
   /** The connection changed: whatever waits looks again. */
   | { type: "wake" }
-  /** Puts the kept edits back, once the root is running. */
-  | { type: "restore" }
   /** A write landed and left this save. */
   | { type: "saved"; save: Omit<SaveEvent, "id"> }
   /** A write of this tab committed: its receipt is a tick the reads hear before the stream's. */
@@ -152,7 +149,6 @@ export const sessionRoot = setup({
   },
   on: {
     wake: { actions: sendTo("edits", { type: "wake" }) },
-    restore: { actions: sendTo("edits", { type: "restore" }) },
     // The scheduler counts the save's SAVED time from now.
     saved: { actions: ["keepSave", sendTo("sync", { type: "saved" })] },
     watch: { actions: "forward" },

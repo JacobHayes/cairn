@@ -16,7 +16,7 @@ import { useFrameActions } from "../shell/frame.tsx";
 import { doneMutations, missingEvidence } from "../acting/acts.ts";
 import { graphPath, graphViewFrom } from "../canvas/settings.ts";
 import { writeDraft } from "../data/drafts.ts";
-import type { OperationId } from "../data/edit-record.ts";
+import type { OperationId } from "../data/edit-command.ts";
 import { useSession } from "../data/react.ts";
 import { newPatchId } from "../data/writes.ts";
 import { journeyPath } from "../journeys/address.ts";
