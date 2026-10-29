@@ -10,9 +10,9 @@ use cairn_schema::{
     Constraint, ConstraintSource, Contribution, Cursor, Date, DisplayState, EffectiveDate,
     EffectiveParticipation, Explained, ExplainedField, ExplanationPage, Guard, Instant,
     InstantPoint, JourneyId, KeyRefs, KindKey, Level, LevelDateLink, LevelDisplay, LevelNode,
-    LevelQuery, ListFlag, ListQuery, LocalEdit, Markdown, Node, NodeDerived, NodeKey, NodeKind,
-    NodeMove, NodeState, Overrides, Progress, Real, Relevance, RelevanceExplanation, RemovalRead,
-    Score, ShortChain, Snapshot, SnoozeTarget, SortBy, StaleReason, StillWaiting,
+    LevelQuery, ListFlag, ListQuery, Markdown, Node, NodeDerived, NodeKey, NodeKind, NodeMove,
+    NodeState, Overrides, Progress, Real, Relevance, RelevanceExplanation, RemovalRead, Score,
+    ShortChain, Snapshot, SnoozeTarget, SortBy, StaleReason, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -208,12 +208,8 @@ pub(crate) struct Detail {
     /// `children_cursor` for the next page. Absent when it has none.
     #[serde(default, skip_serializing_if = "Paged::is_empty")]
     children: Paged<Child>,
-    /// Its stored state, provenance, and actual dates.
+    /// Its stored state and actual dates.
     record: NodeState,
-    // PRD: B4.
-    /// What the journey edited on it.
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    local_edits: BTreeSet<LocalEdit>,
     // PRD: G5.
     /// The checklist items ticked.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -517,7 +513,6 @@ impl Detail {
             parent: _,
             children,
             record,
-            local_edits,
             ticks,
             answer,
             rationale,
@@ -549,7 +544,6 @@ impl Detail {
             node,
             children: page(children.collect(), children_cursor),
             record,
-            local_edits,
             ticks,
             answer,
             rationale,

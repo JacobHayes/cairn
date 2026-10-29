@@ -44,7 +44,7 @@ function withStoredStates(journey: Ready["journey"]) {
   state.nodes ??= {};
   for (const node of journey.graph.nodes ?? []) {
     const decided = node.kind === "decision" && state.answers?.[node.key] !== undefined;
-    state.nodes[node.key] ??= { state: decided ? "decided" : INITIAL[node.kind], provenance: "from_route" };
+    state.nodes[node.key] ??= { state: decided ? "decided" : INITIAL[node.kind] };
   }
   return { ...journey, graph: { ...journey.graph, state } };
 }

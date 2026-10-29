@@ -600,18 +600,13 @@ pub fn every_content_graph() -> cairn_schema::Graph {
 pub fn every_state() -> cairn_schema::JourneyState {
     serde_json::from_value(json!({
         "nodes": {
-            "n_plan": {"state": "active", "provenance": "from_route", "atomic": true,
+            "n_plan": {"state": "active", "atomic": true,
                        "started_on": "2026-10-06"},
-            "n_kickoff": {"state": "done", "provenance": "from_route",
+            "n_kickoff": {"state": "done",
                           "finished_on": "2026-10-05", "finished_revision": 3},
-            "n_scope": {"state": "decided", "provenance": "local", "finished_on": "2026-10-05"},
-            "n_steps": {"state": "todo", "provenance": "orphaned",
-                        "reopened": {"revision": 5, "finished_revision": 2}},
+            "n_scope": {"state": "decided", "finished_on": "2026-10-05"},
+            "n_steps": {"state": "todo", "reopened": {"revision": 5, "finished_revision": 2}},
         },
-        "local_edits": {"n_plan": [
-            {"field": "title"}, {"requires": "n_scope"}, {"participation": "k_reviewer"},
-            {"resource": "a_tip"},
-        ]},
         "answers": {
             "n_scope": {"multi_choice": ["narrow"]},
             "n_lead": {"identity": "who_lead"},
@@ -630,7 +625,6 @@ pub fn every_state() -> cairn_schema::JourneyState {
             "bypass": {"reason": "Waived for now.",
                        "failures": ["missing_note", "not_broken_down"]},
         }},
-        "tombstones": ["n_gone"],
         "annotations": [
             {"body": {"key": "a_context", "node": "n_plan", "title": "Context",
                       "note": "Discussed at the kickoff."},
@@ -663,7 +657,7 @@ pub fn proposal(key: &str, destination: &Domain, at_revision: u32) -> cairn_sche
             "mutations": [{"op": "add_node", "node": {
                 "key": "n_review", "id": "review", "kind": "action", "title": "Review",
             }}],
-            "items": [{"item": "orphan", "node": "n_gone", "keep": true, "removal": {"node": "n_gone"}}],
+            "items": [{"item": "exclusion", "node": "n_gone", "excluded": true}],
         },
         "proposing_agent": "ag_assistant",
         "created_by": "u_tester",

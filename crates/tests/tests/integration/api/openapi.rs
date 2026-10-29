@@ -91,9 +91,7 @@ mod in_process {
             under_each("apply_proposal", |set| &set.apply),
             under_each("discard_proposal", |set| &set.discard),
             under_each("refresh_proposal", |set| &set.refresh),
-            ("propose_upgrade", vec![&at::UPGRADE]),
             ("propose_save_as_route", vec![&at::SAVE_AS_ROUTE]),
-            ("propose_relink", vec![&at::RELINK]),
             ("import_route", vec![&at::IMPORT_ROUTE]),
             ("export_route", vec![&at::EXPORT_ROUTE]),
         ]
@@ -462,11 +460,6 @@ mod in_process {
             &request(&free),
         )
         .await;
-        let upgrade = json!({"patch_id": "p_upgrade", "proposal": "pr_upgrade", "to": 1});
-        for journey in ["j_vendor_eval", "j_free", "j_missing"] {
-            let reply = post(&ann, &at::UPGRADE.path_with(&[journey]), &upgrade).await;
-            conforms(&document, &at::UPGRADE, &reply);
-        }
         let save =
             json!({"patch_id": "p_save", "proposal": "pr_save", "route": "saved", "name": "Saved"});
         let saved = post(
@@ -476,10 +469,6 @@ mod in_process {
         )
         .await;
         conforms(&document, &at::SAVE_AS_ROUTE, &saved);
-        let lineage = json!({"route": "vendor-evaluation", "version": 1});
-        let relink = json!({"patch_id": "p_relink", "proposal": "pr_relink", "lineage": lineage});
-        let relinked = post(&ann, &at::RELINK.path_with(&["j_vendor_eval"]), &relink).await;
-        conforms(&document, &at::RELINK, &relinked);
     }
 
     /// Proposals for a route and for the deployment, and a preview with consequences, answer

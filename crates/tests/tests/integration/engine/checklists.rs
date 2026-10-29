@@ -10,8 +10,8 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{Applied, DerivedJourney, Records};
 use cairn_schema::{
-    ChecklistCount, Domain, GraphKey, GuardFailure, Lineage, ListQuery, RecordKey, Rejection,
-    ReviewItem, RouteFile, SequentialKeys, StaleReason, Violation, ViolationCode, Write, from_yaml,
+    ChecklistCount, GraphKey, GuardFailure, Lineage, ListQuery, RecordKey, Rejection, RouteFile,
+    SequentialKeys, StaleReason, Violation, ViolationCode, Write, from_yaml,
 };
 use support::key;
 
@@ -217,7 +217,7 @@ fn completion_needs_every_item_ticked_and_an_untick_makes_it_stale() {
     assert!(stale(&reopened).is_empty());
 }
 
-/// D4, G5: a bypass records the items that were unticked, so an item added by an upgrade is a
+/// D4, G5: a bypass records the items that were unticked, so an item added later is a
 /// distinct failure and the node goes stale naming it alone.
 #[test]
 fn a_bypass_records_the_items_and_an_added_item_is_stale() {
@@ -236,10 +236,10 @@ fn a_bypass_records_the_items_and_an_added_item_is_stale() {
         BTreeSet::from([failure("load"), failure("docs")])
     );
 
-    let longer = format!("{ITEMS}  - {{id: signoff, title: Sign-off}}\n");
-    let published =
-        support::publish_version(&bypassed, "product-launch", graph_of(&route_text(&longer)));
-    let upgraded = upgraded(&published);
+    let upgraded = accepted(
+        &bypassed,
+        "- op: set_node_field\n  node: n_hardening\n  value: {checklist: [{id: rollback, title: Rollback plan}, {id: load, title: Load test}, {id: docs, title: Runbook updated}, {id: signoff, title: Sign-off}]}\n",
+    );
     assert_eq!(
         stale(&upgraded),
         BTreeSet::from([StaleReason::from(failure("signoff"))])
@@ -292,52 +292,6 @@ fn a_removed_item_leaves_the_bypass_and_a_new_item_under_its_id_is_stale() {
     );
 }
 
-/// G5: an upgrade that drops an item takes its failure out of the bypass the same way.
-#[test]
-fn an_upgrade_dropping_an_item_leaves_the_bypass() {
-    let bypassed = accepted(
-        &ready(ITEMS),
-        &format!("{}{ANYWAY}", tick("rollback", true)),
-    );
-    let changed = "  requires_checklist: true\n  checklist:\n  - {id: rollback, title: Rollback plan}\n  - {id: docs, title: Runbook updated}\n";
-    let published =
-        support::publish_version(&bypassed, "product-launch", graph_of(&route_text(changed)));
-    let upgraded = upgraded(&published);
-    let failures = upgraded.journeys[&LAUNCH.parse().unwrap()]
-        .graph
-        .state
-        .overrides[&key(HARDENING)]
-        .bypass
-        .clone()
-        .unwrap()
-        .failures;
-    assert_eq!(failures, BTreeSet::from([failure("docs")]));
-    assert!(stale(&upgraded).is_empty());
-}
-
-fn upgrade_draft(records: &Records) -> cairn_schema::ProposalDraft {
-    cairn_engine::upgrade(
-        records,
-        &LAUNCH.parse().unwrap(),
-        cairn_schema::VersionNumber::FIRST.next(),
-        &support::fixed_inputs(),
-    )
-    .unwrap()
-}
-
-fn upgraded(records: &Records) -> Records {
-    let proposed = support::propose(
-        records,
-        "pr_upgrade",
-        &format!("{{journey: {LAUNCH}}}"),
-        &upgrade_draft(records),
-    );
-    support::apply_proposal(&proposed, "pr_upgrade")
-        .unwrap_or_else(|rejection| panic!("{rejection:#?}"))
-        .records()
-        .clone()
-}
-
 /// G5: an edit that drops an item removes its tick in the same event, and putting the item
 /// back leaves it unticked.
 #[test]
@@ -362,92 +316,6 @@ fn an_edit_dropping_an_item_drops_its_tick_in_the_same_write() {
         "- op: set_node_field\n  node: n_hardening\n  value: {checklist: [{id: rollback, title: Rolled back}, {id: load, title: Load test}, {id: docs, title: Runbook updated}]}\n",
     );
     assert_eq!(ticked(&retitled), items(&["rollback"]));
-}
-
-/// B7, G5: on a journey that never edited the list, an upgrade that drops one item and
-/// retitles another removes the dropped item's tick and keeps the other's.
-#[test]
-fn an_upgrade_dropping_an_item_drops_its_tick() {
-    let records = accepted(&ready(ITEMS), &ticks(&["rollback", "docs"]));
-    let changed = "  requires_checklist: true\n  checklist:\n  - {id: load, title: Load test}\n  - {id: docs, title: Runbook revised}\n";
-    let published =
-        support::publish_version(&records, "product-launch", graph_of(&route_text(changed)));
-    let proposed = support::propose(
-        &published,
-        "pr_upgrade",
-        &format!("{{journey: {LAUNCH}}}"),
-        &upgrade_draft(&published),
-    );
-    let applied = support::apply_proposal(&proposed, "pr_upgrade").unwrap();
-    assert_eq!(removed_ticks(&applied), items(&["rollback"]));
-    assert_eq!(ticked(applied.records()), items(&["docs"]));
-}
-
-/// B7, G5: an upgrade that turns a ticked action into a decision is a shape conflict, not a
-/// clean merge that drops the ticks; resolving it with the route's shape removes every tick.
-#[test]
-fn a_kind_change_with_ticks_is_a_conflict() {
-    let records = accepted(&ready(ITEMS), &ticks(&["rollback", "load"]));
-    let as_decision = route_text("").replace(
-        "  kind: action\n  title: Hardening pass\n  estimate: 4\n",
-        "  kind: decision\n  title: Hardening pass\n  prompt: Hardened?\n  answer_type: boolean\n",
-    );
-    let published = support::publish_version(&records, "product-launch", graph_of(&as_decision));
-    let draft = upgrade_draft(&published);
-    let shapes: Vec<_> = draft
-        .items
-        .as_slice()
-        .iter()
-        .filter(|item| {
-            matches!(
-                item,
-                ReviewItem::Conflict {
-                    conflict: cairn_schema::Conflict::Shape { .. },
-                    ..
-                }
-            )
-        })
-        .collect();
-    assert_eq!(shapes.len(), 1, "{draft:#?}");
-
-    let preview = cairn_engine::candidate(
-        &published,
-        &Domain::Journey(LAUNCH.parse().unwrap()),
-        &draft,
-        &support::fixed_inputs(),
-    );
-    let after = preview
-        .after
-        .unwrap_or_else(|violations| panic!("{violations:#?}"));
-    assert_eq!(ticked(&after), items(&["rollback", "load"]));
-
-    let clearing_state = cairn_schema::ProposalDraft {
-        items: cairn_schema::BoundedVec::new(
-            draft
-                .items
-                .as_slice()
-                .iter()
-                .map(|item| match item {
-                    ReviewItem::Conflict { conflict, .. } => ReviewItem::Conflict {
-                        conflict: conflict.clone(),
-                        resolution: Some(cairn_schema::ConflictResolution::ClearState),
-                    },
-                    other => other.clone(),
-                })
-                .collect(),
-        )
-        .unwrap(),
-        ..draft
-    };
-    let proposed = support::propose(
-        &published,
-        "pr_upgrade",
-        &format!("{{journey: {LAUNCH}}}"),
-        &clearing_state,
-    );
-    let applied = support::apply_proposal(&proposed, "pr_upgrade").unwrap();
-    assert_eq!(removed_ticks(&applied), items(&["rollback", "load"]));
-    assert!(ticked(applied.records()).is_empty());
 }
 
 /// A16, G5: the guard reads the flag, an empty list meets it, and a deliverable has the same

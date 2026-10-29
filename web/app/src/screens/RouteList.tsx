@@ -116,7 +116,6 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
                 data-kind={node.kind}
                 data-container={containers.has(node.key)}
                 data-diff={diff?.kind}
-                data-choice={diff?.choice === true ? true : undefined}
                 data-faded={faded(node.key) ? true : undefined}
                 data-navigable
                 aria-current={node.key === selected ? "true" : undefined}
@@ -127,7 +126,6 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
                 {diff === undefined ? null : (
                   <span className="layer-word" data-testid="row-diff" data-diff={diff.kind}>
                     {DIFF_LABELS[diff.kind]}
-                    {diff.choice === true ? <span className="layer-choice"> · needs a choice</span> : null}
                   </span>
                 )}
                 <button type="button" className="link route-list-title" data-testid="row-open" onClick={() => { onOpen(node.key); }}>

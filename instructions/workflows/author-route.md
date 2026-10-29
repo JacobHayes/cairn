@@ -37,7 +37,7 @@ draft, the person reviews on the canvas, and publishing makes the next version.
    tell the person it is intended.
 5. **Hand it over.** Tell the person what the proposal adds and ask them to review and
    apply it. When they are happy with the draft, `apply_patch` with `publish_draft`
-   makes it the next version; journeys on older versions can then upgrade. Publishing and
+   makes it the next version. Publishing and
    `import_route` list the same notices in their result.
 
 A route file can also be imported whole with `import_route` (YAML), and any version

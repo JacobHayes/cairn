@@ -107,7 +107,7 @@ pub enum GraphId {
 }
 
 // PRD: glossary, Lineage.
-/// A journey's link to the route version it was created from or last upgraded to.
+/// The route version a journey was made from.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -275,7 +275,7 @@ pub struct RouteHeader {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<Markdown>,
     // PRD: A19.
-    /// Hidden from new-journey creation; its journeys still see upgrades.
+    /// Hidden from new-journey creation.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub retired: bool,
     // PRD: A21.

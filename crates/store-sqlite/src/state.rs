@@ -6,29 +6,28 @@ use std::str::FromStr;
 
 use cairn_schema::{
     Annotation, AnnotationBody, AnnotationContent, BoundedSet, IdentityKey, JourneyState, Keyed,
-    LocalEdit, NodeState, Overrides, Reopened, RoleKey, SnoozeTarget,
+    NodeState, Overrides, Reopened, RoleKey, SnoozeTarget,
 };
 use cairn_store::StoreError;
 use rusqlite::Connection;
 
-use crate::sql::{Row, corrupt, enum_from, enum_name, number, parse, rows, text};
+use crate::sql::{Row, corrupt, number, parse, rows, text};
 
 /// Every state record of one graph.
 pub(crate) fn load(connection: &Connection, id: &str) -> Result<JourneyState, StoreError> {
-    let select = "SELECT node, state, provenance, atomic, started_on, finished_on, reason, \
+    let select = "SELECT node, state, atomic, started_on, finished_on, reason, \
                   finished_revision, reopened_revision, reopened_finished_revision \
                   FROM node_states WHERE graph_id = ?1";
     let nodes = keyed(connection, select, id, |row| {
         let revision = |index| row.opt_int(index)?.map(number).transpose();
         Ok(NodeState {
             state: row.name(1)?,
-            provenance: row.name(2)?,
-            atomic: row.flag(3)?,
-            started_on: row.opt_parse(4)?,
-            finished_on: row.opt_parse(5)?,
-            finished_revision: revision(7)?,
-            reason: row.opt_parse(6)?,
-            reopened: match (revision(8)?, revision(9)?) {
+            atomic: row.flag(2)?,
+            started_on: row.opt_parse(3)?,
+            finished_on: row.opt_parse(4)?,
+            finished_revision: revision(6)?,
+            reason: row.opt_parse(5)?,
+            reopened: match (revision(7)?, revision(8)?) {
                 (Some(revision), Some(finished_revision)) => Some(Reopened {
                     revision,
                     finished_revision,
@@ -61,14 +60,8 @@ pub(crate) fn load(connection: &Connection, id: &str) -> Result<JourneyState, St
             bypass: row.opt_json(3)?,
         })
     })?;
-    let select = "SELECT node FROM tombstones WHERE graph_id = ?1";
-    let mut tombstones = BTreeSet::new();
-    for row in rows(connection, select, vec![text(id)])? {
-        tombstones.insert(row.parse(0)?);
-    }
     Ok(JourneyState {
         nodes,
-        local_edits: local_edits(connection, id)?,
         ticks: ticks(connection, id)?,
         answers,
         rationales,
@@ -76,7 +69,6 @@ pub(crate) fn load(connection: &Connection, id: &str) -> Result<JourneyState, St
         pins,
         snoozes,
         overrides,
-        tombstones,
         annotations: annotations(connection, id)?,
     })
 }
@@ -96,42 +88,6 @@ where
         map.insert(row.parse(0)?, value(&row)?);
     }
     Ok(map)
-}
-
-/// A local edit's aspect and target columns; a marker without a target (the shape) has an
-/// empty target.
-pub(crate) fn local_edit_columns(edit: &LocalEdit) -> Result<(&'static str, String), StoreError> {
-    Ok(match edit {
-        LocalEdit::Field(field) => ("field", enum_name(field)?),
-        LocalEdit::Requires(node) => ("requires", node.to_string()),
-        LocalEdit::Participation(kind) => ("participation", kind.to_string()),
-        LocalEdit::Resource(resource) => ("resource", resource.to_string()),
-        LocalEdit::Shape => ("shape", String::new()),
-    })
-}
-
-fn local_edit_from(aspect: &str, target: &str) -> Result<LocalEdit, StoreError> {
-    Ok(match (aspect, target) {
-        ("field", field) => LocalEdit::Field(enum_from(field)?),
-        ("requires", node) => LocalEdit::Requires(parse(node)?),
-        ("participation", kind) => LocalEdit::Participation(parse(kind)?),
-        ("resource", resource) => LocalEdit::Resource(parse(resource)?),
-        ("shape", "") => LocalEdit::Shape,
-        (aspect, target) => return Err(corrupt(&format!("local edit {aspect} {target:?}"))),
-    })
-}
-
-fn local_edits(
-    connection: &Connection,
-    id: &str,
-) -> Result<BTreeMap<cairn_schema::NodeKey, BTreeSet<LocalEdit>>, StoreError> {
-    let mut edits: BTreeMap<_, BTreeSet<LocalEdit>> = BTreeMap::new();
-    let select = "SELECT node, aspect, target FROM local_edits WHERE graph_id = ?1";
-    for row in rows(connection, select, vec![text(id)])? {
-        let edit = local_edit_from(&row.text(1)?, &row.text(2)?)?;
-        edits.entry(row.parse(0)?).or_default().insert(edit);
-    }
-    Ok(edits)
 }
 
 fn ticks(

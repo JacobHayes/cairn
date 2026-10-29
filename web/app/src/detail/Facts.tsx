@@ -1,10 +1,7 @@
-// C8, E2, B4: who takes part in the node, and where it came from (held by the
-// Details section): they explain rather than ask for anything. The origin says whether the
-// node is the route's, edited here, or the journey's own.
-import { treeOf } from "../authoring/graph.ts";
-import { editWords } from "../authoring/local-edits.ts";
-import { memberOrigin, originLines } from "../segments/model.ts";
-import { useLatestVersions, useSegmentNames } from "../segments/read.ts";
+// C8, E2: who takes part in the node, and where it came from (held by the
+// Details section): they explain rather than ask for anything.
+import { memberOrigin, originLine } from "../segments/model.ts";
+import { useSegmentNames } from "../segments/read.ts";
 import { originText } from "./explain.ts";
 import { ParticipationEditor } from "./editors.tsx";
 import { foldKey } from "./folds.ts";
@@ -32,42 +29,24 @@ export function People({ view, detail }: { view: Ready; detail: NodeDetail }) {
   );
 }
 
-/** C8, B13: a segment member's origin: which segment and version, where the root went, and a newer version when there is one (text only). */
+/** C8, B13: a segment member's origin: which segment and version, where the root went (text only). */
 function SegmentOrigin({ view, node }: { view: Ready; node: string }) {
   const graph = view.journey.graph;
   const origin = memberOrigin(graph, node);
   const nameOf = useSegmentNames();
-  const latest = useLatestVersions();
   if (origin === undefined) {
     return <span>From a segment.</span>;
   }
   const parent = origin.insertion.parent;
   const under = parent == null ? undefined : (graph.nodes ?? []).find((each) => each.key === parent)?.title;
-  const lines = originLines(origin, { segment: nameOf(origin.insertion.segment.route), parent: under }, latest.get(origin.insertion.segment.route));
-  return (
-    <>
-      {lines.map((line) => (
-        <span key={line} data-testid="segment-origin">
-          {line}
-        </span>
-      ))}
-    </>
-  );
+  return <span data-testid="segment-origin">{originLine(origin, { segment: nameOf(origin.insertion.segment.route), parent: under })}</span>;
 }
 
-/** B4, B7, B13: where the node came from, and what was changed here. */
+/** B13: where a segment's node came from; a node of the journey's own says nothing. */
 export function Origin({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const { record, localEdits } = detail;
-  const tree = treeOf(view.journey.graph);
-  const edits = localEdits.map((edit) => editWords(edit, tree)).join(", ");
-  return record.provenance === "from_segment" ? (
-    <span className="stack" data-testid="provenance" data-status={record.provenance}>
+  return memberOrigin(view.journey.graph, detail.node.key) === undefined ? null : (
+    <span className="stack" data-testid="provenance">
       <SegmentOrigin view={view} node={detail.node.key} />
-    </span>
-  ) : (
-    <span data-testid="provenance" data-status={record.provenance}>
-      {record.provenance === "from_route" ? "From the route" : record.provenance === "orphaned" ? "Orphaned: its route version no longer has it" : "Local to this journey"}
-      {edits === "" ? "." : `, edited here: ${edits}.`}
     </span>
   );
 }

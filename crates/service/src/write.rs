@@ -11,7 +11,7 @@ use cairn_engine::{Applied, ApplyInputs, Records, apply};
 use cairn_schema::{
     Consequences, Domain, EventType, IdentityKey, JourneyId, Location, Markdown, Mutation, Notice,
     Patch, PatchReceipt, PatchTarget, ProposalId, Record, Rejection, Revision, RevisionOf, Subject,
-    Violation, ViolationCode, Violations, Write,
+    Violation, ViolationCode, Write,
 };
 use cairn_store::{Commit, CommitError, Committed, EventQuery, PageSize};
 
@@ -137,8 +137,8 @@ impl std::error::Error for WriteError {}
 impl Service {
     /// A17: applies a domain patch as `call`'s actor (H2), at `call`'s today in the
     /// deployment's zone, and commits it. In order: a patch id already committed is answered
-    /// from its receipt before anything is loaded (H5); an upgrade or re-link, which changes
-    /// a journey only once confirmed through its proposal, is refused (B7, B9, I7); the
+    /// from its receipt before anything is loaded (H5); a save as route, which changes
+    /// nothing until confirmed through its proposal, is refused (B8, I7); the
     /// records it reads, including any proposal it applies, are loaded;
     /// `apply` validates it (A15, D4); its consequences are derived (D7); the commit rechecks
     /// every revision it read (H5, E6); and every revision the commit moved is announced
@@ -153,9 +153,6 @@ impl Service {
         if let Some(answer) = self.answer_from_receipt(patch).await? {
             patina_dst::reachable!("service-resubmission-answered-from-receipt");
             return answer;
-        }
-        if let Some(rejection) = unconfirmed(patch) {
-            return Err(WriteError::Rejected(rejection));
         }
         self.write(call, patch, submitted.note.clone()).await
     }
@@ -406,31 +403,6 @@ impl Service {
                 .publish(&RevisionOf::Domain(Domain::Deployment), deployment);
         }
     }
-}
-
-/// B7, B9, I7: an upgrade or a re-link changes a journey only once someone confirms it, by
-/// applying the proposal that drafted it; submitted directly, each is refused, one violation
-/// per mutation. A proposal's own mutations reach the engine through its apply, not here.
-fn unconfirmed(patch: &Patch) -> Option<Rejection> {
-    let found: Vec<Violation> = patch
-        .mutations
-        .as_slice()
-        .iter()
-        .enumerate()
-        .filter(|(_, mutation)| {
-            matches!(mutation, Mutation::Upgrade { .. } | Mutation::Relink { .. })
-        })
-        .map(|(position, _)| {
-            violation(
-                ViolationCode::MutationNotForTarget,
-                Some(u32::try_from(position).unwrap_or(u32::MAX)),
-                "an upgrade or re-link is applied by confirming its proposal".to_owned(),
-            )
-        })
-        .collect();
-    Violations::new(found)
-        .ok()
-        .map(|violations| Rejection::Invalid { violations })
 }
 
 /// The revision before `revision`: the base a committed patch named, given the revision its

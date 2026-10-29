@@ -99,8 +99,8 @@ mod milestone_done {
             assert!(
                 connection
                     .execute(
-                        "INSERT INTO node_states (graph_id, node, state, provenance, atomic) \
-                         VALUES ('journey/j_one', 'n_extra', 'reached', 'local', 0)",
+                        "INSERT INTO node_states (graph_id, node, state, atomic) \
+                         VALUES ('journey/j_one', 'n_extra', 'reached', 0)",
                         ()
                     )
                     .is_err()
@@ -149,24 +149,6 @@ mod milestone_done {
     }
 
     #[test]
-    fn a_local_edit_of_the_flag_names_the_new_field_and_other_edits_stay() {
-        run(async {
-            let (path, store) = migrated("edits");
-            drop(store);
-            assert_eq!(
-                rows(
-                    &path,
-                    "SELECT node, aspect, target FROM local_edits ORDER BY target"
-                ),
-                [
-                    ["n_gate", "field", "auto_done"],
-                    ["n_gate", "field", "title"],
-                ]
-            );
-        });
-    }
-
-    #[test]
     fn events_are_rewritten_where_a_name_stands_and_nowhere_else() {
         run(async {
             let (path, store) = migrated("events");
@@ -185,21 +167,16 @@ mod milestone_done {
                 documents(&path, "SELECT delta FROM events ORDER BY seq"),
                 [
                     json!([put(json!({ "node_state": { "node": "n_kick", "state": {
-                        "state": "done", "provenance": "from_route", "finished_on": "2026-10-05",
+                        "state": "done", "finished_on": "2026-10-05",
                         "finished_revision": 2
                     } } }))]),
                     json!([put(json!({ "node_state": { "node": "n_work", "state": {
-                        "state": "done", "provenance": "from_route", "finished_on": "2026-10-04",
+                        "state": "done", "finished_on": "2026-10-04",
                         "finished_revision": 2
                     } } }))]),
-                    json!([
-                        put(
-                            json!({ "node_field": { "node": "n_gate", "value": { "auto_done": true } } })
-                        ),
-                        put(
-                            json!({ "local_edit": { "node": "n_gate", "edit": { "field": "auto_done" } } })
-                        ),
-                    ]),
+                    json!([put(
+                        json!({ "node_field": { "node": "n_gate", "value": { "auto_done": true } } })
+                    )]),
                     // A title, a description and a state named like the old words stay as written.
                     json!([
                         put(
@@ -207,7 +184,7 @@ mod milestone_done {
                             "title": "auto_reach", "description": "reached" } })
                         ),
                         put(json!({ "node_state": { "node": "n_reach", "state": {
-                            "state": "todo", "provenance": "local" } } })),
+                            "state": "todo" } } })),
                     ]),
                     json!([put(
                         json!({ "node": { "key": "n_late", "id": "late", "kind": "milestone",
@@ -235,25 +212,6 @@ mod milestone_done {
                     { "op": "set_node_field", "node": "n_gate", "value": { "auto_done": false } },
                     { "op": "set_node_field", "node": "n_gate", "value": { "title": "auto_reach" } },
                     { "op": "answer", "decision": "n_note", "value": { "text": "reach" } },
-                ])]
-            );
-            assert_eq!(
-                documents(&path, "SELECT items FROM proposals WHERE id = 'pr_one'"),
-                [json!([
-                    { "item": "conflict", "conflict": { "about": "field", "node": "n_gate",
-                        "journey": { "auto_done": true }, "route": { "auto_done": false } },
-                        "resolution": "keep_journey" },
-                    // A choice a person named, and the map between choices, stay as written.
-                    { "item": "conflict", "conflict": { "about": "answer", "decision": "n_choice",
-                        "answer": { "single_choice": "field" }, "choices": ["auto_reach"] },
-                        "resolution": { "map_choices": { "map": { "field": "auto_reach" } } } },
-                    { "item": "kept_local_edit",
-                        "kept": { "node": "n_gate", "edit": { "field": "auto_done" } } },
-                    { "item": "conflict", "conflict": { "about": "shape", "node": "n_kick",
-                        "journey": { "key": "n_kick", "id": "kick", "kind": "milestone",
-                            "title": "Kickoff", "auto_done": true },
-                        "route": { "key": "n_kick", "id": "kick", "kind": "action",
-                            "title": "Kickoff" } } },
                 ])]
             );
             assert_eq!(

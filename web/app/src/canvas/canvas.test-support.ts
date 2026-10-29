@@ -43,10 +43,10 @@ export function canvasView(): Ready {
         ],
         state: {
           nodes: {
-            n_kick: { state: "done", provenance: "from_route" },
-            n_build: { state: "active", provenance: "from_route" },
-            n_old: { state: "todo", provenance: "from_route" },
-            n_scope: { state: "decided", provenance: "from_route" },
+            n_kick: { state: "done" },
+            n_build: { state: "active" },
+            n_old: { state: "todo" },
+            n_scope: { state: "decided" },
           },
           answers: { n_scope: { boolean: true } },
         },

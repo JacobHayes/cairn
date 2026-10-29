@@ -2,8 +2,7 @@
 // came from, what needs a look, what is the viewer's, how far along it is and its next milestone.
 // The index holds only summaries, so each row reads its journey in the tab (reading.ts) and says
 // "Reading..." or why it could not until it has. With `mine` only the journeys the viewer owns or
-// where they hold something are kept (E4). "Upgrade available" is the host's field on each journey, never
-// worked out here. Kept current (H6). The rows can be picked (C16, A19): the row checkboxes, and
+// where they hold something are kept (E4). Kept current (H6). The rows can be picked (C16, A19): the row checkboxes, and
 // Shift-, Cmd- or Ctrl-click anywhere on a row, add and remove a journey from the index's
 // selection (JourneyIndex.tsx), which the inspector lists and deletes.
 import { Failed } from "../ui/Failed.tsx";
@@ -15,7 +14,7 @@ import { identityNames } from "../detail/sections.tsx";
 import type { JourneySummary, RouteSummary } from "../data/reads.ts";
 import { Meter, PickBox } from "../ui/kit.tsx";
 import { routePath } from "../routes/address.ts";
-import { forYouOf, forYouWords, milestoneOf, progressOf, troubleOf, troubleWords, upgradeWords, type ForYou, type Trouble } from "./figures-model.ts";
+import { forYouOf, forYouWords, milestoneOf, progressOf, troubleOf, troubleWords, type ForYou, type Trouble } from "./figures-model.ts";
 import { journeyPath } from "./address.ts";
 import { mineCountOf, useMineCounts, useReportMine } from "./mine.ts";
 import { useJourneyReading, type JourneyReading } from "./reading.ts";
@@ -56,9 +55,8 @@ function RowOwners({ owners }: { owners: readonly string[] }) {
   );
 }
 
-/** A journey's name, its status when it is not active, where it came from (with its upgrade) and who owns it: the cell that needs nothing derived. */
+/** A journey's name, its status when it is not active, where it came from and who owns it: the cell that needs nothing derived. */
 export function JourneyCell({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
-  const upgrade = upgradeWords(summary);
   const owners = summary.owners ?? [];
   return (
     <td data-column="journey">
@@ -73,14 +71,6 @@ export function JourneyCell({ summary, routes }: { summary: JourneySummary; rout
           <Lineage summary={summary} routes={routes} />
           {owners.length === 0 ? null : <RowOwners owners={owners} />}
         </span>
-        {upgrade === undefined ? null : (
-          <>
-            <span className="cell-sep">{" · "}</span>
-            <span className="ink-warn" data-testid="upgrade" data-status="available">
-              {upgrade}
-            </span>
-          </>
-        )}
       </span>
     </td>
   );

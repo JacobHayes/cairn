@@ -10,7 +10,7 @@ import type { ReferencesByIdentity } from "../data/reads.ts";
 import { identityActions, readingOf, routeFact, type Reading } from "./references.ts";
 
 const none: IdentityReferences = { journeys: [], routes: [] };
-const inJourney: IdentityReferences = { journeys: [{ id: "j_a", name: "A", status: "active", revision: 1, created_at: "2026-10-01T00:00:00Z", upgrade_available: false }], routes: [] };
+const inJourney: IdentityReferences = { journeys: [{ id: "j_a", name: "A", status: "active", revision: 1, created_at: "2026-10-01T00:00:00Z" }], routes: [] };
 const answered = (by: ReferencesByIdentity): Reading => ({ kind: "answered", by });
 const failure = { kind: "transient" as const, message: "down" };
 

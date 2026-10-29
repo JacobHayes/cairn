@@ -1,33 +1,15 @@
-// C14: a proposal's review items, each with its controls: a conflict with the resolutions it
-// offers (B7: keep, take, clear, reopen, map old choices to new, remap or remove a role or
-// kind), an orphan kept or removed with its cascade shown (A18), an identity's participation
-// mapping (B8: drop, an existing role, a new role, the default owner), a node left out of a
-// saved route, and what is only shown (a kept local edit, a cascade, a violation). An item
-// still needing a choice says so, as the preview reports it.
+// C14: a proposal's review items, each with its controls: an identity's participation mapping
+// (B8: drop, an existing role, a new role, the default owner), a node left out of a saved
+// route, and what is only shown (a cascade, a violation). An item still needing a choice says
+// so, as the preview reports it.
 import { useState } from "react";
 
 import type { Kind, Role } from "../authoring/graph.ts";
 import { mintKey, slugOf } from "../authoring/keys.ts";
 import { Picker } from "../authoring/parts.tsx";
-import { choiceId, choiceLabel } from "../status/answer.ts";
 import { Badge, Button, Input } from "../ui/kit.tsx";
-import {
-  kindOf,
-  needsChoice,
-  withExclusion,
-  withMapping,
-  withOrphanKept,
-  withResolution,
-  type Conflict,
-  type ConflictReview,
-  type Mapping,
-  type ProposalDraft,
-  type Resolution,
-  type ResolutionKind,
-  type ReviewItem,
-  type UnresolvedReason,
-} from "./model.ts";
-import { RESOLUTION_WORDS, conflictWords, itemHeading, resolutionEffect, type Names } from "./words.ts";
+import { needsChoice, withExclusion, withMapping, type Mapping, type ProposalDraft, type ReviewItem, type UnresolvedReason } from "./model.ts";
+import { itemHeading, type Names } from "./words.ts";
 
 /** What the item controls read and change. */
 export interface ItemsContext {
@@ -40,86 +22,18 @@ export interface ItemsContext {
   unresolved: ReadonlyMap<number, UnresolvedReason>;
   /** The edits are newer than the preview: whether an item still needs a choice is being checked. */
   checking: boolean;
-  /** What each conflict offers, by position (the preview's). */
-  conflicts: ReadonlyMap<number, ConflictReview>;
   /** The proposal is open and the tab may write. */
   editable: boolean;
 }
 
 const UNRESOLVED_WORDS: Record<UnresolvedReason, string> = {
   no_choice: "Needs a choice",
-  not_offered: "That choice is not offered here",
   mixed_mapping: "Shares a participation with identities mapped to other roles",
   no_default_owner: "The graph has no default owner to map to",
 };
 
-/** B7: an answer's removed choices, each mapped to one that remains. */
-function ChoiceMap({ conflict, removed, value, onChange, disabled }: { conflict: Extract<Conflict, { about: "answer" }>; removed: readonly string[]; value: Record<string, string>; onChange: (map: Record<string, string>) => void; disabled: boolean }) {
-  const remaining = conflict.choices;
-  return (
-    <span className="stack">
-      {removed.map((choice) => (
-        <span key={choice} className="row">
-          {choice} becomes
-          <Picker aria-label={`Map ${choice} to`} disabled={disabled} value={value[choice] ?? ""} none="Choose" options={remaining.map((choice) => ({ value: choiceId(choice), label: choiceLabel(choice) }))} onChange={(event) => { onChange({ ...value, [choice]: event.target.value }); }} />
-        </span>
-      ))}
-    </span>
-  );
-}
-
-/** The resolution of `kind` with what it carries, or none until its parts are picked. */
-function resolutionOf(kind: ResolutionKind, parts: { role: string; kind: string; map: Record<string, string> }): Resolution | null {
-  switch (kind) {
-    case "remap_role":
-      return parts.role === "" ? null : { remap_role: { role: parts.role } };
-    case "remap_kind":
-      return parts.kind === "" ? null : { remap_kind: { kind: parts.kind } };
-    case "map_choices":
-      return Object.values(parts.map).some((choice) => choice === "") ? null : { map_choices: { map: parts.map } };
-    default:
-      return kind;
-  }
-}
-
-function ConflictControls({ index, conflict, resolution, context }: { index: number; conflict: Conflict; resolution: Resolution | null | undefined; context: ItemsContext }) {
-  const chosen = resolution == null ? undefined : kindOf(resolution);
-  const [role, setRole] = useState(resolution != null && typeof resolution === "object" && "remap_role" in resolution ? resolution.remap_role.role : "");
-  const [kind, setKind] = useState(resolution != null && typeof resolution === "object" && "remap_kind" in resolution ? resolution.remap_kind.kind : "");
-  const review = context.conflicts.get(index);
-  const removed = review?.removed_choices ?? [];
-  const [map, setMap] = useState<Record<string, string>>(
-    resolution != null && typeof resolution === "object" && "map_choices" in resolution ? resolution.map_choices.map : Object.fromEntries(removed.map((choice) => [choice, ""])),
-  );
-  const choose = (next: ResolutionKind, parts = { role, kind, map }) => {
-    context.edit(withResolution(context.draft, index, resolutionOf(next, parts)));
-  };
-  const otherRoles = context.roles.filter((each) => conflict.about !== "role" || each.key !== conflict.role);
-  const otherKinds = context.kinds.filter((each) => conflict.about !== "kind" || each.key !== conflict.kind);
-  return (
-    <div className="opts" role="radiogroup" aria-label="Resolution">
-      {(review?.offers ?? []).map((option) => (
-        <label key={option} className="opt">
-          <input type="radio" name={`resolution-${String(index)}`} disabled={!context.editable} checked={chosen === option} onChange={() => { choose(option); }} data-testid="resolution" data-resolution={option} />
-          {RESOLUTION_WORDS[option]}
-          {resolutionEffect(conflict, option, context.names) === undefined ? null : <span className="eff">{resolutionEffect(conflict, option, context.names)}</span>}
-          {option === "remap_role" ? (
-            <Picker aria-label="Move its uses to" disabled={!context.editable} value={role} none="Choose a role" options={otherRoles.map((each) => ({ value: each.key, label: each.title ?? each.id }))} onChange={(event) => { setRole(event.target.value); choose("remap_role", { role: event.target.value, kind, map }); }} />
-          ) : null}
-          {option === "remap_kind" ? (
-            <Picker aria-label="Move its participations to" disabled={!context.editable} value={kind} none="Choose a kind" options={otherKinds.map((each) => ({ value: each.key, label: each.title ?? each.id }))} onChange={(event) => { setKind(event.target.value); choose("remap_kind", { role, kind: event.target.value, map }); }} />
-          ) : null}
-          {option === "map_choices" && conflict.about === "answer" ? (
-            <ChoiceMap conflict={conflict} removed={removed} value={map} disabled={!context.editable} onChange={(next) => { setMap(next); choose("map_choices", { role, kind, map: next }); }} />
-          ) : null}
-        </label>
-      ))}
-    </div>
-  );
-}
-
 /** A18: what removing a node removes, as the removal names it. */
-function RemovalList({ removal, names }: { removal: Extract<ReviewItem, { item: "orphan" }>["removal"]; names: Names }) {
+function RemovalList({ removal, names }: { removal: Extract<ReviewItem, { item: "cascade" }>["removal"]; names: Names }) {
   const descendants = removal.descendants ?? [];
   const edges = removal.edges ?? [];
   const attached = (removal.annotations ?? []).length + (removal.resources ?? []).length + (removal.participations ?? []).length;
@@ -184,31 +98,6 @@ function MappingControls({ index, mapping, context }: { index: number; mapping: 
 function ItemBody({ index, item, context }: { index: number; item: ReviewItem; context: ItemsContext }) {
   const { names } = context;
   switch (item.item) {
-    case "conflict":
-      return (
-        <>
-          <span>{conflictWords(item.conflict, names, context.conflicts.get(index)?.removed_choices)}</span>
-          <ConflictControls index={index} conflict={item.conflict} resolution={item.resolution} context={context} />
-        </>
-      );
-    case "kept_local_edit":
-      return <span className="muted small">{keptWords(item.kept, names)}: the route left it alone, so this journey's stays.</span>;
-    case "orphan":
-      return (
-        <>
-          <span className="row">
-            <label className="row">
-              <input type="radio" name={`orphan-${String(index)}`} disabled={!context.editable} checked={item.keep} onChange={() => { context.edit(withOrphanKept(context.draft, index, true)); }} data-testid="orphan-keep" />
-              Keep it, orphaned, with its state
-            </label>
-            <label className="row">
-              <input type="radio" name={`orphan-${String(index)}`} disabled={!context.editable} checked={!item.keep} onChange={() => { context.edit(withOrphanKept(context.draft, index, false)); }} data-testid="orphan-remove" />
-              Remove it with what is beneath it
-            </label>
-          </span>
-          {item.keep ? null : <RemovalList removal={item.removal} names={names} />}
-        </>
-      );
     case "participation":
       return (
         <>
@@ -230,18 +119,6 @@ function ItemBody({ index, item, context }: { index: number; item: ReviewItem; c
   }
 }
 
-function keptWords(kept: Extract<ReviewItem, { item: "kept_local_edit" }>["kept"], names: Names): string {
-  if (kept === "default_owner") {
-    return "The default owner";
-  }
-  if ("node" in kept) {
-    const edit = kept.node.edit;
-    const what = edit === "shape" ? "shape" : "field" in edit ? edit.field.replaceAll("_", " ") : "requires" in edit ? `requirement on ${names.node(edit.requires)}` : "participation" in edit ? names.kind(edit.participation) : "a resource";
-    return `${names.node(kept.node.node)}: its ${what}`;
-  }
-  return "role" in kept ? `The role ${names.role(kept.role)}` : `The kind ${names.kind(kept.kind)}`;
-}
-
 /**
  * C14: the proposal's review items, in order, those needing a choice marked. With `only`, just the
  * items whose node it keeps: the item editor shows a node's own, the proposal card those about none.
@@ -259,9 +136,8 @@ export function ItemList({ context, itemNode, only }: { context: ItemsContext; i
         if (only !== undefined && !only(node)) {
           return null;
         }
-        const about = item.item === "conflict" ? item.conflict.about : undefined;
         return (
-          <li key={index} className="panel stack proposal-item" data-testid="review-item" data-item={item.item} data-about={about} data-node={node}>
+          <li key={index} className="panel stack proposal-item" data-testid="review-item" data-item={item.item} data-node={node}>
             <span className="row">
               <strong>{itemHeading(item, context.names)}</strong>
               {reason === undefined && context.checking && needsChoice(item) ? <Badge data-testid="checking">Checking</Badge> : null}

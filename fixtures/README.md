@@ -181,12 +181,8 @@ up into a visible node as its checklist (C4), and the first three items of the n
 Version 2, `route-v2.yaml`, extends version 1: the access deliverable is renamed
 ("Environment and data access"), the workload placeholder is removed, a sign-off action is added
 under reporting (`n_signoff`, requiring the final review), and the baseline is relevant only when
-the comparison set is the prior tool. Upgrading the finished scenario journey, which has no local
-edits, to version 2 proposes the upgrade mutation and one item: the workload as an orphan, kept by
-default, whose removal would also remove its two journey-local children (`n_workload_ingest`,
-`n_workload_query`). There is no conflict and no kept edit; the rename, the condition, and the
-sign-off apply with the upgrade, and the workload stays done, orphaned. `crates/tests/tests/integration/engine/upgrade.rs`
-checks these items.
+the comparison set is the prior tool. Tests publish it as a route's second version, beside the
+journey that was made from version 1.
 
 ## `hiring-loop/`
 

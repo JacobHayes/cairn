@@ -6,9 +6,9 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Annotation, AnswerEffects, AnswerValue, Date, DisplayState, KeyRefs, LocalEdit, Markdown,
-    MineEntry, Node, NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path,
-    Revision, State, StillWaiting, Title,
+    Annotation, AnswerEffects, AnswerValue, Date, DisplayState, KeyRefs, Markdown, MineEntry, Node,
+    NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, Revision, State,
+    StillWaiting, Title,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -82,12 +82,8 @@ pub struct NodeDetail {
     /// Its children in key order, each with its state.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<ChildEntry>,
-    /// Its stored state, provenance, and actual dates.
+    /// Its stored state and actual dates.
     pub record: NodeState,
-    // PRD: B4.
-    /// What the journey edited on it, for a route-copied node.
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub local_edits: BTreeSet<LocalEdit>,
     // PRD: G5.
     /// The checklist items ticked.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -151,7 +147,6 @@ impl From<crate::NodeDetail> for NodeDetail {
             parent,
             children,
             record,
-            local_edits,
             ticks,
             answer,
             rationale,
@@ -184,7 +179,6 @@ impl From<crate::NodeDetail> for NodeDetail {
             parent,
             children: children.collect(),
             record,
-            local_edits,
             ticks,
             answer,
             rationale,

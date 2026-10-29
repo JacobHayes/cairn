@@ -1,7 +1,7 @@
 // C16: the journey index, a table opened in full (DESIGN, Table): each journey with its route and
 // version, what needs a look, what is the viewer's, its progress and its next milestone
 // (JourneyTable.tsx). It keeps every journey the filters keep (status, lineage route and version,
-// "mine", "upgrade available"), by name, kept current (H6). "Mine" keeps the journeys where the
+// "mine"), by name, kept current (H6). "Mine" keeps the journeys where the
 // caller holds something. A read that is still going, one that failed, and an empty answer each
 // say so, with the way on. Rows can be picked; the inspector lists the picked journeys and deletes
 // them together once every one is archived (SelectedJourneys.tsx, A19).

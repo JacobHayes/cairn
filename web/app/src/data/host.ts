@@ -133,7 +133,7 @@ export interface Host {
   history(journey: string, node?: string, after?: number): Promise<HistoryPage>;
   /** Sends one patch, its events carrying `note` (J1). */
   send(patch: Patch, note?: Markdown): Promise<Answered<HttpFailure>>;
-  /** I6, C14: proposals, and the upgrade, save-as-route, and re-link drafts (B7, B8, B9). */
+  /** I6, C14: proposals, and the save-as-route draft (B8). */
   readonly proposals: ProposalHost;
   /** I5: the assistant's calls; the capabilities say whether the server has one. */
   readonly assistant: AssistantHost;
@@ -186,8 +186,6 @@ export interface Deriver {
   valueProblems(checks: ValueCheck[]): Promise<ValueProblem[]>;
   /** A18: what removing a node, role or kind from a graph takes and leaves dangling, with the rewrites to send first; none when the node is not in it. */
   removalPlan(graph: Schema<"Graph">, target: Schema<"RemovalTarget">): Promise<Schema<"RemovalPlan"> | undefined>;
-  /** B4: the mutations restoring tombstoned node `key` of a route version into a journey, parents first; none when it is not in the version. */
-  restoreNodes(journey: Schema<"Graph">, version: Schema<"Graph">, key: string, seed: string): Promise<Schema<"Mutation">[] | undefined>;
   /** A10: a stored message draft as an author reads it. */
   draftWritten(graph: Schema<"Graph">, stored: string): Promise<string>;
   /** A10: a written message draft stored with keys, or why it cannot be. */

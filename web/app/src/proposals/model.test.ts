@@ -18,8 +18,6 @@ import {
   withMapping,
   withMutation,
   withMutationsAdded,
-  withOrphanKept,
-  withResolution,
   withoutMutation,
   type GateInput,
   type ProposalDraft,
@@ -103,30 +101,22 @@ describe("intervening (I6)", () => {
 
 describe("a reviewer's edits (C14)", () => {
   const draft: ProposalDraft = {
-    title: "Upgrade",
+    title: "Edit",
     destination_revision: 7,
     items: [
-      { item: "conflict", conflict: { about: "default_owner", journey: "r_a", route: "r_b" } },
-      { item: "orphan", node: "n_b", keep: true, removal: { node: "n_b" } },
       { item: "participation", identity: "who_a", uses: [{ node: "n_a", kind: "k_owner" }] },
       { item: "exclusion", node: "n_c", excluded: false },
     ],
-    mutations: [{ op: "upgrade", to: 2 }, { op: "clear_pin", node: "n_a" }],
+    mutations: [{ op: "set_pin", node: "n_a", date: "2026-11-01" }, { op: "clear_pin", node: "n_a" }],
   };
 
   it("each edits its own item and leaves the rest", () => {
-    const edited = withExclusion(withMapping(withOrphanKept(withResolution(draft, 0, "take_route"), 1, false), 2, "drop"), 3, true);
+    const edited = withExclusion(withMapping(draft, 0, "drop"), 1, true);
     expect(edited.items).toEqual([
-      { ...draft.items?.[0], resolution: "take_route" },
-      { ...draft.items?.[1], keep: false },
-      { ...draft.items?.[2], mapping: "drop" },
-      { ...draft.items?.[3], excluded: true },
+      { ...draft.items?.[0], mapping: "drop" },
+      { ...draft.items?.[1], excluded: true },
     ]);
     expect(edited.mutations).toEqual(draft.mutations);
-  });
-
-  it("an edit for another kind of item changes nothing", () => {
-    expect(withOrphanKept(draft, 0, false)).toEqual(draft);
   });
 
   it("drops, replaces, and adds mutations in place", () => {
@@ -137,30 +127,20 @@ describe("a reviewer's edits (C14)", () => {
 });
 
 describe("diffMarks (C14)", () => {
-  const items = [
-    { item: "conflict" as const, conflict: { about: "field" as const, node: "n_c", journey: { title: "C" }, route: { title: "See" } } },
-    { item: "orphan" as const, node: "n_b", keep: true, removal: { node: "n_b" } },
-  ];
-
-  it("marks the diff by kind, and lets the items' orphans say more", () => {
-    const marks = diffMarks(graphDiff(before, after), items, new Set());
-    expect(Object.fromEntries(Object.entries(marks).map(([key, mark]) => [key, [mark.kind, mark.note, mark.choice]]))).toEqual({
-      n_a: ["changed", undefined, undefined],
-      n_b: ["changed", DIFF_NOTES.orphan, undefined],
-      n_c: ["changed", undefined, undefined],
-      n_d: ["added", undefined, undefined],
+  it("marks the diff by kind, and a node left out of a saved route as removed with its note", () => {
+    const items = [{ item: "exclusion" as const, node: "n_b", excluded: true }];
+    const marks = diffMarks(graphDiff(before, after), items);
+    expect(Object.fromEntries(Object.entries(marks).map(([key, mark]) => [key, [mark.kind, mark.note]]))).toEqual({
+      n_a: ["changed", undefined],
+      n_b: ["removed", DIFF_NOTES.excluded],
+      n_c: ["changed", undefined],
+      n_d: ["added", undefined],
     });
   });
 
-  it("asks for a choice only while its conflict is unresolved", () => {
-    const diff = graphDiff(before, after);
-    expect(diffMarks(diff, items, new Set([0]))["n_c"]).toMatchObject({ kind: "changed", choice: true });
-    expect(diffMarks(diff, items, new Set())["n_c"]?.choice).toBeUndefined();
-  });
-
   it("marks a node whose state a proposal changes though its definition is the same", () => {
-    const diff = graphDiff({ ...before, state: { nodes: { n_a: { state: "todo", provenance: "local" } } } }, { ...before, state: { nodes: { n_a: { state: "done", provenance: "local" } } } });
-    expect(diffMarks(diff, [], new Set())["n_a"]).toMatchObject({ kind: "changed" });
+    const diff = graphDiff({ ...before, state: { nodes: { n_a: { state: "todo" } } } }, { ...before, state: { nodes: { n_a: { state: "done" } } } });
+    expect(diffMarks(diff, [])["n_a"]).toMatchObject({ kind: "changed" });
   });
 });
 
@@ -170,7 +150,7 @@ describe("reviewEntries (C14)", () => {
     const was = nodes([["a"], ["b", "a"], ["c", "b"], ["d"], ["e"]]);
     const now = nodes([["d"], ["e"], ["f"]]);
     const diff = graphDiff(was, now);
-    const entries = reviewEntries(diff, diffMarks(diff, [], new Set()), was);
+    const entries = reviewEntries(diff, diffMarks(diff, []), was);
     expect(entries.map((entry) => [entry.key, entry.cause])).toEqual([
       ["f", undefined],
       ["a", undefined],
@@ -182,9 +162,8 @@ describe("reviewEntries (C14)", () => {
 
 describe("needsChoice (C14)", () => {
   it("is true for the items a reviewer resolves and false for those only shown", () => {
-    expect(needsChoice({ item: "conflict", conflict: { about: "default_owner", journey: "r_a", route: "r_b" } })).toBe(true);
     expect(needsChoice({ item: "participation", identity: "who_a", uses: [] })).toBe(true);
-    expect(needsChoice({ item: "orphan", node: "n_a", keep: true, removal: { node: "n_a" } })).toBe(false);
+    expect(needsChoice({ item: "exclusion", node: "n_a", excluded: true })).toBe(false);
   });
 });
 

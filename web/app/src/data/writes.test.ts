@@ -117,10 +117,8 @@ describe("saveOf", () => {
   it("records the drafting of a proposal with the way to it, whichever way it was drafted, so it stays reachable", () => {
     const drafting: [Command, string][] = [
       [{ kind: "proposal", call: { op: "create", destination: { journey: "j_one" }, request: { id: "pr_new", patch_id: "p_x", draft: {} as never } } }, "/journeys/j_one/proposals/pr_new"],
-      [{ kind: "proposal", call: { op: "upgrade", journey: "j_one", request: { proposal: "pr_new", patch_id: "p_x", to: 2 } } }, "/journeys/j_one/proposals/pr_new"],
       // Saving a journey as a route drafts a proposal for the route, which does not exist yet.
       [{ kind: "proposal", call: { op: "save_as_route", journey: "j_one", request: { proposal: "pr_new", patch_id: "p_x", route: "r", name: "R" } } }, "/routes/r/proposals/pr_new"],
-      [{ kind: "proposal", call: { op: "relink", journey: "j_one", request: { proposal: "pr_new", patch_id: "p_x", route: "r", version: 2 } as never } }, "/journeys/j_one/proposals/pr_new"],
     ];
     for (const [command, address] of drafting) {
       expect(saveOf(command, { outcome: "already_saved" } as never, 5, titleOf)?.address).toBe(address);

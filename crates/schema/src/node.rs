@@ -427,7 +427,13 @@ impl<R: References> AnswerSpec<R> {
         self.answer_type() == answer.answer_type()
             && match self {
                 AnswerSpec::SingleChoice(choices) | AnswerSpec::MultiChoice(choices) => {
-                    crate::proposal::removed_choices(answer, choices).is_empty()
+                    let offered =
+                        |choice: &Slug| choices.as_slice().iter().any(|c| &c.id == choice);
+                    match answer {
+                        crate::state::AnswerValue::SingleChoice(choice) => offered(choice),
+                        crate::state::AnswerValue::MultiChoice(set) => set.iter().all(offered),
+                        _ => true,
+                    }
                 }
                 AnswerSpec::Boolean
                 | AnswerSpec::Text

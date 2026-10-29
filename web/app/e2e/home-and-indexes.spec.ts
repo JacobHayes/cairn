@@ -57,7 +57,7 @@ test("C16, C17: the Journeys index at 390px shows both of each row's facts and n
   for (const right of widths) {
     expect(right).toBeLessThanOrEqual(390);
   }
-  // Both independent facts show on a row that has them (what needs a look, what is yours), a fact that says nothing is left out, and an upgrade notice is never hidden.
+  // Both independent facts show on a row that has them (what needs a look, what is yours), a fact that says nothing is left out.
   let shown = 0;
   const empty = { trouble: ["none"], "for-you": ["nothing", "nothing-open", "inactive"] };
   for (const row of await whenSettled(page, () => rows.all())) {
@@ -69,9 +69,6 @@ test("C16, C17: the Journeys index at 390px shows both of each row's facts and n
         await expect(cell, `${column} on a row that has one`).toBeVisible();
         shown += 1;
       }
-    }
-    for (const notice of await whenSettled(page, () => row.getByTestId("upgrade").all())) {
-      await expect(notice).toBeVisible();
     }
   }
   expect(shown).toBeGreaterThan(0);

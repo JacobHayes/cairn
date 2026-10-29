@@ -570,23 +570,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journeys/{id}/relink": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Proposes re-linking the journey to a published version, differences kept as local edits unless the reviewer takes the route's. */
-        post: operations["proposeRelink"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/journeys/{id}/save-as-route": {
         parameters: {
             query?: never;
@@ -666,23 +649,6 @@ export interface paths {
         get: operations["traceNode"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/journeys/{id}/upgrade": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Proposes upgrading the journey to a newer version of its route: the merge's conflicts, kept edits, and orphans are its review items. */
-        post: operations["proposeUpgrade"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1471,173 +1437,6 @@ export interface components {
          */
         ConditionValue: boolean | components["schemas"]["ConditionText"];
         /**
-         * @description What a conflict is about, with the journey's side and the route's. A side that
-         *     is absent is `None` (an absent edge is `false`).
-         */
-        Conflict: {
-            /** @constant */
-            about: "field";
-            /**
-             * @description The route's value names a node the journey does not hold, so it cannot be taken
-             *     (a removed node's tombstone covers its subtree); only the journey's side is
-             *     offered.
-             */
-            dangling?: boolean;
-            /** @description The journey's value. */
-            journey: components["schemas"]["NodeFieldValueResolved"];
-            /** @description The node. */
-            node: components["schemas"]["NodeKey"];
-            /** @description The route's value. */
-            route: components["schemas"]["NodeFieldValueResolved"];
-        } | {
-            /** @constant */
-            about: "edge";
-            /** @description The edge. */
-            edge: components["schemas"]["Edge"];
-            /** @description Present in the journey. */
-            journey: boolean;
-            /** @description Present in the route. */
-            route: boolean;
-        } | {
-            /** @constant */
-            about: "participation";
-            /** @description The journey's source. */
-            journey?: components["schemas"]["ParticipationSourceResolved"] | null;
-            /** @description The kind. */
-            kind: components["schemas"]["KindKey"];
-            /** @description The node. */
-            node: components["schemas"]["NodeKey"];
-            /** @description The route's source. */
-            route?: components["schemas"]["ParticipationSourceResolved"] | null;
-        } | {
-            /** @constant */
-            about: "resource";
-            /**
-             * @description The route's value names a node the journey does not hold, so it cannot be taken
-             *     (a removed node's tombstone covers its subtree); only the journey's side is
-             *     offered.
-             */
-            dangling?: boolean;
-            /** @description The journey's resource. */
-            journey?: components["schemas"]["Resource"] | null;
-            /** @description The node. */
-            node: components["schemas"]["NodeKey"];
-            /** @description The resource. */
-            resource: components["schemas"]["AttachmentKey"];
-            /** @description The route's resource. */
-            route?: components["schemas"]["Resource"] | null;
-        } | {
-            /** @constant */
-            about: "shape";
-            /** @description The journey has answered it, so taking an answer-type change reopens it. */
-            answered?: boolean;
-            /**
-             * @description The route's value names a node the journey does not hold, so it cannot be taken
-             *     (a removed node's tombstone covers its subtree); only the journey's side is
-             *     offered.
-             */
-            dangling?: boolean;
-            /** @description The journey's node. */
-            journey: components["schemas"]["Node"];
-            /** @description The route's node. */
-            route: components["schemas"]["Node"];
-        } | {
-            /** @constant */
-            about: "answer";
-            /** @description The journey's answer. */
-            answer: components["schemas"]["AnswerValue"];
-            /** @description The route's choices. */
-            choices: components["schemas"]["Choices"];
-            /** @description The decision. */
-            decision: components["schemas"]["NodeKey"];
-            /**
-             * @description The rationale the journey's answer was given with, kept when the answer is
-             *     mapped onto the route's choices.
-             */
-            rationale?: components["schemas"]["Markdown"] | null;
-        } | {
-            /** @constant */
-            about: "role";
-            /**
-             * @description The insertions that map a segment role onto it, when the route removed it:
-             *     the role can then be kept or removed, not remapped.
-             */
-            insertions?: components["schemas"]["InsertionKey"][];
-            /** @description The journey's role. */
-            journey?: components["schemas"]["RoleResolved"] | null;
-            /**
-             * @description Who fills the role now, when insertions map onto it: removing it hands
-             *     these to the segment's nodes directly.
-             */
-            members?: components["schemas"]["IdentityKey"][];
-            /** @description What in the journey refers to it. */
-            references?: components["schemas"]["RoleReference"][];
-            /** @description The role. */
-            role: components["schemas"]["RoleKey"];
-            /** @description The route's role, none when it removed it. */
-            route?: components["schemas"]["RoleResolved"] | null;
-        } | {
-            /** @constant */
-            about: "kind";
-            /**
-             * @description The insertions that map a segment kind onto it, when the route removed it:
-             *     the kind can then be kept or removed, not remapped.
-             */
-            insertions?: components["schemas"]["InsertionKey"][];
-            /** @description The journey's kind. */
-            journey?: components["schemas"]["ParticipationKindResolved"] | null;
-            /** @description The kind. */
-            kind: components["schemas"]["KindKey"];
-            /** @description The journey's participations of the kind, by node. */
-            references?: {
-                [key: string]: components["schemas"]["ParticipationSourceResolved"];
-            };
-            /** @description The route's kind, none when it removed it. */
-            route?: components["schemas"]["ParticipationKindResolved"] | null;
-        } | {
-            /** @constant */
-            about: "default_owner";
-            /** @description The journey's. */
-            journey?: components["schemas"]["RoleKey"] | null;
-            /** @description The route's. */
-            route?: components["schemas"]["RoleKey"] | null;
-        };
-        /**
-         * @description How a reviewer resolves a conflict. Which resolutions a conflict offers depends
-         *     on what it is about ([`Conflict::offers`]); each becomes ordinary mutations when the
-         *     proposal is resolved.
-         */
-        ConflictResolution: "keep_journey" | "take_route" | {
-            map_choices: {
-                /** @description Removed choice to remaining choice. */
-                map: {
-                    [key: string]: components["schemas"]["Slug"];
-                };
-            };
-        } | "clear_state" | "reopen" | {
-            remap_role: {
-                /** @description The role the references move to. */
-                role: components["schemas"]["RoleKey"];
-            };
-        } | {
-            remap_kind: {
-                /** @description The kind the participations move to. */
-                kind: components["schemas"]["KindKey"];
-            };
-        } | "remove";
-        /** @description What the engine offers for one conflict item. */
-        ConflictReview: {
-            /**
-             * Format: uint32
-             * @description The item's position in the proposal.
-             */
-            item: number;
-            /** @description The kinds of resolution the conflict offers, in the order a reviewer reads them. */
-            offers: components["schemas"]["ResolutionKind"][];
-            /** @description For an answer conflict, the choices the answer names that the route no longer offers. */
-            removed_choices?: components["schemas"]["Slug"][];
-        };
-        /**
          * @description What an accepted patch or a proposal preview newly caused in derived state,
          *     reported with the result and never stored.
          */
@@ -2107,7 +1906,7 @@ export interface components {
          *     their content ([`Mutation::event_type`]).
          * @enum {string}
          */
-        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "route_deleted" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "override_removed" | "atomic_changed" | "item_ticked" | "item_unticked" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
+        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "route_deleted" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "override_removed" | "atomic_changed" | "item_ticked" | "item_unticked" | "annotation_added" | "annotation_edited" | "annotation_removed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
         /**
          * @description A list of explanation entries with its total: complete inside
          *     the engine and the browser; a server response keeps the largest entries up to
@@ -2257,13 +2056,6 @@ export interface components {
         } | {
             node_state: components["schemas"]["NodeKey"];
         } | {
-            local_edit: {
-                /** @description The marker. */
-                edit: components["schemas"]["LocalEdit"];
-                /** @description The node. */
-                node: components["schemas"]["NodeKey"];
-            };
-        } | {
             tick: {
                 /** @description The item's id. */
                 item: components["schemas"]["Slug"];
@@ -2280,8 +2072,6 @@ export interface components {
             snooze: components["schemas"]["NodeKey"];
         } | {
             overrides: components["schemas"]["NodeKey"];
-        } | {
-            tombstone: components["schemas"]["NodeKey"];
         } | {
             annotation: {
                 /** @description The annotation. */
@@ -2336,13 +2126,6 @@ export interface components {
                 state: components["schemas"]["NodeState"];
             };
         } | {
-            local_edit: {
-                /** @description The marker. */
-                edit: components["schemas"]["LocalEdit"];
-                /** @description The node. */
-                node: components["schemas"]["NodeKey"];
-            };
-        } | {
             tick: {
                 /** @description The item's id. */
                 item: components["schemas"]["Slug"];
@@ -2389,8 +2172,6 @@ export interface components {
                 /** @description The overrides. */
                 overrides: components["schemas"]["Overrides"];
             };
-        } | {
-            tombstone: components["schemas"]["NodeKey"];
         } | {
             annotation: components["schemas"]["Annotation"];
         };
@@ -2544,8 +2325,6 @@ export interface components {
             insertion: components["schemas"]["InsertionKey"];
             /** @description The root member's current title. */
             title: components["schemas"]["Title"];
-            /** @description Whether the segment has a later published version. */
-            upgrade_available: boolean;
         };
         /** @description A point in time: `n_x.start` or `n_x.finish` for a node's start or finish, `n_x.answer` for a date decision's answered date, `created` for the journey's creation. */
         Instant: string;
@@ -2617,13 +2396,6 @@ export interface components {
             answers?: {
                 [key: string]: components["schemas"]["AnswerValue"];
             };
-            /**
-             * @description Each route-copied node's local edits, apart from its state so that an edit and
-             *     a transition on one node touch different records.
-             */
-            local_edits?: {
-                [key: string]: components["schemas"]["LocalEdit"][];
-            };
             /** @description Each node's stored state. */
             nodes?: {
                 [key: string]: components["schemas"]["NodeState"];
@@ -2665,8 +2437,6 @@ export interface components {
             ticks?: {
                 [key: string]: components["schemas"]["Slug"][];
             };
-            /** @description Route-copied nodes the journey removed, so an upgrade does not re-add them. */
-            tombstones?: components["schemas"]["NodeKey"][];
         };
         /** @description A journey's status. */
         JourneyStatus: "active" | "completed" | "archived";
@@ -2679,8 +2449,6 @@ export interface components {
             created_at: string;
             /** @description The journey. */
             id: components["schemas"]["JourneyId"];
-            /** @description The latest version its route has published. */
-            latest_version?: components["schemas"]["VersionNumber"] | null;
             /** @description The route version it follows. */
             lineage?: components["schemas"]["Lineage"] | null;
             /** @description Its name. */
@@ -2694,25 +2462,7 @@ export interface components {
             revision: components["schemas"]["Revision"];
             /** @description Its status. */
             status: components["schemas"]["JourneyStatus"];
-            /** @description Whether its route has published a version newer than its own. */
-            upgrade_available: boolean;
         };
-        /**
-         * @description A journey's deviation from its route that an upgrade keeps, listed for the reviewer (
-         *     locally edited and unchanged in the route).
-         */
-        Kept: {
-            node: {
-                /** @description What it edited. */
-                edit: components["schemas"]["LocalEdit"];
-                /** @description The node. */
-                node: components["schemas"]["NodeKey"];
-            };
-        } | {
-            role: components["schemas"]["RoleKey"];
-        } | {
-            kind: components["schemas"]["KindKey"];
-        } | "default_owner";
         /** @description What a segment participation kind becomes in the graph it is inserted into. */
         KindChoice: {
             existing: components["schemas"]["KindKey"];
@@ -2842,7 +2592,7 @@ export interface components {
         };
         /** @description A limit, by name. */
         Limit: string;
-        /** @description A journey's link to the route version it was created from or last upgraded to. */
+        /** @description The route version a journey was made from. */
         Lineage: {
             /** @description The route. */
             route: components["schemas"]["RouteId"];
@@ -2877,19 +2627,6 @@ export interface components {
              */
             total: number;
         };
-        /**
-         * @description What a journey changed on a route-copied node, so an upgrade leaves it alone. A
-         *     marker carries no reason.
-         */
-        LocalEdit: {
-            field: components["schemas"]["NodeField"];
-        } | {
-            requires: components["schemas"]["NodeKey"];
-        } | {
-            participation: components["schemas"]["KindKey"];
-        } | {
-            resource: components["schemas"]["AttachmentKey"];
-        } | "shape";
         /** @description Where a violation is: listed by path, specific enough to fix without reading source. */
         Location: {
             /** @description The node field involved. */
@@ -3297,32 +3034,6 @@ export interface components {
             annotation: components["schemas"]["AttachmentKey"];
             /** @constant */
             op: "remove_annotation";
-        } | {
-            /** @constant */
-            op: "upgrade";
-            /** @description The version upgraded to. */
-            to: components["schemas"]["VersionNumber"];
-        } | {
-            /** @description The new lineage. */
-            lineage: components["schemas"]["Lineage"];
-            /** @constant */
-            op: "relink";
-        } | {
-            /** @description The node. */
-            node: components["schemas"]["NodeKey"];
-            /** @constant */
-            op: "set_provenance";
-            /** @description The provenance. */
-            provenance: components["schemas"]["Provenance"];
-        } | {
-            /** @description The edited aspect. */
-            edit: components["schemas"]["LocalEdit"];
-            /** @description Marked or cleared. */
-            marked: boolean;
-            /** @description The node. */
-            node: components["schemas"]["NodeKey"];
-            /** @constant */
-            op: "mark_local_edit";
         } | {
             /** @description The identity, with its key. */
             identity: components["schemas"]["Identity"];
@@ -3740,8 +3451,6 @@ export interface components {
             children?: components["schemas"]["ChildEntry"][];
             /** @description Every derived value with what explains it. */
             derived: components["schemas"]["NodeDerived"];
-            /** @description What the journey edited on it, for a route-copied node. */
-            local_edits?: components["schemas"]["LocalEdit"][];
             /** @description The node: description, resources, participations as written, and its kind's payload. */
             node: components["schemas"]["Node"];
             /** @description Its overrides. */
@@ -3757,7 +3466,7 @@ export interface components {
             pin?: string | null;
             /** @description The rationale the recorded answer was given with, markdown. */
             rationale?: components["schemas"]["Markdown"] | null;
-            /** @description Its stored state, provenance, and actual dates. */
+            /** @description Its stored state and actual dates. */
             record: components["schemas"]["NodeState"];
             /**
              * @description The direct dependents completing it would not yet free, each with what else it waits
@@ -3912,8 +3621,6 @@ export interface components {
              *     what it relied on; held exactly when the finish's day is.
              */
             finished_revision?: components["schemas"]["Revision"] | null;
-            /** @description Where the node came from. */
-            provenance: components["schemas"]["Provenance"];
             /**
              * @description Why the node was skipped, or why a group was marked done, while it is (both require
              *     a reason).
@@ -3989,14 +3696,6 @@ export interface components {
         } | {
             /** @constant */
             fact: "publishes_draft";
-        } | {
-            /** @constant */
-            fact: "upgrades";
-            /** @description The version. */
-            to: components["schemas"]["VersionNumber"];
-        } | {
-            /** @constant */
-            fact: "relinks";
         } | {
             /** @constant */
             fact: "inserts_segment";
@@ -4600,8 +4299,6 @@ export interface components {
          *     validation finds in it.
          */
         ProposalPreview: {
-            /** @description What each conflict item offers. */
-            conflicts?: components["schemas"]["ConflictReview"][];
             /** @description For a journey, what the change does to derived state. */
             consequences?: components["schemas"]["Consequences"] | null;
             /** @description For a journey, its frontier after, in rank order. */
@@ -4700,8 +4397,6 @@ export interface components {
             /** @description The proposal. */
             proposal: components["schemas"]["ProposalId"];
         };
-        /** @description A node's origin in a journey. */
-        Provenance: "from_route" | "local" | "orphaned" | "from_segment";
         /** @description What each of the four terms adds to a rank. */
         RankAdds: {
             /** @description Gravity's share times its constant. */
@@ -4877,15 +4572,6 @@ export interface components {
             /** @description The value. */
             value: components["schemas"]["Relevance"];
         };
-        /** @description `POST /api/journeys/{id}/relink`: proposes re-linking the journey to a published version. */
-        RelinkRequest: {
-            /** @description The route version to follow once it is applied. */
-            lineage: components["schemas"]["Lineage"];
-            /** @description The proposal write's patch id. */
-            patch_id: components["schemas"]["PatchId"];
-            /** @description The proposal's id, generated by the client. */
-            proposal: components["schemas"]["ProposalId"];
-        };
         /**
          * @description Everything a node removal removes, as its author saw it: the subtree, every edge
          *     incident to it, and everything attached to those nodes. If anything else is attached
@@ -4953,9 +4639,7 @@ export interface components {
             /** @description The journey revision the reopen was recorded at. */
             revision: components["schemas"]["Revision"];
         };
-        /** @description The kinds of resolution a conflict can offer: [`ConflictResolution`] without its payload. */
-        ResolutionKind: "keep_journey" | "take_route" | "map_choices" | "clear_state" | "reopen" | "remap_role" | "remap_kind" | "remove";
-        /** @description Route-authored guidance on a node, keyed so upgrades diff it. */
+        /** @description Route-authored guidance on a node. */
         Resource: {
             example?: components["schemas"]["Url"];
             key: components["schemas"]["AttachmentKey"];
@@ -4965,7 +4649,7 @@ export interface components {
             tip?: components["schemas"]["Markdown"];
             title?: components["schemas"]["Title"] | null;
         } & (unknown | unknown | unknown | unknown | unknown);
-        /** @description Route-authored guidance on a node, keyed so upgrades diff it. */
+        /** @description Route-authored guidance on a node. */
         Resource2: {
             example?: components["schemas"]["Url"];
             key?: components["schemas"]["AttachmentKey"] | null;
@@ -4983,7 +4667,7 @@ export interface components {
         } | {
             kind: components["schemas"]["KindKey"];
         };
-        /** @description Every key a graph has retired. Tombstones are the upgrade-facing subset of the node keys. */
+        /** @description Every key a graph has retired. */
         RetiredKeys: {
             /** @description Retired participation kind keys. */
             kinds?: components["schemas"]["KindKey"][];
@@ -4997,27 +4681,6 @@ export interface components {
          *     proposal turns each choice into mutations; an item that still needs one blocks apply.
          */
         ReviewItem: {
-            /** @description What it is about. */
-            conflict: components["schemas"]["Conflict"];
-            /** @constant */
-            item: "conflict";
-            /** @description The reviewer's choice, once made. */
-            resolution?: components["schemas"]["ConflictResolution"] | null;
-        } | {
-            /** @constant */
-            item: "kept_local_edit";
-            /** @description What is kept. */
-            kept: components["schemas"]["Kept"];
-        } | {
-            /** @constant */
-            item: "orphan";
-            /** @description Keep it (the default) or remove it with its descendants. */
-            keep: boolean;
-            /** @description The node. */
-            node: components["schemas"]["NodeKey"];
-            /** @description What removing it removes, shown in review. */
-            removal: components["schemas"]["Removal"];
-        } | {
             /** @description The identity. */
             identity: components["schemas"]["IdentityKey"];
             /** @constant */
@@ -5077,42 +4740,6 @@ export interface components {
         } | "add";
         /** @description Starts with "r_"; at most id_bytes_max (64) bytes. */
         RoleKey: string;
-        /**
-         * @description Something in a journey that refers to a role: what remapping or removing the
-         *     role rewrites.
-         */
-        RoleReference: {
-            participation: {
-                /** @description The kind. */
-                kind: components["schemas"]["KindKey"];
-                /** @description The node. */
-                node: components["schemas"]["NodeKey"];
-            };
-        } | {
-            fills_role: {
-                /** @description The decision. */
-                node: components["schemas"]["NodeKey"];
-            };
-        } | {
-            fill: {
-                /** @description The identities. */
-                identities: components["schemas"]["IdentityKey"][];
-            };
-        } | "default_owner" | {
-            segment_participation: {
-                /** @description The kind. */
-                kind: components["schemas"]["KindKey"];
-                /** @description The node. */
-                node: components["schemas"]["NodeKey"];
-            };
-        } | {
-            draft: {
-                /** @description The node. */
-                node: components["schemas"]["NodeKey"];
-                /** @description The resource holding the draft, as the journey has it. */
-                resource: components["schemas"]["Resource"];
-            };
-        };
         /** @description A role: a named slot, single or multi valued, filled per journey with identities. */
         RoleResolved: {
             /** @description The id, unique in the graph. */
@@ -5231,7 +4858,7 @@ export interface components {
             kind?: components["schemas"]["RouteKind"];
             /** @description Its name. */
             name: components["schemas"]["Title"];
-            /** @description Hidden from new-journey creation; its journeys still see upgrades. */
+            /** @description Hidden from new-journey creation. */
             retired?: boolean;
         };
         /** @description A route id: a slug, unique in the deployment. */
@@ -5793,25 +5420,13 @@ export interface components {
             reason: components["schemas"]["UnresolvedReason"];
         };
         /** @description Why a review item blocks resolving its proposal. */
-        UnresolvedReason: "no_choice" | "not_offered" | "mixed_mapping" | "no_default_owner";
+        UnresolvedReason: "no_choice" | "mixed_mapping" | "no_default_owner";
         /** @description A milestone not yet done and its effective date. */
         UpcomingMilestone: {
             /** @description Its effective date. */
             date: components["schemas"]["EffectiveDate"];
             /** @description The milestone. */
             node: components["schemas"]["NodeKey"];
-        };
-        /**
-         * @description `POST /api/journeys/{id}/upgrade`: proposes upgrading the journey to a newer version of
-         *     the route it follows.
-         */
-        UpgradeRequest: {
-            /** @description The proposal write's patch id. */
-            patch_id: components["schemas"]["PatchId"];
-            /** @description The proposal's id, generated by the client. */
-            proposal: components["schemas"]["ProposalId"];
-            /** @description The version to upgrade to. */
-            to: components["schemas"]["VersionNumber"];
         };
         /** @description A URL: scheme:rest, no whitespace, at most link_bytes_max (4 KiB) bytes. */
         Url: string;
@@ -7209,8 +6824,6 @@ export interface operations {
                 referencing?: components["schemas"]["IdentityKey"][];
                 /** @description Journeys owned by any of these identities, directly or through an alias. */
                 owner?: components["schemas"]["IdentityKey"][];
-                /** @description Journeys whose route has, or has not, published a newer version. */
-                upgrade_available?: boolean;
                 /** @description The page starts after this journey. */
                 after?: components["schemas"]["JourneyId"];
                 /** @description Items per page, 1 to the page limit, the maximum; larger sizes are cut to it. */
@@ -9460,124 +9073,6 @@ export interface operations {
             };
         };
     };
-    proposeRelink: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The journey. */
-                id: components["schemas"]["JourneyId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RelinkRequest"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProposalAnswer"];
-                };
-            };
-            /** @description The request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No credential, or one that is refused (the auth layer, in text). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description No such resource. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Stale (with what intervened) or a reused patch id. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The body is over the request size limit. */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The body is not application/json. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "text/plain": string;
-                };
-            };
-        };
-    };
     proposeSaveAsRoute: {
         parameters: {
             query?: never;
@@ -9987,124 +9482,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "text/plain": string;
-                };
-            };
-        };
-    };
-    proposeUpgrade: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The journey. */
-                id: components["schemas"]["JourneyId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpgradeRequest"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProposalAnswer"];
-                };
-            };
-            /** @description The request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No credential, or one that is refused (the auth layer, in text). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description No such resource. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Stale (with what intervened) or a reused patch id. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The body is over the request size limit. */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The body is not application/json. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */

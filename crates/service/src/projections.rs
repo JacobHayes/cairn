@@ -16,9 +16,9 @@ use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
     Annotation, AnswerEffects, AnswerValue, Cursor, Date, DecisionView, Deployment, DisplayState,
     Domain, ExplainedField, ExplanationPage, IdentityKey, JourneyId, KeyRefs, KindKey, Level,
-    LevelQuery, ListPage, ListQuery, LocalEdit, Markdown, MineEntry, Next, NextQuery, Node,
-    NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, ProposalId,
-    RemovalRead, Revision, Snapshot, State, StatusSummary, StillWaiting, Timeline, Title, Trace,
+    LevelQuery, ListPage, ListQuery, Markdown, MineEntry, Next, NextQuery, Node, NodeDerived,
+    NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, ProposalId, RemovalRead, Revision,
+    Snapshot, State, StatusSummary, StillWaiting, Timeline, Title, Trace,
 };
 use cairn_store::{EventQuery, PageSize};
 
@@ -102,10 +102,8 @@ pub struct NodeDetail {
     pub parent: Option<NodeKey>,
     /// Its children in key order, each with its state: a container's checklist.
     pub children: Vec<ChildEntry>,
-    /// Its stored state, provenance, and actual dates.
+    /// Its stored state and actual dates.
     pub record: NodeState,
-    /// What the journey edited on it, for a route-copied node (B4).
-    pub local_edits: BTreeSet<LocalEdit>,
     /// The checklist items ticked (G5).
     pub ticks: BTreeSet<cairn_schema::Slug>,
     /// A decision's answer, as recorded.
@@ -498,7 +496,7 @@ fn detail(
             .nodes
             .get(key)
             .cloned()
-            .unwrap_or_else(|| NodeState::initial(kind, cairn_schema::Provenance::Local))
+            .unwrap_or_else(|| NodeState::initial(kind))
     };
     let children = tree
         .children(key)
@@ -532,7 +530,6 @@ fn detail(
         parent: tree.parent(key).cloned(),
         children,
         record: stored(key, node.kind()),
-        local_edits: state.local_edits.get(key).cloned().unwrap_or_default(),
         ticks: state.ticks.get(key).cloned().unwrap_or_default(),
         answer: state.answers.get(key).cloned(),
         rationale: state.rationales.get(key).cloned(),

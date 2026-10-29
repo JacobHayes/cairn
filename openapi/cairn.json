@@ -1372,538 +1372,6 @@
         ],
         "description": "The value a clause compares an answer with: a boolean, or text that the decision's\nanswer type gives meaning (a choice id, a date, an identity key, or plain text)."
       },
-      "Conflict": {
-        "description": "What a conflict is about, with the journey's side and the route's. A side that\nis absent is `None` (an absent edge is `false`).",
-        "oneOf": [
-          {
-            "additionalProperties": false,
-            "description": "A node field the journey edited and the route changed to something else.",
-            "properties": {
-              "about": {
-                "const": "field",
-                "type": "string"
-              },
-              "dangling": {
-                "description": "The route's value names a node the journey does not hold, so it cannot be taken\n(a removed node's tombstone covers its subtree); only the journey's side is\noffered.",
-                "type": "boolean"
-              },
-              "journey": {
-                "$ref": "#/components/schemas/NodeFieldValueResolved",
-                "description": "The journey's value."
-              },
-              "node": {
-                "$ref": "#/components/schemas/NodeKey",
-                "description": "The node."
-              },
-              "route": {
-                "$ref": "#/components/schemas/NodeFieldValueResolved",
-                "description": "The route's value."
-              }
-            },
-            "required": [
-              "about",
-              "node",
-              "journey",
-              "route"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "An explicit edge the journey added or removed, and the route the other way.",
-            "properties": {
-              "about": {
-                "const": "edge",
-                "type": "string"
-              },
-              "edge": {
-                "$ref": "#/components/schemas/Edge",
-                "description": "The edge."
-              },
-              "journey": {
-                "description": "Present in the journey.",
-                "type": "boolean"
-              },
-              "route": {
-                "description": "Present in the route.",
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "about",
-              "edge",
-              "journey",
-              "route"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A participation the journey edited and the route changed to something else.",
-            "properties": {
-              "about": {
-                "const": "participation",
-                "type": "string"
-              },
-              "journey": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ParticipationSourceResolved"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The journey's source."
-              },
-              "kind": {
-                "$ref": "#/components/schemas/KindKey",
-                "description": "The kind."
-              },
-              "node": {
-                "$ref": "#/components/schemas/NodeKey",
-                "description": "The node."
-              },
-              "route": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ParticipationSourceResolved"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The route's source."
-              }
-            },
-            "required": [
-              "about",
-              "node",
-              "kind"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A resource the journey edited and the route changed to something else.",
-            "properties": {
-              "about": {
-                "const": "resource",
-                "type": "string"
-              },
-              "dangling": {
-                "description": "The route's value names a node the journey does not hold, so it cannot be taken\n(a removed node's tombstone covers its subtree); only the journey's side is\noffered.",
-                "type": "boolean"
-              },
-              "journey": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/Resource"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The journey's resource."
-              },
-              "node": {
-                "$ref": "#/components/schemas/NodeKey",
-                "description": "The node."
-              },
-              "resource": {
-                "$ref": "#/components/schemas/AttachmentKey",
-                "description": "The resource."
-              },
-              "route": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/Resource"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The route's resource."
-              }
-            },
-            "required": [
-              "about",
-              "node",
-              "resource"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A node whose kind or answer type differs while the journey edited its shape or holds\nstate the change would invalidate: the whole node is in conflict.",
-            "properties": {
-              "about": {
-                "const": "shape",
-                "type": "string"
-              },
-              "answered": {
-                "description": "The journey has answered it, so taking an answer-type change reopens it.",
-                "type": "boolean"
-              },
-              "dangling": {
-                "description": "The route's value names a node the journey does not hold, so it cannot be taken\n(a removed node's tombstone covers its subtree); only the journey's side is\noffered.",
-                "type": "boolean"
-              },
-              "journey": {
-                "$ref": "#/components/schemas/Node",
-                "description": "The journey's node."
-              },
-              "route": {
-                "$ref": "#/components/schemas/Node",
-                "description": "The route's node."
-              }
-            },
-            "required": [
-              "about",
-              "journey",
-              "route"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A decided decision whose answer names choices the route's choices no longer have.",
-            "properties": {
-              "about": {
-                "const": "answer",
-                "type": "string"
-              },
-              "answer": {
-                "$ref": "#/components/schemas/AnswerValue",
-                "description": "The journey's answer."
-              },
-              "choices": {
-                "$ref": "#/components/schemas/Choices",
-                "description": "The route's choices."
-              },
-              "decision": {
-                "$ref": "#/components/schemas/NodeKey",
-                "description": "The decision."
-              },
-              "rationale": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/Markdown"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The rationale the journey's answer was given with, kept when the answer is\nmapped onto the route's choices."
-              }
-            },
-            "required": [
-              "about",
-              "decision",
-              "answer",
-              "choices"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A role both sides changed, one whose new cardinality cannot hold the journey's direct\nfill, or one the route removed that the journey still refers to.",
-            "properties": {
-              "about": {
-                "const": "role",
-                "type": "string"
-              },
-              "insertions": {
-                "description": "The insertions that map a segment role onto it, when the route removed it:\nthe role can then be kept or removed, not remapped.",
-                "items": {
-                  "$ref": "#/components/schemas/InsertionKey"
-                },
-                "type": "array",
-                "uniqueItems": true
-              },
-              "journey": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/RoleResolved"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The journey's role."
-              },
-              "members": {
-                "description": "Who fills the role now, when insertions map onto it: removing it hands\nthese to the segment's nodes directly.",
-                "items": {
-                  "$ref": "#/components/schemas/IdentityKey"
-                },
-                "maxItems": 100,
-                "type": "array",
-                "uniqueItems": true
-              },
-              "references": {
-                "description": "What in the journey refers to it.",
-                "items": {
-                  "$ref": "#/components/schemas/RoleReference"
-                },
-                "type": "array",
-                "uniqueItems": true
-              },
-              "role": {
-                "$ref": "#/components/schemas/RoleKey",
-                "description": "The role."
-              },
-              "route": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/RoleResolved"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The route's role, none when it removed it."
-              }
-            },
-            "required": [
-              "about",
-              "role"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A participation kind both sides changed, or one the route removed that the journey\nstill uses.",
-            "properties": {
-              "about": {
-                "const": "kind",
-                "type": "string"
-              },
-              "insertions": {
-                "description": "The insertions that map a segment kind onto it, when the route removed it:\nthe kind can then be kept or removed, not remapped.",
-                "items": {
-                  "$ref": "#/components/schemas/InsertionKey"
-                },
-                "type": "array",
-                "uniqueItems": true
-              },
-              "journey": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ParticipationKindResolved"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The journey's kind."
-              },
-              "kind": {
-                "$ref": "#/components/schemas/KindKey",
-                "description": "The kind."
-              },
-              "references": {
-                "additionalProperties": false,
-                "description": "The journey's participations of the kind, by node.",
-                "patternProperties": {
-                  "^n_[a-z0-9][a-z0-9_-]*$": {
-                    "$ref": "#/components/schemas/ParticipationSourceResolved"
-                  }
-                },
-                "type": "object"
-              },
-              "route": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ParticipationKindResolved"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The route's kind, none when it removed it."
-              }
-            },
-            "required": [
-              "about",
-              "kind"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "The graph's `default_owner`, which both sides changed.",
-            "properties": {
-              "about": {
-                "const": "default_owner",
-                "type": "string"
-              },
-              "journey": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/RoleKey"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The journey's."
-              },
-              "route": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/RoleKey"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The route's."
-              }
-            },
-            "required": [
-              "about"
-            ],
-            "type": "object"
-          }
-        ]
-      },
-      "ConflictResolution": {
-        "description": "How a reviewer resolves a conflict. Which resolutions a conflict offers depends\non what it is about ([`Conflict::offers`]); each becomes ordinary mutations when the\nproposal is resolved.",
-        "oneOf": [
-          {
-            "const": "keep_journey",
-            "description": "Keep the journey's value as a local edit, or its definition as an override.",
-            "type": "string"
-          },
-          {
-            "const": "take_route",
-            "description": "Take the route's value.",
-            "type": "string"
-          },
-          {
-            "additionalProperties": false,
-            "description": "Take the route's choices and map each removed choice the answer names to one that\nremains (map old to new).",
-            "properties": {
-              "map_choices": {
-                "additionalProperties": false,
-                "properties": {
-                  "map": {
-                    "additionalProperties": false,
-                    "description": "Removed choice to remaining choice.",
-                    "patternProperties": {
-                      "^[a-z0-9][a-z0-9_-]*$": {
-                        "$ref": "#/components/schemas/Slug"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "required": [
-                  "map"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "map_choices"
-            ],
-            "type": "object"
-          },
-          {
-            "const": "clear_state",
-            "description": "Take the route's value and clear the state it makes invalid.",
-            "type": "string"
-          },
-          {
-            "const": "reopen",
-            "description": "Take the route's value and reopen the node.",
-            "type": "string"
-          },
-          {
-            "additionalProperties": false,
-            "description": "Point every reference to a role the route removed at another role, then remove it.\nNot offered while an insertion maps a segment role onto it.",
-            "properties": {
-              "remap_role": {
-                "additionalProperties": false,
-                "properties": {
-                  "role": {
-                    "$ref": "#/components/schemas/RoleKey",
-                    "description": "The role the references move to."
-                  }
-                },
-                "required": [
-                  "role"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "remap_role"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "Move every participation of a kind the route removed to another kind, then remove it.\nNot offered while an insertion maps a segment kind onto it.",
-            "properties": {
-              "remap_kind": {
-                "additionalProperties": false,
-                "properties": {
-                  "kind": {
-                    "$ref": "#/components/schemas/KindKey",
-                    "description": "The kind the participations move to."
-                  }
-                },
-                "required": [
-                  "kind"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "remap_kind"
-            ],
-            "type": "object"
-          },
-          {
-            "const": "remove",
-            "description": "Clear every reference to a role or kind the route removed, then remove it. Where an\ninsertion maps a segment role onto a removed role, the segment's nodes keep what the\nrole held: whoever filled it now fills their participations directly, and the\ninsertion's mapping goes with the role.",
-            "type": "string"
-          }
-        ]
-      },
-      "ConflictReview": {
-        "additionalProperties": false,
-        "description": "What the engine offers for one conflict item.",
-        "properties": {
-          "item": {
-            "description": "The item's position in the proposal.",
-            "format": "uint32",
-            "minimum": 0,
-            "type": "integer"
-          },
-          "offers": {
-            "description": "The kinds of resolution the conflict offers, in the order a reviewer reads them.",
-            "items": {
-              "$ref": "#/components/schemas/ResolutionKind"
-            },
-            "type": "array"
-          },
-          "removed_choices": {
-            "description": "For an answer conflict, the choices the answer names that the route no longer offers.",
-            "items": {
-              "$ref": "#/components/schemas/Slug"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "item",
-          "offers"
-        ],
-        "type": "object"
-      },
       "Consequences": {
         "additionalProperties": false,
         "description": "What an accepted patch or a proposal preview newly caused in derived state,\nreported with the result and never stored.",
@@ -3459,10 +2927,6 @@
           "annotation_added",
           "annotation_edited",
           "annotation_removed",
-          "journey_upgraded",
-          "relinked",
-          "provenance_changed",
-          "local_edit_changed",
           "identity_created",
           "identity_edited",
           "identities_merged",
@@ -3986,34 +3450,6 @@
           },
           {
             "additionalProperties": false,
-            "description": "A local-edit marker.",
-            "properties": {
-              "local_edit": {
-                "additionalProperties": false,
-                "properties": {
-                  "edit": {
-                    "$ref": "#/components/schemas/LocalEdit",
-                    "description": "The marker."
-                  },
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The node."
-                  }
-                },
-                "required": [
-                  "node",
-                  "edit"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "local_edit"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
             "description": "A ticked checklist item.",
             "properties": {
               "tick": {
@@ -4102,19 +3538,6 @@
             },
             "required": [
               "overrides"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A tombstone.",
-            "properties": {
-              "tombstone": {
-                "$ref": "#/components/schemas/NodeKey"
-              }
-            },
-            "required": [
-              "tombstone"
             ],
             "type": "object"
           },
@@ -4367,34 +3790,6 @@
           },
           {
             "additionalProperties": false,
-            "description": "A local-edit marker.",
-            "properties": {
-              "local_edit": {
-                "additionalProperties": false,
-                "properties": {
-                  "edit": {
-                    "$ref": "#/components/schemas/LocalEdit",
-                    "description": "The marker."
-                  },
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The node."
-                  }
-                },
-                "required": [
-                  "node",
-                  "edit"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "local_edit"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
             "description": "A ticked checklist item.",
             "properties": {
               "tick": {
@@ -4575,19 +3970,6 @@
             },
             "required": [
               "overrides"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A tombstone: a removed route-copied node.",
-            "properties": {
-              "tombstone": {
-                "$ref": "#/components/schemas/NodeKey"
-              }
-            },
-            "required": [
-              "tombstone"
             ],
             "type": "object"
           },
@@ -4942,18 +4324,13 @@
           "title": {
             "$ref": "#/components/schemas/Title",
             "description": "The root member's current title."
-          },
-          "upgrade_available": {
-            "description": "Whether the segment has a later published version.",
-            "type": "boolean"
           }
         },
         "required": [
           "host",
           "graph",
           "insertion",
-          "title",
-          "upgrade_available"
+          "title"
         ],
         "type": "object"
       },
@@ -5138,21 +4515,6 @@
             },
             "type": "object"
           },
-          "local_edits": {
-            "additionalProperties": false,
-            "description": "Each route-copied node's local edits, apart from its state so that an edit and\na transition on one node touch different records.",
-            "maxProperties": 2000,
-            "patternProperties": {
-              "^n_[a-z0-9][a-z0-9_-]*$": {
-                "items": {
-                  "$ref": "#/components/schemas/LocalEdit"
-                },
-                "type": "array",
-                "uniqueItems": true
-              }
-            },
-            "type": "object"
-          },
           "nodes": {
             "additionalProperties": false,
             "description": "Each node's stored state.",
@@ -5239,14 +4601,6 @@
               }
             },
             "type": "object"
-          },
-          "tombstones": {
-            "description": "Route-copied nodes the journey removed, so an upgrade does not re-add them.",
-            "items": {
-              "$ref": "#/components/schemas/NodeKey"
-            },
-            "type": "array",
-            "uniqueItems": true
           }
         },
         "type": "object"
@@ -5284,17 +4638,6 @@
             "$ref": "#/components/schemas/JourneyId",
             "description": "The journey."
           },
-          "latest_version": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VersionNumber"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The latest version its route has published."
-          },
           "lineage": {
             "anyOf": [
               {
@@ -5324,10 +4667,6 @@
           "status": {
             "$ref": "#/components/schemas/JourneyStatus",
             "description": "Its status."
-          },
-          "upgrade_available": {
-            "description": "Whether its route has published a version newer than its own.",
-            "type": "boolean"
           }
         },
         "required": [
@@ -5335,74 +4674,9 @@
           "name",
           "status",
           "revision",
-          "created_at",
-          "upgrade_available"
+          "created_at"
         ],
         "type": "object"
-      },
-      "Kept": {
-        "description": "A journey's deviation from its route that an upgrade keeps, listed for the reviewer (\nlocally edited and unchanged in the route).",
-        "oneOf": [
-          {
-            "additionalProperties": false,
-            "description": "A marked edit on a route-copied node.",
-            "properties": {
-              "node": {
-                "additionalProperties": false,
-                "properties": {
-                  "edit": {
-                    "$ref": "#/components/schemas/LocalEdit",
-                    "description": "What it edited."
-                  },
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The node."
-                  }
-                },
-                "required": [
-                  "node",
-                  "edit"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "node"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A role the journey changed.",
-            "properties": {
-              "role": {
-                "$ref": "#/components/schemas/RoleKey"
-              }
-            },
-            "required": [
-              "role"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A participation kind the journey changed.",
-            "properties": {
-              "kind": {
-                "$ref": "#/components/schemas/KindKey"
-              }
-            },
-            "required": [
-              "kind"
-            ],
-            "type": "object"
-          },
-          {
-            "const": "default_owner",
-            "description": "The graph's `default_owner`, which the journey changed.",
-            "type": "string"
-          }
-        ]
       },
       "KindChoice": {
         "description": "What a segment participation kind becomes in the graph it is inserted into.",
@@ -5686,7 +4960,7 @@
       },
       "Lineage": {
         "additionalProperties": false,
-        "description": "A journey's link to the route version it was created from or last upgraded to.",
+        "description": "The route version a journey was made from.",
         "properties": {
           "route": {
             "$ref": "#/components/schemas/RouteId",
@@ -5846,68 +5120,6 @@
           "total"
         ],
         "type": "object"
-      },
-      "LocalEdit": {
-        "description": "What a journey changed on a route-copied node, so an upgrade leaves it alone. A\nmarker carries no reason.",
-        "oneOf": [
-          {
-            "additionalProperties": false,
-            "description": "A field of the node.",
-            "properties": {
-              "field": {
-                "$ref": "#/components/schemas/NodeField"
-              }
-            },
-            "required": [
-              "field"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "The node's explicit edge to the named requirement (added or removed).",
-            "properties": {
-              "requires": {
-                "$ref": "#/components/schemas/NodeKey"
-              }
-            },
-            "required": [
-              "requires"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "The node's participation of a kind.",
-            "properties": {
-              "participation": {
-                "$ref": "#/components/schemas/KindKey"
-              }
-            },
-            "required": [
-              "participation"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "One of the node's resources.",
-            "properties": {
-              "resource": {
-                "$ref": "#/components/schemas/AttachmentKey"
-              }
-            },
-            "required": [
-              "resource"
-            ],
-            "type": "object"
-          },
-          {
-            "const": "shape",
-            "description": "The node's kind or, for a decision, its answer type: what a replacement changes that\nno single field edit can.",
-            "type": "string"
-          }
-        ]
       },
       "Location": {
         "additionalProperties": false,
@@ -7253,97 +6465,6 @@
             "required": [
               "op",
               "annotation"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "Move the journey to a newer version of its route, taking every clean outcome of the\nthree-way merge (route changes it did not edit, new nodes, orphans); conflict\nresolutions and orphan removals ride after it in the same patch as ordinary mutations.",
-            "properties": {
-              "op": {
-                "const": "upgrade",
-                "type": "string"
-              },
-              "to": {
-                "$ref": "#/components/schemas/VersionNumber",
-                "description": "The version upgraded to."
-              }
-            },
-            "required": [
-              "op",
-              "to"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "Link the journey to the version its saved route published, in one event: the\nlineage, each node the version holds route-copied and marked exactly where it differs,\nevery other node local, and the version's roles and kinds the journey lacks.",
-            "properties": {
-              "lineage": {
-                "$ref": "#/components/schemas/Lineage",
-                "description": "The new lineage."
-              },
-              "op": {
-                "const": "relink",
-                "type": "string"
-              }
-            },
-            "required": [
-              "op",
-              "lineage"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "Change a node's provenance, as an upgrade orphaning it does.",
-            "properties": {
-              "node": {
-                "$ref": "#/components/schemas/NodeKey",
-                "description": "The node."
-              },
-              "op": {
-                "const": "set_provenance",
-                "type": "string"
-              },
-              "provenance": {
-                "$ref": "#/components/schemas/Provenance",
-                "description": "The provenance."
-              }
-            },
-            "required": [
-              "op",
-              "node",
-              "provenance"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "Set or clear a local-edit marker (reset to route clears it).",
-            "properties": {
-              "edit": {
-                "$ref": "#/components/schemas/LocalEdit",
-                "description": "The edited aspect."
-              },
-              "marked": {
-                "description": "Marked or cleared.",
-                "type": "boolean"
-              },
-              "node": {
-                "$ref": "#/components/schemas/NodeKey",
-                "description": "The node."
-              },
-              "op": {
-                "const": "mark_local_edit",
-                "type": "string"
-              }
-            },
-            "required": [
-              "op",
-              "node",
-              "edit",
-              "marked"
             ],
             "type": "object"
           },
@@ -8895,14 +8016,6 @@
             "$ref": "#/components/schemas/NodeDerived",
             "description": "Every derived value with what explains it."
           },
-          "local_edits": {
-            "description": "What the journey edited on it, for a route-copied node.",
-            "items": {
-              "$ref": "#/components/schemas/LocalEdit"
-            },
-            "type": "array",
-            "uniqueItems": true
-          },
           "node": {
             "$ref": "#/components/schemas/Node",
             "description": "The node: description, resources, participations as written, and its kind's payload."
@@ -8954,7 +8067,7 @@
           },
           "record": {
             "$ref": "#/components/schemas/NodeState",
-            "description": "Its stored state, provenance, and actual dates."
+            "description": "Its stored state and actual dates."
           },
           "still_waiting": {
             "$ref": "#/components/schemas/StillWaiting",
@@ -9798,10 +8911,6 @@
             ],
             "description": "The journey revision the finish was recorded at, which orders it against reopens of\nwhat it relied on; held exactly when the finish's day is."
           },
-          "provenance": {
-            "$ref": "#/components/schemas/Provenance",
-            "description": "Where the node came from."
-          },
           "reason": {
             "anyOf": [
               {
@@ -9838,8 +8947,7 @@
           }
         },
         "required": [
-          "state",
-          "provenance"
+          "state"
         ],
         "type": "object"
       },
@@ -10034,37 +9142,6 @@
             "properties": {
               "fact": {
                 "const": "publishes_draft",
-                "type": "string"
-              }
-            },
-            "required": [
-              "fact"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "Moves the journey to a newer version of its route.",
-            "properties": {
-              "fact": {
-                "const": "upgrades",
-                "type": "string"
-              },
-              "to": {
-                "$ref": "#/components/schemas/VersionNumber",
-                "description": "The version."
-              }
-            },
-            "required": [
-              "fact",
-              "to"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "Links the journey to the version its saved route published.",
-            "properties": {
-              "fact": {
-                "const": "relinks",
                 "type": "string"
               }
             },
@@ -10755,7 +9832,7 @@
           },
           {
             "const": "cannot_draft",
-            "description": "Cairn cannot draft the upgrade, save as route, or re-link asked for: the journey follows\nno route, the version is not newer, or the draft is past a proposal's limits.",
+            "description": "Cairn cannot draft the save as route asked for: the draft is past a proposal's limits.",
             "type": "string"
           },
           {
@@ -11677,13 +10754,6 @@
         "additionalProperties": false,
         "description": "What a proposal would do to its destination now, for review: the items still\nunresolved, and the candidate the resolved mutations produce, with every violation strict\nvalidation finds in it.",
         "properties": {
-          "conflicts": {
-            "description": "What each conflict item offers.",
-            "items": {
-              "$ref": "#/components/schemas/ConflictReview"
-            },
-            "type": "array"
-          },
           "consequences": {
             "anyOf": [
               {
@@ -11916,31 +10986,6 @@
           "destination"
         ],
         "type": "object"
-      },
-      "Provenance": {
-        "description": "A node's origin in a journey.",
-        "oneOf": [
-          {
-            "const": "from_route",
-            "description": "Copied from the route version the journey follows.",
-            "type": "string"
-          },
-          {
-            "const": "local",
-            "description": "Created in the journey.",
-            "type": "string"
-          },
-          {
-            "const": "orphaned",
-            "description": "Copied from a route version that no longer has it.",
-            "type": "string"
-          },
-          {
-            "const": "from_segment",
-            "description": "Copied in from a segment version: a member of an insertion.",
-            "type": "string"
-          }
-        ]
       },
       "RankAdds": {
         "additionalProperties": false,
@@ -12626,30 +11671,6 @@
         ],
         "type": "object"
       },
-      "RelinkRequest": {
-        "additionalProperties": false,
-        "description": "`POST /api/journeys/{id}/relink`: proposes re-linking the journey to a published version.",
-        "properties": {
-          "lineage": {
-            "$ref": "#/components/schemas/Lineage",
-            "description": "The route version to follow once it is applied."
-          },
-          "patch_id": {
-            "$ref": "#/components/schemas/PatchId",
-            "description": "The proposal write's patch id."
-          },
-          "proposal": {
-            "$ref": "#/components/schemas/ProposalId",
-            "description": "The proposal's id, generated by the client."
-          }
-        },
-        "required": [
-          "patch_id",
-          "proposal",
-          "lineage"
-        ],
-        "type": "object"
-      },
       "Removal": {
         "additionalProperties": false,
         "description": "Everything a node removal removes, as its author saw it: the subtree, every edge\nincident to it, and everything attached to those nodes. If anything else is attached\nwhen the patch applies, the patch is rejected rather than widening the removal.",
@@ -12839,54 +11860,9 @@
         ],
         "type": "object"
       },
-      "ResolutionKind": {
-        "description": "The kinds of resolution a conflict can offer: [`ConflictResolution`] without its payload.",
-        "oneOf": [
-          {
-            "const": "keep_journey",
-            "description": "Keep the journey's value or definition.",
-            "type": "string"
-          },
-          {
-            "const": "take_route",
-            "description": "Take the route's value.",
-            "type": "string"
-          },
-          {
-            "const": "map_choices",
-            "description": "Map each removed choice to one that remains.",
-            "type": "string"
-          },
-          {
-            "const": "clear_state",
-            "description": "Take the route's value and clear the state it makes invalid.",
-            "type": "string"
-          },
-          {
-            "const": "reopen",
-            "description": "Take the route's value and reopen the node.",
-            "type": "string"
-          },
-          {
-            "const": "remap_role",
-            "description": "Point references at another role, then remove the role.",
-            "type": "string"
-          },
-          {
-            "const": "remap_kind",
-            "description": "Move participations to another kind, then remove the kind.",
-            "type": "string"
-          },
-          {
-            "const": "remove",
-            "description": "Clear every reference, then remove the role or kind.",
-            "type": "string"
-          }
-        ]
-      },
       "Resource": {
         "additionalProperties": false,
-        "description": "Route-authored guidance on a node, keyed so upgrades diff it.",
+        "description": "Route-authored guidance on a node.",
         "oneOf": [
           {
             "required": [
@@ -12951,7 +11927,7 @@
       },
       "Resource2": {
         "additionalProperties": false,
-        "description": "Route-authored guidance on a node, keyed so upgrades diff it.",
+        "description": "Route-authored guidance on a node.",
         "oneOf": [
           {
             "required": [
@@ -13064,7 +12040,7 @@
       },
       "RetiredKeys": {
         "additionalProperties": false,
-        "description": "Every key a graph has retired. Tombstones are the upgrade-facing subset of the node keys.",
+        "description": "Every key a graph has retired.",
         "properties": {
           "kinds": {
             "description": "Retired participation kind keys.",
@@ -13096,84 +12072,6 @@
       "ReviewItem": {
         "description": "One thing a reviewer looks at, and resolves where it needs a choice. Resolving a\nproposal turns each choice into mutations; an item that still needs one blocks apply.",
         "oneOf": [
-          {
-            "additionalProperties": false,
-            "description": "Something the journey and the route both changed, or a route change that invalidates\nthe journey's state; a difference a re-link keeps by default.",
-            "properties": {
-              "conflict": {
-                "$ref": "#/components/schemas/Conflict",
-                "description": "What it is about."
-              },
-              "item": {
-                "const": "conflict",
-                "type": "string"
-              },
-              "resolution": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ConflictResolution"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The reviewer's choice, once made."
-              }
-            },
-            "required": [
-              "item",
-              "conflict"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "Something the journey edited and the route left alone: kept, listed.",
-            "properties": {
-              "item": {
-                "const": "kept_local_edit",
-                "type": "string"
-              },
-              "kept": {
-                "$ref": "#/components/schemas/Kept",
-                "description": "What is kept."
-              }
-            },
-            "required": [
-              "item",
-              "kept"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A node the new version removed: kept as orphaned by default.",
-            "properties": {
-              "item": {
-                "const": "orphan",
-                "type": "string"
-              },
-              "keep": {
-                "description": "Keep it (the default) or remove it with its descendants.",
-                "type": "boolean"
-              },
-              "node": {
-                "$ref": "#/components/schemas/NodeKey",
-                "description": "The node."
-              },
-              "removal": {
-                "$ref": "#/components/schemas/Removal",
-                "description": "What removing it removes, shown in review."
-              }
-            },
-            "required": [
-              "item",
-              "node",
-              "keep",
-              "removal"
-            ],
-            "type": "object"
-          },
           {
             "additionalProperties": false,
             "description": "An explicit identity on nodes being saved as a route.",
@@ -13405,151 +12303,6 @@
         "minLength": 1,
         "pattern": "^r_[a-z0-9][a-z0-9_-]*$",
         "type": "string"
-      },
-      "RoleReference": {
-        "description": "Something in a journey that refers to a role: what remapping or removing the\nrole rewrites.",
-        "oneOf": [
-          {
-            "additionalProperties": false,
-            "description": "A node's participation of a kind names the role.",
-            "properties": {
-              "participation": {
-                "additionalProperties": false,
-                "properties": {
-                  "kind": {
-                    "$ref": "#/components/schemas/KindKey",
-                    "description": "The kind."
-                  },
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The node."
-                  }
-                },
-                "required": [
-                  "node",
-                  "kind"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "participation"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "An identity decision fills the role.",
-            "properties": {
-              "fills_role": {
-                "additionalProperties": false,
-                "properties": {
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The decision."
-                  }
-                },
-                "required": [
-                  "node"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "fills_role"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "The role is filled directly with these identities.",
-            "properties": {
-              "fill": {
-                "additionalProperties": false,
-                "properties": {
-                  "identities": {
-                    "description": "The identities.",
-                    "items": {
-                      "$ref": "#/components/schemas/IdentityKey"
-                    },
-                    "maxItems": 100,
-                    "type": "array",
-                    "uniqueItems": true
-                  }
-                },
-                "required": [
-                  "identities"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "fill"
-            ],
-            "type": "object"
-          },
-          {
-            "const": "default_owner",
-            "description": "The role is the graph's `default_owner`.",
-            "type": "string"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A participation of a kind on a node an insertion copied in, whose segment role the\ninsertion mapped onto the role: removing the role hands the node the role's fill\ndirectly.",
-            "properties": {
-              "segment_participation": {
-                "additionalProperties": false,
-                "properties": {
-                  "kind": {
-                    "$ref": "#/components/schemas/KindKey",
-                    "description": "The kind."
-                  },
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The node."
-                  }
-                },
-                "required": [
-                  "node",
-                  "kind"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "segment_participation"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A node's message draft names the role.",
-            "properties": {
-              "draft": {
-                "additionalProperties": false,
-                "properties": {
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The node."
-                  },
-                  "resource": {
-                    "$ref": "#/components/schemas/Resource",
-                    "description": "The resource holding the draft, as the journey has it."
-                  }
-                },
-                "required": [
-                  "node",
-                  "resource"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "draft"
-            ],
-            "type": "object"
-          }
-        ]
       },
       "RoleResolved": {
         "additionalProperties": false,
@@ -13851,7 +12604,7 @@
             "description": "Its name."
           },
           "retired": {
-            "description": "Hidden from new-journey creation; its journeys still see upgrades.",
+            "description": "Hidden from new-journey creation.",
             "type": "boolean"
           }
         },
@@ -15482,11 +14235,6 @@
             "type": "string"
           },
           {
-            "const": "not_offered",
-            "description": "Its choice is not one the item offers.",
-            "type": "string"
-          },
-          {
             "const": "mixed_mapping",
             "description": "Its identity shares a participation with identities mapped to other roles.",
             "type": "string"
@@ -15514,30 +14262,6 @@
         "required": [
           "node",
           "date"
-        ],
-        "type": "object"
-      },
-      "UpgradeRequest": {
-        "additionalProperties": false,
-        "description": "`POST /api/journeys/{id}/upgrade`: proposes upgrading the journey to a newer version of\nthe route it follows.",
-        "properties": {
-          "patch_id": {
-            "$ref": "#/components/schemas/PatchId",
-            "description": "The proposal write's patch id."
-          },
-          "proposal": {
-            "$ref": "#/components/schemas/ProposalId",
-            "description": "The proposal's id, generated by the client."
-          },
-          "to": {
-            "$ref": "#/components/schemas/VersionNumber",
-            "description": "The version to upgrade to."
-          }
-        },
-        "required": [
-          "patch_id",
-          "proposal",
-          "to"
         ],
         "type": "object"
       },
@@ -17591,17 +16315,6 @@
                 "$ref": "#/components/schemas/IdentityKey"
               },
               "type": "array"
-            },
-            "style": "form"
-          },
-          {
-            "description": "Journeys whose route has, or has not, published a newer version.",
-            "explode": true,
-            "in": "query",
-            "name": "upgrade_available",
-            "required": false,
-            "schema": {
-              "type": "boolean"
             },
             "style": "form"
           },
@@ -20739,157 +19452,6 @@
         "summary": "Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying."
       }
     },
-    "/api/journeys/{id}/relink": {
-      "post": {
-        "operationId": "proposeRelink",
-        "parameters": [
-          {
-            "description": "The journey.",
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/JourneyId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RelinkRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProposalAnswer"
-                }
-              }
-            },
-            "description": "Answered."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The request is malformed."
-          },
-          "401": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "No credential, or one that is refused (the auth layer, in text)."
-          },
-          "403": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "No such resource."
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Rejection"
-                }
-              }
-            },
-            "description": "Stale (with what intervened) or a reused patch id."
-          },
-          "413": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is over the request size limit."
-          },
-          "415": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is not application/json."
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Rejection"
-                    },
-                    {
-                      "$ref": "#/components/schemas/Problem"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Invalid: every violation, by path; or a problem when it cannot be drafted."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The server failed; the request id names it in the logs."
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
-          }
-        },
-        "summary": "Proposes re-linking the journey to a published version, differences kept as local edits unless the reviewer takes the route's."
-      }
-    },
     "/api/journeys/{id}/save-as-route": {
       "post": {
         "operationId": "proposeSaveAsRoute",
@@ -21424,157 +19986,6 @@
           }
         },
         "summary": "What is upstream and downstream of a node, gravity contributors marked."
-      }
-    },
-    "/api/journeys/{id}/upgrade": {
-      "post": {
-        "operationId": "proposeUpgrade",
-        "parameters": [
-          {
-            "description": "The journey.",
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/JourneyId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpgradeRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProposalAnswer"
-                }
-              }
-            },
-            "description": "Answered."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The request is malformed."
-          },
-          "401": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "No credential, or one that is refused (the auth layer, in text)."
-          },
-          "403": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "No such resource."
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Rejection"
-                }
-              }
-            },
-            "description": "Stale (with what intervened) or a reused patch id."
-          },
-          "413": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is over the request size limit."
-          },
-          "415": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is not application/json."
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Rejection"
-                    },
-                    {
-                      "$ref": "#/components/schemas/Problem"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Invalid: every violation, by path; or a problem when it cannot be drafted."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The server failed; the request id names it in the logs."
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
-          }
-        },
-        "summary": "Proposes upgrading the journey to a newer version of its route: the merge's conflicts, kept edits, and orphans are its review items."
       }
     },
     "/api/proposals": {

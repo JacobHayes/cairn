@@ -70,11 +70,8 @@ export function nodeClasses(card: Card, options: { overlay?: CanvasOverlay | und
   }
   const mark = overlay?.marks[card.key];
   if (mark?.diff !== undefined) {
-    // The proposal layer's mark (C14): a fill, an edge whose style is the kind's, and a ring for a choice.
+    // The proposal layer's mark (C14): a fill and an edge whose style is the kind's.
     classes.push("node-diff", `node-diff-${mark.diff}`);
-    if (mark.choice === true) {
-      classes.push("node-diff-choice");
-    }
     if (mark.ghost === true) {
       classes.push("node-ghost");
     }

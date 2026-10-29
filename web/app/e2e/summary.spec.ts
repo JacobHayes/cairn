@@ -139,7 +139,6 @@ test("C18, A19: an archived journey's Summary is read-only: its notes are shown,
   await expect(about.getByTestId("annotation")).toHaveCount(1);
   await expect(page.locator(".summary .row-act")).toHaveCount(0);
   await expect(about.getByRole("button")).toHaveCount(0);
-  await expect(page.getByTestId("journey-upgrade")).toHaveCount(0);
   await expect(page.getByTestId("stalled")).toBeVisible();
   await expect(page.getByRole("button", { name: "Unsnooze" })).toHaveCount(0);
 });

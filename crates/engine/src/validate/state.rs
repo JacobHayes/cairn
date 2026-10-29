@@ -247,12 +247,11 @@ fn pins_and_snoozes(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     }
 }
 
-/// Overrides, local-edit markers, and notes hang off nodes that exist (a tombstone names a
-/// removed node, never a live one: the structure check refuses it with the retired keys, B4).
+/// Overrides and notes hang off nodes that exist.
 fn attached_records(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let document = check.document;
     let state = &document.state;
-    let keys = state.overrides.keys().chain(state.local_edits.keys());
+    let keys = state.overrides.keys();
     let notes = state
         .annotations
         .values()

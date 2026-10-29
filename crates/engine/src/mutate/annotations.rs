@@ -1,21 +1,18 @@
-//! Notes and links (G1, G2), provenance (B7), and local-edit markers (B4) in a journey.
+//! Notes and links (G1, G2) in a journey.
 
 use cairn_schema::{
-    Annotation, AnnotationBody, AttachmentKey, GraphKey, GraphRecord, Mutation, NodeState,
-    Provenance, ViolationCode, Write,
+    Annotation, AnnotationBody, AttachmentKey, GraphKey, GraphRecord, Mutation, ViolationCode,
+    Write,
 };
 
 use super::Session;
-use super::journey::{local_edit, stored};
 
-/// Applies an annotation, provenance, or marker mutation.
+/// Applies an annotation mutation.
 pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write> {
     match mutation {
         Mutation::AddAnnotation { annotation } => put(session, annotation, true),
         Mutation::EditAnnotation { annotation } => put(session, annotation, false),
         Mutation::RemoveAnnotation { annotation } => remove(session, annotation),
-        Mutation::SetProvenance { node, provenance } => set_provenance(session, node, *provenance),
-        Mutation::MarkLocalEdit { node, edit, marked } => local_edit(session, node, edit, *marked),
         other => unreachable!("{other:?} is dispatched elsewhere"),
     }
 }
@@ -68,20 +65,5 @@ fn remove(session: &mut Session<'_>, key: &AttachmentKey) -> Vec<Write> {
     vec![session.remove(GraphKey::Annotation {
         annotation: key.clone(),
         node: previous.body.node,
-    })]
-}
-
-/// B7: an upgrade orphaning a node, or anything else that changes where a node came from.
-fn set_provenance(
-    session: &mut Session<'_>,
-    node: &cairn_schema::NodeKey,
-    provenance: Provenance,
-) -> Vec<Write> {
-    let Some(next) = stored(session, node) else {
-        return Vec::new();
-    };
-    vec![session.put(GraphRecord::NodeState {
-        node: node.clone(),
-        state: NodeState { provenance, ..next },
     })]
 }

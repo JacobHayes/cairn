@@ -50,10 +50,6 @@ impl State {
                 lineage: header.lineage.clone(),
                 revision: *revision,
                 created_at: header.created_at,
-                latest_version: header
-                    .lineage
-                    .as_ref()
-                    .and_then(|lineage| self.latest_version(&lineage.route)),
             };
             if backend::query::journey_listed(
                 query,

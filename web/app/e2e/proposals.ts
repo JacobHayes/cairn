@@ -1,13 +1,12 @@
-// What proposal review's browser tests share : the vendor evaluation's
-// version 2 published from its file, the journey's local edits that meet it, a proposal's
-// review items and controls, and confirming and applying it, each the way a person does it.
+// What proposal review's browser tests share: the vendor evaluation's version 2 published from
+// its file, a drafted breakdown, a proposal's review items and controls, and confirming and
+// applying it, each the way a person does it.
 import { fileURLToPath } from "node:url";
 
 import { expect, type Locator, type Page } from "@playwright/test";
 
-import { importIntoDraft, openRoute, publishDraft, versionSelect } from "./around.ts";
-import { formField, openEditing, openForm, saveForm } from "./authoring.ts";
-import { nodeCard, openFromCanvas, settled, whenSettled } from "./shell.ts";
+import { importIntoDraft, journeyName, openRoute, publishDraft, startJourney, versionSelect } from "./around.ts";
+import { nodeCard, openAt, settled, whenSettled } from "./shell.ts";
 
 /** The vendor evaluation's version 2 file (fixtures/README.md). */
 export const VERSION_TWO = fileURLToPath(new URL("../../../fixtures/vendor-evaluation/route-v2.yaml", import.meta.url));
@@ -20,23 +19,18 @@ export async function publishVersionTwo(page: Page): Promise<void> {
   await publishDraft(page);
 }
 
-/**
- * Edits the scenario journey where version 2 also changed (the access deliverable's title,
- * the baseline's condition) and where it did not (kickoff's title), as a person does in edit
- * mode.
- */
-export async function editWhereVersionTwoChanges(page: Page): Promise<void> {
-  await openEditing(page, "j_vendor_eval");
-  await openFromCanvas(page, "n_access");
-  await formField(page, "title").getByRole("textbox").fill("Access to the environment");
-  await saveForm(page);
-  await openFromCanvas(page, "n_baseline");
-  await openForm(page, "relevance");
-  await formField(page, "relevant_when").getByLabel("Comparison").selectOption("equals");
-  await saveForm(page);
-  await openFromCanvas(page, "n_kickoff");
-  await formField(page, "title").getByRole("textbox").fill("Kickoff meeting");
-  await saveForm(page);
+/** Starts a journey from the vendor evaluation and drafts a breakdown of its workload placeholder into one piece, as a person does from its node; the journey's id and the review's address. */
+export async function draftBreakdown(page: Page): Promise<{ journey: string; reviewed: string }> {
+  const journey = await startJourney(page, journeyName("Breakdown"), { route: "vendor-evaluation" });
+  await openAt(page, journey, "list", { node: "n_workload" });
+  await page.getByTestId("actions").getByRole("button", { name: /^Break down/ }).click();
+  const form = page.getByTestId("break-down-form");
+  await form.getByLabel("Piece title").fill("Size the workload");
+  await form.getByTestId("propose-breakdown").click();
+  await reviewOpen(page);
+  const reviewed = new URL(page.url()).pathname;
+  expect(reviewed).toMatch(new RegExp(`^/journeys/${journey}/proposals/pr_[0-9a-f]+$`));
+  return { journey, reviewed };
 }
 
 /** The review rail, once the proposal's layer is on its destination's page and the proposal is read and previewed. */
@@ -54,45 +48,10 @@ export async function pickNode(page: Page, node: string): Promise<void> {
   await expect(page.getByTestId("item-editor")).toHaveAttribute("aria-label", await whenSettled(page, () => nodeCard(page, node).getByTestId("title").innerText()));
 }
 
-/** The review item of kind `item` about `node`, in the item editor of the node picked. */
-export function reviewItem(page: Page, item: string, node: string): Locator {
-  return page.locator(`[data-testid="review-item"][data-item="${item}"][data-node="${node}"]`);
-}
-
-/** The inspector's body scrolls to its end under the wheel, and neither the page nor the workspace scrolls with it (each region scrolls once). */
-export async function scrollsOnce(page: Page): Promise<void> {
-  const body = page.locator('.inspector-body[data-pane="inspector"]');
-  const box = await whenSettled(page, () => body.boundingBox());
-  expect(box).not.toBeNull();
-  await page.mouse.move((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) / 2);
-  for (let step = 0; step < 12; step += 1) {
-    await page.mouse.wheel(0, 600);
-  }
-  await expect.poll(() => body.evaluate((element) => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeLessThanOrEqual(1);
-  expect(await whenSettled(page, () => Promise.all([page.evaluate(() => document.scrollingElement?.scrollTop), page.locator(".ws-body").evaluate((element) => element.scrollTop)]))).toEqual([0, 0]);
-}
-
-/** Resolves the conflict on `node` with `resolution`. */
-export async function resolve(page: Page, node: string, resolution: string): Promise<void> {
-  await pickNode(page, node);
-  const item = reviewItem(page, "conflict", node);
-  await item.locator(`[data-testid="resolution"][data-resolution="${resolution}"]`).check();
-  await expect(item.getByTestId("unresolved")).toHaveCount(0);
-}
-
 /** What blocks the apply now, as the footer lists it. */
 export async function blockers(page: Page): Promise<string[]> {
   const text = (await whenSettled(page, () => page.getByTestId("apply-proposal").getAttribute("data-blockers"))) ?? "";
   return text.split(" ").filter(Boolean);
-}
-
-/** Saves the reviewer's edits and waits for the proposal's new revision and the page to settle. */
-export async function saveEdits(page: Page): Promise<void> {
-  const revision = Number(await whenSettled(page, () => page.getByTestId("proposal-rail").getAttribute("data-revision")));
-  await page.getByTestId("save-proposal").click();
-  await expect(page.getByTestId("unsaved")).toHaveCount(0);
-  await expect.poll(async () => Number(await page.getByTestId("proposal-rail").getAttribute("data-revision"))).toBeGreaterThan(revision);
-  await settled(page);
 }
 
 /** Applies in one click, waiting for the page to say so: the destination as the proposal left it, its band saying the proposal was applied, and the page settled. */

@@ -113,7 +113,6 @@ export function TileCard({ card, pieces, overlay, faded, selected, picked, edgeE
         data-relevance={journey?.relevance}
         data-trace={mark?.diff === undefined ? mark?.label : undefined}
         data-diff={mark?.diff}
-        data-choice={mark?.choice === true ? "" : undefined}
         data-parent={card.parent}
         data-x={place.x}
         data-y={place.y}

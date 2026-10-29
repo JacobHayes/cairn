@@ -206,11 +206,9 @@ fn shapes(write: &Write) -> Vec<Shape<'_>> {
             | GraphRecord::Resource { .. }
             | GraphRecord::RetiredKey(_)
             | GraphRecord::Insertion(_)
-            | GraphRecord::LocalEdit { .. }
             | GraphRecord::Tick { .. }
             | GraphRecord::RoleFill { .. }
             | GraphRecord::Snooze { .. }
-            | GraphRecord::Tombstone(_)
             | GraphRecord::Annotation(_) => Vec::new(),
         },
         Write::Remove(RecordKey::InGraph { key, .. }) => match key {
@@ -233,11 +231,9 @@ fn shapes(write: &Write) -> Vec<Shape<'_>> {
             | GraphKey::Resource { .. }
             | GraphKey::RetiredKey(_)
             | GraphKey::Insertion(_)
-            | GraphKey::LocalEdit { .. }
             | GraphKey::Tick { .. }
             | GraphKey::RoleFill(_)
             | GraphKey::Snooze(_)
-            | GraphKey::Tombstone(_)
             | GraphKey::Annotation { .. } => Vec::new(),
         },
         Write::Put(_) | Write::Remove(_) | Write::CopyGraph { .. } => Vec::new(),

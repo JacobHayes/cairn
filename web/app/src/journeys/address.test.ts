@@ -35,7 +35,6 @@ describe("the index's filters in the address", () => {
     ["every status", { ...DEFAULT_FILTERS, status: "any" }],
     ["a route's version", { ...DEFAULT_FILTERS, route: "vendor-evaluation", version: 2 }],
     ["an owner", { ...DEFAULT_FILTERS, owner: "who_a" }],
-    ["mine with an upgrade", { ...DEFAULT_FILTERS, status: "archived", mine: true, upgrade: true }],
   ];
   it.each(cases)("round-trip: %s", (_, filters) => {
     expect(filtersFrom(filterParams(filters))).toEqual(filters);
@@ -50,12 +49,11 @@ describe("the index's filters in the address", () => {
 });
 
 describe("the host's query for the filters", () => {
-  it("names the status, lineage, and upgrade filters as the host reads them", () => {
-    expect(queryOf({ ...DEFAULT_FILTERS, route: "r", version: 3, upgrade: true }, [])).toEqual({
+  it("names the status and lineage filters as the host reads them", () => {
+    expect(queryOf({ ...DEFAULT_FILTERS, route: "r", version: 3 }, [])).toEqual({
       status: ["active"],
       route: "r",
       version: 3,
-      upgrade_available: true,
     });
     expect(queryOf({ ...DEFAULT_FILTERS, status: "any" }, [])).toEqual({});
   });

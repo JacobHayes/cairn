@@ -61,7 +61,6 @@ export class FakeHost implements Host {
       status: "active" as const,
       revision: held.revision,
       created_at: "2026-10-01T00:00:00Z",
-      upgrade_available: false,
     }));
     return Promise.resolve({ items });
   }
@@ -241,9 +240,7 @@ function scriptedProposals(host: FakeHost): ProposalHost {
     discard: () => written("discard"),
     refresh: () => written("refresh"),
     apply: () => written("apply"),
-    upgrade: () => written("upgrade"),
     saveAsRoute: () => written("save_as_route"),
-    relink: () => written("relink"),
   };
 }
 
@@ -338,10 +335,6 @@ export class FakeDeriver implements Deriver {
 
   valueProblems(): Promise<never> {
     return Promise.reject(new Error("no value checks in the fake"));
-  }
-
-  restoreNodes(): Promise<never> {
-    return Promise.reject(new Error("no restores in the fake"));
   }
 
   removalPlan(): Promise<never> {

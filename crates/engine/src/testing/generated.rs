@@ -23,8 +23,8 @@ use cairn_schema::{
     Action, AnswerSpec, AnswerValue, BoundedSet, Bypass, Clause, Comparison, Condition,
     ConditionValue, DateRule, DateSource, Days, Decision, Deliverable, Direction, Group,
     GuardFailure, KeyRefs, KindKey, Milestone, Node, NodeKey, NodeKind, NodeState, OneOrMany,
-    Overrides, ParticipationKind, ParticipationSource, Participations, Payload, Provenance, Role,
-    State, Weight,
+    Overrides, ParticipationKind, ParticipationSource, Participations, Payload, Role, State,
+    Weight,
 };
 
 use super::parse;
@@ -707,7 +707,7 @@ impl Shape {
     /// A stored state legal for the node's kind, its answer, and its overrides.
     fn state(&self, document: &mut Document, index: usize, seed: &NodeSeed) {
         let kind = self.kinds[index];
-        let mut stored = NodeState::initial(kind, Provenance::Local);
+        let mut stored = NodeState::initial(kind);
         // A weighted mix, not a copy of the kind's machine: repeats make decided decisions and
         // derived groups likelier, so generated graphs carry the open and active work the cost
         // and priority tests rely on. The schema owns which states are legal (D1).

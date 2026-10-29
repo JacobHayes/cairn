@@ -132,14 +132,13 @@ export function testView(): Ready {
           { key: "n_pick", id: "pick", kind: "decision", title: "Pick one", prompt: "Which?", answer_type: "boolean" },
         ],
         state: {
-          nodes: { n_report: { state: "active", provenance: "from_route", started_on: "2026-10-05" } },
+          nodes: { n_report: { state: "active", started_on: "2026-10-05" } },
           pins: { n_report: "2026-11-02" },
           answers: { n_when: { date: "2026-11-20" } },
           annotations: [
             { body: { key: "a_link", node: "n_report", artifact: "https://example.org/report" }, created_by: "u_one", created_at: "2026-10-05T10:00:00Z" },
             { body: { key: "a_other", node: "n_findings", note: "Elsewhere." }, created_by: "u_one", created_at: "2026-10-05T10:00:00Z" },
           ],
-          local_edits: { n_report: [{ field: "title" }] },
         },
       },
     },

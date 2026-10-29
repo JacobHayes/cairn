@@ -19,7 +19,7 @@ use crate::node::{IdentitySet, Node, ParticipationSource};
 use crate::number::VersionNumber;
 use crate::proposal::Proposal;
 use crate::refs::KeyRefs;
-use crate::state::{AnswerValue, LocalEdit, NodeState, Overrides, SnoozeTarget};
+use crate::state::{AnswerValue, NodeState, Overrides, SnoozeTarget};
 use crate::text::Markdown;
 use jiff::Timestamp;
 use jiff::civil::Date;
@@ -89,13 +89,6 @@ pub enum GraphRecord {
         /// The state.
         state: NodeState,
     },
-    /// A local-edit marker.
-    LocalEdit {
-        /// The node.
-        node: NodeKey,
-        /// The marker.
-        edit: LocalEdit,
-    },
     // PRD: G5.
     /// A ticked checklist item.
     Tick {
@@ -143,8 +136,6 @@ pub enum GraphRecord {
         /// The overrides.
         overrides: Overrides,
     },
-    /// A tombstone: a removed route-copied node.
-    Tombstone(NodeKey),
     /// A note or link.
     Annotation(Annotation),
 }
@@ -247,13 +238,6 @@ pub enum GraphKey {
     Insertion(InsertionKey),
     /// A node's stored state.
     NodeState(NodeKey),
-    /// A local-edit marker.
-    LocalEdit {
-        /// The node.
-        node: NodeKey,
-        /// The marker.
-        edit: LocalEdit,
-    },
     /// A ticked checklist item.
     Tick {
         /// The node.
@@ -271,8 +255,6 @@ pub enum GraphKey {
     Snooze(NodeKey),
     /// A node's overrides.
     Overrides(NodeKey),
-    /// A tombstone.
-    Tombstone(NodeKey),
     /// A note or link, with the node it is on when the address knows it.
     Annotation {
         /// The annotation.
@@ -366,10 +348,6 @@ impl GraphRecord {
             GraphRecord::RetiredKey(key) => GraphKey::RetiredKey(key.clone()),
             GraphRecord::Insertion(insertion) => GraphKey::Insertion(insertion.key.clone()),
             GraphRecord::NodeState { node, .. } => GraphKey::NodeState(node.clone()),
-            GraphRecord::LocalEdit { node, edit } => GraphKey::LocalEdit {
-                node: node.clone(),
-                edit: edit.clone(),
-            },
             GraphRecord::Tick { node, item } => GraphKey::Tick {
                 node: node.clone(),
                 item: item.clone(),
@@ -379,7 +357,6 @@ impl GraphRecord {
             GraphRecord::Pin { node, .. } => GraphKey::Pin(node.clone()),
             GraphRecord::Snooze { node, .. } => GraphKey::Snooze(node.clone()),
             GraphRecord::Overrides { node, .. } => GraphKey::Overrides(node.clone()),
-            GraphRecord::Tombstone(node) => GraphKey::Tombstone(node.clone()),
             GraphRecord::Annotation(annotation) => GraphKey::Annotation {
                 annotation: annotation.body.key.clone(),
                 node: annotation.body.node.clone(),
@@ -399,13 +376,11 @@ impl GraphKey {
             | GraphKey::Participation { node, .. }
             | GraphKey::Resource { node, .. }
             | GraphKey::NodeState(node)
-            | GraphKey::LocalEdit { node, .. }
             | GraphKey::Tick { node, .. }
             | GraphKey::Answer(node)
             | GraphKey::Pin(node)
             | GraphKey::Snooze(node)
             | GraphKey::Overrides(node)
-            | GraphKey::Tombstone(node)
             | GraphKey::Annotation {
                 node: Some(node), ..
             }

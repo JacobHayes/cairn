@@ -19,7 +19,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import type { AddressName } from "../src/address.ts";
 import { JOURNEY_OFFERS, ROUTE_OFFERS } from "../src/journeys/view.ts";
 import { openJourneyCard } from "./around.ts";
-import { editWhereVersionTwoChanges, publishVersionTwo, reviewOpen } from "./proposals.ts";
+import { draftBreakdown, reviewOpen } from "./proposals.ts";
 import { holdToday, nodeCard, nodePanel, open, openAt, reachCard, settled } from "./shell.ts";
 
 /** What the walk reaches states of: the journey and the route it opens, a node and an edge both have, an identity, and the proposals `seedProposals` made. */
@@ -33,9 +33,11 @@ export interface Subject {
   proposals?: Proposals;
 }
 
-/** The ids of the two proposals `seedProposals` drafted: the journey's upgrade, and its saving as the route `savedRoute`. */
+/** The ids of the two proposals `seedProposals` drafted: the journey's breakdown, and its saving as the route `savedRoute`. */
 export interface Proposals {
-  upgrade: string;
+  breakdown: string;
+  /** The journey the breakdown is of. */
+  breakdownJourney: string;
   saved: string;
   savedRoute: string;
 }
@@ -181,9 +183,9 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
     { name: "graph", reach: async (page, on) => { await journeyAt(page, on.journey, "graph", on.node); await fitGraph(page); }, ready: (page, on) => nodePanel(page, on.node) },
   ],
   journeyEdge: [{ name: "edge-card", reach: async (page, on) => { await journeyAt(page, on.journey, `graph/edges/${on.edge}`); await fitGraph(page); }, ready: (page) => page.getByTestId("edge-card") }],
-  journeyProposals: [{ name: "tab", reach: (page, on) => indexAt(page, `/journeys/${on.journey}/proposals`), ready: (page) => page.getByTestId("proposals-pane") }],
-  journeyProposal: [{ name: "review", reach: async (page, on) => { await indexAt(page, `/journeys/${on.journey}/proposals/${proposalsOf(on).upgrade}`); await reviewOpen(page); }, ready: (page) => page.getByTestId("layer-band") }],
-  journeyProposalNode: [{ name: "item", reach: async (page, on) => { await indexAt(page, `/journeys/${on.journey}/proposals/${proposalsOf(on).upgrade}/nodes/n_access`); await reviewOpen(page); }, ready: (page) => page.getByTestId("item-editor") }],
+  journeyProposals: [{ name: "tab", reach: (page, on) => indexAt(page, `/journeys/${proposalsOf(on).breakdownJourney}/proposals`), ready: (page) => page.getByTestId("proposals-pane") }],
+  journeyProposal: [{ name: "review", reach: async (page, on) => { await indexAt(page, `/journeys/${proposalsOf(on).breakdownJourney}/proposals/${proposalsOf(on).breakdown}`); await reviewOpen(page); await fitGraph(page); }, ready: (page) => page.getByTestId("layer-band") }],
+  journeyProposalNode: [{ name: "item", reach: async (page, on) => { await indexAt(page, `/journeys/${proposalsOf(on).breakdownJourney}/proposals/${proposalsOf(on).breakdown}/nodes/n_workload`); await reviewOpen(page); await fitGraph(page); }, ready: (page) => page.getByTestId("item-editor") }],
   routes: [{ name: "index", reach: (page) => indexAt(page, "/routes"), ready: (page) => page.getByTestId("routes") }],
   routeNew: [{ name: "form", reach: (page) => indexAt(page, "/routes/new"), ready: (page) => page.getByTestId("new-route-kinds") }],
   route: [
@@ -206,19 +208,14 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
 
 /**
  * Drafts the two proposals the proposal addresses show, on the page's own store: the vendor
- * evaluation journey upgraded to version 2 after the edits version 2 also touches, and the
- * journey saved as a route. Returns their ids, which `Subject.proposals` carries. It edits the
+ * evaluation's workload placeholder broken down in a journey of its own, and the
+ * scenario journey saved as a route. Returns their ids, which `Subject.proposals` carries. It edits the
  * journey, so the walk takes it last.
  */
 export async function seedProposals(page: Page, on: Subject): Promise<Proposals> {
-  await editWhereVersionTwoChanges(page);
-  await publishVersionTwo(page);
-  await openJourneyCard(page, on.journey);
-  await page.getByTestId("journey-upgrade").click();
-  await page.getByTestId("upgrade-flow").getByRole("button", { name: "Propose the upgrade" }).click();
-  await reviewOpen(page);
-  const upgrade = /\/proposals\/(pr_[0-9a-f]+)$/.exec(new URL(page.url()).pathname)?.[1] ?? "";
-  expect(upgrade).not.toBe("");
+  const { journey, reviewed } = await draftBreakdown(page);
+  const breakdown = /\/proposals\/(pr_[0-9a-f]+)$/.exec(reviewed)?.[1] ?? "";
+  expect(breakdown).not.toBe("");
   await openJourneyCard(page, on.journey);
   await page.getByTestId("journey-menu").click();
   await page.getByTestId("menu-save").click();
@@ -227,14 +224,14 @@ export async function seedProposals(page: Page, on: Subject): Promise<Proposals>
   await reviewOpen(page);
   const saved = /\/routes\/r_saved\/proposals\/(pr_[0-9a-f]+)$/.exec(new URL(page.url()).pathname)?.[1] ?? "";
   expect(saved).not.toBe("");
-  return { upgrade, saved, savedRoute: "r_saved" };
+  return { breakdown, breakdownJourney: journey, saved, savedRoute: "r_saved" };
 }
 
 /** The day the fixtures' last scenario patch applies, so the dates every walk shows read as one history. */
 const WALK_TODAY = "2026-10-26";
 
 /** The proposal addresses need the proposals drafted, which edits the journey: they come last. */
-const NEEDS_PROPOSALS: readonly AddressName[] = ["journeyProposal", "journeyProposalNode", "routeProposal", "routeProposalNode"];
+const NEEDS_PROPOSALS: readonly AddressName[] = ["journeyProposals", "journeyProposal", "journeyProposalNode", "routeProposal", "routeProposalNode"];
 
 /** The window the authoring forms (and so the drafting of proposals) need, which is a desktop's. */
 const DRAFTING_WINDOW = { width: 1440, height: 900 };

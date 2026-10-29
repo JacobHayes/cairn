@@ -8,7 +8,7 @@ use cairn_store::{CommitError, StoreError};
 use rusqlite::types::Value;
 
 use crate::sql::{date, flag, json, json_enum, opt_int, opt_json, opt_text, opt_time, text, time};
-use crate::state::{annotation_columns, local_edit_columns};
+use crate::state::annotation_columns;
 use crate::write::{Writer, answer_identities, retired_columns, snooze_columns};
 
 /// A statement and its parameters.
@@ -75,14 +75,6 @@ fn puts(id: &str, record: &GraphRecord) -> Result<Vec<Statement>, CommitError> {
             )]
         }
         GraphRecord::NodeState { node, state } => vec![node_state_put(id, node, state)?],
-        GraphRecord::LocalEdit { node, edit } => {
-            let (aspect, target) = local_edit_columns(edit)?;
-            vec![statement(
-                "INSERT OR IGNORE INTO local_edits (graph_id, node, aspect, target) \
-                 VALUES (?1, ?2, ?3, ?4)",
-                vec![graph, text(node), text(aspect), text(&target)],
-            )]
-        }
         GraphRecord::Tick { node, item } => vec![statement(
             "INSERT OR IGNORE INTO ticks (graph_id, node, item) VALUES (?1, ?2, ?3)",
             vec![graph, text(node), text(item)],
@@ -102,10 +94,6 @@ fn puts(id: &str, record: &GraphRecord) -> Result<Vec<Statement>, CommitError> {
             )]
         }
         GraphRecord::Overrides { node, overrides } => vec![overrides_put(id, node, overrides)?],
-        GraphRecord::Tombstone(node) => vec![statement(
-            "INSERT OR IGNORE INTO tombstones (graph_id, node) VALUES (?1, ?2)",
-            vec![graph, text(node)],
-        )],
         GraphRecord::Annotation(annotation) => vec![annotation_put(id, annotation)?],
         GraphRecord::Node(_)
         | GraphRecord::NodeField { .. }
@@ -124,7 +112,6 @@ fn puts(id: &str, record: &GraphRecord) -> Result<Vec<Statement>, CommitError> {
 fn node_state_put(id: &str, node: &NodeKey, state: &NodeState) -> Result<Statement, CommitError> {
     let NodeState {
         state,
-        provenance,
         atomic,
         started_on,
         finished_on,
@@ -133,15 +120,14 @@ fn node_state_put(id: &str, node: &NodeKey, state: &NodeState) -> Result<Stateme
         reopened,
     } = state;
     Ok(statement(
-        "INSERT OR REPLACE INTO node_states (graph_id, node, state, provenance, atomic, \
+        "INSERT OR REPLACE INTO node_states (graph_id, node, state, atomic, \
          started_on, finished_on, reason, finished_revision, reopened_revision, \
          reopened_finished_revision) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         vec![
             text(id),
             text(node),
             json_enum(state)?,
-            json_enum(provenance)?,
             flag(*atomic),
             started_on.map_or(Value::Null, date),
             finished_on.map_or(Value::Null, date),
@@ -283,15 +269,6 @@ fn removal(id: &str, key: &GraphKey) -> Result<Vec<Statement>, CommitError> {
             "DELETE FROM resources WHERE graph_id = ?1 AND node = ?2 AND key = ?3".to_owned(),
             vec![graph(), text(node), text(resource)],
         )],
-        GraphKey::LocalEdit { node, edit } => {
-            let (aspect, target) = local_edit_columns(edit)?;
-            vec![(
-                "DELETE FROM local_edits WHERE graph_id = ?1 AND node = ?2 AND aspect = ?3 \
-                 AND target = ?4"
-                    .to_owned(),
-                vec![graph(), text(node), text(aspect), text(&target)],
-            )]
-        }
         GraphKey::Tick { node, item } => vec![(
             "DELETE FROM ticks WHERE graph_id = ?1 AND node = ?2 AND item = ?3".to_owned(),
             vec![graph(), text(node), text(item)],
@@ -306,7 +283,6 @@ fn removal(id: &str, key: &GraphKey) -> Result<Vec<Statement>, CommitError> {
         | GraphKey::Pin(_)
         | GraphKey::Snooze(_)
         | GraphKey::Overrides(_)
-        | GraphKey::Tombstone(_)
         | GraphKey::Annotation { .. } => keyed_removal(id, key),
     })
 }
@@ -334,7 +310,6 @@ fn keyed_removal(id: &str, key: &GraphKey) -> Vec<Statement> {
         GraphKey::Pin(node) => vec![("pins", "node", node.as_str())],
         GraphKey::Snooze(node) => vec![("snoozes", "node", node.as_str())],
         GraphKey::Overrides(node) => vec![("overrides", "node", node.as_str())],
-        GraphKey::Tombstone(node) => vec![("tombstones", "node", node.as_str())],
         GraphKey::Annotation {
             annotation,
             node: _,
@@ -348,7 +323,6 @@ fn keyed_removal(id: &str, key: &GraphKey) -> Vec<Statement> {
         | GraphKey::DefaultOwner
         | GraphKey::Participation { .. }
         | GraphKey::Resource { .. }
-        | GraphKey::LocalEdit { .. }
         | GraphKey::Tick { .. } => Vec::new(),
     };
     tables
@@ -375,14 +349,12 @@ fn node_removal(id: &str, node: &NodeKey) -> Vec<Statement> {
         ("resources", "node"),
         ("nodes", "key"),
         ("node_states", "node"),
-        ("local_edits", "node"),
         ("ticks", "node"),
         ("answer_identities", "decision"),
         ("answers", "decision"),
         ("pins", "node"),
         ("snoozes", "node"),
         ("overrides", "node"),
-        ("tombstones", "node"),
         ("annotations", "node"),
     ];
     for (table, column) in tables {

@@ -1,8 +1,8 @@
 // The routes index (`/routes`): routes and segments in one table (C17, C19), each linking to its
 // detail with how much it is used: a route its active journeys (counted
-// from their own lineage), a segment its places ("Used in 6 places", or "2 of 6 behind"), and a
+// from their own lineage), a segment its places ("Used in 6 places"), and a
 // route with a published version the way to start a journey from it. A retired route (A19:
-// hidden from new-journey creation, its journeys still upgrading) or one with a draft open says so
+// hidden from new-journey creation) or one with a draft open says so
 // in one chip. The Type filter keeps it to one type; `New route` opens the
 // form that starts a route or segment empty, to author by hand (A12), or imports a route file as
 // a new route or draft (A13). Each read says whether it is still going or failed. Kept current (H6).
@@ -51,13 +51,12 @@ function UseCell({ route, reading }: { route: RouteSummary; reading: UseReading 
   }
   const words = inUseWords(reading.use);
   const nothing = reading.use.kind === "journeys" ? reading.use.count === 0 : reading.use.places === 0;
-  const behind = reading.use.kind === "places" && reading.use.behind > 0;
   return (
     <td data-column="use" data-testid={segment ? "segment-use" : "route-use"}>
       {reading.use.kind === "journeys" && !nothing ? (
         <Link to={indexPath({ ...ACTIVE, route: route.header.id })}>{words}</Link>
       ) : (
-        <span className={nothing ? "muted" : behind ? "ink-warn" : undefined}>{words}</span>
+        <span className={nothing ? "muted" : undefined}>{words}</span>
       )}
     </td>
   );
@@ -134,7 +133,7 @@ export function RouteIndex() {
   const counts = activeJourneyCounts(valueOf(active.view) ?? []);
   const useOf = (route: RouteSummary): UseReading =>
     route.header.kind === "segment"
-      ? readingOf(uses.view, (all) => ({ kind: "places", places: all[route.header.id]?.places ?? 0, behind: all[route.header.id]?.behind ?? 0 }))
+      ? readingOf(uses.view, (all) => ({ kind: "places", places: all[route.header.id]?.places ?? 0, }))
       : readingOf(active.view, () => ({ kind: "journeys", count: counts.get(route.header.id) ?? 0 }));
   const newWords = type === "segments" ? "New segment" : "New route";
   return (

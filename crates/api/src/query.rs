@@ -105,10 +105,6 @@ pub const JOURNEY_PARAMS: &[ParamSpec] = &[
         "owner",
         "Journeys owned by any of these identities, directly or through an alias.",
     ),
-    ParamSpec::one::<bool>(
-        "upgrade_available",
-        "Journeys whose route has, or has not, published a newer version.",
-    ),
     ParamSpec::one::<JourneyId>("after", "The page starts after this journey."),
     SIZE,
 ];
@@ -469,7 +465,6 @@ pub fn journeys(params: &Params) -> Result<JourneyQuery, ApiError> {
             .all::<IdentityKey>("referencing")?
             .into_iter()
             .collect(),
-        params.one("upgrade_available")?,
         params.one("after")?,
         params.one("size")?,
     )

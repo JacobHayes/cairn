@@ -24,15 +24,14 @@ export function indexKey(query: JourneyIndexQuery | undefined): string {
 
 /**
  * C16: every journey `query` asks for, kept current: a tick for any journey newer than held,
- * or one not held (a journey just created, or newly matching), refetches it; so does a route
- * moving (a version published changes its journeys' "upgrade available" with no journey tick)
- * and the deployment moving (a merge changes which journeys refer to the caller). No query is
- * nothing to ask for: an empty answer.
+ * or one not held (a journey just created, or newly matching), refetches it; so does the
+ * deployment moving (a merge changes which journeys refer to the caller). No query is nothing
+ * to ask for: an empty answer.
  */
 export function journeyIndex(query: JourneyIndexQuery | undefined) {
   return (session: Session): LiveSpec<JourneySummary[]> => ({
-    watching: ["journeys", "routes", "deployment"],
-    about: (of) => isJourney(of) || isRoute(of) || ("domain" in of && of.domain === "deployment"),
+    watching: ["journeys", "deployment"],
+    about: (of) => isJourney(of) || ("domain" in of && of.domain === "deployment"),
     fetch: () =>
       query === undefined ? Promise.resolve([]) : allPages<JourneySummary, string>((after) => session.host.journeys(after === undefined ? query : { ...query, after })),
     holds: (items) => items.map((item) => ({ of: journeyOf(item.id), revision: item.revision })),
@@ -77,10 +76,9 @@ export function routesOfKind(kind: Schema<"RouteKind"> | undefined) {
 /** The route index of both kinds, kept current. */
 export const routeIndex = routesOfKind(undefined);
 
-/** B13: how much a segment is used: the insertions of it across every version, and how many are behind its latest. */
+/** B13: how much a segment is used: the insertions of it across every version. */
 export interface SegmentUse {
   places: number;
-  behind: number;
 }
 
 /** C19: each segment's use, kept current: any route or journey moving can change it, so every tick asks again. */
@@ -93,7 +91,7 @@ export function segmentUses(session: Session): LiveSpec<Record<string, SegmentUs
       const uses = await Promise.all(
         segments.map(async (route): Promise<[string, SegmentUse]> => {
           const found = (await session.host.routeDetail(route.header.id)).versions.flatMap((version) => version.insertions ?? []);
-          return [route.header.id, { places: found.length, behind: found.filter((use) => use.upgrade_available).length }];
+          return [route.header.id, { places: found.length }];
         }),
       );
       return Object.fromEntries(uses);
@@ -111,7 +109,7 @@ export interface RouteRead {
 
 /**
  * C17: route `id` with its versions and the journeys on each, kept current: its own ticks
- * (publishing, a draft, retiring) and any journey's (one started, upgraded, or deleted). A
+ * (publishing, a draft, retiring) and any journey's (one started or deleted). A
  * segment's insertions may sit in another route, so any route's tick asks again too (C19).
  */
 export function routeRead(id: string) {

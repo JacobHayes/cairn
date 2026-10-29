@@ -75,9 +75,3 @@ export function useSegmentNames(): (route: string) => string {
     return (route) => names.get(route) ?? route;
   }, [indexed]);
 }
-
-/** A segment's latest published version by route id, from the route index. */
-export function useLatestVersions(): ReadonlyMap<string, number> {
-  const indexed = valueOf(useLive("routes", routeIndex).view);
-  return useMemo(() => new Map((indexed ?? []).flatMap((route) => (route.latest_version == null ? [] : [[route.header.id, route.latest_version] as const]))), [indexed]);
-}

@@ -125,18 +125,9 @@ export function reviewing(edits: Edits, review: ProposalReview, preview: Proposa
   };
 }
 
-/** The route versions a journey proposal's mutations read: an upgrade's target and the journey's own, a re-link's new version, an insertion's segment. */
-function versionsRead(ready: Ready, draft: ProposalDraft): Schema<"Lineage">[] {
-  const own = ready.journey.header.lineage ?? undefined;
-  return (draft.mutations ?? []).flatMap((mutation) => {
-    if (mutation.op === "upgrade" && own !== undefined) {
-      return [own, { route: own.route, version: mutation.to }];
-    }
-    if (mutation.op === "relink") {
-      return own === undefined ? [mutation.lineage] : [own, mutation.lineage];
-    }
-    return mutation.op === "insert_segment" ? [mutation.segment] : [];
-  });
+/** The route versions a journey proposal's mutations read: an insertion's segment. */
+function versionsRead(draft: ProposalDraft): Schema<"Lineage">[] {
+  return (draft.mutations ?? []).flatMap((mutation) => (mutation.op === "insert_segment" ? [mutation.segment] : []));
 }
 
 /** What a journey proposal's local preview holds: the engine's answer for the edited proposal, and the journey it would leave, derived and held under the proposal's slot. */
@@ -177,7 +168,7 @@ export const slotOf = (journey: string, proposal: string): string => {
 const JOURNEY_AFTER: ReadSource<AfterArgs, JourneyAfter> = {
   policy: previewPolicy(PREVIEW_SETTLE_MS),
   read: async ({ host, deriver, before, proposal, draft, user }, at) => {
-    const lineages = versionsRead(before, draft);
+    const lineages = versionsRead(draft);
     const versions: RouteVersion[] = await Promise.all(lineages.map((lineage) => host.routeVersion(lineage.route, lineage.version)));
     // B13: the engine reads a segment's header for its kind and retirement.
     const segments = await Promise.all([...new Set((draft.mutations ?? []).flatMap((mutation) => (mutation.op === "insert_segment" ? [mutation.segment.route] : [])))].map((route) => host.route(route)));
@@ -275,10 +266,7 @@ export function useLayerModel(args: ModelArgs): LayerModel {
   // Which items still need a choice is known only from a preview of the edits on screen.
   const settled = current && previewed;
   const unresolved = useMemo(() => (settled ? new Map((preview.unresolved ?? []).map((item) => [item.item, item.reason])) : new Map<number, UnresolvedReason>()), [settled, preview.unresolved]);
-  // What a conflict offers is the conflict's own, which the reviewer's edits do not change.
-  const conflicts = useMemo(() => new Map((preview.conflicts ?? []).map((review) => [review.item, review])), [preview.conflicts]);
-  const open = useMemo(() => new Set(unresolved.keys()), [unresolved]);
-  const marked = useMemo(() => layerMarks({ before, after, items: draft.items ?? [], unresolved: open, known, members }), [before, after, draft.items, open, known, members]);
+  const marked = useMemo(() => layerMarks({ before, after, items: draft.items ?? [], known, members }), [before, after, draft.items, known, members]);
   const added = useMemo<Graph>(() => ({ nodes: (draft.mutations ?? []).flatMap((mutation) => (mutation.op === "add_node" ? [mutation.node] : [])) }), [draft.mutations]);
   const today = args.today ?? sessionToday;
   const names = useMemo(() => namesOf([added, before, after], deployment ?? { revision: 0 }, today), [added, before, after, deployment, today]);
@@ -302,7 +290,6 @@ export function useLayerModel(args: ModelArgs): LayerModel {
     names,
     unresolved,
     checking: !settled,
-    conflicts,
     today,
     editable: proposal.status === "open" && !writing,
   };

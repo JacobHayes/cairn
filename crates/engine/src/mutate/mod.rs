@@ -18,8 +18,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     DeletedId, Domain, GraphId, GraphKey, GraphRecord, IdentityKey, Journey, JourneyId, KeyRefs,
-    Lineage, LocalEdit, Mutation, Node, NodeKey, Patch, PatchTarget, Provenance, Record, RecordKey,
-    RevisionConflict, Subject, Violation, ViolationCode, Write,
+    Lineage, Mutation, Node, NodeKey, Patch, PatchTarget, Record, RecordKey, RevisionConflict,
+    Subject, Violation, ViolationCode, Write,
 };
 
 use crate::edit::RemovalIndex;
@@ -106,9 +106,7 @@ fn scope(mutation: &Mutation) -> Scope {
     match mutation {
         Mutation::CreateJourney { .. }
         | Mutation::EditJourney { .. }
-        | Mutation::SetJourneyStatus { .. }
-        | Mutation::Upgrade { .. }
-        | Mutation::Relink { .. } => Scope::Journey,
+        | Mutation::SetJourneyStatus { .. } => Scope::Journey,
         Mutation::Transition { .. }
         | Mutation::Answer { .. }
         | Mutation::SetRecordedDate { .. }
@@ -125,9 +123,7 @@ fn scope(mutation: &Mutation) -> Scope {
         | Mutation::SetTicked { .. }
         | Mutation::AddAnnotation { .. }
         | Mutation::EditAnnotation { .. }
-        | Mutation::RemoveAnnotation { .. }
-        | Mutation::SetProvenance { .. }
-        | Mutation::MarkLocalEdit { .. } => Scope::JourneyState,
+        | Mutation::RemoveAnnotation { .. } => Scope::JourneyState,
         Mutation::CreateRoute { .. }
         | Mutation::EditRoute { .. }
         | Mutation::SetRouteRetired { .. }
@@ -462,26 +458,6 @@ impl Session<'_> {
             unreachable!("graph records are removed only in patches to a journey or route")
         };
         Write::Remove(RecordKey::InGraph { graph, key })
-    }
-
-    /// B4: the local-edit marker an edit to a route-copied node sets in a journey, when it is
-    /// not set already.
-    pub(crate) fn marker(&self, node: &NodeKey, edit: LocalEdit) -> Option<Write> {
-        let state = &self.journey()?.graph.state;
-        let from_route = state
-            .nodes
-            .get(node)
-            .is_some_and(|stored| stored.provenance == Provenance::FromRoute);
-        let marked = state
-            .local_edits
-            .get(node)
-            .is_some_and(|edits| edits.contains(&edit));
-        (from_route && !marked).then(|| {
-            self.put(GraphRecord::LocalEdit {
-                node: node.clone(),
-                edit,
-            })
-        })
     }
 
     /// The patch's domain.

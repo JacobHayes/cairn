@@ -79,7 +79,6 @@ function Change({ mark }: { mark: DiffMark | undefined }) {
   return (
     <span className="layer-word" data-testid="row-diff" data-diff={mark.kind}>
       {DIFF_LABELS[mark.kind]}
-      {mark.choice === true ? <span className="layer-choice"> · needs a choice</span> : null}
     </span>
   );
 }
@@ -113,7 +112,6 @@ function Row({ line, columns, context: shared, selection, current, faded, mark }
       data-selected={chosen}
       data-faded={faded ? true : undefined}
       data-diff={mark?.kind}
-      data-choice={mark?.choice === true ? true : undefined}
       data-frontier={context.frontier?.has(line.key) === true ? true : undefined}
       aria-selected={current}
       onClick={(event) => {

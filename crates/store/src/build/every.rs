@@ -13,10 +13,10 @@ use cairn_schema::{
     Action, Annotation, AnnotationBody, AnnotationContent, AnswerSpec, AnswerType, AnswerValue,
     BoundedSet, Bypass, Checklist, Choices, Date, Days, Decision, Deliverable, Domain, Graph,
     Group, GuardFailure, Identity, Insertion, JourneyHeader, JourneyState, JourneyStatus, Keyed,
-    Lineage, LocalEdit, Milestone, Node, NodeField, NodeKey, NodeKind, NodeState, Overrides,
-    ParticipationKind, ParticipationSource, Participations, Payload, Proposal, ProposalDraft,
-    ProposalStatus, Provenance, Reopened, Resource, ResourceContent, RetiredKeys, Revision, Role,
-    RouteHeader, RouteKind, SnoozeTarget, State, Weight, refs::KeyRefs,
+    Lineage, Milestone, Node, NodeKey, NodeKind, NodeState, Overrides, ParticipationKind,
+    ParticipationSource, Participations, Payload, Proposal, ProposalDraft, ProposalStatus,
+    Reopened, Resource, ResourceContent, RetiredKeys, Revision, Role, RouteHeader, RouteKind,
+    SnoozeTarget, State, Weight, refs::KeyRefs,
 };
 use serde_json::json;
 
@@ -68,17 +68,6 @@ fn node_key(index: usize) -> NodeKey {
     id(&format!("n_{index}"))
 }
 
-/// Every node provenance.
-#[must_use]
-pub fn provenances() -> Vec<Provenance> {
-    chain(Provenance::FromRoute, |provenance| match provenance {
-        Provenance::FromRoute => Some(Provenance::Local),
-        Provenance::Local => Some(Provenance::Orphaned),
-        Provenance::Orphaned => Some(Provenance::FromSegment),
-        Provenance::FromSegment => None,
-    })
-}
-
 /// Every journey status.
 #[must_use]
 pub fn journey_statuses() -> Vec<JourneyStatus> {
@@ -97,22 +86,6 @@ pub fn proposal_statuses() -> Vec<ProposalStatus> {
         ProposalStatus::Applied => Some(ProposalStatus::Discarded),
         ProposalStatus::Discarded => None,
     })
-}
-
-/// Every local edit: one per node field, and each other marker.
-#[must_use]
-pub fn local_edits() -> BTreeSet<LocalEdit> {
-    let others = chain(LocalEdit::Shape, |edit| match edit {
-        LocalEdit::Shape => Some(LocalEdit::Requires(node_key(1))),
-        LocalEdit::Requires(_) => Some(LocalEdit::Participation(id("k_role"))),
-        LocalEdit::Participation(_) => Some(LocalEdit::Resource(id("a_0"))),
-        LocalEdit::Resource(_) | LocalEdit::Field(_) => None,
-    });
-    NodeField::ALL
-        .into_iter()
-        .map(LocalEdit::Field)
-        .chain(others)
-        .collect()
 }
 
 /// An answer of every type.
@@ -429,17 +402,15 @@ pub fn insertion(fill: Fill) -> Insertion {
     }
 }
 
-/// A node state in every state and provenance, each with every field filled or cleared.
+/// A node state in every state, each with every field filled or cleared.
 fn node_states(fill: Fill) -> BTreeMap<NodeKey, NodeState> {
     (0..)
         .zip(fill.rotate(State::ALL.to_vec()))
-        .zip(fill.rotate(provenances()).into_iter().cycle())
-        .map(|((index, state), provenance)| {
+        .map(|(index, state)| {
             (
                 node_key(index),
                 NodeState {
                     state,
-                    provenance,
                     atomic: fill.on(),
                     started_on: fill.some(day(1)),
                     finished_on: fill.some(day(2)),
@@ -455,9 +426,8 @@ fn node_states(fill: Fill) -> BTreeMap<NodeKey, NodeState> {
         .collect()
 }
 
-/// Every state record a journey holds: a node state in every state and provenance, every
-/// local edit, an answer of every type, filled and empty role fills, a pin, every snooze
-/// target, overrides with every reason and a bypass of every guard, a tombstone, and an
+/// Every state record a journey holds: a node state in every state, an answer of every type, filled and empty role fills, a pin, every snooze
+/// target, overrides with every reason and a bypass of every guard, and an
 /// annotation of every content.
 #[must_use]
 pub fn state(fill: Fill) -> JourneyState {
@@ -477,9 +447,7 @@ pub fn state(fill: Fill) -> JourneyState {
     let fills = [("r_lead", vec!["who_a", "who_b"]), ("r_other", Vec::new())];
     JourneyState {
         nodes: node_states(fill),
-        local_edits: BTreeMap::from([(node_key(0), local_edits())]),
-        // A tick is a record of its own, so a put over the graph leaves it as it is, like a
-        // local edit; the removal at the end of the conformance run takes it by key.
+        // A tick is a record of its own, so a put over the graph leaves it as it is; the removal at the end of the conformance run takes it by key.
         ticks: BTreeMap::from([(node_key(0), BTreeSet::from([id("load"), id("rollback")]))]),
         answers: by_node(fill.rotate(answer_values())),
         // Cleared drops every rationale: an overwrite must clear the stored column.
@@ -515,7 +483,6 @@ pub fn state(fill: Fill) -> JourneyState {
                 bypass: fill.some(bypass()),
             },
         )]),
-        tombstones: BTreeSet::from([id("n_gone")]),
         annotations: Keyed::new(annotations).unwrap(),
     }
 }
@@ -609,8 +576,7 @@ pub fn proposal(
     let mutations = json!([{"op": "add_node", "node": {
         "key": "n_review", "id": "review", "kind": "action", "title": "Review",
     }}]);
-    let items =
-        json!([{"item": "orphan", "node": "n_gone", "keep": true, "removal": {"node": "n_gone"}}]);
+    let items = json!([{"item": "exclusion", "node": "n_gone", "excluded": true}]);
     Proposal {
         id: id(key),
         destination,

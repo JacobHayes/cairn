@@ -44,8 +44,7 @@ pub(crate) fn journeys(
         .as_ref()
         .map(|wanted| backend::query::resolved_owners(wanted, &aliases));
     let select = "SELECT j.id, j.name, j.status, j.lineage_route, j.lineage_version, j.revision, \
-                  j.created_at, (SELECT max(v.version_number) FROM route_versions v \
-                  WHERE v.route_id = j.lineage_route) \
+                  j.created_at \
                   FROM journeys j WHERE ?1 IS NULL OR j.id > ?1 ORDER BY j.id";
     let after = query.after.as_ref().map_or(Value::Null, text);
     let mut items = Vec::new();
@@ -62,7 +61,6 @@ pub(crate) fn journeys(
             lineage: load::lineage(&row, 3)?,
             revision: row.number(5)?,
             created_at: row.timestamp(6)?,
-            latest_version: row.opt_int(7)?.map(crate::sql::number).transpose()?,
         };
         if backend::query::journey_listed(query, &summary, referencing.as_ref(), wanted.as_ref()) {
             items.push(summary);

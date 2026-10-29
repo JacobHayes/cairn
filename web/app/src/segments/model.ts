@@ -232,12 +232,8 @@ export function memberOrigin(graph: Graph, key: string): MemberOrigin | undefine
   return insertion === undefined ? undefined : { insertion, root: insertionRoot(graph, insertion) === key };
 }
 
-/** Origin's sentence for a member: from which segment and version, where the root went, and whether a newer version exists. */
-export function originLines(origin: MemberOrigin, names: { segment: string; parent: string | undefined }, latest: number | undefined): string[] {
+/** Origin's sentence for a member: from which segment and version, and where the root went. */
+export function originLine(origin: MemberOrigin, names: { segment: string; parent: string | undefined }): string {
   const { segment } = origin.insertion;
-  const lines = [`From segment ${names.segment}, version ${String(segment.version)}${origin.root ? (names.parent === undefined ? ", inserted at the top level" : `, inserted under ${names.parent}`) : ""}.`];
-  if (latest !== undefined && latest > segment.version) {
-    lines.push(`Version ${String(latest)} is available.`);
-  }
-  return lines;
+  return `From segment ${names.segment}, version ${String(segment.version)}${origin.root ? (names.parent === undefined ? ", inserted at the top level" : `, inserted under ${names.parent}`) : ""}.`;
 }

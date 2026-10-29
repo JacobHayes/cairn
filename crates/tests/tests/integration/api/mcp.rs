@@ -227,8 +227,8 @@ mod mcp_in_process {
         );
     }
 
-    /// A13, A11, B7, B8, B9: a version exported and imported back as a draft, published as
-    /// version 2; a new route opened; and the journey's upgrade, save, and re-link drafted.
+    /// A13, A11, B8: a version exported and imported back as a draft, published as
+    /// version 2; a new route opened; and the journey's save drafted.
     async fn routes(agent: &Agent) {
         let exported = agent
             .ok("export_route", json!({ "route": ROUTE, "version": 1 }))
@@ -256,26 +256,14 @@ mod mcp_in_process {
                 { "op": "open_draft", "source": "edit" },
             ] });
         agent.ok("apply_patch", open).await;
-        // B7, B8, B9: each kind Cairn drafts reaches review at its destination holding the
-        // draft of its kind, a saved route at the new route; asked again under its patch id,
+        // B8: each kind Cairn drafts reaches review at its destination holding the draft of its
+        // kind, a saved route at the new route; asked again under its patch id,
         // it is answered.
-        let drafted = [
-            (
-                json!({ "upgrade": { "journey": JOURNEY, "to": 2 }, "proposal": "pr_upgrade", "patch_id": "p_upgrade" }),
-                json!({ "journey": JOURNEY }),
-                json!({ "op": "upgrade" }),
-            ),
-            (
-                json!({ "save_as_route": { "journey": JOURNEY, "route": "saved-evaluation", "name": "Saved evaluation" }, "proposal": "pr_save", "patch_id": "p_save" }),
-                json!({ "route": "saved-evaluation" }),
-                json!({ "op": "open_draft", "source": { "save_as_route": { "journey": JOURNEY } } }),
-            ),
-            (
-                json!({ "relink": { "journey": JOURNEY, "to": { "route": ROUTE, "version": 2 } }, "proposal": "pr_relink", "patch_id": "p_relink" }),
-                json!({ "journey": JOURNEY }),
-                json!({ "op": "relink" }),
-            ),
-        ];
+        let drafted = [(
+            json!({ "save_as_route": { "journey": JOURNEY, "route": "saved-evaluation", "name": "Saved evaluation" }, "proposal": "pr_save", "patch_id": "p_save" }),
+            json!({ "route": "saved-evaluation" }),
+            json!({ "op": "open_draft", "source": { "save_as_route": { "journey": JOURNEY } } }),
+        )];
         for (arguments, destination, drafts) in drafted {
             let proposed = agent.ok("create_proposal", arguments.clone()).await;
             assert_eq!(proposed["status"], "saved", "{arguments}");

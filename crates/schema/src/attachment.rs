@@ -281,8 +281,8 @@ pub enum ResourceContent<R: References> {
     MessageDraft(MessageTemplate<R>),
 }
 
-// PRD: A10, B7.
-/// Route-authored guidance on a node, keyed so upgrades diff it.
+// PRD: A10.
+/// Route-authored guidance on a node.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]

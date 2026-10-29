@@ -26,7 +26,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "list_journeys",
         description: "Journeys, paged: status, owners, route version, revision. Filter by \
-            status, route, owner, upgrade available, or the identities they refer \
+            status, route, owner, or the identities they refer \
             to.",
         writes: Writes::Nothing,
         destructive: false,
@@ -271,9 +271,6 @@ pub(crate) struct ListJourneys {
     statuses: BTreeSet<JourneyStatus>,
     #[serde(default)]
     route: Option<RouteId>,
-    /// Whether the route has a newer published version.
-    #[serde(default)]
-    upgrade_available: Option<bool>,
     // PRD: H3.
     /// Journeys that refer to the caller.
     #[serde(default)]
@@ -307,7 +304,6 @@ struct JourneyRow {
     #[serde(skip_serializing_if = "Option::is_none")]
     lineage: Option<Lineage>,
     revision: Revision,
-    upgrade_available: bool,
 }
 
 /// `export_route`.
@@ -455,7 +451,6 @@ impl From<ProposalReview> for Review {
         } = review;
         let ProposalPreview {
             unresolved,
-            conflicts: _,
             violations,
             frontier,
             consequences: _,
@@ -751,13 +746,11 @@ impl ToolSet {
             version: None,
             referencing,
             owners: (!arguments.owners.is_empty()).then_some(arguments.owners),
-            upgrade_available: arguments.upgrade_available,
             after: arguments.after,
             size: PageSize::MAX,
         };
         let page = self.service.journeys(&query).await?;
         let journeys = page.items.into_iter().map(|summary| JourneyRow {
-            upgrade_available: summary.upgrade_available(),
             id: summary.id,
             name: summary.name,
             status: summary.status,

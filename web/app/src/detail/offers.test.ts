@@ -49,7 +49,7 @@ describe("a page that takes no write (B11)", () => {
 describe("the inspector's offers", () => {
   it("lists a decided decision's Reopen and the shape of the node, with nothing to snooze or skip or answer", () => {
     const view = made("n_when", { display_state: "done" });
-    view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, n_when: { state: "decided", provenance: "local" } } };
+    view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, n_when: { state: "decided" } } };
     expect(menuOf(view, detailOf(view, "n_when"), true).map((group) => group.map((item) => item.id))).toEqual([["reopen"], ["rename", "assign", "weight"], ["show-in-graph", "edit-node", "copy-link"]]);
     expect(offered(view, "n_when").primary).toBeUndefined();
   });
@@ -157,7 +157,7 @@ describe("a group marked done (D1a)", () => {
   /** The stage stored as `state`, with its report effectively skipped through it when it is marked done. */
   function stage(state: "derived" | "done", derived: Partial<NodeDerived> = {}): Ready {
     const view = made("n_stage", state === "done" ? { moves: ["insert_segment", "reopen"], skips_beneath: true, ...derived } : derived);
-    view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, n_stage: { state, provenance: "local", ...(state === "done" ? { reason: "Covered elsewhere." } : {}) } } };
+    view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, n_stage: { state, ...(state === "done" ? { reason: "Covered elsewhere." } : {}) } } };
     return view;
   }
 

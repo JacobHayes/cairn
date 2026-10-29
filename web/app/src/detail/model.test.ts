@@ -6,14 +6,13 @@ import { ITEM_GONE } from "../ui/gone.ts";
 import { checklistView, testView } from "./view.test-support.ts";
 
 describe("nodeDetail", () => {
-  it("composes a node's path, record, pin, annotations, and local edits from the document", () => {
+  it("composes a node's path, record, pin, and annotations from the document", () => {
     const detail = nodeDetail(testView(), "n_report");
     expect(detail?.path).toBe("stage/report");
     expect(detail?.ancestors.map((node) => node.key)).toEqual(["n_stage"]);
-    expect(detail?.record).toMatchObject({ state: "active", provenance: "from_route" });
+    expect(detail?.record).toMatchObject({ state: "active" });
     expect(detail?.pin).toBe("2026-11-02");
     expect(detail?.annotations.map((annotation) => annotation.body.key)).toEqual(["a_link"]);
-    expect(detail?.localEdits).toEqual([{ field: "title" }]);
     expect(detail?.fedBy).toBeUndefined();
   });
 

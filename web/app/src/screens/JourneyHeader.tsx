@@ -1,6 +1,6 @@
 // The journey header: one line with the name, the status when the journey is not active (a
 // read-only chip), the View picker and the journey's `⋯` (Edit, insert a segment, save it as a
-// route, re-link it, copy its link, and its Status: the moves the status allows, B11, and
+// route, copy its link, and its Status: the moves the status allows, B11, and
 // deletion once archived, A19). What the journey is (progress, next milestone, route) is on the
 // journey card in the inspector. When completion is suggested, a band under the header offers it.
 import { useLayoutEffect, useRef, useState } from "react";
@@ -18,7 +18,7 @@ import { useSuggested } from "../journeys/suggested.ts";
 import { OpenProposalsItem } from "../proposals/DestinationProposals.tsx";
 import { JOURNEY_OFFERS } from "../journeys/view.ts";
 import { useLayer } from "../proposals/layer.ts";
-import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
+import { JourneyFlow } from "../proposals/Entries.tsx";
 import { Button } from "../ui/kit.tsx";
 import { plural } from "../ui/words.ts";
 import { Receipt } from "../ui/Receipt.tsx";
@@ -31,7 +31,7 @@ import { useWritable } from "./writable.ts";
 import { JourneyStatusBadge, STATUS_WORDS } from "../journeys/StatusBadge.tsx";
 import { Tip } from "../ui/Tip.tsx";
 
-type Panel = JourneyFlowName | "delete";
+type Panel = "save" | "delete";
 
 /** B11, A19: the `⋯` menu's Status row, which opens in place to the moves the status allows, and deletion once archived. */
 function StatusItems({ ready, write, onDelete, close }: { ready: Ready; write: ScreenWrite; onDelete: () => void; close: () => void }) {
@@ -123,7 +123,6 @@ function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready:
               </button>
             )}
             {!live ? null : item("menu-save", "Save as route...", "save")}
-            {!writable ? null : item("menu-relink", "Re-link...", "relink")}
             {!live ? null : <hr />}
             <OpenProposalsItem destination={{ journey: header.id }} close={close} />
             {screen !== "summary" ? null : (
@@ -227,9 +226,7 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
       <WriteStatus view={write.status} />
       {write.rejection === undefined ? <Receipt receipt={write.receipt} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
       {panel === "delete" ? <DeleteJourney ready={ready} onCancel={() => { setPanel(undefined); }} /> : null}
-      {panel === "save" || panel === "relink" ? (
-        <JourneyFlow ready={ready} flow={panel} onClose={() => { setPanel(undefined); }} />
-      ) : null}
+      {panel === "save" ? <JourneyFlow ready={ready} onClose={() => { setPanel(undefined); }} /> : null}
     </section>
   );
 }

@@ -6,11 +6,10 @@ import "./authoring.css";
 
 import { Section } from "../detail/parts.tsx";
 import { titleIn, type GraphNode } from "./graph.ts";
-import { LocalEdits } from "./LocalEdits.tsx";
 import { NodeForm } from "./NodeForm.tsx";
 import { ResourceEditor } from "./ResourceEditor.tsx";
 import { Breakdown, EdgesEditor, ParticipationWiring, PlaceEditor, RemoveNode } from "./StructureEditors.tsx";
-import { isJourney, type Authored } from "./target.ts";
+import type { Authored } from "./target.ts";
 import { isWork } from "../detail/model.ts";
 
 export interface AuthoringPanelProps {
@@ -44,11 +43,6 @@ export function AuthoringPanel({ authored, node, onRemoved }: AuthoringPanelProp
         {breaksDown ? (
           <Section title="Break it down" summary={node.placeholder === true ? "a placeholder" : undefined} open={node.placeholder === true} testId="author-breakdown">
             <Breakdown authored={authored} node={node} />
-          </Section>
-        ) : null}
-        {isJourney(authored) ? (
-          <Section title="Provenance and local edits" summary={(authored.graph.state?.local_edits?.[node.key] ?? []).length === 0 ? undefined : `${String((authored.graph.state?.local_edits?.[node.key] ?? []).length)} edited here`} testId="author-local-edits">
-            <LocalEdits authored={authored} node={node} />
           </Section>
         ) : null}
       </div>

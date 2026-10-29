@@ -9,6 +9,7 @@ mod finish_revisions_migration;
 mod journey_owners_migration;
 mod milestone_done_migration;
 mod open;
+mod pointer_migration;
 mod property_round_trip;
 mod reason_migration;
 mod receipts_migration;

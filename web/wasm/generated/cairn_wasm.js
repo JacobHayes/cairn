@@ -601,53 +601,6 @@ export function removalPlan(graph, target) {
 }
 
 /**
- * B4: the mutations that restore tombstoned node `key` of a route version (`version`, a
- * `Graph`) into a journey's graph, with fresh keys built from `seed`; `null` when the node
- * is not in the version or a message draft would not fit under the new keys.
- *
- * # Errors
- *
- * The JSON of a [`HostError`] when an input does not read.
- * @param {string} journey
- * @param {string} version
- * @param {string} key
- * @param {string} seed
- * @returns {string}
- */
-export function restoreNodes(journey, version, key, seed) {
-    let deferred6_0;
-    let deferred6_1;
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passStringToWasm0(journey, wasm.__wbindgen_export, wasm.__wbindgen_export2);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passStringToWasm0(version, wasm.__wbindgen_export, wasm.__wbindgen_export2);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passStringToWasm0(key, wasm.__wbindgen_export, wasm.__wbindgen_export2);
-        const len2 = WASM_VECTOR_LEN;
-        const ptr3 = passStringToWasm0(seed, wasm.__wbindgen_export, wasm.__wbindgen_export2);
-        const len3 = WASM_VECTOR_LEN;
-        wasm.restoreNodes(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
-        var ptr5 = r0;
-        var len5 = r1;
-        if (r3) {
-            ptr5 = 0; len5 = 0;
-            throw takeObject(r2);
-        }
-        deferred6_0 = ptr5;
-        deferred6_1 = len5;
-        return getStringFromWasm0(ptr5, len5);
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-        wasm.__wbindgen_export3(deferred6_0, deferred6_1, 1);
-    }
-}
-
-/**
  * A13: the file document (the JSON of a `RouteFile`, as an export answers it) written as
  * the canonical YAML a route file is kept in on disk: sorted, in a stable field order.
  *

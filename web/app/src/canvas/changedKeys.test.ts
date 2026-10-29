@@ -4,7 +4,7 @@ import type { Layer } from "../proposals/layer.ts";
 import { changedKeys } from "./graph.ts";
 
 const layer = (model: object, mode = "reviewing"): Layer => ({ mode, model: { known: true, previewed: true, previewError: undefined, marks: {}, entries: [], unresolved: new Map(), draft: {}, diff: { edgesAdded: [], edgesRemoved: [] }, ...model } }) as unknown as Layer;
-const conflict = (node: string) => ({ item: "conflict", conflict: { about: "field", node } });
+const conflict = (node: string) => ({ item: "exclusion", node, excluded: true });
 
 describe("changedKeys", () => {
   it("lists what waits on a choice first, in the order of the rail's items, then the other changes, then the ends of changed requirements, each once", () => {

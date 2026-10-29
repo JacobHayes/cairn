@@ -2,7 +2,7 @@
 // what needs a look (worst first), what is the viewer's, the next milestone, and the one fact a
 // phone row leads with. Words come from the functions here, so the index, Home and the journey
 // card say a thing one way. Pure, so the unit tests check them without a page.
-import { STATUS_HOLDS_CURRENT_WORK, type Schema } from "@cairn/client";
+import { STATUS_HOLDS_CURRENT_WORK } from "@cairn/client";
 
 import type { FactTone } from "../acting/reasons.ts";
 import { dateInk, whenWords } from "../status/when.ts";
@@ -95,12 +95,4 @@ export function milestoneOf(model: SummaryModel, today: string): { title: string
     return undefined;
   }
   return { title: next.title, when: whenWords(next.date, next.origin, today), tone: dateInk(next.date, today) };
-}
-
-/** C16: that a journey's route has a newer version, from the host's field and never worked out from versions; none when it has not. */
-export function upgradeWords(summary: Schema<"JourneySummary">): string | undefined {
-  if (!summary.upgrade_available) {
-    return undefined;
-  }
-  return summary.latest_version == null ? "Upgrade available" : `Version ${String(summary.latest_version)} available`;
 }

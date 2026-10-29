@@ -113,12 +113,8 @@ function callOf(proposals: ProposalHost, call: ProposalCall): Promise<ProposalWr
       return proposals.refresh(call.destination, call.proposal, call.request);
     case "apply":
       return proposals.apply(call.destination, call.proposal, call.request);
-    case "upgrade":
-      return proposals.upgrade(call.journey, call.request);
     case "save_as_route":
       return proposals.saveAsRoute(call.journey, call.request);
-    case "relink":
-      return proposals.relink(call.journey, call.request);
   }
 }
 

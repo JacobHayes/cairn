@@ -1,13 +1,12 @@
 //! Insertions (PRD Invariants: insertions; B13): every member of an insertion is a node of
 //! the graph and a member of no other insertion, every insertion has a member, the roles and
-//! kinds it maps onto exist, and in a journey a node has `from_segment` provenance exactly
-//! when it is a member. What only the segment version can tell (its keys, the cardinality of
+//! kinds it maps onto exist. What only the segment version can tell (its keys, the cardinality of
 //! what it maps) is checked where the insertion is made. Cost at the limits: one pass over
-//! the insertions' members and one over the journey's node states, each one lookup.
+//! the insertions' members, each one lookup.
 
 use std::collections::BTreeMap;
 
-use cairn_schema::{InsertionKey, KindKey, NodeKey, Provenance, Subject, Violation, ViolationCode};
+use cairn_schema::{InsertionKey, KindKey, NodeKey, Subject, Violation, ViolationCode};
 
 use super::{GraphCheck, at_node, violation};
 
@@ -52,34 +51,6 @@ pub(super) fn check(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                     "the participation kind {kind} it maps onto is not in the graph"
                 )));
             }
-        }
-    }
-    if check.journey {
-        provenance(check, &holders, out);
-    }
-}
-
-/// In a journey, a node is `from_segment` exactly when it is a member.
-fn provenance(
-    check: &GraphCheck<'_>,
-    holders: &BTreeMap<&NodeKey, &InsertionKey>,
-    out: &mut Vec<Violation>,
-) {
-    for (key, stored) in &check.document.state.nodes {
-        let segment = stored.provenance == Provenance::FromSegment;
-        let member = holders.contains_key(key);
-        if segment != member && check.document.nodes.get(key).is_some() {
-            let message = if segment {
-                "a node copied in from a segment is a member of an insertion"
-            } else {
-                "a member of an insertion has from_segment provenance"
-            };
-            out.push(at_node(
-                check.tree,
-                key,
-                ViolationCode::InsertionInvalid,
-                message,
-            ));
         }
     }
 }

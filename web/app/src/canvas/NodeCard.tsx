@@ -382,7 +382,6 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
       data-here={here.join(", ") || undefined}
       data-trace={mark?.diff === undefined ? mark?.label : undefined}
       data-diff={mark?.diff}
-      data-choice={mark?.choice === true ? "" : undefined}
       data-parent={card.parent}
       data-x={data.place.x}
       data-y={data.place.y}

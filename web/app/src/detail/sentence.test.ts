@@ -15,7 +15,7 @@ function finished(key: string, state: "done" | "decided", derived: Partial<NodeD
   if (found !== undefined) {
     view.derived.nodes[key] = { ...found, display_state: "done", ...derived };
   }
-  view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, [key]: { state, provenance: "local", finished_on: "2026-10-04" } } };
+  view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, [key]: { state, finished_on: "2026-10-04" } } };
   return view;
 }
 

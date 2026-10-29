@@ -10,7 +10,7 @@ import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { fieldWords, upperFirst } from "../status/words.ts";
 import { ITEM_GONE, nodeTitle } from "../ui/gone.ts";
-import type { Conflict, ResolutionKind, ReviewItem } from "./model.ts";
+import type { ReviewItem } from "./model.ts";
 import { plural } from "../ui/words.ts";
 import { moveOf } from "../detail/model.ts";
 import { identityNamed, kindNamed, roleNamed, type Slot } from "../detail/sections.tsx";
@@ -189,10 +189,6 @@ export function mutationWords(mutation: Mutation, names: Names): string {
       return `Snooze ${node(mutation.node)} until ${"date" in mutation.until ? names.date(mutation.until.date) : `${node(mutation.until.node)}${SNOOZE_NODE_TAIL}`}`;
     case "unsnooze":
       return `Wake ${node(mutation.node)}`;
-    case "upgrade":
-      return `Upgrade to version ${String(mutation.to)}, with every change the merge applies cleanly`;
-    case "relink":
-      return `Follow ${mutation.lineage.route} version ${String(mutation.lineage.version)}`;
     case "set_ticked":
       return `${mutation.ticked ? "Tick" : "Untick"} ${quoted(names.item(mutation.node, mutation.item))} on ${node(mutation.node)}`;
     case "set_atomic":
@@ -216,72 +212,9 @@ export function mutationWords(mutation: Mutation, names: Names): string {
   }
 }
 
-/** B7: what a conflict is about, in words. */
-export function conflictWords(conflict: Conflict, names: Names, removed: readonly string[] = []): string {
-  const node = (key: string) => quoted(names.node(key));
-  switch (conflict.about) {
-    case "field": {
-      const [field] = fieldOf(conflict.journey);
-      const dangling = conflict.dangling === true ? " (it names a node this journey removed)" : "";
-      return `${node(conflict.node)}: its ${fieldWords(field)} differs here and in the route${dangling}`;
-    }
-    case "edge":
-      return `${node(conflict.edge.node)} requiring ${node(conflict.edge.requires)}: ${conflict.journey ? "added" : "removed"} here, ${conflict.route ? "kept" : "dropped"} by the route`;
-    case "participation":
-      return `${node(conflict.node)}: its ${names.kind(conflict.kind)} differs here and in the route`;
-    case "resource":
-      return `${node(conflict.node)}: a resource differs here and in the route${conflict.dangling === true ? " (the route's names a node this journey removed)" : ""}`;
-    case "shape":
-      return `${node(conflict.journey.key)}: a ${conflict.journey.kind} here, a ${conflict.route.kind} in the route${conflict.answered === true ? "; its answer would be cleared" : ""}`;
-    case "answer":
-      return `${node(conflict.decision)}: its answer names ${removed.map(quoted).join(", ")}, which the route no longer offers`;
-    case "role":
-      return conflict.route == null
-        ? `The role ${quoted(names.role(conflict.role))}: the route removed it, and this journey still uses it`
-        : `The role ${quoted(names.role(conflict.role))}: changed here and in the route`;
-    case "kind":
-      return conflict.route == null
-        ? `The ${quoted(names.kind(conflict.kind))} participations: the route removed the kind, and this journey still uses it`
-        : `The participation kind ${quoted(names.kind(conflict.kind))}: changed here and in the route`;
-    case "default_owner":
-      return `The default owner: ${conflict.journey == null ? "none" : quoted(names.role(conflict.journey))} here, ${conflict.route == null ? "none" : quoted(names.role(conflict.route))} in the route`;
-  }
-}
-
-/** B7: each resolution's words. */
-export const RESOLUTION_WORDS: Record<ResolutionKind, string> = {
-  keep_journey: "Keep this journey's",
-  take_route: "Take the route's",
-  clear_state: "Take the route's and clear what it invalidates",
-  reopen: "Take the route's and reopen it",
-  remove: "Remove it and what names it",
-  remap_role: "Move its uses to another role",
-  remap_kind: "Move its participations to another kind",
-  map_choices: "Map each removed choice to one that remains",
-};
-
-/** What taking `resolution` leaves a field conflict's field as, said beside the option; none for the other conflicts, whose option says it all. */
-export function resolutionEffect(conflict: Conflict, resolution: ResolutionKind, names: Names): string | undefined {
-  if (conflict.about !== "field") {
-    return undefined;
-  }
-  const [field, ours] = fieldOf(conflict.journey);
-  const [, theirs] = fieldOf(conflict.route);
-  if (resolution === "keep_journey") {
-    return fieldValueWords(field, ours, names);
-  }
-  return resolution === "take_route" ? fieldValueWords(field, theirs, names) : undefined;
-}
-
 /** C14: a review item's heading. */
 export function itemHeading(item: ReviewItem, names: Names): string {
   switch (item.item) {
-    case "conflict":
-      return "Conflict";
-    case "kept_local_edit":
-      return "Kept local edit";
-    case "orphan":
-      return `Orphan: ${quoted(names.node(item.node))}, which the new version removed`;
     case "participation":
       return `Who stands in for ${quoted(names.identity(item.identity))} in the route`;
     case "exclusion":
@@ -320,10 +253,6 @@ function factWords(fact: OutlineFact): string {
       return "discards the draft";
     case "publishes_draft":
       return "publishes the draft";
-    case "upgrades":
-      return `upgrades to version ${String(fact.to)}`;
-    case "relinks":
-      return "re-links to the saved route";
     case "inserts_segment":
       return "inserts a segment";
   }
@@ -334,7 +263,7 @@ const counted = (count: number, one: string, many: string) => `${String(count)} 
 /**
  * C14: what a proposal changes, in one sentence, from the outline the engine worked out of its
  * mutations (the listing's and the preview's are the same value): its header and lifecycle facts
- * first, then the nodes, requirements and identities it names. "Upgrades to version 2 and adds 1 node."
+ * first, then the nodes, requirements and identities it names. "Creates the route and adds 1 node."
  */
 export function outlineWords(outline: Outline): string {
   const phrases = [

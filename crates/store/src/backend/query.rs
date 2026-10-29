@@ -147,9 +147,6 @@ pub fn journey_listed(
         && query.version.is_none_or(|wanted| version == Some(wanted))
         && referencing.is_none_or(|found| found.contains(&summary.id))
         && owners.is_none_or(|wanted| summary.owners.iter().any(|owner| wanted.contains(owner)))
-        && query
-            .upgrade_available
-            .is_none_or(|wanted| summary.upgrade_available() == wanted)
 }
 
 /// C19: the insertions of `segment`'s versions across `graphs`, each under the version it is on:
@@ -173,7 +170,6 @@ pub fn insertion_uses<'g>(
         })
         .flat_map(|(route, graph)| graph.insertions.values().map(move |i| (route, &i.key)))
         .collect();
-    let newest = latest(segment);
     let mut found: BTreeMap<VersionNumber, Vec<InsertionUse>> = BTreeMap::new();
     for (id, graph) in graphs {
         let (host, current) = match id {
@@ -209,8 +205,6 @@ pub fn insertion_uses<'g>(
                     graph: id.clone(),
                     insertion: insertion.key.clone(),
                     title: root.title.clone(),
-                    upgrade_available: newest
-                        .is_some_and(|newest| newest > insertion.segment.version),
                 });
         }
     }

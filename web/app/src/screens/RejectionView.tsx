@@ -12,11 +12,6 @@ import { Button } from "../ui/kit.tsx";
 type RecordKey = Schema<"RecordKey">;
 
 
-/** A field of a node an edit names, when the edit names one. */
-function fieldOf(edit: unknown): string | undefined {
-  return typeof edit === "object" && edit !== null && "field" in edit && typeof edit.field === "string" ? edit.field : undefined;
-}
-
 /** A record a touched set names, in words when it is a node of a journey or one of its fields; none for a record a person has no word for. */
 export function describeRecord(key: RecordKey, titleOf: (journey: string, node: string) => string): string | undefined {
   if (!("in_graph" in key) || typeof key.in_graph.key !== "object") {
@@ -34,10 +29,6 @@ export function describeRecord(key: RecordKey, titleOf: (journey: string, node: 
   }
   if ("node_field" in inner) {
     return `${fieldWords(inner.node_field.field)} of "${node(inner.node_field.node)}"`;
-  }
-  if ("local_edit" in inner) {
-    const field = fieldOf(inner.local_edit.edit);
-    return field === undefined ? `"${node(inner.local_edit.node)}"` : `${fieldWords(field)} of "${node(inner.local_edit.node)}"`;
   }
   const [name, value] = Object.entries(inner as Record<string, unknown>)[0] ?? ["", undefined];
   const about = typeof value === "string" ? value : typeof value === "object" && value !== null ? Object.values(value).find((each): each is string => typeof each === "string") : undefined;

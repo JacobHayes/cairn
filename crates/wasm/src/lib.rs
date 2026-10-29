@@ -24,7 +24,7 @@ pub use files::{read_route_file, route_file_text};
 pub use local::{
     AppliedLocally, ApplyRequest, PreviewRequest, RouteApplyRequest, apply, apply_locally,
     apply_route, apply_route_locally, condition_problem, condition_problem_of, draft_stored,
-    draft_written, node_form_problems_text, preview, preview_locally, removal_plan, restore_nodes,
+    draft_written, node_form_problems_text, preview, preview_locally, removal_plan,
     value_problems_text,
 };
 pub use route::{

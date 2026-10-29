@@ -1,5 +1,5 @@
 // C8, J4: the inspector's last section, folded: the facts about a node that nothing is done
-// with, in one place. Where it came from (a route, a segment, or this journey) and what
+// with, in one place. Where it came from (a segment) and what
 // happened to it, in sentences naming who did each thing. Open it and the history is read;
 // folded, nothing is fetched.
 import { Origin } from "./Facts.tsx";

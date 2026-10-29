@@ -24,9 +24,8 @@ use cairn_schema::{
 use cairn_service::wire::{
     Caller, Capabilities, EventPage, Health, History, IdentityReferences, JourneyPage, Mine,
     NodeDetail, PatchAnswer, PatchRequest, Problem, Projected, ProposalAnswer, ProposalApply,
-    ProposalCreate, ProposalEdit, ProposalList, ProposalReview, ProposalStep, RelinkRequest,
-    RouteDetail, RouteImport, RoutePage, SaveAsRouteRequest, SearchPage, Tick, Tour, TourWrite,
-    UpgradeRequest, UserName,
+    ProposalCreate, ProposalEdit, ProposalList, ProposalReview, ProposalStep, RouteDetail,
+    RouteImport, RoutePage, SaveAsRouteRequest, SearchPage, Tick, Tour, TourWrite, UserName,
 };
 
 type SchemaFn = fn(&mut SchemaGenerator) -> Schema;
@@ -397,24 +396,14 @@ fn drafted<T: JsonSchema>(endpoint: &'static Endpoint, summary: &'static str) ->
     }
 }
 
-/// Bulk and import: upgrade, save as route, and re-link as proposals; route files.
+/// Bulk and import: save as route as a proposal; route files.
 fn bulk() -> Vec<Operation> {
     use crate::endpoints as at;
     vec![
-        drafted::<UpgradeRequest>(
-            &at::UPGRADE,
-            "Proposes upgrading the journey to a newer version of its route: the merge's \
-             conflicts, kept edits, and orphans are its review items.",
-        ),
         drafted::<SaveAsRouteRequest>(
             &at::SAVE_AS_ROUTE,
             "Proposes saving the journey's structure as a route draft, with a participation \
              mapping per explicit identity and an exclusion per node.",
-        ),
-        drafted::<RelinkRequest>(
-            &at::RELINK,
-            "Proposes re-linking the journey to a published version, differences kept as \
-             local edits unless the reviewer takes the route's.",
         ),
         Operation {
             path: &[ROUTE_ID],

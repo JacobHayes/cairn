@@ -25,7 +25,7 @@ export interface OverlayMark {
   tone: MarkTone;
   /** The tag it hangs, and what tests read. */
   label: string;
-  /** More to say of the card, on the tag's hover (a diff's conflict or orphan). */
+  /** More to say of the card, on the tag's hover (a diff's left-out node). */
   note?: string;
   /** A gravity contributor (an UNBLOCKS tag): a dot leads the tag, whose hover says it adds to the selected node's gravity. */
   contributor?: true;
@@ -35,8 +35,6 @@ export interface OverlayMark {
   ghost?: true;
   /** The proposal layer's mark (C14): the card is added, changed or removed, drawn as a fill, an edge and the word in its kind line, never a tag. */
   diff?: DiffKind;
-  /** The layer's mark: an unresolved choice is about the card. */
-  choice?: true;
 }
 
 /** How a line is lit: ink (upstream) or accent (downstream), lit for a card a diff marks, or add or remove for a requirement the diff adds or removes. */
@@ -172,7 +170,7 @@ export function marksOverlay(title: string, marks: Record<string, DiffMark>, mod
     const mark = key === undefined ? undefined : marks[key];
     const lost = drawn.shrunk?.get(card.key);
     if (mark !== undefined) {
-      shown[card.key] = { tone: TONES[mark.kind], label: WORDS[mark.kind], diff: mark.kind, ...(mark.choice === true ? { choice: true as const } : {}), ...(mark.note === undefined ? {} : { note: mark.note }), ...(mark.kind === "removed" ? { ghost: true as const } : {}) };
+      shown[card.key] = { tone: TONES[mark.kind], label: WORDS[mark.kind], diff: mark.kind, ...(mark.note === undefined ? {} : { note: mark.note }), ...(mark.kind === "removed" ? { ghost: true as const } : {}) };
     } else if (lost !== undefined) {
       shown[card.key] = { tone: "warn", label: WORDS.changed, diff: "changed", note: `${String(lost.length)} inside it removed` };
     }

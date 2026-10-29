@@ -23,6 +23,7 @@ pub(crate) enum Step {
     EvidenceGuards,
     FinishRevisions,
     CompleteAnyway,
+    Pointer,
 }
 
 /// The first migration this store applies.
@@ -31,7 +32,7 @@ const FIRST: u32 = 13;
 /// Every migration, numbered from [`FIRST`], in order. A migration is never edited once
 /// released; a change is a new one. It is a list of steps run in one transaction with its
 /// number.
-pub(crate) const MIGRATIONS: [(u32, &[Step]); 12] = [
+pub(crate) const MIGRATIONS: [(u32, &[Step]); 13] = [
     (
         FIRST,
         &[Step::Sql(include_str!("migrations/0013_schema.sql"))],
@@ -94,6 +95,13 @@ pub(crate) const MIGRATIONS: [(u32, &[Step]); 12] = [
         24,
         &[Step::Sql(include_str!("migrations/0024_receipts.sql"))],
     ),
+    (
+        25,
+        &[
+            Step::Pointer,
+            Step::Sql(include_str!("migrations/0025_pointer.sql")),
+        ],
+    ),
 ];
 
 /// Puts the database in WAL mode and applies the migrations it lacks.
@@ -145,6 +153,7 @@ pub(crate) fn run(connection: &Connection) -> Result<(), StoreError> {
                 Step::EvidenceGuards => crate::to_evidence_guards::run(connection),
                 Step::FinishRevisions => crate::to_finish_revisions::run(connection),
                 Step::CompleteAnyway => crate::to_complete_anyway::run(connection),
+                Step::Pointer => crate::to_pointer::run(connection),
             })
             .and_then(|()| {
                 execute(

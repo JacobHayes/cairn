@@ -1,7 +1,7 @@
 // Proposals (I6, C14): fetched, created, edited, previewed,
-// applied, discarded, and refreshed by id, and the upgrade, save-as-route, and re-link drafts
-// (B7, B8, B9). The server answers over HTTP (`/api/{domain}/proposals`, `/api/proposals/{id}...`,
-// `/api/journeys/{id}/{upgrade,save-as-route,relink}`). Each write names a client patch id (H5) and a client proposal id (I6), so a
+// applied, discarded, and refreshed by id, and the save-as-route draft (B8). The server answers
+// over HTTP (`/api/{domain}/proposals`, `/api/proposals/{id}...`, `/api/journeys/{id}/save-as-route`).
+// Each write names a client patch id (H5) and a client proposal id (I6), so a
 // lost answer is resubmitted rather than guessed at; nothing retries on its own.
 import { answerFailure, networkFailure, rejectionOf, type CairnClient, type HttpFailure, type Schema } from "@cairn/client";
 
@@ -45,12 +45,8 @@ export interface ProposalHost {
   preview(destination: Domain, id: string): Promise<ProposalReview>;
   /** I6, H2: applies it as the caller, at the editing revision they reviewed. */
   apply(destination: Domain, id: string, request: Schema<"ProposalApply">): Promise<ProposalWritten<PatchAnswer>>;
-  /** B7: proposes upgrading `journey`. */
-  upgrade(journey: string, request: Schema<"UpgradeRequest">): Promise<ProposalWritten<ProposalAnswer>>;
   /** B8: proposes saving `journey`'s structure as a draft of a route. */
   saveAsRoute(journey: string, request: Schema<"SaveAsRouteRequest">): Promise<ProposalWritten<ProposalAnswer>>;
-  /** B9: proposes re-linking `journey` to a published version. */
-  relink(journey: string, request: Schema<"RelinkRequest">): Promise<ProposalWritten<ProposalAnswer>>;
 }
 
 /** A fresh proposal id (I6): `pr_` and 32 hex digits from the browser's random UUID. */
@@ -192,9 +188,7 @@ function serverWrites(client: CairnClient): Omit<ProposalHost, "get" | "list" | 
           route: (route) => client.POST("/api/routes/{id}/proposals/{proposal}/apply", { ...under(route, id), body }),
         }),
       ),
-    upgrade: (journey, body) => written(() => client.POST("/api/journeys/{id}/upgrade", { ...at(journey), body })),
     saveAsRoute: (journey, body) => written(() => client.POST("/api/journeys/{id}/save-as-route", { ...at(journey), body })),
-    relink: (journey, body) => written(() => client.POST("/api/journeys/{id}/relink", { ...at(journey), body })),
   };
 }
 

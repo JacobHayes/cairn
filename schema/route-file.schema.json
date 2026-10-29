@@ -1076,7 +1076,7 @@
     },
     "Resource": {
       "additionalProperties": false,
-      "description": "Route-authored guidance on a node, keyed so upgrades diff it.",
+      "description": "Route-authored guidance on a node.",
       "oneOf": [
         {
           "required": [

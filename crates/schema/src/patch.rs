@@ -32,10 +32,10 @@ use crate::id::{
     RoleKey, RouteId, Slug,
 };
 use crate::node::{IdentitySet, Node, ParticipationSource};
-use crate::number::{Revision, SignedDays, VersionNumber};
+use crate::number::{Revision, SignedDays};
 use crate::proposal::ProposalDraft;
 use crate::refs::KeyRefs;
-use crate::state::{AnswerValue, LocalEdit, OverrideKind, Provenance, SnoozeTarget};
+use crate::state::{AnswerValue, OverrideKind, SnoozeTarget};
 use crate::text::{Markdown, Reason, Title};
 use jiff::civil::Date;
 
@@ -751,42 +751,6 @@ pub enum Mutation {
         annotation: AttachmentKey,
     },
 
-    // Lineage (B4, B7, B9).
-    // PRD: B7.
-    /// Move the journey to a newer version of its route, taking every clean outcome of the
-    /// three-way merge (route changes it did not edit, new nodes, orphans); conflict
-    /// resolutions and orphan removals ride after it in the same patch as ordinary mutations.
-    Upgrade {
-        /// The version upgraded to.
-        to: VersionNumber,
-    },
-    // PRD: B9.
-    /// Link the journey to the version its saved route published, in one event: the
-    /// lineage, each node the version holds route-copied and marked exactly where it differs,
-    /// every other node local, and the version's roles and kinds the journey lacks.
-    Relink {
-        /// The new lineage.
-        lineage: Lineage,
-    },
-    // PRD: B7.
-    /// Change a node's provenance, as an upgrade orphaning it does.
-    SetProvenance {
-        /// The node.
-        node: NodeKey,
-        /// The provenance.
-        provenance: Provenance,
-    },
-    // PRD: B4.
-    /// Set or clear a local-edit marker (reset to route clears it).
-    MarkLocalEdit {
-        /// The node.
-        node: NodeKey,
-        /// The edited aspect.
-        edit: LocalEdit,
-        /// Marked or cleared.
-        marked: bool,
-    },
-
     // Identities (E6, H3).
     /// Create an identity; may ride in any patch.
     CreateIdentity {
@@ -938,8 +902,6 @@ impl Mutation {
             | Mutation::RemoveOverride { node, .. }
             | Mutation::SetAtomic { node, .. }
             | Mutation::SetTicked { node, .. }
-            | Mutation::SetProvenance { node, .. }
-            | Mutation::MarkLocalEdit { node, .. }
             | Mutation::Answer { decision: node, .. } => Some(node),
             Mutation::CreateJourney { .. }
             | Mutation::EditJourney { .. }
@@ -965,8 +927,6 @@ impl Mutation {
             | Mutation::AddAnnotation { .. }
             | Mutation::EditAnnotation { .. }
             | Mutation::RemoveAnnotation { .. }
-            | Mutation::Upgrade { .. }
-            | Mutation::Relink { .. }
             | Mutation::CreateIdentity { .. }
             | Mutation::EditIdentity { .. }
             | Mutation::MergeIdentities { .. }
@@ -1010,10 +970,6 @@ impl Mutation {
             | Mutation::EditResource { .. }
             | Mutation::RemoveResource { .. }
             | Mutation::InsertSegment { .. }
-            | Mutation::Upgrade { .. }
-            | Mutation::Relink { .. }
-            | Mutation::SetProvenance { .. }
-            | Mutation::MarkLocalEdit { .. }
             | Mutation::MergeIdentities { .. }
             | Mutation::DeleteIdentity { .. }
             | Mutation::ApplyProposal { .. } => ChangeClass::Structural,

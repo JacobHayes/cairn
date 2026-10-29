@@ -428,7 +428,7 @@ impl Service {
     }
 
     /// H5, I6: the answer for a proposal write whose content is drafted from its destination
-    /// as it stands (a proposed upgrade, save, or re-link, or a refresh), which a resubmission
+    /// as it stands (a proposed save as route, or a refresh), which a resubmission
     /// after the destination moved could not rebuild byte for byte. A committed patch id is
     /// answered from its receipt when it was the same request: a proposal create (or, given
     /// `edited_from`, an edit from that revision) of this proposal for this destination, by

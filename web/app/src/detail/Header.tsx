@@ -1,9 +1,8 @@
 // C8, D8: the inspector's header: the kind and where the node sits (each crumb a
 // link) with its display state at the top right, its title (renamed in place from the menu),
-// one meta line (the owner; the date and rank are the Dates section's and the sentence's), the flags that are set, and, for an orphaned node, the choice it needs. Where the
+// one meta line (the owner; the date and rank are the Dates section's and the sentence's), the flags that are set. Where the
 // node came from is not here: it is the Origin section.
 import { useId } from "react";
-import { Link } from "react-router";
 
 import { CheckFailed, invalidAttrs, Problem } from "../authoring/parts.tsx";
 
@@ -55,26 +54,6 @@ function RenameForm({ view, title, rename }: { view: Ready; title: string; renam
   );
 }
 
-/** B7: an orphaned node needs a choice: keep it as the journey's own, or remove it (in Edit structure, which shows what goes with it). */
-function Orphaned({ view, detail, removeTo }: { view: Ready; detail: NodeDetail; removeTo: string }) {
-  const write = useNodeWrite(view, `orphan:${detail.node.key}`);
-  return (
-    <div className="row" data-testid="orphaned">
-      <span>Orphaned: its route version no longer has it.</span>
-      {write.writable ? (
-        <>
-          <Button disabled={write.disabled} onClick={() => void write.run([{ op: "set_provenance", node: detail.node.key, provenance: "local" }])}>
-            Keep
-          </Button>
-          <Link className="button" to={removeTo}>
-            Remove…
-          </Link>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
 /** The owner, or an inline `Assign ▾` that lists the people. The date and the rank are said once, by the Dates section and the sentence under the title. */
 function Meta({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `assign:${detail.node.key}`);
@@ -94,8 +73,8 @@ function Meta({ view, detail }: { view: Ready; detail: NodeDetail }) {
   );
 }
 
-export function Header({ view, detail, rename, removeTo }: { view: Ready; detail: NodeDetail; rename: Rename; removeTo: string }) {
-  const { node, record } = detail;
+export function Header({ view, detail, rename }: { view: Ready; detail: NodeDetail; rename: Rename }) {
+  const { node } = detail;
   const shown = detail.derived.display_state;
   // An unassigned node says so with the Assign control beside its meta line, not with a flag as well.
   const flags = flagsOf(detail.derived).filter(({ flag }) => flag !== "no owner");
@@ -128,7 +107,6 @@ export function Header({ view, detail, rename, removeTo }: { view: Ready; detail
           ))}
         </div>
       )}
-      {record.provenance === "orphaned" ? <Orphaned view={view} detail={detail} removeTo={removeTo} /> : null}
     </div>
   );
 }

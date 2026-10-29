@@ -66,11 +66,11 @@ describe("a control waiting on its write", () => {
     session.edits.send({
       type: "submit",
       id: "p_one",
-      command: { kind: "proposal", call: { op: "upgrade", journey: "j_one", request: { patch_id: "p_one", proposal: "pr_new", to: 2 } } },
+      command: { kind: "proposal", call: { op: "save_as_route", journey: "j_one", request: { patch_id: "p_one", proposal: "pr_new", route: "r", name: "R" } } },
       about: aboutNode(),
     });
     await settled();
-    expect(session.root.getSnapshot().context.recent.saves.map((save) => save.address)).toEqual(["/journeys/j_one/proposals/pr_new"]);
+    expect(session.root.getSnapshot().context.recent.saves.map((save) => save.address)).toEqual(["/routes/r/proposals/pr_new"]);
     expect(session.edits.getSnapshot().context.writes).toEqual({});
   });
 

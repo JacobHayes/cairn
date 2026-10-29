@@ -38,7 +38,7 @@ function LineageFold({ ready }: { ready: Ready }) {
     return null;
   }
   return (
-    <Section title="Lineage" open={lineage.latest !== undefined} testId="card-lineage">
+    <Section title="Lineage" testId="card-lineage">
       <LineageBlock ready={ready} lineage={lineage} />
     </Section>
   );

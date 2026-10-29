@@ -18,7 +18,6 @@ export const nodeFormProblems: (a: number, b: number, c: number) => void;
 export const preview: (a: number, b: number, c: number, d: number, e: number) => void;
 export const readRouteFile: (a: number, b: number, c: number) => void;
 export const removalPlan: (a: number, b: number, c: number, d: number, e: number) => void;
-export const restoreNodes: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
 export const routeFileText: (a: number, b: number, c: number) => void;
 export const routeNotices: (a: number, b: number, c: number) => void;
 export const routederivation_new: (a: number, b: number, c: number) => void;

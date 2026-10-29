@@ -1,26 +1,22 @@
-//! Upgrade, save as route, and re-link as proposals (B7, B8, B9; ARCHITECTURE, Upgrade,
-//! save-as-route, re-link): the engine drafts each from what the service loads, and the
-//! service stores the draft as an ordinary proposal, reviewed and applied like any other
-//! (C14, I6, I7). A proposal whose destination moved is refreshed (I6): an upgrade, save, or
-//! re-link is drafted again on the new base with the reviewer's choices carried over by what
-//! they are about (node and field, edge, identity, role, kind), anything else is re-based as it
-//! stands, and the edit gives it a new revision, so it must be reviewed again before it can be
+//! Save as route as a proposal (B8; ARCHITECTURE, Save as route): the engine drafts it from
+//! what the service loads, and the service stores the draft as an ordinary proposal, reviewed
+//! and applied like any other (C14, I6, I7). A proposal whose destination moved is refreshed
+//! (I6): a save is drafted again on the new base with the reviewer's choices carried over by
+//! what they are about (identity, node), anything else is re-based as it stands, and the edit gives it a new revision, so it must be reviewed again before it can be
 //! applied. A write resubmitted under its patch id is answered from its receipt before
 //! anything is drafted, since the destination may have moved since (H5), and a proposal
 //! resubmitted under a new patch id is the one its author already holds (I6).
 //!
-//! Cost: one load of the journey, the deployment, the route, and the versions the draft
-//! reads, then the engine's draft (a merge and a trial apply for an upgrade or a save, a pass
-//! over the nodes for a re-link), and one proposal write.
+//! Cost: one load of the journey, the deployment, and the route, then the engine's draft (a
+//! trial apply), and one proposal write.
 
 use std::collections::BTreeMap;
 use std::fmt;
 
 use cairn_engine::{ApplyInputs, DraftError};
 use cairn_schema::{
-    AttachmentKey, Conflict, Domain, DraftSource, Edge, JourneyId, KindKey, Lineage, Mutation,
-    NodeField, NodeKey, PatchId, ProposalDraft, ProposalId, ReviewItem, Revision, RoleKey, RouteId,
-    Title, VersionNumber,
+    Domain, DraftSource, JourneyId, Mutation, NodeKey, PatchId, ProposalDraft, ProposalId,
+    ReviewItem, Revision, RouteId, Title,
 };
 
 use crate::write::engine;
@@ -31,10 +27,10 @@ use crate::{Call, ProposalWritten, Service, ServiceError, WriteError, load};
 /// cannot be made, or the write was refused or failed.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ProposeError {
-    /// What the draft reads does not exist: the journey or a route version (B7, B8, B9).
+    /// What the draft reads does not exist: the journey (B8).
     Missing(DraftError),
-    /// The engine cannot draft it from what exists, which the caller can change: the journey
-    /// follows no route, the version is not newer, or the draft is too large (B7, B8, B9).
+    /// The engine cannot draft it from what exists, which the caller can change: the draft is
+    /// too large (B8).
     CannotDraft(DraftError),
     /// The proposal write was refused or failed.
     Write(WriteError),
@@ -43,12 +39,8 @@ pub enum ProposeError {
 impl From<DraftError> for ProposeError {
     fn from(error: DraftError) -> Self {
         match error {
-            DraftError::JourneyMissing(_) | DraftError::VersionMissing(_) => {
-                ProposeError::Missing(error)
-            }
-            DraftError::NoLineage(_) | DraftError::NotNewer { .. } | DraftError::TooLarge => {
-                ProposeError::CannotDraft(error)
-            }
+            DraftError::JourneyMissing(_) => ProposeError::Missing(error),
+            DraftError::TooLarge => ProposeError::CannotDraft(error),
         }
     }
 }
@@ -85,8 +77,6 @@ impl std::error::Error for ProposeError {}
 /// What a stored proposal was drafted as, read off its mutations.
 #[derive(Debug, PartialEq, Eq)]
 enum Drafted {
-    Upgrade(JourneyId, VersionNumber),
-    Relink(JourneyId, Lineage),
     Save {
         journey: JourneyId,
         route: RouteId,
@@ -96,50 +86,15 @@ enum Drafted {
 }
 
 impl Service {
-    /// B7: proposes upgrading `journey` to version `to` of the route it follows, as proposal
-    /// `id`: the merge's clean outcomes ride in its upgrade mutation, and its conflicts, kept
-    /// edits, orphans, and the violations a trial apply finds are its review items. Nothing
-    /// changes in the journey until someone applies it (Journey durability).
-    ///
-    /// # Errors
-    ///
-    /// [`ProposeError::Missing`] when the journey or a version does not exist,
-    /// [`ProposeError::CannotDraft`] when the journey follows no route or `to` is older;
-    /// [`ProposeError::Write`] when the proposal write is
-    /// refused or fails.
-    pub async fn propose_upgrade(
-        &self,
-        call: &Call,
-        patch_id: PatchId,
-        id: &ProposalId,
-        journey: &JourneyId,
-        to: VersionNumber,
-    ) -> Result<ProposalWritten, ProposeError> {
-        let destination = Domain::Journey(journey.clone());
-        if let Some(answer) = self
-            .drafted_before(call, &patch_id, (&destination, id), None, |held| {
-                asked(
-                    &Drafted::Upgrade(journey.clone(), to),
-                    &drafted(&held.destination, &held.draft),
-                )
-            })
-            .await?
-        {
-            return Ok(answer);
-        }
-        let draft = self.draft_upgrade(call, journey, to).await?;
-        Ok(self
-            .create_proposal(call, patch_id, &destination, id, draft)
-            .await?)
-    }
-
     /// B8: proposes saving `journey`'s structure as a draft of `route` (created with `name`
     /// when it does not exist), as proposal `id`, with a participation item per explicit
     /// identity and an exclusion item per node for the reviewer.
     ///
     /// # Errors
     ///
-    /// As [`Service::propose_upgrade`].
+    /// [`ProposeError::Missing`] when the journey does not exist, [`ProposeError::CannotDraft`]
+    /// when the draft is too large; [`ProposeError::Write`] when the proposal write is refused
+    /// or fails.
     pub async fn propose_save_as_route(
         &self,
         call: &Call,
@@ -171,45 +126,10 @@ impl Service {
             .await?)
     }
 
-    /// B9: proposes re-linking `journey` to `lineage`, a version its saved route published, as
-    /// proposal `id`: each difference from the version is kept as a local edit unless the
-    /// reviewer takes the route's value. The old lineage holds until it is applied.
-    ///
-    /// # Errors
-    ///
-    /// As [`Service::propose_upgrade`].
-    pub async fn propose_relink(
-        &self,
-        call: &Call,
-        patch_id: PatchId,
-        id: &ProposalId,
-        journey: &JourneyId,
-        lineage: &Lineage,
-    ) -> Result<ProposalWritten, ProposeError> {
-        let destination = Domain::Journey(journey.clone());
-        if let Some(answer) = self
-            .drafted_before(call, &patch_id, (&destination, id), None, |held| {
-                asked(
-                    &Drafted::Relink(journey.clone(), lineage.clone()),
-                    &drafted(&held.destination, &held.draft),
-                )
-            })
-            .await?
-        {
-            return Ok(answer);
-        }
-        let draft = self.draft_relink(journey, lineage).await?;
-        Ok(self
-            .create_proposal(call, patch_id, &destination, id, draft)
-            .await?)
-    }
-
     /// I6: refreshes proposal `id` against its destination as it stands now, against
-    /// `base_revision`, its editing revision the caller saw. An upgrade, save as route, or
-    /// re-link is drafted again on the new base, carrying each choice the reviewer made to the
-    /// item about the same thing (a conflict by node and field, edge, participation, resource,
-    /// role, kind, or default owner, when the new item still offers it; an orphan's keep, an
-    /// identity's mapping, a node's exclusion); any other proposal keeps its mutations and items
+    /// `base_revision`, its editing revision the caller saw. A save as route is drafted again
+    /// on the new base, carrying each choice the reviewer made to the item about the same thing
+    /// (an identity's mapping, a node's exclusion); any other proposal keeps its mutations and items
     /// and names the current revision. Its title and description stay as edited. The edit
     /// moves the proposal's revision, so it must be reviewed again before it applies.
     ///
@@ -243,8 +163,6 @@ impl Service {
             return Ok(answer);
         }
         let mut draft = match drafted(&held.destination, &held.draft) {
-            Drafted::Upgrade(journey, to) => self.draft_upgrade(call, &journey, to).await?,
-            Drafted::Relink(journey, lineage) => self.draft_relink(&journey, &lineage).await?,
             Drafted::Save {
                 journey,
                 route,
@@ -273,33 +191,6 @@ impl Service {
             .await?)
     }
 
-    async fn draft_upgrade(
-        &self,
-        call: &Call,
-        journey: &JourneyId,
-        to: VersionNumber,
-    ) -> Result<ProposalDraft, ProposeError> {
-        let records = load::drafting(&*self.store, journey, None, |held| {
-            let follows = held.and_then(|held| held.header.lineage.clone());
-            follows
-                .into_iter()
-                .flat_map(|current| {
-                    let target = Lineage {
-                        route: current.route.clone(),
-                        version: to,
-                    };
-                    [current, target]
-                })
-                .collect()
-        })
-        .await?;
-        let inputs = self.drafting_inputs(call);
-        engine(&Domain::Journey(journey.clone()), || {
-            cairn_engine::upgrade(&records, journey, to, &inputs)
-        })?
-        .map_err(ProposeError::from)
-    }
-
     async fn draft_save(
         &self,
         call: &Call,
@@ -307,23 +198,10 @@ impl Service {
         route: &RouteId,
         name: &Title,
     ) -> Result<ProposalDraft, ProposeError> {
-        let records = load::drafting(&*self.store, journey, Some(route), |_| Vec::new()).await?;
+        let records = load::drafting(&*self.store, journey, route).await?;
         let inputs = self.drafting_inputs(call);
         engine(&Domain::Route(route.clone()), || {
             cairn_engine::save_as_route(&records, journey, route, name, &inputs)
-        })?
-        .map_err(ProposeError::from)
-    }
-
-    async fn draft_relink(
-        &self,
-        journey: &JourneyId,
-        lineage: &Lineage,
-    ) -> Result<ProposalDraft, ProposeError> {
-        let records =
-            load::drafting(&*self.store, journey, None, |_| vec![lineage.clone()]).await?;
-        engine(&Domain::Journey(journey.clone()), || {
-            cairn_engine::relink(&records, journey, lineage)
         })?
         .map_err(ProposeError::from)
     }
@@ -339,21 +217,11 @@ impl Service {
     }
 }
 
-/// What `draft`, a proposal for `destination`, was drafted as: an upgrade or re-link of the
-/// journey it is for, a save of a journey into the route it is for, or something else.
+/// What `draft`, a proposal for `destination`, was drafted as: a save of a journey into the
+/// route it is for, or something else.
 fn drafted(destination: &Domain, draft: &ProposalDraft) -> Drafted {
     let mutations = draft.mutations.as_slice();
     match destination {
-        Domain::Journey(journey) => mutations
-            .iter()
-            .find_map(|mutation| match mutation {
-                Mutation::Upgrade { to } => Some(Drafted::Upgrade(journey.clone(), *to)),
-                Mutation::Relink { lineage } => {
-                    Some(Drafted::Relink(journey.clone(), lineage.clone()))
-                }
-                _ => None,
-            })
-            .unwrap_or(Drafted::Other),
         Domain::Route(route) => {
             let name = mutations.iter().find_map(|mutation| match mutation {
                 Mutation::CreateRoute { name, .. } => Some(name.clone()),
@@ -373,13 +241,12 @@ fn drafted(destination: &Domain, draft: &ProposalDraft) -> Drafted {
                 })
                 .unwrap_or(Drafted::Other)
         }
-        Domain::Deployment => Drafted::Other,
+        Domain::Journey(_) | Domain::Deployment => Drafted::Other,
     }
 }
 
 /// H5: whether a stored proposal drafted as `stored` is what `request` asks for: the same
-/// upgrade target, re-link lineage, or saved journey and route (a save's name is in the draft
-/// only when it created the route).
+/// saved journey and route (a save's name is in the draft only when it created the route).
 fn asked(request: &Drafted, stored: &Drafted) -> bool {
     match (request, stored) {
         (
@@ -402,16 +269,6 @@ fn asked(request: &Drafted, stored: &Drafted) -> bool {
 /// What a review item is about, for carrying a choice made on it to a refreshed draft.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum About {
-    Field(NodeKey, NodeField),
-    Edge(Edge),
-    Participation(NodeKey, KindKey),
-    Resource(NodeKey, AttachmentKey),
-    Shape(NodeKey),
-    Answer(NodeKey),
-    Role(RoleKey),
-    Kind(KindKey),
-    DefaultOwner,
-    Orphan(NodeKey),
     Identity(cairn_schema::IdentityKey),
     Exclusion(NodeKey),
 }
@@ -419,35 +276,16 @@ enum About {
 /// The item's subject, when it holds a choice.
 fn about(item: &ReviewItem) -> Option<About> {
     Some(match item {
-        ReviewItem::Conflict { conflict, .. } => match conflict {
-            Conflict::Field { node, journey, .. } => About::Field(node.clone(), journey.field()),
-            Conflict::Edge { edge, .. } => About::Edge(edge.clone()),
-            Conflict::Participation { node, kind, .. } => {
-                About::Participation(node.clone(), kind.clone())
-            }
-            Conflict::Resource { node, resource, .. } => {
-                About::Resource(node.clone(), resource.clone())
-            }
-            Conflict::Shape { journey, .. } => About::Shape(journey.key.clone()),
-            Conflict::Answer { decision, .. } => About::Answer(decision.clone()),
-            Conflict::Role { role, .. } => About::Role(role.clone()),
-            Conflict::Kind { kind, .. } => About::Kind(kind.clone()),
-            Conflict::DefaultOwner { .. } => About::DefaultOwner,
-        },
-        ReviewItem::Orphan { node, .. } => About::Orphan(node.clone()),
         ReviewItem::Participation { identity, .. } => About::Identity(identity.clone()),
         ReviewItem::Exclusion { node, .. } => About::Exclusion(node.clone()),
-        ReviewItem::KeptLocalEdit { .. }
-        | ReviewItem::Cascade { .. }
-        | ReviewItem::Violation { .. } => {
+        ReviewItem::Cascade { .. } | ReviewItem::Violation { .. } => {
             return None;
         }
     })
 }
 
-/// I6: carries each choice in `old` to the item in `new` about the same thing: a conflict's
-/// resolution when the new conflict offers it, an orphan's keep, an identity's mapping, and a
-/// node's exclusion. An item with no counterpart keeps the draft's default.
+/// I6: carries each choice in `old` to the item in `new` about the same thing: an identity's
+/// mapping and a node's exclusion. An item with no counterpart keeps the draft's default.
 fn carry(old: &[ReviewItem], new: &mut [ReviewItem]) {
     let chosen: BTreeMap<About, &ReviewItem> = old
         .iter()
@@ -458,19 +296,6 @@ fn carry(old: &[ReviewItem], new: &mut [ReviewItem]) {
             continue;
         };
         match (item, previous) {
-            (
-                ReviewItem::Conflict {
-                    conflict,
-                    resolution,
-                },
-                ReviewItem::Conflict {
-                    resolution: Some(made),
-                    ..
-                },
-            ) if conflict.offers(made) => *resolution = Some(made.clone()),
-            (ReviewItem::Orphan { keep, .. }, ReviewItem::Orphan { keep: kept, .. }) => {
-                *keep = *kept;
-            }
             (
                 ReviewItem::Participation { mapping, .. },
                 ReviewItem::Participation {

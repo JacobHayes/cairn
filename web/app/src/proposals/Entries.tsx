@@ -1,6 +1,5 @@
-// Where proposals start, on earlier screens. A journey's `⋯` menu proposes its upgrade to a
-// newer version of its route (B7, C17: one journey at a time), saving its structure as a route
-// (B8), and re-linking it to a version of the route it was saved as (B9). A placeholder's
+// Where proposals start, on earlier screens. A journey's `⋯` menu proposes saving its structure
+// as a route (B8). A placeholder's
 // triage card and node detail break it down (B10): the pieces typed there open a proposal,
 // reviewed, edited, and applied like any other (I6). Each draft is made by the host and opens
 // on its review.
@@ -12,13 +11,9 @@ import { proposalAddress } from "../address.ts";
 import { destinationOf } from "../data/edit-command.ts";
 import { breakdownMutations, PieceRows, type Piece } from "../authoring/StructureEditors.tsx";
 import { slugOf } from "../authoring/keys.ts";
-import { Picker } from "../authoring/parts.tsx";
 import { journeyAuthored } from "../authoring/target.ts";
-import { isSegment, routeIndex } from "../data/reads.ts";
 import { isPatchAnswer } from "../data/writes.ts";
 import { newProposalId, proposalOf } from "../data/proposals.ts";
-import { valueOf } from "../data/keyed-read.ts";
-import { useLive } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
@@ -57,35 +52,11 @@ export function Problem({ write, onRebase }: { write: ProposalWrite; onRebase: (
   return write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onRebase={onRebase} />;
 }
 
-/** B7: the versions newer than the journey's, from the route index's latest. */
-function Upgrade({ ready, latest }: { ready: Ready; latest: number | undefined }) {
-  const lineage = ready.journey.header.lineage ?? undefined;
-  const { write, start } = useDraftAndOpen(`upgrade:${ready.journey.header.id}`, ready.journey.header.name);
-  const newer = lineage === undefined || latest === undefined ? [] : Array.from({ length: latest - lineage.version }, (_, at) => lineage.version + at + 1);
-  const [to, setTo] = useState("");
-  if (lineage === undefined) {
-    return null;
-  }
-  if (newer.length === 0) {
-    return <span className="muted small" data-testid="upgrade-none">On the latest version of its route: nothing to upgrade to.</span>;
-  }
-  const chosen = to === "" ? newer.at(-1) : Number(to);
-  return (
-    <span className="row" data-testid="upgrade-flow">
-      <Picker aria-label="Upgrade to version" value={String(chosen)} options={newer.map((version) => ({ value: String(version), label: `version ${String(version)}` }))} onChange={(event) => { setTo(event.target.value); }} />
-      <Button primary disabled={write.disabled || chosen === undefined} onClick={() => { start((id) => ({ op: "upgrade", journey: ready.journey.header.id, request: { proposal: id, to: chosen ?? lineage.version } })); }}>
-        Propose the upgrade to v{chosen ?? lineage.version}
-      </Button>
-      <Problem write={write} onRebase={write.dismiss} />
-    </span>
-  );
-}
-
-/** B8: the journey's structure saved as a draft of a route: its own route, or a new one. */
+/** B8: the journey's structure saved as a draft of a new route, or of an existing one by its id. */
 function SaveAsRoute({ ready }: { ready: Ready }) {
   const { header } = ready.journey;
   const { write, start } = useDraftAndOpen(`save-as-route:${header.id}`, header.name);
-  const [route, setRoute] = useState(header.lineage?.route ?? slugOf(header.name, "route"));
+  const [route, setRoute] = useState(slugOf(header.name, "route"));
   const [name, setName] = useState(header.name);
   return (
     <span className="row" data-testid="save-as-route-flow">
@@ -99,39 +70,11 @@ function SaveAsRoute({ ready }: { ready: Ready }) {
   );
 }
 
-/** B9: the journey re-linked to a published version of a route. */
-function Relink({ ready, routes }: { ready: Ready; routes: readonly Schema<"RouteSummary">[] }) {
-  const { write, start } = useDraftAndOpen(`relink:${ready.journey.header.id}`, ready.journey.header.name);
-  const published = routes.filter((each) => each.latest_version != null && !isSegment(each));
-  const [route, setRoute] = useState("");
-  const [version, setVersion] = useState("");
-  const latest = published.find((each) => each.header.id === route)?.latest_version ?? undefined;
-  const versions = latest === undefined ? [] : Array.from({ length: latest }, (_, at) => at + 1);
-  const chosen = version === "" ? latest : Number(version);
-  return (
-    <span className="row" data-testid="relink-flow">
-      <Picker aria-label="Re-link to route" value={route} none="Choose a route" options={published.map((each) => ({ value: each.header.id, label: each.header.name }))} onChange={(event) => { setRoute(event.target.value); setVersion(""); }} />
-      {versions.length === 0 ? null : <Picker aria-label="Re-link to version" value={String(chosen)} options={versions.map((each) => ({ value: String(each), label: `version ${String(each)}` }))} onChange={(event) => { setVersion(event.target.value); }} />}
-      <Button disabled={write.disabled || route === "" || chosen === undefined} onClick={() => { start((id) => ({ op: "relink", journey: ready.journey.header.id, request: { proposal: id, lineage: { route, version: chosen ?? 1 } } })); }}>
-        Propose the re-link
-      </Button>
-      <Problem write={write} onRebase={write.dismiss} />
-    </span>
-  );
-}
-
-/** The journey `⋯` menu's proposal flows (B7, B8, B9). */
-export type JourneyFlowName = "upgrade" | "save" | "relink";
-
 /**
- * B7, B8, B9: one of the journey's proposal flows, opened from its `⋯` menu: each opens a
- * proposal to review, edit, and apply, and nothing changes until it is applied.
+ * B8: the journey's save-as-route flow, opened from its `⋯` menu: it opens a proposal to
+ * review, edit, and apply, and nothing changes until it is applied.
  */
-export function JourneyFlow({ ready, flow, onClose }: { ready: Ready; flow: JourneyFlowName; onClose: () => void }) {
-  const routes = useLive("routes", routeIndex).view;
-  const list = valueOf(routes) ?? [];
-  const lineage = ready.journey.header.lineage ?? undefined;
-  const latest = lineage === undefined ? undefined : (list.find((each) => each.header.id === lineage.route)?.latest_version ?? undefined);
+export function JourneyFlow({ ready, onClose }: { ready: Ready; onClose: () => void }) {
   return (
     <Panel aria-label="Proposals" data-testid="journey-flows">
       <span className="row">
@@ -139,9 +82,7 @@ export function JourneyFlow({ ready, flow, onClose }: { ready: Ready; flow: Jour
         <span className="spacer" />
         <Button onClick={onClose}>Close</Button>
       </span>
-      {flow === "upgrade" ? <Upgrade ready={ready} latest={latest} /> : null}
-      {flow === "save" ? <SaveAsRoute ready={ready} /> : null}
-      {flow === "relink" ? <Relink ready={ready} routes={list} /> : null}
+      <SaveAsRoute ready={ready} />
     </Panel>
   );
 }

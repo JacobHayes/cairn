@@ -164,7 +164,7 @@ pub struct RouteFile {
 }
 
 // PRD: Invariants: a removed key never comes back as a new object.
-/// Every key a graph has retired. Tombstones are the upgrade-facing subset of the node keys.
+/// Every key a graph has retired.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RetiredKeys {

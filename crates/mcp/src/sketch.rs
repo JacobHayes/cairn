@@ -101,7 +101,6 @@ pub(crate) const GROUPS: &[(&str, &str)] = &[
         "What happened: progress, answers, dates, snoozes, overrides, ticks",
     ),
     ("add_annotation", "Notes and links"),
-    ("upgrade", "Lineage (upgrade and relink only in a proposal)"),
     (
         "create_identity",
         "Identities (create_identity also rides with a journey write)",

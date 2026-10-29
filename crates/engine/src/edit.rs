@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     AttachmentKey, BoundedSet, Checklist, Edge, Graph, GraphKey, GuardFailure, JourneyState,
-    KeyRefs, KindKey, LocalEdit, Node, NodeField, NodeFieldValue, NodeKey, Overrides,
-    ParticipationRef, ParticipationSource, Participations, Removal, Resource, Slug,
+    KeyRefs, KindKey, Node, NodeKey, Overrides, ParticipationRef, ParticipationSource,
+    Participations, Removal, Resource, Slug,
 };
 
 // PRD: G5.
@@ -147,51 +147,6 @@ pub(crate) fn put_resource(node: &mut Node<KeyRefs>, resource: Resource<KeyRefs>
     }
 }
 
-/// What differs between two versions of a node, as the local-edit markers a replacement sets
-/// (B4) and a re-link keeps (B9).
-pub(crate) fn differences(old: &Node<KeyRefs>, new: &Node<KeyRefs>) -> BTreeSet<LocalEdit> {
-    let mut edits = BTreeSet::new();
-    for field in NodeField::ALL {
-        if NodeFieldValue::read(field, old) != NodeFieldValue::read(field, new) {
-            edits.insert(LocalEdit::Field(field));
-        }
-    }
-    let requires = old
-        .requires
-        .as_set()
-        .symmetric_difference(new.requires.as_set());
-    edits.extend(requires.cloned().map(LocalEdit::Requires));
-    let (before, after) = (old.participations.as_map(), new.participations.as_map());
-    for kind in before.keys().chain(after.keys()) {
-        if before.get(kind) != after.get(kind) {
-            edits.insert(LocalEdit::Participation(kind.clone()));
-        }
-    }
-    // By key, so a node with many resources compares in O(r log r).
-    let (before, after) = (resources_by_key(old), resources_by_key(new));
-    for key in before.keys().chain(after.keys()) {
-        if before.get(key) != after.get(key) {
-            edits.insert(LocalEdit::Resource((*key).clone()));
-        }
-    }
-    if old.kind() != new.kind() || old.payload.answer_type() != new.payload.answer_type() {
-        // B7: a replacement's change of kind or answer type has no field of its own.
-        edits.insert(LocalEdit::Shape);
-    }
-    assert!(
-        old != new || edits.is_empty(),
-        "an unchanged node differs in nothing"
-    );
-    edits
-}
-
-fn resources_by_key(node: &Node<KeyRefs>) -> BTreeMap<&AttachmentKey, &Resource<KeyRefs>> {
-    node.resources
-        .iter()
-        .map(|resource| (&resource.key, resource))
-        .collect()
-}
-
 /// A18: a removal naming everything removing `node` reaches as the graph stands: its subtree,
 /// every edge into or out of it, and everything attached to those nodes. Only the generated
 /// operations remove one node at a time; the engine itself removes in batches.
@@ -204,8 +159,7 @@ pub(crate) fn full_removal(graph: &Graph, node: &NodeKey) -> Removal {
 }
 
 /// A18: the full removal of each of `nodes`, from one [`RemovalIndex`]: O(n log n + edges)
-/// once, then each removal's subtree with its nodes' edges, so many removals (an upgrade's
-/// orphans) cost at most depth x (n + edges) together.
+/// once, then each removal's subtree with its nodes' edges, so many removals cost at most depth x (n + edges) together.
 pub(crate) fn full_removals(graph: &Graph, nodes: &[NodeKey]) -> Vec<Removal> {
     let mut index = RemovalIndex::build(graph);
     nodes
@@ -359,14 +313,12 @@ impl RemovalIndex {
                     | GraphRecord::RetiredKey(_)
                     | GraphRecord::Insertion(_)
                     | GraphRecord::NodeState { .. }
-                    | GraphRecord::LocalEdit { .. }
                     | GraphRecord::Tick { .. }
                     | GraphRecord::Answer { .. }
                     | GraphRecord::RoleFill { .. }
                     | GraphRecord::Pin { .. }
                     | GraphRecord::Snooze { .. }
-                    | GraphRecord::Overrides { .. }
-                    | GraphRecord::Tombstone(_) => {}
+                    | GraphRecord::Overrides { .. } => {}
                 }
                 true
             }

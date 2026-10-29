@@ -16,7 +16,7 @@ const after: Graph = { nodes: [node("n_a"), node("n_c"), node("n_d", "n_a", ["n_
 
 describe("layerMarks (C14)", () => {
   it("marks added, changed and removed nodes, and says which insertion an added one belongs to", () => {
-    const { marks, entries } = layerMarks({ before, after, items: [], unresolved: new Set(), known: true, members: { n_d: "Security review" } });
+    const { marks, entries } = layerMarks({ before, after, items: [], known: true, members: { n_d: "Security review" } });
     expect(Object.fromEntries(Object.entries(marks).map(([key, mark]) => [key, [mark.kind, mark.note]]))).toEqual({
       n_b: ["removed", undefined],
       n_c: ["changed", undefined],
@@ -26,14 +26,7 @@ describe("layerMarks (C14)", () => {
   });
 
   it("marks nothing while the destination after is not known", () => {
-    expect(layerMarks({ before, after: undefined, items: [], unresolved: new Set(), known: false, members: {} }).marks).toEqual({});
-  });
-
-  it("asks for a choice only on the node of a conflict still unresolved", () => {
-    const items = [{ item: "conflict" as const, conflict: { about: "field" as const, node: "n_c", journey: { title: "C" }, route: { title: "See" } } }];
-    const asked = layerMarks({ before, after, items, unresolved: new Set([0]), known: true, members: {} }).marks;
-    const settled = layerMarks({ before, after, items, unresolved: new Set(), known: true, members: {} }).marks;
-    expect([asked["n_c"]?.choice, settled["n_c"]?.choice]).toEqual([true, undefined]);
+    expect(layerMarks({ before, after: undefined, items: [], known: false, members: {} }).marks).toEqual({});
   });
 });
 

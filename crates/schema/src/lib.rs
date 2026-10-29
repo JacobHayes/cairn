@@ -108,10 +108,8 @@ pub use projection::{
     StatusSummary, Timeline, TimelineEntry, Trace, UndatedEntry, UnderlyingEdge, UpcomingMilestone,
 };
 pub use proposal::{
-    Conflict, ConflictResolution, ConflictReview, DestinationAfter, Kept, OutlineFact,
-    ParticipationMapping, Proposal, ProposalDraft, ProposalOutline, ProposalPreview,
-    ProposalStatus, ResolutionKind, ReviewItem, RoleReference, UnresolvedItem, UnresolvedReason,
-    removed_choices,
+    DestinationAfter, OutlineFact, ParticipationMapping, Proposal, ProposalDraft, ProposalOutline,
+    ProposalPreview, ProposalStatus, ReviewItem, UnresolvedItem, UnresolvedReason,
 };
 pub use record::{GraphKey, GraphRecord, Record, RecordKey, RetiredKey, Write};
 pub use refs::{FileRefs, KeyRefs, KeySlot, MapReferences, Reference, References};
@@ -121,8 +119,8 @@ pub use rejection::{
 };
 pub use scenario::{Scenario, ScenarioStep};
 pub use state::{
-    AnswerText, AnswerValue, Bypass, Guard, GuardFailure, JourneyState, LocalEdit, NodeState,
-    OverrideKind, Overrides, Provenance, Reopened, SnoozeTarget, StaleReason, State,
+    AnswerText, AnswerValue, Bypass, Guard, GuardFailure, JourneyState, NodeState, OverrideKind,
+    Overrides, Reopened, SnoozeTarget, StaleReason, State,
 };
 pub use text::{Email, Markdown, Reason, TextError, Title, Url};
 pub use touched::TouchedSet;

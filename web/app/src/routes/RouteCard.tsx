@@ -1,8 +1,6 @@
 // C17, C19: a route's card, the inspector's empty state on its page. Every state of the route says
-// its description and how many journeys, across all its versions, can upgrade to the latest (a
-// link to the journey index filtered to those); a published version's card (`VersionCard`) adds
-// when it was published, Start a journey, and the journeys on it with which have an upgrade
-// available, or for a segment where the version is inserted. The draft card
+// its description; a published version's card (`VersionCard`) adds when it was published, Start
+// a journey, and the journeys made from it, or for a segment where the version is inserted. The draft card
 // (authoring/RouteDraft.tsx) puts the same facts above what blocks publishing. Kept current
 // (H6): the route's own ticks and every journey's.
 import type { Schema } from "@cairn/client";
@@ -13,11 +11,10 @@ import { RowsPanel, type PanelRow } from "../acting/RowsPanel.tsx";
 import { journeyIndex, routeIndex, routeRead, type RouteRead } from "../data/reads.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive, useToday } from "../data/react.ts";
-import { DEFAULT_FILTERS, indexPath, journeyPath, newJourneyPath } from "../journeys/address.ts";
+import { journeyPath, newJourneyPath } from "../journeys/address.ts";
 import { dateWords } from "../status/when.ts";
 import { routePath } from "./address.ts";
-import { startsJourneys, upgradable, versionRows, type VersionRow } from "./model.ts";
-import { plural } from "../ui/words.ts";
+import { startsJourneys, versionRows, type VersionRow } from "./model.ts";
 
 type InsertionUse = Schema<"InsertionUse">;
 
@@ -26,26 +23,16 @@ export function useRouteRead(id: string): RouteRead | undefined {
   return valueOf(useLive(`route:${id}`, routeRead(id)).view);
 }
 
-/** The route's description, and, for a route, how many of its journeys can upgrade to its latest version. */
+/** The route's description. */
 export function RouteFacts({ read, children }: { read: RouteRead; children?: ReactNode }) {
   const { header } = read.route;
-  const rows = versionRows(read);
-  const waiting = header.kind === "segment" ? 0 : upgradable(rows).length;
-  const latest = rows[0]?.version;
-  if (header.description == null && children == null && (waiting === 0 || latest === undefined)) {
+  if (header.description == null && children == null) {
     return null;
   }
   return (
     <div className="stack" data-testid="route-facts">
       {header.description == null ? null : <p data-testid="route-description">{header.description}</p>}
       {children}
-      {waiting === 0 || latest === undefined ? null : (
-        <p className="small" data-testid="route-upgrades" data-count={waiting}>
-          <Link to={indexPath({ ...DEFAULT_FILTERS, route: header.id, upgrade: true })}>
-            {plural(waiting, "journey")} can upgrade to version {latest}
-          </Link>
-        </p>
-      )}
     </div>
   );
 }
@@ -66,18 +53,17 @@ function useHostNames(): (host: Schema<"Domain">) => { name: string; to: string 
   };
 }
 
-/** A route version's journeys, one fact each: whether it can upgrade. */
+/** A route version's journeys. */
 function journeyRows(row: VersionRow): PanelRow[] {
   return row.journeys.map((journey) => ({
     key: journey.id,
     render: () => (
-      <li className="node-row" data-row data-testid="version-journey" data-journey={journey.id} data-upgrade={journey.upgrade ? "available" : "none"}>
+      <li className="node-row" data-row data-testid="version-journey" data-journey={journey.id}>
         <div className="node-row-main">
           <span className="node-row-text">
             <Link to={journeyPath({ journey: journey.id })} className="node-title" data-row-title>
               {journey.name}
             </Link>
-            {journey.upgrade ? <span className="node-fact ink-warn" data-testid="upgrade" data-status="available">Upgrade available</span> : null}
           </span>
         </div>
       </li>
@@ -85,21 +71,20 @@ function journeyRows(row: VersionRow): PanelRow[] {
   }));
 }
 
-/** A segment version's insertions, each with the host it is inserted in and whether the host is behind. */
+/** A segment version's insertions, each with the host it is inserted in . */
 function insertionRows(uses: readonly InsertionUse[], hostOf: ReturnType<typeof useHostNames>): PanelRow[] {
   return uses.map((use) => {
     const host = hostOf(use.host);
     return {
       key: JSON.stringify([use.graph, use.insertion]),
       render: () => (
-        <li className="node-row" data-row data-testid="insertion-use" data-upgrade={use.upgrade_available ? "available" : "none"}>
+        <li className="node-row" data-row data-testid="insertion-use">
           <div className="node-row-main">
             <span className="node-row-text">
               <Link to={host.to} className="node-title" data-row-title>
                 {host.name}
               </Link>
               <span className="node-fact muted">{use.title}</span>
-              {use.upgrade_available ? <span className="node-fact ink-warn" data-testid="upgrade" data-status="available">Upgrade available</span> : null}
             </span>
           </div>
         </li>
@@ -136,7 +121,7 @@ export function VersionCard({ read, version, stages }: { read: RouteRead; versio
           <RowsPanel title="Inserted in" testId="insertions-panel" rows={insertionRows(uses, hostOf)} />
         )
       ) : row === undefined || row.journeys.length === 0 ? null : (
-        <RowsPanel title={`Journeys on version ${String(version)}`} testId="version-journeys" rows={journeyRows(row)} />
+        <RowsPanel title={`Journeys started from version ${String(version)}`} testId="version-journeys" rows={journeyRows(row)} />
       )}
     </aside>
   );

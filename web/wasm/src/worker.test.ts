@@ -25,7 +25,7 @@ function sample(): string {
     journey: {
       header: { id: JOURNEY, name: "Sample", status: "active", created_at: "2026-10-01T00:00:00Z", created_on: "2026-10-01" },
       revision: 1,
-      graph: { nodes: [{ key: "n_kickoff", id: "kickoff", kind: "action", title: "Kickoff" }], state: { nodes: { n_kickoff: { state: "todo", provenance: "local" } } } },
+      graph: { nodes: [{ key: "n_kickoff", id: "kickoff", kind: "action", title: "Kickoff" }], state: { nodes: { n_kickoff: { state: "todo" } } } },
     },
     inputs: {
       today: "2026-10-06",

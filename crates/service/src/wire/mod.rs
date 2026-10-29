@@ -13,8 +13,8 @@ pub use crate::{AgentSignIn, AuthKind, AuthMethod, Capabilities, McpAccess};
 pub use projections::{ChildEntry, History, Mine, NodeDetail, Projected};
 pub use proposals::{
     DestinationKind, DestinationNow, ProposalAnswer, ProposalApply, ProposalCreate, ProposalCursor,
-    ProposalEdit, ProposalList, ProposalReview, ProposalStep, ProposalSummary, RelinkRequest,
-    RouteImport, SaveAsRouteRequest, StaleBase, UpgradeRequest,
+    ProposalEdit, ProposalList, ProposalReview, ProposalStep, ProposalSummary, RouteImport,
+    SaveAsRouteRequest, StaleBase,
 };
 pub use reads::{
     EventPage, IdentityReferences, InsertionUse, JourneyMatches, JourneyPage, JourneySummary,
@@ -172,9 +172,8 @@ pub enum ProblemCode {
     PayloadTooLarge,
     /// The patch's target is not the domain the path names, or is a proposal.
     TargetMismatch,
-    // PRD: B7, B8, B9.
-    /// Cairn cannot draft the upgrade, save as route, or re-link asked for: the journey follows
-    /// no route, the version is not newer, or the draft is past a proposal's limits.
+    // PRD: B8.
+    /// Cairn cannot draft the save as route asked for: the draft is past a proposal's limits.
     CannotDraft,
     /// No such resource.
     NotFound,

@@ -1,12 +1,12 @@
 //! The proposal tools (I6, C14): a proposal is drafted against any domain under an id the
 //! agent chooses, so a lost response is answered by fetching or resubmitting it; edited,
 //! discarded, or refreshed against its own editing revision; and applied by a user, who is
-//! recorded as confirming it (H2). Upgrade, save as route, and re-link are drafted by Cairn
-//! as proposals and reach their destination only when one is applied (B7, B8, B9, I7).
+//! recorded as confirming it (H2). Save as route is drafted by Cairn as a proposal and reaches
+//! its destination only when one is applied (B8, I7).
 
 use cairn_schema::{
-    Domain, JourneyId, Lineage, Markdown, PatchId, Proposal, ProposalDraft, ProposalId,
-    ProposalStatus, Revision, RouteId, Title, VersionNumber,
+    Domain, JourneyId, Markdown, PatchId, Proposal, ProposalDraft, ProposalId, ProposalStatus,
+    Revision, RouteId, Title,
 };
 use cairn_service::{Call, ProposalWritten};
 use schemars::JsonSchema;
@@ -23,9 +23,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "create_proposal",
         description: "Draft a proposal for someone to review, under an id you choose: your own ordered \
             mutations to a destination (one that does not exist yet is created at revision 0), \
-            or one Cairn drafts: upgrading a journey to a newer version of its route, saving a \
-            journey's structure as a new route, or linking a journey to a published route \
-            version. Name exactly one.\n\n\
+            or one Cairn drafts: saving a journey's structure as a new route. Name exactly one.\n\n\
             To reuse a recurring piece of a process, find a segment first (`list_routes` with \
             `kind` `segment`) and propose an `insert_segment`; the insert-segment workflow has \
             the wiring and an example.",
@@ -71,7 +69,7 @@ impl ToolSet {
         }
     }
 
-    // PRD: I6, B7, B8, B9.
+    // PRD: I6, B8.
     async fn create_proposal(
         &self,
         call: &Call,
@@ -85,12 +83,6 @@ impl ToolSet {
                         .create_proposal(call, patch_id, &destination, &proposal, draft);
                 create.await?
             }
-            ProposalContent::Upgrade(UpgradeTo { journey, to }) => {
-                let upgrade = self
-                    .service
-                    .propose_upgrade(call, patch_id, &proposal, &journey, to);
-                upgrade.await?
-            }
             ProposalContent::SaveAsRoute(SaveAs {
                 journey,
                 route,
@@ -100,12 +92,6 @@ impl ToolSet {
                     .service
                     .propose_save_as_route(call, patch_id, &proposal, &journey, &route, &name);
                 save.await?
-            }
-            ProposalContent::Relink(RelinkTo { journey, to }) => {
-                let relink = self
-                    .service
-                    .propose_relink(call, patch_id, &proposal, &journey, &to);
-                relink.await?
             }
         };
         Ok(written.into())
@@ -257,7 +243,7 @@ impl From<ProposalWritten> for ProposalOutput {
 }
 
 /// `create_proposal`: exactly one content, a draft of your own (`destination` with `draft`)
-/// or one Cairn drafts (`upgrade`, `save_as_route`, or `relink`). The listed schema is a
+/// or one Cairn drafts (`save_as_route`). The listed schema is a
 /// plain object, as every provider requires of a tool's arguments; `content`
 /// refuses a call that names none or more than one.
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -273,15 +259,9 @@ pub struct CreateProposal {
     /// create it), and the mutations in order.
     #[serde(default, deserialize_with = "named")]
     pub draft: Option<ProposalDraft>,
-    /// Upgrading a journey to a newer version of its route.
-    #[serde(default, deserialize_with = "named")]
-    pub upgrade: Option<UpgradeTo>,
     /// Saving a journey's structure as a new route.
     #[serde(default, deserialize_with = "named")]
     pub save_as_route: Option<SaveAs>,
-    /// Linking a journey to a published route version.
-    #[serde(default, deserialize_with = "named")]
-    pub relink: Option<RelinkTo>,
 }
 
 /// A content argument that is named: present with a value. A null is refused at its path,
@@ -300,9 +280,7 @@ enum ProposalContent {
         destination: Domain,
         draft: ProposalDraft,
     },
-    Upgrade(UpgradeTo),
     SaveAsRoute(SaveAs),
-    Relink(RelinkTo),
 }
 
 impl CreateProposal {
@@ -314,31 +292,19 @@ impl CreateProposal {
         } else {
             self.draft.as_ref().map(|_| "draft")
         };
-        let kinds: Vec<&str> = [
-            own,
-            self.upgrade.as_ref().map(|_| "upgrade"),
-            self.save_as_route.as_ref().map(|_| "save_as_route"),
-            self.relink.as_ref().map(|_| "relink"),
-        ]
-        .into_iter()
-        .flatten()
-        .collect();
+        let kinds: Vec<&str> = [own, self.save_as_route.as_ref().map(|_| "save_as_route")]
+            .into_iter()
+            .flatten()
+            .collect();
         if kinds.len() != 1 {
             return Err(ToolError::Arguments {
                 // The second content named, or the whole call when it names none.
                 path: kinds.get(1).copied().unwrap_or_default().to_owned(),
-                message: "name exactly one content: destination with draft, upgrade, \
-                    save_as_route, or relink"
+                message: "name exactly one content: destination with draft, or save_as_route"
                     .to_owned(),
             });
         }
-        let content = match (
-            self.destination,
-            self.draft,
-            self.upgrade,
-            self.save_as_route,
-            self.relink,
-        ) {
+        let content = match (self.destination, self.draft, self.save_as_route) {
             (Some(destination), Some(draft), ..) => ProposalContent::Draft { destination, draft },
             (Some(_), None, ..) | (None, Some(_), ..) => {
                 let missing = if own == Some("destination") {
@@ -351,10 +317,8 @@ impl CreateProposal {
                     message: "a draft of your own names both destination and draft".to_owned(),
                 });
             }
-            (None, None, Some(upgrade), ..) => ProposalContent::Upgrade(upgrade),
-            (None, None, None, Some(save), _) => ProposalContent::SaveAsRoute(save),
-            (None, None, None, None, Some(relink)) => ProposalContent::Relink(relink),
-            (None, None, None, None, None) => unreachable!("one content was named"),
+            (None, None, Some(save)) => ProposalContent::SaveAsRoute(save),
+            (None, None, None) => unreachable!("one content was named"),
         };
         Ok((self.proposal, self.patch_id, content))
     }
@@ -400,16 +364,6 @@ pub(crate) struct ApplyProposal {
     note: Option<Markdown>,
 }
 
-// PRD: B7.
-/// A journey's upgrade to a newer version of its route.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct UpgradeTo {
-    journey: JourneyId,
-    /// The route version to upgrade to.
-    to: VersionNumber,
-}
-
 // PRD: B8.
 /// A journey's structure saved as a new route.
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -421,14 +375,4 @@ pub struct SaveAs {
     route: RouteId,
     /// The new route's name.
     name: Title,
-}
-
-// PRD: B9.
-/// A journey linked to a published route version.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct RelinkTo {
-    journey: JourneyId,
-    /// The route version to link to.
-    to: Lineage,
 }

@@ -1,13 +1,10 @@
-//! Journey and route lifecycle (A11, A17, A19, B1, B7, B9, B11): create, edit, status,
-//! lineage, drafts, and publishing.
-
-use std::collections::BTreeSet;
+//! Journey and route lifecycle (A11, A17, A19, B1, B11): create, edit, status, drafts, and
+//! publishing.
 
 use cairn_schema::{
     DraftSource, GraphId, GraphKey, GraphRecord, IdentitySet, JourneyHeader, JourneyId,
-    JourneyStatus, Limit, Lineage, LocalEdit, Markdown, Mutation, NodeKey, NodeState, PatchTarget,
-    Provenance, Record, RecordKey, RetiredKey, RouteHeader, RouteId, RouteKind, Subject, Title,
-    VersionNumber, ViolationCode, Write,
+    JourneyStatus, Lineage, Markdown, Mutation, NodeState, PatchTarget, Record, RecordKey,
+    RetiredKey, RouteHeader, RouteId, RouteKind, Title, VersionNumber, ViolationCode, Write,
 };
 
 use super::Session;
@@ -50,8 +47,6 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
         (PatchTarget::Journey(_), Mutation::SetJourneyStatus { status }) => {
             set_status(session, *status)
         }
-        (PatchTarget::Journey(_), Mutation::Upgrade { to }) => upgrade(session, *to),
-        (PatchTarget::Journey(_), Mutation::Relink { lineage }) => relink(session, lineage),
         (
             PatchTarget::Route(id),
             Mutation::CreateRoute {
@@ -126,12 +121,11 @@ fn create_journey(
             graph: graph.clone(),
             record: GraphRecord::NodeState {
                 node: node.key.clone(),
-                state: NodeState::initial(node.kind(), Provenance::FromRoute),
+                state: NodeState::initial(node.kind()),
             },
         }));
     }
-    // B13: the nodes are the route's own here, so the insertions the version holds are the
-    // route's to upgrade, not the journey's.
+    // B13: the nodes are the journey's own now, so the insertions the version holds go.
     writes.extend(
         version
             .graph
@@ -218,212 +212,6 @@ fn set_status(session: &mut Session<'_>, status: JourneyStatus) -> Vec<Write> {
         return Vec::new();
     }
     edit_journey(session, |header| header.status = status)
-}
-
-/// B7: the journey moves to a newer version of its route and takes every clean outcome of
-/// the three-way merge (route changes it did not edit, new nodes, orphans); conflicts and
-/// orphan removals ride after it as ordinary mutations. The version it follows and the target
-/// are both loaded.
-fn upgrade(session: &mut Session<'_>, to: VersionNumber) -> Vec<Write> {
-    let lineage = session
-        .journey()
-        .and_then(|journey| journey.header.lineage.clone());
-    let target = lineage.as_ref().map(|lineage| Lineage {
-        route: lineage.route.clone(),
-        version: to,
-    });
-    let valid = match (&lineage, &target) {
-        (Some(lineage), Some(target)) => {
-            to > lineage.version && session.candidate.versions.contains_key(target)
-        }
-        (None | Some(_), None | Some(_)) => false,
-    };
-    let (Some(lineage), Some(target), true) = (lineage, target, valid) else {
-        session.reject(
-            ViolationCode::LineageInvalid,
-            None,
-            format!("the journey cannot upgrade to version {to}: it needs lineage and a newer existing version"),
-        );
-        return Vec::new();
-    };
-    let (Some(base), Some(targeted), Some(journey)) = (
-        session.candidate.versions.get(&lineage),
-        session.candidate.versions.get(&target),
-        session.journey(),
-    ) else {
-        session.reject(
-            ViolationCode::TargetMissing,
-            None,
-            format!(
-                "version {} of route {}, which the journey follows, was not loaded",
-                lineage.version, lineage.route
-            ),
-        );
-        return Vec::new();
-    };
-    let merged = crate::upgrade::merge::merge(&base.graph, &targeted.graph, &journey.graph);
-    let changes = crate::upgrade::changes(&journey.graph, &merged.merged);
-    let overfilled = past_resource_limit(&changes);
-    if !overfilled.is_empty() {
-        for node in &overfilled {
-            super::structure::limit(session, node, Limit::ResourceCountPerNode);
-        }
-        return Vec::new();
-    }
-    let flipped = cardinality_flips(&journey.graph, &changes);
-    session.cardinality_changed.extend(flipped);
-    let mut writes = edit_journey(session, |header| header.lineage = Some(target));
-    writes.extend(changes.into_iter().map(|change| match change {
-        crate::upgrade::Change::Put(record) => session.put(*record),
-        crate::upgrade::Change::Remove(key) => session.remove(key),
-    }));
-    writes
-}
-
-/// B13: the roles and kinds the upgrade writes with a cardinality other than the journey's,
-/// for the insertion guard that `put_role` and `put_kind` feed on an ordinary edit.
-fn cardinality_flips(
-    graph: &crate::graph::Document,
-    changes: &[crate::upgrade::Change],
-) -> Vec<Subject> {
-    changes
-        .iter()
-        .filter_map(|change| {
-            let crate::upgrade::Change::Put(record) = change else {
-                return None;
-            };
-            match record.as_ref() {
-                GraphRecord::Role(role) => graph
-                    .roles
-                    .get(&role.key)
-                    .is_some_and(|held| held.multi != role.multi)
-                    .then(|| Subject::Role(role.key.clone())),
-                GraphRecord::Kind(kind) => graph
-                    .participation_kinds
-                    .get(&kind.key)
-                    .is_some_and(|held| held.multi != kind.multi)
-                    .then(|| Subject::Kind(kind.key.clone())),
-                _ => None,
-            }
-        })
-        .collect()
-}
-
-/// Each node the upgrade would write with more than `resource_count_per_node_max` resources
-/// (the route's and the journey's own together). Refused here, not only by the final check,
-/// so that every node record an event carries reads back even if a later mutation in the
-/// patch removes a resource; every such node is reported, since the refused upgrade writes
-/// nothing the final check could see.
-fn past_resource_limit(changes: &[crate::upgrade::Change]) -> Vec<NodeKey> {
-    changes
-        .iter()
-        .filter_map(|change| match change {
-            crate::upgrade::Change::Put(record) => match record.as_ref() {
-                GraphRecord::Node(node)
-                    if Limit::ResourceCountPerNode
-                        .check(node.resources.len())
-                        .is_err() =>
-                {
-                    Some(node.key.clone())
-                }
-                _ => None,
-            },
-            crate::upgrade::Change::Remove(_) => None,
-        })
-        .collect()
-}
-
-/// B9: the journey links to the version its saved route published, in one event: the new
-/// lineage; each node the version holds becomes route-copied, marked exactly where it differs
-/// from the version's (B4) and unmarked where it matches; every other node is the journey's
-/// own; the version's roles and kinds the journey lacks are added.
-fn relink(session: &mut Session<'_>, lineage: &Lineage) -> Vec<Write> {
-    if refuse_segment(session, &lineage.route) {
-        return Vec::new();
-    }
-    let (Some(version), Some(journey)) = (
-        session.candidate.versions.get(lineage).cloned(),
-        session.journey().cloned(),
-    ) else {
-        session.reject(
-            ViolationCode::LineageInvalid,
-            None,
-            format!("route {} has no version {}", lineage.route, lineage.version),
-        );
-        return Vec::new();
-    };
-    let mut writes = edit_journey(session, |header| header.lineage = Some(lineage.clone()));
-    let graph = &journey.graph;
-    for node in graph.nodes.values() {
-        let routed = version.graph.nodes.get(&node.key);
-        let wanted: BTreeSet<LocalEdit> = routed.map_or_else(BTreeSet::new, |routed| {
-            crate::edit::differences(node, routed)
-        });
-        let held = graph
-            .state
-            .local_edits
-            .get(&node.key)
-            .cloned()
-            .unwrap_or_default();
-        for edit in wanted.difference(&held) {
-            writes.push(session.put(GraphRecord::LocalEdit {
-                node: node.key.clone(),
-                edit: edit.clone(),
-            }));
-        }
-        for edit in held.difference(&wanted) {
-            writes.push(session.remove(GraphKey::LocalEdit {
-                node: node.key.clone(),
-                edit: edit.clone(),
-            }));
-        }
-        let held = graph.state.nodes.get(&node.key);
-        let segment_member = held.is_some_and(|state| state.provenance == Provenance::FromSegment);
-        let provenance = if routed.is_some() {
-            Provenance::FromRoute
-        } else if segment_member {
-            Provenance::FromSegment
-        } else {
-            Provenance::Local
-        };
-        if let Some(state) = held
-            && state.provenance != provenance
-        {
-            writes.push(session.put(GraphRecord::NodeState {
-                node: node.key.clone(),
-                state: NodeState {
-                    provenance,
-                    ..state.clone()
-                },
-            }));
-        }
-    }
-    // B13: a member the version holds is the route's now; an insertion left with no member
-    // goes.
-    writes.extend(super::insertion::narrowed(session, |member| {
-        version.graph.nodes.get(member).is_none()
-    }));
-    writes.extend(missing_roles_and_kinds(session, &version.graph, graph));
-    writes
-}
-
-/// The roles and kinds `version` holds that `graph` lacks, as writes.
-fn missing_roles_and_kinds(
-    session: &Session<'_>,
-    version: &cairn_schema::Graph,
-    graph: &cairn_schema::Graph,
-) -> Vec<Write> {
-    let roles = version
-        .roles
-        .values()
-        .filter(|role| graph.roles.get(&role.key).is_none())
-        .map(|role| session.put(GraphRecord::Role(role.clone())));
-    let kinds = version
-        .participation_kinds
-        .values()
-        .filter(|kind| graph.participation_kinds.get(&kind.key).is_none())
-        .map(|kind| session.put(GraphRecord::Kind(kind.clone())));
-    roles.chain(kinds).collect()
 }
 
 fn route_header(

@@ -1,11 +1,11 @@
 //! Journey state (B2, B5, B6, B10, D1, D1a, D4, E3, F1, F2, F5, G1): transitions by each kind's
 //! table, answers, recorded dates, direct role fills, pins, snoozes, overrides, atomic
-//! placeholders, notes and links, provenance, and local-edit markers.
+//! placeholders, and notes and links.
 
 use cairn_schema::{
-    AnswerValue, GraphKey, GraphRecord, Limit, LocalEdit, Markdown, Mutation, NodeKey, NodeKind,
-    NodeState, OverrideKind, Overrides, RecordedEnd, Revision, RoleKey, SignedDays, Slug, State,
-    Subject, Transition, ViolationCode, Write,
+    AnswerValue, GraphKey, GraphRecord, Limit, Markdown, Mutation, NodeKey, NodeKind, NodeState,
+    OverrideKind, Overrides, RecordedEnd, Revision, RoleKey, SignedDays, Slug, State, Subject,
+    Transition, ViolationCode, Write,
 };
 
 use super::Session;
@@ -693,39 +693,4 @@ fn set_ticked(session: &mut Session<'_>, node: &NodeKey, item: &Slug, ticked: bo
         })],
         (true, true) | (false, false) => Vec::new(),
     }
-}
-
-/// The marker a reset to the route clears (B4), or an explicit marker.
-pub(super) fn local_edit(
-    session: &mut Session<'_>,
-    node: &NodeKey,
-    edit: &LocalEdit,
-    marked: bool,
-) -> Vec<Write> {
-    if !session.require(node) {
-        return Vec::new();
-    }
-    let present = session.journey().is_some_and(|journey| {
-        let edits = journey.graph.state.local_edits.get(node);
-        edits.is_some_and(|edits| edits.contains(edit))
-    });
-    if !marked && !present {
-        session.reject(
-            ViolationCode::UnresolvedReference,
-            Some(node),
-            "the node has no such local edit",
-        );
-        return Vec::new();
-    }
-    vec![if marked {
-        session.put(GraphRecord::LocalEdit {
-            node: node.clone(),
-            edit: edit.clone(),
-        })
-    } else {
-        session.remove(GraphKey::LocalEdit {
-            node: node.clone(),
-            edit: edit.clone(),
-        })
-    }]
 }

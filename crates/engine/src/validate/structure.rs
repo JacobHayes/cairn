@@ -98,13 +98,12 @@ fn tree_issues(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     }
 }
 
-/// PRD Invariants: a graph remembers every key it retired, so no key comes back. A node a
-/// journey holds a tombstone for was removed, so it counts as retired too.
+/// PRD Invariants: a graph remembers every key it retired, so no key comes back.
 fn retired_keys(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let document = check.document;
     let retired = &document.retired_keys;
     for key in document.nodes.as_map().keys() {
-        if retired.nodes.contains(key) || document.state.tombstones.contains(key) {
+        if retired.nodes.contains(key) {
             out.push(retired_key_reused(
                 Some(check.tree),
                 &RetiredKey::Node(key.clone()),
@@ -212,7 +211,7 @@ fn edge_counts(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     }
 }
 
-/// Resources are keyed so upgrades diff them (B7): a key names one resource in the graph.
+/// Resources are keyed: a key names one resource in the graph.
 fn resource_keys(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let mut seen: BTreeMap<&AttachmentKey, &NodeKey> = BTreeMap::new();
     for node in check.document.nodes.values() {
@@ -232,7 +231,7 @@ fn resource_keys(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
 }
 
 /// PRACTICES, Explicit limits: at most `resource_count_per_node_max` resources per node,
-/// however they arrived (added one at a time, imported, or merged in by an upgrade).
+/// however they arrived (added one at a time or imported).
 fn resource_counts(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     for node in check.document.nodes.values() {
         if let Err(exceeded) = Limit::ResourceCountPerNode.check(node.resources.len()) {

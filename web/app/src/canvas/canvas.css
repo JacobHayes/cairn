@@ -719,13 +719,6 @@
   border-bottom-color: var(--color-frame);
 }
 
-.node-diff-choice {
-  box-shadow:
-    0 0 0 calc(3px / var(--z, 1)) var(--color-surface),
-    0 0 0 calc(5px / var(--z, 1)) var(--color-accent),
-    var(--shadow-sm);
-}
-
 .node-kind-line {
   display: flex;
   /* A kind with no room beside the word for a letter and its ellipsis wraps out of the one-line head, so it is gone whole rather than cut bare. */

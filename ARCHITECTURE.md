@@ -4,7 +4,7 @@ How the PRD is built, never what is built. Read `PRD.md` first; requirement ids 
 
 ## Summary
 
-One Rust binary around a pure **engine**: every PRD rule (model, patches, invariants, derive, date network, projections, upgrade merge, file format) as I/O-free functions over in-memory graphs. The **shell** adds storage, HTTP API, MCP, auth, the optional assistant, and the embedded web UI. The engine also compiles to wasm, so the browser derives and projects journeys locally. `cairn demo` runs the binary over an in-memory store seeded with the fixtures, for development, demos, and end-to-end tests.
+One Rust binary around a pure **engine**: every PRD rule (model, patches, invariants, derive, date network, projections, save-as-route, file format) as I/O-free functions over in-memory graphs. The **shell** adds storage, HTTP API, MCP, auth, the optional assistant, and the embedded web UI. The engine also compiles to wasm, so the browser derives and projects journeys locally. `cairn demo` runs the binary over an in-memory store seeded with the fixtures, for development, demos, and end-to-end tests.
 
 ```mermaid
 flowchart LR
@@ -57,7 +57,7 @@ PRD terms keep their meaning. Additionally:
 
 | Term | Definition |
 |---|---|
-| **Domain** | A patch target (A17), loaded and revision-checked as one unit: a journey, a route with its draft (a segment is a route of kind `segment`), or the deployment. Published versions are immutable graphs loaded singly by id, never part of the domain; inserting or upgrading a segment (B13, B14) reads the versions it names as inputs. |
+| **Domain** | A patch target (A17), loaded and revision-checked as one unit: a journey, a route with its draft (a segment is a route of kind `segment`), or the deployment. Published versions are immutable graphs loaded singly by id, never part of the domain; inserting a segment (B13) reads the version it names as an input. |
 | **Derive inputs** | Today, deployment timezone, the viewer's identities (resolved by the host from verified emails, H3), and the deployment context (identities, emails, aliases at a deployment revision) through which ownership, "mine", and the owner factor resolve (E4, E6). Supplied by the host. |
 | **Projection** | A read-only view over a derived journey (snapshot, level, trace, decision view, timeline, status summary, next, mine). |
 | **Domain document** | A journey's graph and state plus its derive inputs. Nothing derived, no proposals; the browser derives it locally. |
@@ -73,7 +73,7 @@ PRD terms keep their meaning. Additionally:
 ```
 cairn/
   crates/
-    engine/        pure domain: model, patch, validate, derive, dates, project, upgrade, format
+    engine/        pure domain: model, patch, validate, derive, dates, project, save, format
     wasm/          wasm-bindgen surface for the browser: the engine's projections, checks and previews, run locally
     schema/        serde types shared by engine and shell: document, patch, API payloads; JSON Schema export
     store/         Store and Notifier traits; memory backend; the store conformance test suite. No delta types of its own: it persists the change set from schema
@@ -125,8 +125,8 @@ flowchart LR
 
 ### Model
 
-- One `Node` struct with shared fields and a per-kind payload enum (A1a), so a field a kind cannot have is unrepresentable. Kinds, states, transitions, guard outcomes, relevance (`Relevant | NotRelevant | Undecided`), provenance, override kinds, and attachment scopes are closed enums matched exhaustively. `Key`, `Id`, `Path`, `Revision`, `PatchId`, `IdentityKey` are newtypes.
-- A `Graph` is the tree of nodes plus edges, roles, participation kinds, resources, insertions, retired keys (never reused; tombstones are the upgrade-facing subset), and for a journey its state. Route versions and drafts are graphs with empty state. An insertion (B13) records its segment version, parent, role and kind maps, and members; its local edits are never stored but are its members' differences from the version (B14).
+- One `Node` struct with shared fields and a per-kind payload enum (A1a), so a field a kind cannot have is unrepresentable. Kinds, states, transitions, guard outcomes, relevance (`Relevant | NotRelevant | Undecided`), override kinds, and attachment scopes are closed enums matched exhaustively. `Key`, `Id`, `Path`, `Revision`, `PatchId`, `IdentityKey` are newtypes.
+- A `Graph` is the tree of nodes plus edges, roles, participation kinds, resources, insertions, retired keys (never reused), and for a journey its state. Route versions and drafts are graphs with empty state. An insertion (B13) records its segment version, parent, role and kind maps, and members.
 - A `Proposal` is separate from every graph, with its own revision (I6, C14); editing one never changes its destination.
 - `Deployment` holds identities (emails unique across identities, H3), aliases, and the deployment revision. Users and logins are auth state.
 
@@ -181,11 +181,11 @@ All projections live in the engine so every host produces the same views (I1, C2
 
 A structured predicate tree with the fixed operators of A5 (`equals`, `not_equals`, `in`, `contains`, `answered`, `all`, `any`, `not`), no parser. References resolve to decision keys at import or edit time and are validated for answer-type compatibility and the no-own-subtree rule. The static reference set is what makes implicit gates, the decision view (C12), and explanations possible. The sentence rendering is display only. New operators are a PRD change.
 
-### Upgrade, save-as-route, re-link, and segments
+### Save-as-route and segments
 
-Pure functions from two graphs to a proposal (B7, B8, B9): a three-way diff by key, local-edit markers deciding merges, conflicts listed with explicit resolutions; orphans, tombstones, participation mapping, and exclusion are reviewer-edited items (C14). The upgrade mutation applies clean outcomes itself from the versions it loads, so a proposal stays within the patch limit. `resolve(proposal)` turns choices into mutations; apply refuses unresolved items; `preview` applies to a copy.
+A pure function from a journey to a proposal (B8): the journey's structure as mutations that create or open a route's draft, with participation mapping and exclusion as reviewer-edited items (C14). A journey keeps only its lineage pointer (B7); nothing is merged back. `resolve(proposal)` turns choices into mutations; apply refuses unresolved items; `preview` applies to a copy.
 
-Segment insertion mints keys from the insertion key and each segment key with one pure function, so preview, apply, and upgrade agree. Insertion upgrade translates both segment versions into the graph's keys, uses members' differences from the translated base as local-edit markers, and runs the same merge.
+Segment insertion mints keys from the insertion key and each segment key with one pure function, so preview and apply agree. Save as segment cuts the selection's boundary and drafts a segment the way save-as-route drafts a route.
 
 ### File format
 
@@ -239,7 +239,7 @@ The composition root in `crates/cairn` assembles store (SQLite), auth providers 
 - Every endpoint is under `/api`; the server also keeps `/.well-known/` and `/healthz`, and every other path is the web app's.
 - Rust types are the source of truth; the OpenAPI 3.1 document is generated from their schemars schemas. The Rust client in `crates/api` uses the shared types and the router's endpoint table.
 - Reads return projections; the UI reads the domain document and derives it, `/derived` serves clients without wasm.
-- One write verb: `POST /api/{domain}/patches` with base revision and ordered mutations (A17), answering the new revision or the full rejection. Bulk operations (import, save-as-route, re-link, upgrade, identity merge, status changes, hard delete) are patches or proposals underneath. Proposals live under their destination, and one asked for under another is not found.
+- One write verb: `POST /api/{domain}/patches` with base revision and ordered mutations (A17), answering the new revision or the full rejection. Bulk operations (import, save-as-route, identity merge, status changes, hard delete) are patches or proposals underneath. Proposals live under their destination, and one asked for under another is not found.
 - SSE streams revision ticks from the notifier, starting with current revisions; no diffs.
 - Each graph serializes with its state to at most 16 MiB; the request body limit is larger, so a capped domain fits an envelope. Explanation lists are capped and continuable.
 - Records carry user ids only; screens resolve names in one `GET /api/users` call (identity name, else login name, else email) and never print ids.

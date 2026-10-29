@@ -278,7 +278,6 @@ function Label({ axis, row, selected, onFold, title, mark }: { axis: Axis; row: 
       data-selected={selected}
       data-container={row.shape === "span"}
       data-diff={mark?.kind}
-      data-choice={mark?.choice === true ? true : undefined}
       style={{ height: ROW_PX }}
     >
       <div className="timeline-title" style={{ "--depth": row.depth } as CSSProperties}>
@@ -291,7 +290,6 @@ function Label({ axis, row, selected, onFold, title, mark }: { axis: Axis; row: 
             {mark === undefined ? null : (
               <span className="layer-word" data-testid="row-diff" data-diff={mark.kind}>
                 {DIFF_LABELS[mark.kind]}
-                {mark.choice === true ? <span className="layer-choice"> · needs a choice</span> : null}
                 {" · "}
               </span>
             )}

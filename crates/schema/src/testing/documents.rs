@@ -5,10 +5,10 @@ use proptest::prelude::*;
 use super::model::{bounded_set, bounded_vec, keyed};
 
 use super::{
-    ArbRefs, arb_annotation, arb_attachment_key, arb_date, arb_email, arb_identity_key,
-    arb_identity_set, arb_insertion_key, arb_journey_id, arb_kind_key, arb_markdown, arb_node,
-    arb_node_field, arb_node_key, arb_reason, arb_revision, arb_role_key, arb_route_id, arb_slug,
-    arb_timestamp, arb_title, arb_version_number,
+    ArbRefs, arb_annotation, arb_date, arb_email, arb_identity_key, arb_identity_set,
+    arb_insertion_key, arb_journey_id, arb_kind_key, arb_markdown, arb_node, arb_node_key,
+    arb_reason, arb_revision, arb_role_key, arb_route_id, arb_slug, arb_timestamp, arb_title,
+    arb_version_number,
 };
 
 use crate::domain::{
@@ -20,8 +20,8 @@ use crate::graph::{
 };
 use crate::refs::{FileRefs, KeyRefs};
 use crate::state::{
-    AnswerText, AnswerValue, Bypass, Guard, GuardFailure, JourneyState, LocalEdit, NodeState,
-    Overrides, Provenance, Reopened, SnoozeTarget, StaleReason, State,
+    AnswerText, AnswerValue, Bypass, Guard, GuardFailure, JourneyState, NodeState, Overrides,
+    Reopened, SnoozeTarget, StaleReason, State,
 };
 
 /// A role.
@@ -118,27 +118,10 @@ fn arb_state() -> impl Strategy<Value = State> {
     prop::sample::select(State::ALL.to_vec())
 }
 
-/// A local-edit marker.
-pub fn arb_local_edit() -> impl Strategy<Value = LocalEdit> {
-    prop_oneof![
-        arb_node_field().prop_map(LocalEdit::Field),
-        arb_node_key().prop_map(LocalEdit::Requires),
-        arb_kind_key().prop_map(LocalEdit::Participation),
-        arb_attachment_key().prop_map(LocalEdit::Resource),
-        Just(LocalEdit::Shape),
-    ]
-}
-
 /// A node's stored state.
 pub fn arb_node_state() -> impl Strategy<Value = NodeState> {
     (
         arb_state(),
-        prop::sample::select(vec![
-            Provenance::FromRoute,
-            Provenance::Local,
-            Provenance::Orphaned,
-            Provenance::FromSegment,
-        ]),
         any::<bool>(),
         prop::option::of(arb_date()),
         prop::option::of((arb_date(), arb_revision())),
@@ -146,9 +129,8 @@ pub fn arb_node_state() -> impl Strategy<Value = NodeState> {
         prop::option::of((arb_revision(), arb_revision())),
     )
         .prop_map(
-            |(state, provenance, atomic, started_on, finished, reason, reopened)| NodeState {
+            |(state, atomic, started_on, finished, reason, reopened)| NodeState {
                 state,
-                provenance,
                 atomic,
                 started_on,
                 finished_on: finished.map(|(day, _)| day),
@@ -241,11 +223,6 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
             prop::collection::btree_map(arb_node_key(), arb_node_state(), 0..3),
             prop::collection::btree_map(
                 arb_node_key(),
-                prop::collection::btree_set(arb_local_edit(), 1..3),
-                0..2,
-            ),
-            prop::collection::btree_map(
-                arb_node_key(),
                 prop::collection::btree_set(arb_slug(), 1..3),
                 0..2,
             ),
@@ -260,20 +237,10 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
         prop::collection::btree_map(arb_node_key(), arb_date(), 0..2),
         prop::collection::btree_map(arb_node_key(), arb_snooze_target(), 0..2),
         prop::collection::btree_map(arb_node_key(), arb_overrides(), 0..2),
-        prop::collection::btree_set(arb_node_key(), 0..2),
         prop::collection::vec(arb_annotation(), 0..2),
     )
         .prop_map(
-            |(
-                (nodes, local_edits, ticks),
-                answered,
-                role_fills,
-                pins,
-                snoozes,
-                overrides,
-                tombstones,
-                annotations,
-            )| {
+            |((nodes, ticks), answered, role_fills, pins, snoozes, overrides, annotations)| {
                 let mut answers = std::collections::BTreeMap::new();
                 let mut rationales = std::collections::BTreeMap::new();
                 for (decision, (value, rationale)) in answered {
@@ -282,7 +249,6 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
                 }
                 JourneyState {
                     nodes,
-                    local_edits,
                     ticks,
                     answers,
                     rationales,
@@ -290,7 +256,6 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
                     pins,
                     snoozes,
                     overrides,
-                    tombstones,
                     annotations: keyed(annotations),
                 }
             },

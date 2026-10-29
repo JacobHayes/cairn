@@ -3,7 +3,7 @@
 //!
 //! A put stores a record's after-state at its address. A removal removes every record its
 //! address covers: a whole node takes everything on it (its fields, edges at either end,
-//! participations, resources, state, tombstone, and the notes on it), a draft takes its
+//! participations, resources, state, and the notes on it), a draft takes its
 //! graph, a journey's or route's domain takes its fields, graphs (a route's draft and every
 //! version), and proposals (A19). A copy puts every record of one graph into another. Published
 //! versions are written once, by the copy that publishes them, and the deployment is never
@@ -395,14 +395,12 @@ fn put_graph_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
         }
         GraphRecord::RetiredKey(_)
         | GraphRecord::NodeState { .. }
-        | GraphRecord::LocalEdit { .. }
         | GraphRecord::Tick { .. }
         | GraphRecord::Answer { .. }
         | GraphRecord::RoleFill { .. }
         | GraphRecord::Pin { .. }
         | GraphRecord::Snooze { .. }
         | GraphRecord::Overrides { .. }
-        | GraphRecord::Tombstone(_)
         | GraphRecord::Annotation(_) => put_state_record(graph, record)?,
     }
     Ok(())
@@ -437,13 +435,6 @@ fn put_state_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
         GraphRecord::NodeState { node, state: value } => {
             state.nodes.insert(node.clone(), value.clone());
         }
-        GraphRecord::LocalEdit { node, edit } => {
-            state
-                .local_edits
-                .entry(node.clone())
-                .or_default()
-                .insert(edit.clone());
-        }
         GraphRecord::Tick { node, item } => {
             state
                 .ticks
@@ -467,9 +458,6 @@ fn put_state_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
         }
         GraphRecord::Overrides { node, overrides } => {
             state.overrides.insert(node.clone(), overrides.clone());
-        }
-        GraphRecord::Tombstone(node) => {
-            state.tombstones.insert(node.clone());
         }
         GraphRecord::Annotation(annotation) => {
             state
@@ -541,14 +529,12 @@ fn remove_graph_key(graph: &mut Graph, key: &GraphKey) -> Result<(), StoreError>
         }
         GraphKey::RetiredKey(_)
         | GraphKey::NodeState(_)
-        | GraphKey::LocalEdit { .. }
         | GraphKey::Tick { .. }
         | GraphKey::Answer(_)
         | GraphKey::RoleFill(_)
         | GraphKey::Pin(_)
         | GraphKey::Snooze(_)
         | GraphKey::Overrides(_)
-        | GraphKey::Tombstone(_)
         | GraphKey::Annotation { .. } => remove_state_key(graph, key),
     }
     Ok(())
@@ -568,14 +554,6 @@ fn remove_state_key(graph: &mut Graph, key: &GraphKey) {
         }
         GraphKey::NodeState(node) => {
             state.nodes.remove(node);
-        }
-        GraphKey::LocalEdit { node, edit } => {
-            if let Some(edits) = state.local_edits.get_mut(node) {
-                edits.remove(edit);
-                if edits.is_empty() {
-                    state.local_edits.remove(node);
-                }
-            }
         }
         GraphKey::Tick { node, item } => {
             if let Some(ticked) = state.ticks.get_mut(node) {
@@ -600,9 +578,6 @@ fn remove_state_key(graph: &mut Graph, key: &GraphKey) {
         }
         GraphKey::Overrides(node) => {
             state.overrides.remove(node);
-        }
-        GraphKey::Tombstone(node) => {
-            state.tombstones.remove(node);
         }
         GraphKey::Annotation {
             annotation,
@@ -641,14 +616,12 @@ fn remove_node(graph: &mut Graph, node: &cairn_schema::NodeKey) -> Result<(), St
     }
     let state = &mut graph.state;
     state.nodes.remove(node);
-    state.local_edits.remove(node);
     state.ticks.remove(node);
     state.answers.remove(node);
     state.rationales.remove(node);
     state.pins.remove(node);
     state.snoozes.remove(node);
     state.overrides.remove(node);
-    state.tombstones.remove(node);
     let notes: BTreeSet<_> = state
         .annotations
         .values()
@@ -665,7 +638,7 @@ fn remove_node(graph: &mut Graph, node: &cairn_schema::NodeKey) -> Result<(), St
 mod tests {
     use super::*;
     use crate::build::{self, id, node_key};
-    use cairn_schema::{Edge, GraphKey, NodeState, Provenance, State};
+    use cairn_schema::{Edge, GraphKey, NodeState, State};
 
     fn journey_with_two_nodes() -> Domains {
         let graph = build::journey_graph("j_one");
@@ -689,7 +662,6 @@ mod tests {
                     node: node_key("n_a"),
                     state: NodeState {
                         state: State::Active,
-                        provenance: Provenance::Local,
                         atomic: false,
                         started_on: None,
                         finished_on: None,
@@ -779,7 +751,7 @@ mod tests {
                 route,
                 version: build::version(1),
             },
-            GraphRecord::Tombstone(node_key("n_a")),
+            GraphRecord::DefaultOwner(id("r_owner")),
         );
         assert!(matches!(
             domains.apply(&rewrite),

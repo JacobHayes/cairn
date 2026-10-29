@@ -378,42 +378,38 @@ fn effective_mutations<'a>(records: &'a Records, patch: &'a Patch) -> Vec<&'a Mu
     found
 }
 
-/// B7, B8, B9: what drafting an upgrade, a save as route, or a re-link reads: the deployment,
-/// the journey, the route it saves to (with its latest version, which a draft opened on it
-/// reads), and the versions `versions` names from what was loaded.
+/// B8: what drafting a save as route reads: the deployment, the journey, and the route it
+/// saves to with its latest version, which a draft opened on it reads.
 pub(crate) async fn drafting(
     store: &dyn Store,
     id: &JourneyId,
-    route: Option<&cairn_schema::RouteId>,
-    versions: impl FnOnce(Option<&cairn_schema::Journey>) -> Vec<Lineage>,
+    route: &cairn_schema::RouteId,
 ) -> Result<Records, StoreError> {
     let mut records = Records::default();
     match store.load(&LoadTarget::Deployment).await? {
         Some(Document::Deployment(deployment)) => records.deployment = deployment,
         other => unreachable!("the deployment always loads, not {other:?}"),
     }
-    let held = journey(store, id).await?;
-    let mut read = versions(held.as_ref());
-    if let Some(held) = held {
+    if let Some(held) = journey(store, id).await? {
         records.journeys.insert(id.clone(), held);
     }
-    if let Some(route) = route
-        && let Some(Document::Route(found)) = store.load(&LoadTarget::Route(route.clone())).await?
-    {
-        read.extend(found.versions.iter().next_back().map(|version| Lineage {
-            route: route.clone(),
-            version: *version,
-        }));
-        records.routes.insert(route.clone(), found);
-    }
-    for lineage in read {
-        let target = LoadTarget::RouteVersion {
-            route: lineage.route.clone(),
-            version: lineage.version,
-        };
-        if let Some(Document::RouteVersion(version)) = store.load(&target).await? {
-            records.versions.insert(lineage, version);
+    if let Some(Document::Route(found)) = store.load(&LoadTarget::Route(route.clone())).await? {
+        if let Some(latest) = found.versions.iter().next_back().copied() {
+            let target = LoadTarget::RouteVersion {
+                route: route.clone(),
+                version: latest,
+            };
+            if let Some(Document::RouteVersion(version)) = store.load(&target).await? {
+                records.versions.insert(
+                    Lineage {
+                        route: route.clone(),
+                        version: latest,
+                    },
+                    version,
+                );
+            }
         }
+        records.routes.insert(route.clone(), found);
     }
     Ok(records)
 }
@@ -429,46 +425,25 @@ async fn journey(
     })
 }
 
-/// The published versions `mutations` read, in order: a journey created from one (B1), the
-/// version it follows and the one it is upgraded to (B7: the merge reads both), one it is
-/// re-linked to (B9), and for a draft opened, discarded or published (A11, A13, B8) the route's latest
+/// The published versions `mutations` read, in order: a journey created from one (B1), and
+/// for a draft opened, discarded or published (A11, A13, B8) the route's latest
 /// version and the one its draft extends (an edit copies it, an import or a saved journey
 /// carries its retired keys, and a publish retires what the draft left out of it). A version
 /// that does not exist is simply not loaded, and the engine rejects the mutation naming it.
 fn versions_read(records: &Records, patch: &Patch, mutations: &[&Mutation]) -> BTreeSet<Lineage> {
     let mut read = BTreeSet::new();
-    let mut follows: Option<Lineage> = match &patch.target {
-        PatchTarget::Journey(id) => records
-            .journeys
-            .get(id)
-            .and_then(|journey| journey.header.lineage.clone()),
-        PatchTarget::Route(_) | PatchTarget::Deployment | PatchTarget::Proposal { .. } => None,
-    };
     for mutation in mutations {
         match (mutation, &patch.target) {
             (
                 Mutation::CreateJourney {
                     from: Some(from), ..
-                }
-                | Mutation::Relink { lineage: from },
+                },
                 _,
             ) => {
-                follows = Some(from.clone());
                 read.insert(from.clone());
             }
             (Mutation::InsertSegment { segment, .. }, _) => {
                 read.insert(segment.clone());
-            }
-            (Mutation::Upgrade { to }, _) => {
-                if let Some(current) = follows.take() {
-                    let target = Lineage {
-                        route: current.route.clone(),
-                        version: *to,
-                    };
-                    read.insert(current);
-                    read.insert(target.clone());
-                    follows = Some(target);
-                }
             }
             (Mutation::DiscardDraft {}, PatchTarget::Route(id)) => {
                 // C14: a proposal that discards the draft leaves the route's latest version on show.
@@ -502,8 +477,8 @@ fn versions_read(records: &Records, patch: &Patch, mutations: &[&Mutation]) -> B
     read
 }
 
-/// A21: the routes whose kind the mutations check: the one a journey is created from, re-linked
-/// to, or a segment is inserted from.
+/// A21: the routes whose kind the mutations check: the one a journey is created from, or a
+/// segment is inserted from.
 fn kinds_read(mutations: &[&Mutation]) -> BTreeSet<RouteId> {
     mutations
         .iter()
@@ -511,7 +486,6 @@ fn kinds_read(mutations: &[&Mutation]) -> BTreeSet<RouteId> {
             Mutation::CreateJourney {
                 from: Some(from), ..
             }
-            | Mutation::Relink { lineage: from }
             | Mutation::InsertSegment { segment: from, .. } => Some(from.route.clone()),
             _ => None,
         })

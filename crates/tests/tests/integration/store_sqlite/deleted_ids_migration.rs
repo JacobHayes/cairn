@@ -1,16 +1,13 @@
 //! Migration 0016 on a database frozen at migration 13 (`at_migration_13.sql`) with a journey
 //! hard-deleted the way the code before it did: the journey's own patch, its deleted id in
 //! `deleted_journeys`, the record and its address in the old JSON shapes, an open proposal
-//! deleting its journey and the event that created it, whose review item holds a reviewer's
-//! map that uses the old record's name as its one key. The expected state is written here, not derived from the current types.
+//! deleting its journey. The expected state is written here, not derived from the current types.
 
 #[cfg(test)]
 mod deleted_ids {
     use std::path::PathBuf;
 
-    use cairn_schema::{
-        ConflictResolution, DeletedId, Mutation, Record, RecordKey, ReviewItem, Write,
-    };
+    use cairn_schema::{DeletedId, Mutation, Record, RecordKey, Write};
     use cairn_store::{EventQuery, Store};
     use cairn_store_sqlite::SqliteStore;
 
@@ -21,7 +18,6 @@ mod deleted_ids {
 INSERT INTO "deleted_journeys" VALUES ('j_old', 1791288000000000009);
 INSERT INTO "events" VALUES (9, 'p_gone', 0, 'deployment', NULL, 'journey_deleted', 'u_lead', NULL, NULL, '{"journey":"j_old"}', 1791288000000000009, NULL, '[{"remove":{"domain":{"journey":"j_old"}}},{"put":{"deleted_journey":{"journey":"j_old","deleted_at":"2026-10-06T12:00:00Z"}}}]');
 INSERT INTO "patch_receipts" VALUES ('p_gone', 'journey', 'j_old', NULL, 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 4, NULL, '{}', '[{"deleted_journey":"j_old"}]');
-INSERT INTO "events" VALUES (10, 'p_propose', 0, 'journey', 'j_one', 'proposal_created', 'u_lead', NULL, NULL, '{"proposal":"pr_gone"}', 1791288000000000010, NULL, '[{"put":{"proposal":{"id":"pr_gone","destination":{"journey":"j_one"},"revision":1,"status":"open","draft":{"title":"Delete it","destination_revision":1,"mutations":[{"op":"delete_journey"}],"items":[{"item":"conflict","conflict":{"about":"field","node":"n_gate","journey":{"title":"Gate"},"route":{"title":"Gate check"}},"resolution":{"map_choices":{"map":{"deleted_journey":"kept"}}}}]},"created_by":"u_lead","created_at":"2026-10-06T12:00:00Z"}}}]');
 INSERT INTO "proposals" VALUES ('pr_gone', 'journey', 'j_one', 1, 'open', 'Delete it', NULL, 1, '[{"op":"delete_journey"}]', '[]', NULL, 'u_lead', 1791288000000000000);
 "#;
 
@@ -46,40 +42,6 @@ INSERT INTO "proposals" VALUES ('pr_gone', 'journey', 'j_one', 1, 'open', 'Delet
         drop(connection);
         let store = SqliteStore::open(&path).unwrap();
         (path, store)
-    }
-
-    /// The event that created the proposal puts it with the same deletions as the stored
-    /// proposal, and a reviewer's map keyed by the old record's name kept as it was.
-    async fn proposal_event_migrated(store: &SqliteStore, mutations: &[Mutation]) {
-        let query = EventQuery {
-            log: Some(cairn_schema::Domain::Journey("j_one".parse().unwrap())),
-            ..EventQuery::default()
-        };
-        let logged = store.events(&query).await.unwrap().items;
-        let put = logged
-            .iter()
-            .flat_map(|entry| entry.event.delta.iter())
-            .find_map(|write| match write {
-                Write::Put(Record::Proposal(put)) => Some(put),
-                _ => None,
-            })
-            .unwrap();
-        assert_eq!(put.draft.mutations.as_slice(), mutations);
-        // A map of the reviewer's that uses the old record's name as its one key is kept.
-        let [
-            ReviewItem::Conflict {
-                resolution: Some(ConflictResolution::MapChoices { map }),
-                ..
-            },
-        ] = put.draft.items.as_slice()
-        else {
-            panic!("{:?}", put.draft.items)
-        };
-        let kept: Vec<_> = map
-            .iter()
-            .map(|(old, new)| (old.as_str(), new.as_str()))
-            .collect();
-        assert_eq!(kept, [("deleted_journey", "kept")]);
     }
 
     #[test]
@@ -115,7 +77,6 @@ INSERT INTO "proposals" VALUES ('pr_gone', 'journey', 'j_one', 1, 'open', 'Delet
                     revision: cairn_schema::Revision::NONE.next(),
                 }]
             );
-            proposal_event_migrated(&store, proposal.draft.mutations.as_slice()).await;
             drop(store);
             let connection = rusqlite::Connection::open(&path).unwrap();
             let (kind, id): (String, String) = connection

@@ -17,8 +17,6 @@ export interface FieldNotes {
   problem?: string | undefined;
   /** What the engine said about it. */
   violations?: readonly Violation[] | undefined;
-  /** B4: the field is edited here, away from the route. */
-  edited?: boolean | undefined;
 }
 
 /** The attributes of a control whose value has a problem: it is invalid, and points to the message `id` names. */
@@ -77,14 +75,7 @@ export function FieldBox({ label, place, notes = {}, children }: { label: string
   });
   return (
     <div ref={controls} className="stack author-field" data-testid="author-field" data-field={place} data-invalid={invalid ? "true" : "false"}>
-      <span className="row">
-        {label === "" ? null : <span className="label">{label}</span>}
-        {notes.edited === true ? (
-          <span className="badge warn" data-testid="edited-here">
-            edited here
-          </span>
-        ) : null}
-      </span>
+      {label === "" ? null : <span className="label">{label}</span>}
       {children}
       {notes.problem === undefined ? null : <Problem id={message}>{notes.problem}</Problem>}
       <ViolationLines violations={violations} idPrefix={message} />

@@ -86,25 +86,15 @@ fn breakdown() -> Value {
         "mutations": [child("ingest"), child("query")] })
 }
 
-/// B7, B9, I6: a draft the service cannot make is answered by its kind, as every host answers
-/// it: a journey or route version that does not exist is not found, and a journey that follows
-/// no route cannot be upgraded, which the caller is told is refused.
+/// B8, I6: a draft the service cannot make is answered by its kind, as every host answers
+/// it: a save of a journey that does not exist is not found.
 #[tokio::test]
 async fn a_draft_that_cannot_be_made_is_answered_by_its_kind() {
     let world = World::new();
     let ann = user("u_ann");
     world.vendor_journey(&ann).await;
-    let free = json!({ "target": { "journey": "j_free" }, "patch_id": "p_free", "base_revision": 0,
-        "mutations": [{ "op": "create_journey", "name": "Free" }] });
-    world.ok(&ann, "apply_patch", free).await;
-    let upgrade = |journey: &str| json!({ "upgrade": { "journey": journey, "to": 2 }, "proposal": "pr_up", "patch_id": "p_up" });
-    let relink = json!({ "proposal": "pr_relink", "patch_id": "p_relink", "relink": {
-        "journey": "j_vendor_eval", "to": { "route": "vendor-evaluation", "version": 9 } } });
-    let cases = [
-        ("upgrade", upgrade("j_missing"), "not found"),
-        ("relink", relink, "not found"),
-        ("upgrade", upgrade("j_free"), "refused"),
-    ];
+    let save = |journey: &str| json!({ "save_as_route": { "journey": journey, "route": "saved", "name": "Saved" }, "proposal": "pr_save", "patch_id": "p_save" });
+    let cases = [("save_as_route", save("j_missing"), "not found")];
     for (tool, arguments, kind) in cases {
         let answered = world.call(&ann, "create_proposal", arguments).await;
         let found = match &answered {
@@ -133,25 +123,20 @@ async fn a_proposal_names_exactly_one_content() {
             .extend(extra.as_object().unwrap().clone());
         arguments
     };
-    let relink =
-        json!({ "journey": "j_vendor_eval", "to": { "route": "vendor-evaluation", "version": 1 } });
+    let save = json!({ "journey": "j_vendor_eval", "route": "saved", "name": "Saved" });
     let cases = [
         (base.clone(), ""),
-        (
-            with(json!({ "upgrade": { "journey": "j_vendor_eval", "to": 2 }, "relink": relink })),
-            "relink",
-        ),
         (
             with(json!({ "destination": { "journey": "j_vendor_eval" } })),
             "draft",
         ),
         (
-            with(json!({ "draft": breakdown(), "relink": relink })),
-            "relink",
+            with(json!({ "draft": breakdown(), "save_as_route": save })),
+            "save_as_route",
         ),
         (
-            with(json!({ "relink": relink, "upgrade": null })),
-            "upgrade",
+            with(json!({ "save_as_route": save, "draft": null })),
+            "draft",
         ),
     ];
     let listed = cairn_mcp::ToolSet::definitions()
@@ -161,7 +146,7 @@ async fn a_proposal_names_exactly_one_content() {
     let listed = jsonschema::draft202012::new(&Value::Object(listed.input_schema)).unwrap();
     // The listing is a plain object, as every provider requires: it refuses a content named
     // as null, and the server refuses the rest.
-    assert!(!listed.is_valid(&with(json!({ "relink": relink, "upgrade": null }))));
+    assert!(!listed.is_valid(&with(json!({ "save_as_route": null }))));
     for (arguments, at) in cases {
         let answered = world.call(&ann, "create_proposal", arguments.clone()).await;
         let Err(cairn_mcp::ToolError::Arguments { path, .. }) = &answered else {

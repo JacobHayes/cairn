@@ -190,7 +190,7 @@ export function saveOf(command: Command, answer: Answer, began: number, titleOf:
 }
 
 /** The proposal writes that make a proposal. */
-const DRAFTING: ReadonlySet<string> = new Set(["create", "upgrade", "save_as_route", "relink"]);
+const DRAFTING: ReadonlySet<string> = new Set(["create", "save_as_route"]);
 
 /**
  * A save as the event Recent lists (D7), made at `at`: its words, and the warning sentence its

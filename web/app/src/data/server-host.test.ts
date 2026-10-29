@@ -9,12 +9,11 @@ import { indexParams, serverHost } from "./server-host.ts";
 
 describe("the index's query parameters", () => {
   it("names each filter given and leaves out the empty ones", () => {
-    expect(indexParams({ status: ["active"], route: "r", version: 2, referencing: ["who_a", "who_b"], upgrade_available: false, after: "j_x" })).toEqual({
+    expect(indexParams({ status: ["active"], route: "r", version: 2, referencing: ["who_a", "who_b"], after: "j_x" })).toEqual({
       status: ["active"],
       route: "r",
       version: 2,
       referencing: ["who_a", "who_b"],
-      upgrade_available: false,
       after: "j_x",
     });
     expect(indexParams({ owner: ["who_a"] })).toEqual({ owner: ["who_a"] });

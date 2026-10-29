@@ -85,25 +85,16 @@ test("A12, A1a: a route authored by hand from an empty draft, published, exporte
 });
 
 
-test("B4: on a fixture journey, a local node added, a route-copied title edited and reset to the route", async ({ page }) => {
+test("on a fixture journey, a node added and a title edited", async ({ page }) => {
   await readable(page);
   await openEditing(page, "j_vendor_eval");
   const local = await addNode(page, "action", "Order the test data", "Setup");
-  await expect((await section(page, "author-local-edits")).getByTestId("local-edits")).toHaveAttribute("data-status", "local");
   await expect(nodeCard(page, local)).toBeVisible();
   await openFromCanvas(page, "n_access");
   await formField(page, "title").getByRole("textbox").fill("Sandbox access");
   await saveForm(page);
   await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Sandbox access");
-  await expect(formField(page, "title").getByTestId("edited-here")).toBeVisible();
-  const edits = await section(page, "author-local-edits");
-  const marker = edits.getByTestId("local-edit").filter({ hasText: "title" });
-  await marker.getByRole("button", { name: "Reset to route" }).click();
-  await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Environment access");
-  await expect(edits.getByTestId("local-edit")).toHaveCount(0);
-  await expect(formField(page, "title").getByTestId("edited-here")).toHaveCount(0);
 });
-
 
 test("A3: Edit is one state entered from the journey menu, with the name editor beside the structure tools; Escape in a field belongs to the field and outside one stops drawing and keeps edit mode, on a phone too; leaving edit mode or opening another graph stops it too", async ({ page }) => {
   const banner = page.getByTestId("drawing-edge");

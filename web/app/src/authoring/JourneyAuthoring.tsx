@@ -12,12 +12,11 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { graphPath, type GraphView } from "../canvas/settings.ts";
 import { DrawingBanner, type EdgeDrawing } from "./connect.tsx";
 import { StructureTools } from "./StructureTools.tsx";
-import { Tombstones } from "./LocalEdits.tsx";
 import { HeaderEditor } from "../journeys/HeaderEditor.tsx";
 import type { Ready } from "../detail/model.ts";
 import type { Authored } from "./target.ts";
 
-/** Edit mode's band under the header: what the edits are, the palette and the roles, Done; then tombstones and the edge being drawn. */
+/** Edit mode's band under the header: what the edits are, the palette and the roles, Done; then the edge being drawn. */
 export function JourneyAuthoringBar({
   ready,
   authored,
@@ -52,7 +51,6 @@ export function JourneyAuthoringBar({
         </Link>
       </div>
       <HeaderEditor ready={ready} />
-      <Tombstones authored={authored} />
       <DrawingBanner drawing={drawing} />
     </section>
   );

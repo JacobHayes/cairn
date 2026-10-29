@@ -25,7 +25,7 @@ const words: Words = {
 
 const put = (record: GraphRecord): Write => ({ put: { graph: { graph: { journey: "j_test" }, record } } });
 const state = (node: string, fields: Partial<Schema<"NodeState">> & { state: Schema<"State"> }): Write =>
-  put({ node_state: { node, state: { provenance: "local", ...fields } } });
+  put({ node_state: { node, state: { ...fields } } });
 const field = (node: string, value: Schema<"NodeFieldValueResolved">): Write => put({ node_field: { node, value } });
 
 function event(type: EventType, subject: Event["subject"], delta: Write[] = [], more: Partial<Event> = {}): Event {
@@ -88,10 +88,6 @@ const CASES: Record<EventType, Case> = {
   annotation_added: { event: event("annotation_added", { attachment: "a_note" }) },
   annotation_edited: { event: event("annotation_edited", { attachment: "a_note" }) },
   annotation_removed: { event: event("annotation_removed", { attachment: "a_note" }) },
-  journey_upgraded: { event: event("journey_upgraded", { journey: "j_test" }) },
-  relinked: { event: event("relinked", { journey: "j_test" }) },
-  provenance_changed: { event: event("provenance_changed", plan, [state("n_plan", { state: "todo", provenance: "from_route" })]) },
-  local_edit_changed: { event: event("local_edit_changed", plan) },
   identity_created: { event: event("identity_created", { identity: "who_ana" }, [{ put: { identity: { key: "who_ana", name: "Ana Reyes" } } }]) },
   identity_edited: { event: event("identity_edited", { identity: "who_ana" }, [{ put: { identity: { key: "who_ana", name: "Ana Reyes" } } }]) },
   identities_merged: { event: event("identities_merged", { identity: "who_ana" }, [{ put: { identity: { key: "who_ana", name: "Ana Reyes" } } }]) },

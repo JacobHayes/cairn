@@ -1,7 +1,7 @@
-//! Bulk and import (ARCHITECTURE, HTTP API: Bulk and import): upgrade, save as route, and
-//! re-link, each drafted by the engine and stored as a proposal that is reviewed and applied
-//! through the proposal endpoints (B7, B8, B9, I6); and route files exported and imported, an
-//! import being one route patch (A13).
+//! Bulk and import (ARCHITECTURE, HTTP API: Bulk and import): save as route, drafted by the
+//! engine and stored as a proposal that is reviewed and applied through the proposal
+//! endpoints (B8, I6); and route files exported and imported, an import being one route patch
+//! (A13).
 
 use axum::Json;
 use axum::extract::{Extension, RawQuery, State};
@@ -16,44 +16,17 @@ use crate::extract::{JsonBody, Path, segment};
 use crate::observe;
 use crate::query::{self, Params};
 use cairn_service::wire::{
-    PatchAnswer, ProblemCode, ProposalAnswer, RelinkRequest, RouteImport, SaveAsRouteRequest,
-    UpgradeRequest,
+    PatchAnswer, ProblemCode, ProposalAnswer, RouteImport, SaveAsRouteRequest,
 };
 
 /// The bulk endpoints and their handlers.
 pub fn served() -> crate::Served {
     use crate::endpoints as at;
     vec![
-        (&at::UPGRADE, post(upgrade)),
         (&at::SAVE_AS_ROUTE, post(save_as_route)),
-        (&at::RELINK, post(relink)),
         (&at::IMPORT_ROUTE, post(import)),
         (&at::EXPORT_ROUTE, get(export)),
     ]
-}
-
-/// `POST /api/journeys/{id}/upgrade` (B7).
-pub async fn upgrade(
-    State(api): State<Api>,
-    Extension(actor): Extension<Actor>,
-    Path(id): Path<String>,
-    JsonBody(request): JsonBody<UpgradeRequest>,
-) -> Answer<ProposalAnswer> {
-    let journey: JourneyId = segment(&id, "journey")?;
-    let UpgradeRequest {
-        patch_id,
-        proposal,
-        to,
-    } = request;
-    let (service, call) = (api.service.clone(), api.call(actor));
-    let (logged_id, logged_patch) = (proposal.clone(), patch_id.clone());
-    let drafted = committed(async move {
-        service
-            .propose_upgrade(&call, patch_id, &proposal, &journey, to)
-            .await
-    })
-    .await?;
-    drafted_written(&logged_patch, &logged_id, "upgrade", drafted)
 }
 
 /// `POST /api/journeys/{id}/save-as-route` (B8).
@@ -79,30 +52,6 @@ pub async fn save_as_route(
     })
     .await?;
     drafted_written(&logged_patch, &logged_id, "save_as_route", drafted)
-}
-
-/// `POST /api/journeys/{id}/relink` (B9).
-pub async fn relink(
-    State(api): State<Api>,
-    Extension(actor): Extension<Actor>,
-    Path(id): Path<String>,
-    JsonBody(request): JsonBody<RelinkRequest>,
-) -> Answer<ProposalAnswer> {
-    let journey: JourneyId = segment(&id, "journey")?;
-    let RelinkRequest {
-        patch_id,
-        proposal,
-        lineage,
-    } = request;
-    let (service, call) = (api.service.clone(), api.call(actor));
-    let (logged_id, logged_patch) = (proposal.clone(), patch_id.clone());
-    let drafted = committed(async move {
-        service
-            .propose_relink(&call, patch_id, &proposal, &journey, &lineage)
-            .await
-    })
-    .await?;
-    drafted_written(&logged_patch, &logged_id, "relink", drafted)
 }
 
 /// `POST /api/routes/{id}/import` (A13): one route patch opening a new route or a new draft.

@@ -280,8 +280,7 @@ fn a_map_key_written_twice_is_rejected_in_both_formats() {
     use cairn_schema::{Deployment, JourneyState, Mutation};
     let state = |map: &str, entries: &str| format!(r#"{{"{map}":{{{entries}}}}}"#);
     let pin = |key: &str, date: &str| format!(r#""{key}":"{date}""#);
-    let node =
-        |key: &str, state: &str| format!(r#""{key}":{{"state":"{state}","provenance":"local"}}"#);
+    let node = |key: &str, state: &str| format!(r#""{key}":{{"state":"{state}"}}"#);
     let answer = |key: &str, yes: bool| format!(r#""{key}":{{"boolean":{yes}}}"#);
     let journeys = |entries: &str| {
         format!(

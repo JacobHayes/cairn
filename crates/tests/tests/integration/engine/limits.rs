@@ -227,42 +227,6 @@ fn merges_add_aliases_up_to_the_limit() {
     );
 }
 
-/// An upgrade that would give nodes more resources than the limit (the route's and the
-/// journey's own together) is refused, naming every such node, even when a later mutation in
-/// its patch removes one.
-#[test]
-fn an_upgrade_that_overfills_resources_is_refused_though_trimmed_after() {
-    let limit = Limit::ResourceCountPerNode;
-    let nodes = ["n_findings", "n_plan"];
-    let mut local = String::new();
-    for node in nodes {
-        writeln!(
-            local,
-            "- op: add_resource\n  node: {node}\n  resource: {{key: a_local_{node}, tip: Local.}}"
-        )
-        .unwrap();
-    }
-    let records = support::accepted_on(&support::vendor_after(1), "j_vendor_eval", &local);
-    let mut target = support::vendor_v2();
-    for node in nodes {
-        let mut found = target.nodes.get(&support::key(node)).unwrap().clone();
-        found.resources = (0..limit.max())
-            .map(|index| {
-                let resource = format!("{{key: a_route_{node}_{index}, tip: Route.}}");
-                cairn_schema::from_yaml(&resource).unwrap()
-            })
-            .collect();
-        target.nodes.put(found).unwrap();
-    }
-    let records = support::publish_vendor(&records, target);
-    let trim = "- op: remove_resource\n  node: n_findings\n  resource: a_local_n_findings\n";
-    for after in ["", trim] {
-        let upgrade = format!("- op: upgrade\n  to: 2\n{after}");
-        let past = support::vendor_patch(&records, &upgrade);
-        assert_eq!(limits_named(past), [Some(limit), Some(limit)], "{after}");
-    }
-}
-
 /// At the identity limit, a deployment patch that merges two identities may then create one:
 /// the count never passes the limit.
 #[test]

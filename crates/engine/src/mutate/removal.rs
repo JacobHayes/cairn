@@ -1,11 +1,10 @@
-//! Node removal (A18, B4): a node goes with its subtree, every incident edge, and everything
+//! Node removal (A18): a node goes with its subtree, every incident edge, and everything
 //! attached to them, but only as far as its author saw: a removal names all of it, and one
 //! whose subtree or edges gained anything it does not name (a child added or moved in, an
 //! edge, a resource, a note, a participation) is rejected rather than widened, so a safe
 //! retry (H5) never removes work its author never saw. Names that no longer apply (a child
 //! moved out since) are ignored: removing less than the author saw is safe. Every removed key
-//! is retired, and in a journey each route-copied node in the subtree gets a tombstone so an
-//! upgrade does not bring it back (B4).
+//! is retired.
 //!
 //! Cost at the limits: the patch's first removal indexes the graph once ([`RemovalIndex`],
 //! O(n log n) plus the edges and notes); each removal then walks its own subtree with that
@@ -16,8 +15,7 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Edge, GraphKey, GraphRecord, LocalEdit, NodeKey, ParticipationRef, Provenance, Removal,
-    RetiredKey, Subject, ViolationCode, Write,
+    Edge, GraphKey, NodeKey, ParticipationRef, Removal, RetiredKey, Subject, ViolationCode, Write,
 };
 
 use super::Session;
@@ -142,8 +140,6 @@ pub(super) fn remove(session: &mut Session<'_>, removal: &Removal) -> Vec<Write>
     for edge in &reach.edges {
         if !inside.contains(&edge.node) {
             writes.push(session.remove(GraphKey::Edge(edge.clone())));
-            // B4: the node that stays lost a route-copied edge.
-            writes.extend(session.marker(&edge.node, LocalEdit::Requires(edge.requires.clone())));
         }
     }
     for annotation in &reach.annotations {
@@ -159,27 +155,11 @@ pub(super) fn remove(session: &mut Session<'_>, removal: &Removal) -> Vec<Write>
     for key in &reach.nodes {
         writes.push(session.remove(GraphKey::Node(key.clone())));
         writes.push(retire(session, RetiredKey::Node(key.clone())));
-        if from_route(session, key) {
-            writes.push(session.put(GraphRecord::Tombstone(key.clone())));
-        }
     }
-    // B13: a removed member leaves its insertion, which goes with its last (no tombstone: a
-    // member is not route-copied).
+    // B13: a removed member leaves its insertion, which goes with its last.
     writes.extend(super::insertion::narrowed(session, |member| {
         !inside.contains(member)
     }));
     assert!(writes.len() >= reach.nodes.len() * 2);
     writes
-}
-
-/// B4: whether a journey copied this node from its route.
-fn from_route(session: &Session<'_>, key: &NodeKey) -> bool {
-    session.journey().is_some_and(|journey| {
-        journey
-            .graph
-            .state
-            .nodes
-            .get(key)
-            .is_some_and(|stored| stored.provenance == Provenance::FromRoute)
-    })
 }

@@ -232,8 +232,4 @@ fn an_explicit_participation_survives_a_role_change() {
     assert!(
         matches!(owner, cairn_schema::ParticipationSource::Identities(found) if found.iter().any(|e| e.as_str() == "who_d4m6uk2eqf5rbhzs"))
     );
-    assert!(
-        graph.state.local_edits[&key("n_access")]
-            .contains(&cairn_schema::LocalEdit::Participation(kind("k_owner")))
-    );
 }

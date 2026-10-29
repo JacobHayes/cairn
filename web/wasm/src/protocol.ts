@@ -32,7 +32,6 @@ export type WorkerRequest =
   | { op: "condition_problem"; clause: Schema<"ConditionResolved"> }
   | { op: "node_form_problems"; values: NodeFormValues }
   | { op: "value_problems"; checks: ValueCheck[] }
-  | { op: "restore_nodes"; journey: Schema<"Graph">; version: Schema<"Graph">; key: string; seed: string }
   | { op: "removal_plan"; graph: Schema<"Graph">; target: Schema<"RemovalTarget"> }
   | { op: "draft_written"; graph: Schema<"Graph">; stored: string }
   | { op: "draft_stored"; graph: Schema<"Graph">; written: string }

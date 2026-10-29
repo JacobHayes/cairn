@@ -235,27 +235,13 @@ fn walk_segment(records: &Records, ops: &mut BTreeSet<String>) -> Records {
         "- op: create_journey\n  name: Started\n  from: {route: vendor-evaluation, version: 3}\n";
     let started = accept(&records, "{journey: j_reuse}", start, ops);
     let graph = &started.journeys[&"j_reuse".parse().unwrap()].graph;
-    let from_route = cairn_schema::Provenance::FromRoute;
     assert!(graph.insertions.is_empty());
-    assert!(
-        graph
-            .state
-            .nodes
-            .values()
-            .all(|state| state.provenance == from_route)
-    );
     records
 }
 
-/// B7, B9, B4, F2, E3, B6, B5, B10, G1, B11 on the finished vendor journey.
+/// F2, E3, B6, B5, B10, G1, B11 on the finished vendor journey.
 fn walk_journey(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     let changes = "\
-- op: upgrade\n  to: 2\n\
-- op: relink\n  lineage: {route: vendor-evaluation, version: 2}\n\
-- op: set_provenance\n  node: n_access\n  provenance: orphaned\n\
-- op: set_provenance\n  node: n_access\n  provenance: from_route\n\
-- op: mark_local_edit\n  node: n_plan\n  edit: {field: title}\n  marked: true\n\
-- op: mark_local_edit\n  node: n_plan\n  edit: {field: title}\n  marked: false\n\
 - op: edit_journey\n  name: Evaluate the analytics vendor again\n\
 - op: set_recorded_date\n  node: n_access\n  end: start\n  date: \"2026-10-05\"\n\
 - op: add_role\n  role: {key: r_helper, id: helper}\n\
@@ -278,10 +264,6 @@ fn walk_journey(records: &Records, ops: &mut BTreeSet<String>) -> Records {
 - op: set_journey_status\n  status: active\n";
     let records = accept(records, JOURNEY, changes, ops);
     let journey = records.journeys.values().next().unwrap();
-    assert_eq!(
-        journey.header.lineage.as_ref().unwrap().version,
-        VersionNumber::FIRST.next()
-    );
     assert_eq!(
         journey.graph.state.nodes[&support::key("n_access")].started_on,
         Some("2026-10-05".parse().unwrap())

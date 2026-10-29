@@ -1,15 +1,13 @@
 //! Journey owners (B1, C16, E6, I3): zero or more identities in a journey's header. An owner is
 //! an identity reference like any other (deleting it is refused, a merge follows it), an edit
-//! keeps owners unless it names them, an upgrade keeps them, a saved route never carries them,
+//! keeps owners unless it names them, a saved route never carries them,
 //! and owning makes no node anyone's.
 #![cfg(test)]
 
 use crate::engine::support;
 
-use cairn_engine::{DerivedJourney, Records, save_as_route, upgrade};
-use cairn_schema::{
-    IdentityKey, JourneyId, Rejection, ReviewItem, Subject, VersionNumber, ViolationCode,
-};
+use cairn_engine::{DerivedJourney, Records, save_as_route};
+use cairn_schema::{IdentityKey, JourneyId, Rejection, ReviewItem, Subject, ViolationCode};
 
 const JOURNEY: &str = "j_vendor_eval";
 const TARGET: &str = "{journey: j_vendor_eval}";
@@ -174,42 +172,6 @@ fn a_journey_is_created_with_owners_an_earlier_mutation_made() {
     );
     let header = &created.journeys[&"j_new".parse::<JourneyId>().unwrap()].header;
     assert_eq!(header.owners.len(), 1);
-}
-
-/// B7: an upgrade keeps the owners. Owning makes no node anyone's: the unassigned count is the
-/// same with and without owners.
-#[test]
-fn an_upgrade_keeps_owners_and_owning_assigns_nothing() {
-    let plain = support::publish_vendor(
-        &support::finished("vendor-evaluation"),
-        support::vendor_v2(),
-    );
-    let records = support::accepted_to(
-        &plain,
-        "deployment",
-        "- op: create_identity\n  identity: {key: who_solo, name: Solo}\n",
-    );
-    let owned = edit(&records, "owners: [who_solo]");
-    let unassigned = |records: &Records| {
-        let graph = support::journey_graph(records, JOURNEY);
-        let derived = support::derived(records, JOURNEY);
-        DerivedJourney::new(&graph, &derived)
-            .snapshot(&support::journey_header(records, JOURNEY))
-            .counts
-            .unassigned
-    };
-    assert_eq!(unassigned(&owned), unassigned(&records));
-
-    let draft = upgrade(
-        &owned,
-        &JOURNEY.parse().unwrap(),
-        VersionNumber::FIRST.next(),
-        &support::fixed_inputs(),
-    )
-    .unwrap();
-    let proposed = support::propose(&owned, "pr_upgrade", TARGET, &draft);
-    let upgraded = support::apply_proposal(&proposed, "pr_upgrade").unwrap();
-    assert_eq!(owners_of(upgraded.records()), ["who_solo"]);
 }
 
 /// B8: saving a journey as a route does not carry its owners: an owner named nowhere else is

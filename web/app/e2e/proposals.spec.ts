@@ -1,42 +1,26 @@
-// Proposal review in the browser, on cairn demo: the one proposal-review flow, the scenario
-// journey upgraded to the fixture's version 2 with each kind of conflict that version raises
-// resolved and applied (B7, C14), where the review screen meets the canvas, the inspector and
-// the host. What a proposal offers, blocks and reads as stale is model and host tests'.
+// Proposal review in the browser, on cairn demo: the one flow, a breakdown of a
+// journey's placeholder reviewed and applied (B10, C14), where the review screen meets the
+// canvas, the inspector and the host. What a proposal offers, blocks and reads as stale is model and host tests'.
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
 
 import { DESKTOP_MIN } from "../src/shell/breakpoints.ts";
 import { openJourneyCard } from "./around.ts";
-import { apply, blockers, editWhereVersionTwoChanges, graphRoom, marginIn, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
-import { expectAddress, goTo, nodeCard, open, readable, setDepth, syncChip, whenSettled } from "./shell.ts";
+import { apply, blockers, draftBreakdown, graphRoom, marginIn, pickNode, reviewOpen } from "./proposals.ts";
+import { expectAddress, goTo, nodeCard, open, setDepth, syncChip, whenSettled } from "./shell.ts";
 
-/** Drafts the upgrade of the scenario journey to version 2 (after the edits version 2 also touches) and returns the review's address. */
-async function draftUpgrade(page: Page): Promise<string> {
-  await editWhereVersionTwoChanges(page);
-  await publishVersionTwo(page);
-  await openJourneyCard(page, "j_vendor_eval");
-  await page.getByTestId("journey-upgrade").click();
-  const flow = page.getByTestId("upgrade-flow");
-  await expect(flow.getByLabel("Upgrade to version")).toHaveValue("2");
-  await flow.getByRole("button", { name: "Propose the upgrade" }).click();
-  await reviewOpen(page);
-  const reviewed = new URL(page.url()).pathname;
-  expect(reviewed).toMatch(/^\/journeys\/j_vendor_eval\/proposals\/pr_[0-9a-f]+$/);
-  return reviewed;
-}
-
-/** The drafted upgrade is listed in its journey's Proposals tab and on Home, and opens under the journey. */
-async function proposalIsListed(page: Page, reviewed: string): Promise<void> {
+/** The drafted proposal is listed in its journey's Proposals tab and on Home, and opens under the journey. */
+async function proposalIsListed(page: Page, journey: string, reviewed: string): Promise<void> {
   // Away from it: the journey's tab names it, and its row opens the same address.
-  await open(page, "/journeys/j_vendor_eval");
+  await open(page, `/journeys/${journey}`);
   await expect(page.getByTestId("tab-proposals")).toContainText("1");
   await page.getByTestId("tab-proposals").click();
   await page.getByTestId("proposals-pane").getByTestId("proposal-row").getByRole("link").click();
   await reviewOpen(page);
   await expectAddress(page, reviewed);
   // The address of the list opens the journey with the tab in view.
-  await open(page, "/journeys/j_vendor_eval/proposals");
+  await open(page, `/journeys/${journey}/proposals`);
   await expect(page.getByTestId("tab-proposals")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("proposals-panel").getByTestId("proposal-row")).toHaveCount(1);
   // Home waits on it too, in a fold after the journeys.
@@ -49,83 +33,29 @@ async function proposalIsListed(page: Page, reviewed: string): Promise<void> {
   await page.getByRole("tab", { name: "Inspector" }).click();
 }
 
-/** A change the first fit leaves out is brought into view from the rail, at the zoom it was at. */
-async function changeBroughtIntoView(page: Page): Promise<void> {
-  const zoom = (await graphRoom(page)).zoom;
-  await page.getByTestId("changes-fold").locator("summary").click();
-  await page.locator('[data-testid="diff-node"][data-node="n_signoff"] button').click();
-  await expect(page.getByTestId("item-editor")).toBeVisible();
-  await expect.poll(async () => (await marginIn(page, "n_signoff", await graphRoom(page))) >= 0).toBe(true);
-  expect((await graphRoom(page)).zoom).toBeCloseTo(zoom, 2);
-}
-
-/** The drafted proposal is one click away in Recent, and a conflict still to decide holds Apply, for that reason alone. */
-async function conflictHoldsApply(page: Page): Promise<void> {
-  // The drafted proposal is also one click away in Recent, for when the screen that opened it is gone.
+/** The drafted proposal is one click away in Recent, and its added piece is marked in the list. */
+async function proposalIsRead(page: Page): Promise<void> {
   await syncChip(page).click();
   await expect(page.getByTestId("sync-popover").getByTestId("sync-recent").filter({ hasText: "Drafted a proposal" }).getByRole("button", { name: "Review it" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("sync-popover")).toHaveCount(0);
-  // Still a conflict to decide: Apply is held, for that reason alone, and pressing it shows why.
-  await expect.poll(() => blockers(page)).toEqual(["unresolved"]);
-  await expect(page.getByTestId("apply-proposal")).toHaveAttribute("aria-disabled", "true");
-  await expect(page.getByTestId("to-decide")).toBeVisible();
-  await expect(nodeCard(page, "n_signoff")).toHaveAttribute("data-diff", "added");
-  await expect(nodeCard(page, "n_signoff").getByTestId("card-diff")).toContainText("Added");
-  await page.getByTestId("apply-proposal").click({ force: true });
-  await expect(page.getByTestId("apply-waits")).toBeFocused();
-}
-
-/** Each kind of conflict is read on its node. */
-async function conflictsAreRead(page: Page): Promise<void> {
-  await pickNode(page, "n_access");
-  await expect(reviewItem(page, "conflict", "n_access")).toHaveAttribute("data-about", "field");
-  await scrollsOnce(page);
-  await pickNode(page, "n_baseline");
-  await expect(reviewItem(page, "conflict", "n_baseline")).toHaveAttribute("data-about", "field");
-  await pickNode(page, "n_kickoff");
-  await expect(reviewItem(page, "kept_local_edit", "n_kickoff")).toBeVisible();
-  await pickNode(page, "n_workload");
-  await expect(reviewItem(page, "orphan", "n_workload")).toBeVisible();
-}
-
-/** Each conflict resolved, the removal confirmed, saved and applied. */
-async function resolvedAndApplied(page: Page): Promise<void> {
-  await resolve(page, "n_access", "keep_journey");
-  await resolve(page, "n_baseline", "take_route");
-  await pickNode(page, "n_workload");
-  const orphan = reviewItem(page, "orphan", "n_workload");
-  await orphan.getByTestId("orphan-remove").check();
-  await expect(orphan.locator('[data-testid="removal-descendant"]')).toHaveCount(2);
   await goTo(page, "list");
-  await expect(page.locator('[data-testid="list-row"][data-node="n_workload"]')).toHaveAttribute("data-diff", "removed");
-  await expect(page.locator('[data-testid="list-row"][data-diff="removed"]')).toHaveCount(3);
-  await saveEdits(page);
-  await apply(page);
-  await goTo(page, "graph");
+  await expect(page.locator('[data-testid="list-row"][data-diff="added"]')).toHaveCount(1);
+}
+
+test("B10, C14: a breakdown is listed on its journey and on Home, read as one added row, then applied", async ({ page }) => {
+  const { journey, reviewed } = await draftBreakdown(page);
+  await proposalIsListed(page, journey, reviewed);
+  await page.setViewportSize({ width: 1440, height: 768 });
   await setDepth(page, "Actions");
-  // Wide enough for every card to be drawn at the fit.
-  await readable(page);
-  await page.keyboard.press("f");
-  await expect(nodeCard(page, "n_signoff")).toBeVisible();
-  await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Access to the environment");
-  await expect(nodeCard(page, "n_workload")).toHaveCount(0);
+  await proposalIsRead(page);
+  await apply(page);
+  await expect(page.getByTestId("layer-band")).toHaveAttribute("data-mode", "applied");
+  await expect(page.locator('[data-testid="list-row"]', { hasText: "Size the workload" })).toBeVisible();
   // Close leaves the layer for the journey itself, the view kept.
   await page.getByTestId("close-layer").click();
   await expect(page.getByTestId("layer-band")).toHaveCount(0);
-  expect(new URL(page.url()).pathname).toBe("/journeys/j_vendor_eval");
-}
-
-test("B7, C14, C16: the scenario journey upgraded to version 2 is listed on its journey and on Home, a change out of the first fit is brought into view, each conflict is resolved, then applied", async ({ page }) => {
-  const reviewed = await draftUpgrade(page);
-  await proposalIsListed(page, reviewed);
-  await page.setViewportSize({ width: 1440, height: 768 });
-  // The layer opens at the page's own depth; the changes the proposal makes inside the stages are reached at Actions.
-  await setDepth(page, "Actions");
-  await conflictHoldsApply(page);
-  await changeBroughtIntoView(page);
-  await conflictsAreRead(page);
-  await resolvedAndApplied(page);
+  expect(new URL(page.url()).pathname).toBe(`/journeys/${journey}`);
 });
 
 test("C14, A11: saving a journey as a route is reviewed over the route's own page, in every view, and applied", async ({ page }) => {
@@ -158,22 +88,21 @@ test("C14, A11: saving a journey as a route is reviewed over the route's own pag
 const LEGIBLE = 0.75;
 
 /** Away and back at `size`, so the canvas opens afresh there: the first change is framed with a margin, legible and drawn to read. */
-async function firstChangeFramed(page: Page, layered: string, size: { width: number; height: number }): Promise<void> {
+async function firstChangeFramed(page: Page, journey: string, layered: string, size: { width: number; height: number }): Promise<void> {
   await page.setViewportSize(size);
-  await open(page, "/journeys/j_vendor_eval");
+  await open(page, `/journeys/${journey}`);
   await open(page, `${layered}?depth=actions`);
   await reviewOpen(page);
-  // The first change in the rail's order is the first conflict waiting on a choice.
-  const first = await whenSettled(page, () => page.getByTestId("to-decide-item").first().evaluate((row) => row.querySelector("button")?.textContent ?? ""));
-  const card = page.locator('[data-testid="node-card"][data-diff]').filter({ has: page.getByTestId("title").filter({ hasText: first }) });
+  // The first change in the rail's order is the first node the proposal marks.
+  const card = page.locator('[data-testid="node-card"][data-diff]');
   await expect(card.first()).toBeVisible();
   const node = (await whenSettled(page, () => card.first().getAttribute("data-node"))) ?? "";
   await expect.poll(async () => (await marginIn(page, node, await graphRoom(page))) >= 8).toBe(true);
   expect((await graphRoom(page)).zoom).toBeGreaterThanOrEqual(LEGIBLE - 0.001);
   await changeReads(page, node);
   if (size.width < DESKTOP_MIN) {
-    // At the sheet's peek the rail already says what holds Apply.
-    const [holds, sheet] = await whenSettled(page, () => Promise.all([page.getByTestId("apply-waits").boundingBox(), page.locator(".inspector").locator("xpath=..").boundingBox()]));
+    // At the sheet's peek Apply is already in view.
+    const [holds, sheet] = await whenSettled(page, () => Promise.all([page.getByTestId("apply-proposal").boundingBox(), page.locator(".inspector").locator("xpath=..").boundingBox()]));
     expect((holds?.y ?? 0) + (holds?.height ?? 0)).toBeLessThanOrEqual((sheet?.y ?? 0) + (sheet?.height ?? 0));
   } else {
     // The sync dot stays at the right edge of the brand row.
@@ -201,19 +130,13 @@ async function changeReads(page: Page, node: string): Promise<void> {
 }
 
 test("C14: on a desktop and then a phone the layer opens the graph on its first change, framed with a margin and legible", async ({ page }) => {
-  await editWhereVersionTwoChanges(page);
-  await publishVersionTwo(page);
-  await openJourneyCard(page, "j_vendor_eval");
-  await page.getByTestId("journey-upgrade").click();
-  await page.getByTestId("upgrade-flow").getByRole("button", { name: "Propose the upgrade" }).click();
-  await reviewOpen(page);
-  const layered = new URL(page.url()).pathname;
-  await firstChangeFramed(page, layered, { width: 1440, height: 768 });
-  await firstChangeFramed(page, layered, { width: 390, height: 844 });
+  const { journey, reviewed: layered } = await draftBreakdown(page);
+  await firstChangeFramed(page, journey, layered, { width: 1440, height: 768 });
+  await firstChangeFramed(page, journey, layered, { width: 390, height: 844 });
 });
 
 test("C14, A1a: a node a reviewer adds to a proposal is checked as it is typed, and its editor keeps an edit until the engine has passed it", async ({ page }) => {
-  await draftUpgrade(page);
+  await draftBreakdown(page);
   const changes = page.getByTestId("all-changes");
   if ((await whenSettled(page, () => changes.getAttribute("open"))) === null) {
     await changes.locator("summary").first().click();
@@ -233,8 +156,8 @@ test("C14, A1a: a node a reviewer adds to a proposal is checked as it is typed, 
   await expect(adder.getByTestId("problem")).toHaveCount(0);
   await add.click();
   // Its editor: Done waits while the title is refused, and keeps the title once it is fine.
-  const added = page.locator('[data-testid="change"][data-op="add_node"]').first();
-  await expect(added).toContainText("Extra step");
+  const added = page.locator('[data-testid="change"][data-op="add_node"]', { hasText: "Extra step" });
+  await expect(added).toBeVisible();
   await added.getByRole("button", { name: "Edit" }).click();
   const title = added.getByTestId("added-node-form").getByLabel("Title", { exact: true });
   await title.fill("x".repeat(300));
@@ -245,7 +168,7 @@ test("C14, A1a: a node a reviewer adds to a proposal is checked as it is typed, 
 });
 
 test("C14: a node typed in a proposal's additions survives switching to another node's editor, and the hold says what it is", async ({ page }) => {
-  await draftUpgrade(page);
+  await draftBreakdown(page);
   const changes = page.getByTestId("all-changes");
   if ((await whenSettled(page, () => changes.getAttribute("open"))) === null) {
     await changes.locator("summary").first().click();
@@ -257,7 +180,7 @@ test("C14: a node typed in a proposal's additions survives switching to another 
   await expect(page.getByTestId("apply-waits")).toContainText("the node you are adding to be added or cleared");
   await expect(page.getByTestId("apply-waits")).not.toContainText("fixed or dropped");
   // Another node's editor takes the rail; coming back finds the title and the additions open on it.
-  await pickNode(page, "n_access");
+  await pickNode(page, "n_workload");
   // The typed node still holds Apply while another editor is shown.
   expect(await blockers(page)).toContain("editing");
   await page.getByRole("link", { name: /The proposal/ }).click();

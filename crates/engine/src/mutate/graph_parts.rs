@@ -1,12 +1,12 @@
 //! Roles, participation kinds, the default owner, and resources (A6, A7, A10, A18, B4).
 
 use cairn_schema::{
-    AttachmentKey, GraphKey, GraphRecord, KeyRefs, KindKey, Limit, LocalEdit, Mutation, NodeKey,
+    AttachmentKey, GraphKey, GraphRecord, KeyRefs, KindKey, Limit, Mutation, NodeKey,
     ParticipationKind, Resource, RetiredKey, Role, RoleKey, Subject, ViolationCode, Write,
 };
 
 use super::Session;
-use super::structure::{marked, retire};
+use super::structure::retire;
 
 /// Applies a role, kind, default owner, or resource mutation.
 pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write> {
@@ -237,12 +237,7 @@ fn put_resource(
         node: node.clone(),
         resource: resource.clone(),
     };
-    marked(
-        session,
-        node,
-        LocalEdit::Resource(resource.key.clone()),
-        session.put(record),
-    )
+    vec![session.put(record)]
 }
 
 fn remove_resource(
@@ -271,10 +266,5 @@ fn remove_resource(
         node: node.clone(),
         resource: resource.clone(),
     };
-    marked(
-        session,
-        node,
-        LocalEdit::Resource(resource.clone()),
-        session.remove(key),
-    )
+    vec![session.remove(key)]
 }

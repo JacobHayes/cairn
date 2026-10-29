@@ -32,12 +32,6 @@ pub struct JourneySummary {
     pub revision: Revision,
     /// When it was created.
     pub created_at: Timestamp,
-    /// The latest version its route has published.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub latest_version: Option<VersionNumber>,
-    // PRD: C16.
-    /// Whether its route has published a version newer than its own.
-    pub upgrade_available: bool,
 }
 
 impl From<cairn_store::Page<cairn_store::JourneySummary, JourneyId>> for JourneyPage {
@@ -51,7 +45,6 @@ impl From<cairn_store::Page<cairn_store::JourneySummary, JourneyId>> for Journey
 
 impl From<cairn_store::JourneySummary> for JourneySummary {
     fn from(summary: cairn_store::JourneySummary) -> Self {
-        let upgrade_available = summary.upgrade_available();
         let cairn_store::JourneySummary {
             id,
             name,
@@ -60,7 +53,6 @@ impl From<cairn_store::JourneySummary> for JourneySummary {
             lineage,
             revision,
             created_at,
-            latest_version,
         } = summary;
         Self {
             id,
@@ -70,8 +62,6 @@ impl From<cairn_store::JourneySummary> for JourneySummary {
             lineage,
             revision,
             created_at,
-            latest_version,
-            upgrade_available,
         }
     }
 }
@@ -186,8 +176,6 @@ pub struct InsertionUse {
     pub insertion: InsertionKey,
     /// The root member's current title.
     pub title: Title,
-    /// Whether the segment has a later published version.
-    pub upgrade_available: bool,
 }
 
 impl From<cairn_store::RouteDetail> for RouteDetail {
@@ -217,14 +205,12 @@ impl From<cairn_store::RouteDetail> for RouteDetail {
                             graph,
                             insertion,
                             title,
-                            upgrade_available,
                         } = held;
                         InsertionUse {
                             host,
                             graph,
                             insertion,
                             title,
-                            upgrade_available,
                         }
                     })
                     .collect(),

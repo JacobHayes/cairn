@@ -12,7 +12,7 @@ moves (someone else wrote to it), applying is refused as `stale`, and `get_propo
    writes touched. `get_history` on the journey shows who changed what.
 2. **Refresh it.** `edit_proposal` with `change` `"refresh"` and the proposal's editing
    revision drafts it again against the destination as it stands, keeping the reviewer's
-   choices. An upgrade, save, or re-link is drafted again by Cairn; any other proposal is
+   choices. A save as route is drafted again by Cairn; any other proposal is
    re-based as it stands.
 3. **Check it again.** `get_proposal` with `review`: the refreshed proposal may now have
    violations, or items to choose again. Fix them with `edit_proposal` and `replace`.

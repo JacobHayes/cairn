@@ -1,8 +1,6 @@
 // What route detail shows (C17), worked out from what the host answers: each published
-// version, newest first, with the journeys on it, each marked when an upgrade is available.
-// That mark is each journey's own field from the host's index (the PRD glossary's "upgrade
-// available": a fact about versions, which retiring a route does not change); nothing here
-// compares versions. Route files leave and arrive as text (A13: YAML on disk).
+// version, newest first, with the journeys made from it. Route files leave and arrive as
+// text (A13: YAML on disk).
 import type { Schema } from "@cairn/client";
 
 import type { JourneySummary, RouteRead } from "../data/reads.ts";
@@ -14,7 +12,6 @@ export interface VersionJourney {
   id: string;
   name: string;
   status: Schema<"JourneyStatus">;
-  upgrade: boolean;
 }
 
 export interface VersionRow {
@@ -32,16 +29,11 @@ export function versionRows(read: RouteRead): VersionRow[] {
     journeys: version.journeys
       .map((id): VersionJourney => {
         const summary = byId.get(id);
-        return { id, name: summary?.name ?? id, status: summary?.status ?? "active", upgrade: summary?.upgrade_available ?? false };
+        return { id, name: summary?.name ?? id, status: summary?.status ?? "active" };
       })
       .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id)),
   }));
   return rows.reverse();
-}
-
-/** The journeys on any version with an upgrade available: the ones an author would upgrade, one at a time. */
-export function upgradable(rows: readonly VersionRow[]): VersionJourney[] {
-  return rows.flatMap((row) => row.journeys.filter((journey) => journey.upgrade));
 }
 
 /** A11: what an author can do to the route as it is: each one route patch. */
@@ -109,9 +101,9 @@ export function activeJourneyCounts(journeys: readonly JourneySummary[]): Map<st
 }
 
 /** What a route or segment is used by: a route's active journeys, a segment's insertions (B13). */
-export type InUse = { kind: "journeys"; count: number } | { kind: "places"; places: number; behind: number };
+export type InUse = { kind: "journeys"; count: number } | { kind: "places"; places: number };
 
-/** The use in words: `2 active journeys`, `Used in 6 places`, `2 of 6 behind`, and what none says. */
+/** The use in words: `2 active journeys`, `Used in 6 places`, and what none says. */
 export function inUseWords(use: InUse): string {
   if (use.kind === "journeys") {
     return use.count === 0 ? "No active journeys" : plural(use.count, "active journey");
@@ -119,7 +111,7 @@ export function inUseWords(use: InUse): string {
   if (use.places === 0) {
     return "Not used yet";
   }
-  return use.behind > 0 ? `${String(use.behind)} of ${String(use.places)} behind` : `Used in ${plural(use.places, "place")}`;
+  return `Used in ${plural(use.places, "place")}`;
 }
 
 /** A19, A21: whether journeys start from the route's published versions: not from a segment, and not once the route is retired. */

@@ -5,13 +5,12 @@ use proptest::prelude::*;
 use super::model::bounded_vec;
 use super::{
     arb_agent_id, arb_annotation, arb_annotation_body, arb_answer_value, arb_attachment_key,
-    arb_choices, arb_date, arb_identity, arb_identity_key, arb_identity_set, arb_insertion,
-    arb_insertion_key, arb_journey_header, arb_journey_id, arb_journey_status, arb_kind_key,
-    arb_lineage, arb_local_edit, arb_markdown, arb_node, arb_node_field_value, arb_node_key,
-    arb_node_state, arb_overrides, arb_participation_kind, arb_patch_id, arb_proposal_id,
-    arb_reason, arb_resource, arb_revision, arb_role, arb_role_key, arb_route_header, arb_route_id,
-    arb_route_kind, arb_slug, arb_snooze_target, arb_timestamp, arb_title, arb_user_id,
-    arb_version_number,
+    arb_date, arb_identity, arb_identity_key, arb_identity_set, arb_insertion, arb_insertion_key,
+    arb_journey_header, arb_journey_id, arb_journey_status, arb_kind_key, arb_lineage,
+    arb_markdown, arb_node, arb_node_field_value, arb_node_key, arb_node_state, arb_overrides,
+    arb_participation_kind, arb_patch_id, arb_proposal_id, arb_reason, arb_resource, arb_revision,
+    arb_role, arb_role_key, arb_route_header, arb_route_id, arb_route_kind, arb_slug,
+    arb_snooze_target, arb_timestamp, arb_title, arb_user_id, arb_version_number,
 };
 use crate::domain::{DeletedId, Domain, GraphId};
 use crate::event::{Actor, ChangeSet, Event, PatchReceipt, Subject};
@@ -22,13 +21,10 @@ use crate::patch::{
     DraftSource, EdgeEnd, InsertedEdge, KindChoice, Mutation, Mutations, Override,
     ParticipationRef, Patch, PatchTarget, RecordedEnd, Removal, RoleChoice, Transition,
 };
-use crate::proposal::{
-    Conflict, ConflictResolution, Kept, ParticipationMapping, Proposal, ProposalDraft,
-    ProposalStatus, ReviewItem, RoleReference,
-};
+use crate::proposal::{ParticipationMapping, Proposal, ProposalDraft, ProposalStatus, ReviewItem};
 use crate::record::{GraphRecord, Record, RecordKey, RetiredKey, Write};
 use crate::refs::KeyRefs;
-use crate::state::{OverrideKind, Provenance};
+use crate::state::OverrideKind;
 
 /// A domain.
 pub fn arb_domain() -> BoxedStrategy<Domain> {
@@ -291,20 +287,8 @@ fn arb_state_mutation() -> BoxedStrategy<Mutation> {
     .boxed()
 }
 
-fn arb_lineage_and_identity_mutation() -> BoxedStrategy<Mutation> {
-    let provenance = prop::sample::select(vec![
-        Provenance::FromRoute,
-        Provenance::Local,
-        Provenance::Orphaned,
-        Provenance::FromSegment,
-    ]);
+fn arb_identity_mutation() -> BoxedStrategy<Mutation> {
     prop_oneof![
-        arb_version_number().prop_map(|to| Mutation::Upgrade { to }),
-        arb_lineage().prop_map(|lineage| Mutation::Relink { lineage }),
-        (arb_node_key(), provenance)
-            .prop_map(|(node, provenance)| Mutation::SetProvenance { node, provenance }),
-        (arb_node_key(), arb_local_edit(), any::<bool>())
-            .prop_map(|(node, edit, marked)| Mutation::MarkLocalEdit { node, edit, marked }),
         arb_identity().prop_map(|identity| Mutation::CreateIdentity { identity }),
         arb_identity().prop_map(|identity| Mutation::EditIdentity { identity }),
         (
@@ -328,159 +312,7 @@ pub fn arb_domain_mutation() -> BoxedStrategy<Mutation> {
         arb_lifecycle_mutation(),
         arb_structure_mutation(),
         arb_state_mutation(),
-        arb_lineage_and_identity_mutation()
-    ]
-    .boxed()
-}
-
-/// A conflict resolution.
-pub fn arb_conflict_resolution() -> BoxedStrategy<ConflictResolution> {
-    prop_oneof![
-        Just(ConflictResolution::KeepJourney),
-        Just(ConflictResolution::TakeRoute),
-        prop::collection::btree_map(arb_slug(), arb_slug(), 0..2)
-            .prop_map(|map| ConflictResolution::MapChoices { map }),
-        Just(ConflictResolution::ClearState),
-        Just(ConflictResolution::Reopen),
-        arb_role_key().prop_map(|role| ConflictResolution::RemapRole { role }),
-        arb_kind_key().prop_map(|kind| ConflictResolution::RemapKind { kind }),
-        Just(ConflictResolution::Remove),
-    ]
-    .boxed()
-}
-
-fn arb_source() -> BoxedStrategy<ParticipationSource<KeyRefs>> {
-    prop_oneof![
-        arb_role_key().prop_map(ParticipationSource::Role),
-        arb_identity_set().prop_map(ParticipationSource::Identities),
-    ]
-    .boxed()
-}
-
-fn arb_role_reference() -> BoxedStrategy<RoleReference> {
-    prop_oneof![
-        (arb_node_key(), arb_kind_key())
-            .prop_map(|(node, kind)| RoleReference::Participation { node, kind }),
-        (arb_node_key(), arb_kind_key())
-            .prop_map(|(node, kind)| RoleReference::SegmentParticipation { node, kind }),
-        arb_node_key().prop_map(|node| RoleReference::FillsRole { node }),
-        arb_identity_set().prop_map(|identities| RoleReference::Fill { identities }),
-        Just(RoleReference::DefaultOwner),
-        (arb_node_key(), arb_resource::<KeyRefs>())
-            .prop_map(|(node, resource)| RoleReference::Draft { node, resource }),
-    ]
-    .boxed()
-}
-
-/// A conflict, of every kind.
-pub fn arb_conflict() -> BoxedStrategy<Conflict> {
-    let value = || arb_node_field_value::<KeyRefs>();
-    prop_oneof![
-        (arb_node_key(), value(), value(), any::<bool>()).prop_map(
-            |(node, journey, route, dangling)| Conflict::Field {
-                dangling,
-                node,
-                journey,
-                route
-            }
-        ),
-        (arb_edge(), any::<bool>()).prop_map(|(edge, journey)| Conflict::Edge {
-            edge,
-            journey,
-            route: !journey
-        }),
-        (
-            arb_node_key(),
-            arb_kind_key(),
-            prop::option::of(arb_source()),
-            prop::option::of(arb_source())
-        )
-            .prop_map(|(node, kind, journey, route)| Conflict::Participation {
-                node,
-                kind,
-                journey,
-                route
-            }),
-        (
-            arb_node_key(),
-            arb_attachment_key(),
-            prop::option::of(arb_resource::<KeyRefs>()),
-            prop::option::of(arb_resource::<KeyRefs>())
-        )
-            .prop_map(|(node, resource, journey, route)| Conflict::Resource {
-                dangling: false,
-                node,
-                resource,
-                journey,
-                route
-            }),
-        (arb_node::<KeyRefs>(), arb_node::<KeyRefs>(), any::<bool>()).prop_map(
-            |(journey, route, answered)| Conflict::Shape {
-                dangling: false,
-                journey: Box::new(journey),
-                route: Box::new(route),
-                answered
-            }
-        ),
-        (
-            arb_node_key(),
-            arb_answer_value(),
-            prop::option::of(arb_markdown()),
-            arb_choices()
-        )
-            .prop_map(|(decision, answer, rationale, choices)| Conflict::Answer {
-                decision,
-                answer,
-                rationale,
-                choices
-            }),
-        arb_graph_conflict(),
-    ]
-    .boxed()
-}
-
-/// A conflict over a role, a kind, or the default owner.
-fn arb_graph_conflict() -> BoxedStrategy<Conflict> {
-    prop_oneof![
-        (
-            arb_role_key(),
-            prop::option::of(arb_role::<KeyRefs>()),
-            prop::option::of(arb_role::<KeyRefs>()),
-            prop::collection::btree_set(arb_role_reference(), 0..3),
-            prop::collection::btree_set(arb_insertion_key(), 0..2),
-            arb_identity_set()
-        )
-            .prop_map(|(role, journey, route, references, insertions, members)| {
-                Conflict::Role {
-                    role,
-                    journey,
-                    route,
-                    references,
-                    insertions,
-                    members,
-                }
-            }),
-        (
-            arb_kind_key(),
-            prop::option::of(arb_participation_kind::<KeyRefs>()),
-            prop::option::of(arb_participation_kind::<KeyRefs>()),
-            prop::collection::btree_map(arb_node_key(), arb_source(), 0..2),
-            prop::collection::btree_set(arb_insertion_key(), 0..2)
-        )
-            .prop_map(
-                |(kind, journey, route, references, insertions)| Conflict::Kind {
-                    kind,
-                    journey,
-                    route,
-                    references,
-                    insertions
-                }
-            ),
-        (
-            prop::option::of(arb_role_key()),
-            prop::option::of(arb_role_key())
-        )
-            .prop_map(|(journey, route)| Conflict::DefaultOwner { journey, route }),
+        arb_identity_mutation()
     ]
     .boxed()
 }
@@ -493,31 +325,11 @@ pub fn arb_review_item() -> BoxedStrategy<ReviewItem> {
         arb_role::<KeyRefs>().prop_map(ParticipationMapping::NewRole),
         Just(ParticipationMapping::DefaultOwner),
     ];
-    let kept = prop_oneof![
-        (arb_node_key(), arb_local_edit()).prop_map(|(node, edit)| Kept::Node { node, edit }),
-        arb_role_key().prop_map(Kept::Role),
-        arb_kind_key().prop_map(Kept::Kind),
-        Just(Kept::DefaultOwner),
-    ];
     let uses = prop::collection::btree_set(
         (arb_node_key(), arb_kind_key()).prop_map(|(node, kind)| ParticipationRef { node, kind }),
         1..3,
     );
     prop_oneof![
-        (arb_conflict(), prop::option::of(arb_conflict_resolution())).prop_map(
-            |(conflict, resolution)| ReviewItem::Conflict {
-                conflict,
-                resolution
-            }
-        ),
-        kept.prop_map(|kept| ReviewItem::KeptLocalEdit { kept }),
-        (arb_node_key(), any::<bool>(), arb_removal()).prop_map(|(node, keep, removal)| {
-            ReviewItem::Orphan {
-                node,
-                keep,
-                removal,
-            }
-        }),
         (arb_identity_key(), uses, prop::option::of(mapping)).prop_map(
             |(identity, uses, mapping)| {
                 ReviewItem::Participation {
@@ -699,8 +511,6 @@ fn arb_state_record() -> BoxedStrategy<GraphRecord> {
     prop_oneof![
         (arb_node_key(), arb_node_state())
             .prop_map(|(node, state)| GraphRecord::NodeState { node, state }),
-        (arb_node_key(), arb_local_edit())
-            .prop_map(|(node, edit)| GraphRecord::LocalEdit { node, edit }),
         (arb_node_key(), arb_slug()).prop_map(|(node, item)| GraphRecord::Tick { node, item }),
         (
             arb_node_key(),
@@ -719,7 +529,6 @@ fn arb_state_record() -> BoxedStrategy<GraphRecord> {
             .prop_map(|(node, until)| GraphRecord::Snooze { node, until }),
         (arb_node_key(), arb_overrides())
             .prop_map(|(node, overrides)| GraphRecord::Overrides { node, overrides }),
-        arb_node_key().prop_map(GraphRecord::Tombstone),
         arb_annotation().prop_map(GraphRecord::Annotation),
     ]
     .boxed()

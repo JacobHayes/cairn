@@ -59,8 +59,8 @@ const paths: Path[] = [
   },
   {
     name: "drafting a proposal and opening it",
-    edit: "upgrade:j_one",
-    command: (id) => proposalCommand({ op: "upgrade", journey: "j_one", request: { proposal: "pr_new", to: 2 } }, id),
+    edit: "save-as-route:j_one",
+    command: (id) => proposalCommand({ op: "save_as_route", journey: "j_one", request: { proposal: "pr_new", route: "r", name: "R" } }, id),
     refuse: (host) => {
       host.proposed = [rejected, rejected, rejected];
     },

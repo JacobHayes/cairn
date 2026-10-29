@@ -22,7 +22,7 @@ use crate::sql::{
 };
 
 /// The tables holding one graph's records, children before parents.
-pub(crate) const GRAPH_TABLES: [&str; 22] = [
+pub(crate) const GRAPH_TABLES: [&str; 20] = [
     "participation_identities",
     "condition_identities",
     "answer_identities",
@@ -36,14 +36,12 @@ pub(crate) const GRAPH_TABLES: [&str; 22] = [
     "retired_keys",
     "insertions",
     "node_states",
-    "local_edits",
     "ticks",
     "answers",
     "role_fills",
     "pins",
     "snoozes",
     "overrides",
-    "tombstones",
     "annotations",
 ];
 
@@ -365,14 +363,12 @@ impl<'connection> Writer<'connection> {
             GraphRecord::Insertion(insertion) => self.put_insertion(id, insertion),
             GraphRecord::RetiredKey(_)
             | GraphRecord::NodeState { .. }
-            | GraphRecord::LocalEdit { .. }
             | GraphRecord::Tick { .. }
             | GraphRecord::Answer { .. }
             | GraphRecord::RoleFill { .. }
             | GraphRecord::Pin { .. }
             | GraphRecord::Snooze { .. }
             | GraphRecord::Overrides { .. }
-            | GraphRecord::Tombstone(_)
             | GraphRecord::Annotation(_) => crate::write_state::put(self, id, record),
         }
     }

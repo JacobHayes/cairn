@@ -10,8 +10,8 @@ mod finish_revisions {
     use std::path::{Path, PathBuf};
 
     use cairn_schema::{
-        EventType, GraphRecord, JourneyState, NodeState, Provenance, Record, Reopened, Revision,
-        State, Subject, Write,
+        EventType, GraphRecord, JourneyState, NodeState, Record, Reopened, Revision, State,
+        Subject, Write,
     };
     use cairn_store::build::{action, create_journey, id, journey_graph, journey_patch, put_in};
     use cairn_store::{Document, EventQuery, LoadTarget, Store};
@@ -56,7 +56,7 @@ mod finish_revisions {
             state: State::Done,
             finished_on: Some(date(on)),
             finished_revision: Some(revision(at)),
-            ..NodeState::initial(cairn_schema::NodeKind::Action, Provenance::Local)
+            ..NodeState::initial(cairn_schema::NodeKind::Action)
         }
     }
 
@@ -143,7 +143,7 @@ mod finish_revisions {
                     revision: revision(4),
                     finished_revision: revision(2),
                 }),
-                ..NodeState::initial(cairn_schema::NodeKind::Action, Provenance::Local)
+                ..NodeState::initial(cairn_schema::NodeKind::Action)
             };
             for commit in [
                 state("p_a", 1, "n_a", done("2026-10-07", 2)),

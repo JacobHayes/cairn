@@ -1,27 +1,20 @@
 //! Route files and the drafting flows over HTTP, in process against the memory store
 //! (PRACTICES, Shell: API tests): a version exported and imported back as a new draft (A13);
-//! an upgrade drafted as a proposal whose conflict blocks its apply until resolved (B7, C14,
-//! I6); save as route and re-link drafted as proposals (B8, B9); and each request that cannot
-//! be drafted answers its problem.
+//! save as route drafted as a proposal (B8); and each request that cannot be drafted answers
+//! its problem.
 #![cfg(test)]
 
 mod in_process {
-    use std::collections::BTreeSet;
-
     use axum::http::{Method, StatusCode};
-    use cairn_api::client::{Reply, Transport};
-    use cairn_schema::{
-        Conflict, ConflictResolution, Domain, Journey, Kept, Proposal, ProposalDraft, Rejection,
-        ReviewItem, Route, RouteFile, Subject, ViolationCode, from_yaml,
-    };
-    use cairn_service::wire::{PatchAnswer, Problem, ProblemCode, ProposalAnswer, ProposalReview};
+    use cairn_api::client::Reply;
+    use cairn_schema::{Domain, Proposal, ReviewItem, RouteFile, from_yaml};
+    use cairn_service::wire::{PatchAnswer, Problem, ProblemCode, ProposalAnswer};
     use serde_json::json;
 
     use crate::api::support::{self, World, get, ok, post};
 
     const ROUTE: &str = "/api/routes/vendor-evaluation";
     const JOURNEY: &str = "/api/journeys/j_vendor_eval";
-    const UPGRADE_APPLY: &str = "/api/journeys/j_vendor_eval/proposals/pr_upgrade/apply";
 
     fn route_v2() -> RouteFile {
         let path = support::fixtures_root().join("vendor-evaluation/route-v2.yaml");
@@ -38,32 +31,6 @@ mod in_process {
     fn problem(reply: &Reply) -> (StatusCode, ProblemCode) {
         let problem: Problem = reply.json().unwrap();
         (reply.status, problem.error)
-    }
-
-    /// The journey after its first three steps with two local edits (B4), and version 2
-    /// imported and published; answers ann's transport.
-    async fn version_two_published(world: &World) -> Transport {
-        let ann = world.vendor_after(3).await;
-        let edits = support::patch(
-            "p_local_edits",
-            "{journey: j_vendor_eval}",
-            3,
-            "- op: set_node_field\n  node: n_access\n  value: {title: Access to the test environment}\n- op: set_node_field\n  node: n_findings\n  value: {estimate: 4}\n",
-        );
-        let target = format!("{JOURNEY}/patches");
-        ok::<PatchAnswer>(&post(&ann, &target, &support::request(&edits)).await);
-        let import = json!({"patch_id": "p_import_v2", "file": route_v2()});
-        ok::<PatchAnswer>(&post(&ann, &format!("{ROUTE}/import"), &import).await);
-        let route: Route = get(&ann, ROUTE).await;
-        let publish = support::patch(
-            "p_publish_v2",
-            "{route: vendor-evaluation}",
-            route.revision.get(),
-            "- op: publish_draft\n",
-        );
-        let target = format!("{ROUTE}/patches");
-        ok::<PatchAnswer>(&post(&ann, &target, &support::request(&publish)).await);
-        ann
     }
 
     /// A13: version 1 exported names the version it extends; imported back under the same
@@ -104,105 +71,10 @@ mod in_process {
         assert_eq!(draft, exported, "the draft is version 1, every key kept");
     }
 
-    /// What each review item of `draft` is about: its kind and node.
-    fn items_about(draft: &ProposalDraft) -> BTreeSet<(&str, &str)> {
-        draft
-            .items
-            .as_slice()
-            .iter()
-            .map(|item| match item {
-                ReviewItem::Conflict {
-                    conflict: Conflict::Field { node, .. },
-                    ..
-                } => ("conflict", node.as_str()),
-                ReviewItem::KeptLocalEdit {
-                    kept: Kept::Node { node, .. },
-                } => ("kept", node.as_str()),
-                ReviewItem::Orphan { node, .. } => ("orphan", node.as_str()),
-                other => panic!("{other:?}"),
-            })
-            .collect()
-    }
-
-    /// B7, C14, I6: an upgrade is drafted as a proposal of review items, the journey keeps its
-    /// version until it is applied, and its conflict blocks the apply until resolved.
+    /// B8, I6: save as route is drafted as a proposal for the route, with a review item per
+    /// node to exclude.
     #[tokio::test]
-    async fn an_upgrade_is_a_proposal_whose_conflict_blocks_until_resolved() {
-        let world = World::start().await;
-        let ann = version_two_published(&world).await;
-        let upgrade = json!({"patch_id": "p_upgrade", "proposal": "pr_upgrade", "to": 2});
-        let drafted = saved(ok(
-            &post(&ann, &format!("{JOURNEY}/upgrade"), &upgrade).await
-        ));
-        // The title both sides changed conflicts, the estimate only the journey changed is
-        // kept, and the workload version 2 removes is an orphan.
-        let about = items_about(&drafted.draft);
-        let expected = [
-            ("conflict", "n_access"),
-            ("kept", "n_findings"),
-            ("orphan", "n_workload"),
-        ];
-        assert_eq!(about, expected.into());
-        let journey: Journey = get(&ann, JOURNEY).await;
-        assert_eq!(journey.header.lineage.unwrap().version.get(), 1, "not yet");
-
-        let review: ProposalReview = ok(&post(
-            &ann,
-            "/api/journeys/j_vendor_eval/proposals/pr_upgrade/preview",
-            &json!({}),
-        )
-        .await);
-        assert_ne!(review.preview.unresolved.len(), 0);
-        let apply = |patch_id: &str, reviewed: u32| json!({"patch_id": patch_id, "reviewed_revision": reviewed});
-        let blocked = post(&ann, UPGRADE_APPLY, &apply("p_blocked", 1)).await;
-        assert_eq!(blocked.status, StatusCode::UNPROCESSABLE_ENTITY);
-        let Rejection::Invalid { violations } = blocked.json().unwrap() else {
-            panic!("an unresolved conflict blocks the apply")
-        };
-        let unresolved: Vec<&Option<Subject>> = violations
-            .as_slice()
-            .iter()
-            .filter(|violation| violation.code == ViolationCode::UnresolvedReviewItem)
-            .map(|violation| &violation.at.subject)
-            .collect();
-        let access = Subject::Node("n_access".parse().unwrap());
-        assert_eq!(unresolved, [&Some(access)], "{violations:#?}");
-
-        let mut resolved = drafted.draft.clone();
-        for item in resolved.items.as_mut_slice() {
-            if let ReviewItem::Conflict { resolution, .. } = item {
-                *resolution = Some(ConflictResolution::TakeRoute);
-            }
-        }
-        let edit = json!({"patch_id": "p_resolve", "base_revision": 1, "draft": resolved});
-        let edited = ann
-            .send(
-                Method::PATCH,
-                "/api/journeys/j_vendor_eval/proposals/pr_upgrade",
-                Some(&edit),
-            )
-            .await;
-        ok::<ProposalAnswer>(&edited.unwrap());
-        let review: ProposalReview = ok(&post(
-            &ann,
-            "/api/journeys/j_vendor_eval/proposals/pr_upgrade/preview",
-            &json!({}),
-        )
-        .await);
-        let left = (
-            review.preview.unresolved.len(),
-            review.preview.violations.len(),
-        );
-        assert_eq!(left, (0, 0));
-        ok::<PatchAnswer>(&post(&ann, UPGRADE_APPLY, &apply("p_apply", 2)).await);
-        let journey: Journey = get(&ann, JOURNEY).await;
-        assert_eq!(journey.header.lineage.unwrap().version.get(), 2);
-    }
-
-    /// B8, B9, I6: save as route is drafted as a proposal for the route, with a review item
-    /// per node to exclude; re-link as one for the journey.
-    #[tokio::test]
-    async fn save_as_route_and_relink_are_drafted_as_proposals() {
+    async fn save_as_route_is_drafted_as_a_proposal() {
         let world = World::start().await;
         let ann = world.vendor_after(3).await;
         let save = json!({
@@ -219,15 +91,6 @@ mod in_process {
         let exclusions = drafted.draft.items.as_slice().iter();
         let exclusions = exclusions.filter(|item| matches!(item, ReviewItem::Exclusion { .. }));
         assert_ne!(exclusions.count(), 0);
-
-        let relink = json!({
-            "patch_id": "p_relink",
-            "proposal": "pr_relink",
-            "lineage": {"route": "vendor-evaluation", "version": 1},
-        });
-        let drafted = saved(ok(&post(&ann, &format!("{JOURNEY}/relink"), &relink).await));
-        let journey = Domain::Journey("j_vendor_eval".parse().unwrap());
-        assert_eq!(drafted.destination, journey);
     }
 
     /// `/routes/new` is the app's new-route form, so no route can be called `new`: a route
@@ -256,48 +119,19 @@ mod in_process {
         }
     }
 
-    /// A journey or version that does not exist is not found; an upgrade of a journey that
-    /// follows no route, or a file of another route, is refused.
+    /// A version that does not exist is not found; a file of another route is refused.
     #[tokio::test]
     async fn each_request_that_cannot_be_drafted_answers_its_problem() {
         let world = World::start().await;
         let ann = world.vendor_after(1).await;
-        let free = support::patch(
-            "p_free",
-            "{journey: j_free}",
-            0,
-            "- op: create_journey\n  name: Free\n",
-        );
-        let target = "/api/journeys/j_free/patches";
-        ok::<PatchAnswer>(&post(&ann, target, &support::request(&free)).await);
-        let upgrade =
-            |to: u32| json!({"patch_id": format!("p_up_{to}"), "proposal": "pr_up", "to": to});
-        let relink = json!({
-            "patch_id": "p_relink",
-            "proposal": "pr_relink",
-            "lineage": {"route": "vendor-evaluation", "version": 9},
-        });
         let mut other = route_v2();
         other.route = "another-route".parse().unwrap();
         let import = json!({"patch_id": "p_import", "file": other});
-        let cases = [
-            (
-                "/api/journeys/j_free/upgrade".to_owned(),
-                upgrade(2),
-                ProblemCode::CannotDraft,
-            ),
-            (
-                "/api/journeys/j_missing/upgrade".to_owned(),
-                upgrade(2),
-                ProblemCode::NotFound,
-            ),
-            (format!("{JOURNEY}/relink"), relink, ProblemCode::NotFound),
-            (
-                format!("{ROUTE}/import"),
-                import,
-                ProblemCode::TargetMismatch,
-            ),
-        ];
+        let cases = [(
+            format!("{ROUTE}/import"),
+            import,
+            ProblemCode::TargetMismatch,
+        )];
         for (target, body, code) in cases {
             let reply = post(&ann, &target, &body).await;
             let expected = (cairn_api::error::status_of(code), code);

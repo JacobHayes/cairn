@@ -1,7 +1,6 @@
-//! A node's individually editable fields (PRD glossary: Touched set, by key and field;
-//! Local edit, a per-field marker). A field edit names one of these, so two edits to
-//! different fields of one node do not overlap, and a journey can mark exactly the fields
-//! it changed. Changing a node's kind or a decision's answer type replaces the whole node.
+//! A node's individually editable fields (PRD glossary: Touched set, by key and field). A
+//! field edit names one of these, so two edits to different fields of one node do not
+//! overlap. Changing a node's kind or a decision's answer type replaces the whole node.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

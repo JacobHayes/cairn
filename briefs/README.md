@@ -4,10 +4,7 @@ A brief is a planned unit of work: what it builds, its acceptance, and a decisio
 
 | Brief | Title |
 |---|---|
-| [7.8](7.8-insertion-upgrade.md) | Insertion upgrade |
-| [7.9](7.9-save-as-segment.md) | Save as segment and link |
-
-The two are independent of each other.
+| [7.9](7.9-save-as-segment.md) | Save as segment |
 
 ## Template
 

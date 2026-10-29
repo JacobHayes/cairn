@@ -230,17 +230,12 @@ pub static DEPLOYMENT_PROPOSALS: ProposalEndpoints =
 /// destination holds: those waiting on the caller, and those that would create a journey or
 /// a route. A collection only; no proposal is addressed here (C14, C16).
 pub static PROPOSALS: Endpoint = endpoint(Method::GET, "/api/proposals", "listProposals");
-/// `POST /api/journeys/{id}/upgrade`: proposes upgrading it to a newer route version (B7).
-pub static UPGRADE: Endpoint =
-    endpoint(Method::POST, "/api/journeys/{id}/upgrade", "proposeUpgrade");
 /// `POST /api/journeys/{id}/save-as-route`: proposes saving its structure as a route draft (B8).
 pub static SAVE_AS_ROUTE: Endpoint = endpoint(
     Method::POST,
     "/api/journeys/{id}/save-as-route",
     "proposeSaveAsRoute",
 );
-/// `POST /api/journeys/{id}/relink`: proposes re-linking it to a published version (B9).
-pub static RELINK: Endpoint = endpoint(Method::POST, "/api/journeys/{id}/relink", "proposeRelink");
 /// `POST /api/routes/{id}/import`: imports a route file as a new route or draft (A13).
 pub static IMPORT_ROUTE: Endpoint =
     endpoint(Method::POST, "/api/routes/{id}/import", "importRoute");
@@ -388,7 +383,7 @@ pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = for_users(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 72] = [
+pub static ALL: [&Endpoint; 70] = [
     &HEALTH,
     &CAPABILITIES,
     &PATCH_JOURNEY,
@@ -419,9 +414,7 @@ pub static ALL: [&Endpoint; 72] = [
     &DEPLOYMENT_PROPOSALS.discard,
     &DEPLOYMENT_PROPOSALS.refresh,
     &PROPOSALS,
-    &UPGRADE,
     &SAVE_AS_ROUTE,
-    &RELINK,
     &IMPORT_ROUTE,
     &EXPORT_ROUTE,
     &JOURNEYS,

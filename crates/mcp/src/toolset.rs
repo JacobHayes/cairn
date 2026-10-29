@@ -156,8 +156,8 @@ const MUTATION: Citation = (
 
 pub(crate) const REVIEW_ITEM: Citation = (
     "ReviewItem",
-    "A review item, as `get_proposal` shows them: Cairn drafts them for an upgrade, a save \
-     as route, or a re-link; a proposal you draft yourself needs none.",
+    "A review item, as `get_proposal` shows them: Cairn drafts them for a save as \
+     route; a proposal you draft yourself needs none.",
 );
 
 /// The schema of `T` with each of `citations` described in a sentence, and what only they

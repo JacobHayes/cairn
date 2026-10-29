@@ -209,8 +209,6 @@ async function answer(request: WorkerRequest): Promise<string> {
       return ready().nodeFormProblemsText(request.values);
     case "value_problems":
       return ready().valueProblemsText(request.checks);
-    case "restore_nodes":
-      return ready().restoreNodesText(request.journey, request.version, request.key, request.seed);
     case "removal_plan":
       return ready().removalPlanText(request.graph, request.target);
     case "draft_written":

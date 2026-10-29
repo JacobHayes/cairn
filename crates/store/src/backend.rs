@@ -642,7 +642,6 @@ pub fn graph_records(graph: &Graph) -> Vec<GraphRecord> {
 fn state_records(state: &JourneyState) -> Vec<GraphRecord> {
     let JourneyState {
         nodes,
-        local_edits,
         ticks,
         answers,
         rationales,
@@ -650,19 +649,12 @@ fn state_records(state: &JourneyState) -> Vec<GraphRecord> {
         pins,
         snoozes,
         overrides,
-        tombstones,
         annotations,
     } = state;
     let mut records = Vec::new();
     for (node, state) in nodes {
         let (node, state) = (node.clone(), state.clone());
         records.push(GraphRecord::NodeState { node, state });
-    }
-    for (node, edits) in local_edits {
-        for edit in edits {
-            let (node, edit) = (node.clone(), edit.clone());
-            records.push(GraphRecord::LocalEdit { node, edit });
-        }
     }
     for (node, items) in ticks {
         for item in items {
@@ -695,7 +687,6 @@ fn state_records(state: &JourneyState) -> Vec<GraphRecord> {
         let (node, overrides) = (node.clone(), overrides.clone());
         records.push(GraphRecord::Overrides { node, overrides });
     }
-    records.extend(tombstones.iter().cloned().map(GraphRecord::Tombstone));
     records.extend(annotations.values().cloned().map(GraphRecord::Annotation));
     records
 }
@@ -740,7 +731,10 @@ mod tests {
                 Subject::Journey(id("j_one")),
                 vec![build::put_in(
                     &build::journey_graph("j_other"),
-                    cairn_schema::GraphRecord::Tombstone(id("n_a")),
+                    cairn_schema::GraphRecord::Tick {
+                        node: id("n_a"),
+                        item: id("item"),
+                    },
                 )],
             )
             .commit();

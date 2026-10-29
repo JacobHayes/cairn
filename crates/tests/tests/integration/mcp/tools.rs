@@ -217,12 +217,6 @@ fn a_mutation_is_an_object_with_an_op_and_named_fields() {
                 assert!(fields.contains_key(field), "{name} names {field}");
             }
         }
-        // A relink or upgrade has a `to`; a state change has none.
-        assert_eq!(
-            fields.contains_key("to"),
-            name != "update_journey_state",
-            "{name}"
-        );
     }
 }
 

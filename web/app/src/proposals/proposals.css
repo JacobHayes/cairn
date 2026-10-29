@@ -49,12 +49,6 @@
   color: var(--color-text);
 }
 
-/* What waits on a choice is said in ink, not in the accent: the accent on a change's fill is under the contrast floor. */
-.layer-choice {
-  color: var(--color-text);
-  font-weight: 600;
-}
-
 /* The key beside a fold's head wraps inside the room left of the chevron, so the head never breaks and the chevron stays on the head's line. */
 .detail-section > summary:has(.layer-key) {
   padding-block: var(--space-2);

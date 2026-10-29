@@ -5,9 +5,7 @@
 use crate::engine::support;
 
 use cairn_engine::{candidate, destination_after};
-use cairn_schema::{
-    DestinationAfter, Domain, OutlineFact, ProposalDraft, ProposalOutline, VersionNumber,
-};
+use cairn_schema::{DestinationAfter, Domain, ProposalDraft, ProposalOutline};
 
 fn outline(mutations: &str) -> ProposalOutline {
     let draft: ProposalDraft = support::draft(&format!(
@@ -52,9 +50,9 @@ fn each_node_is_counted_once_by_what_first_happened_to_it() {
 }
 
 /// A removal counts the nodes it names with their descendants; identity creates and merges count
-/// as identities, never as nodes; an upgrade is a fact of its own.
+/// as identities, never as nodes.
 #[test]
-fn removals_identities_and_upgrades_are_counted_apart() {
+fn removals_and_identities_are_counted_apart() {
     let removed =
         outline("- op: remove_node\n  removal: {node: n_access, descendants: [n_signoff]}\n");
     assert_eq!(removed.nodes_removed, 2);
@@ -70,15 +68,6 @@ fn removals_identities_and_upgrades_are_counted_apart() {
         ),
         (1, 1, 0)
     );
-
-    let upgrade = outline(&format!("- op: upgrade\n  to: 2\n{ADD}"));
-    assert_eq!(
-        upgrade.facts,
-        [OutlineFact::Upgrades {
-            to: VersionNumber::FIRST.next()
-        }]
-    );
-    assert_eq!(upgrade.nodes_added, 1);
 }
 
 /// A route proposal's after is the engine's, whatever the route holds: a retirement of a route

@@ -1,6 +1,7 @@
 //! Previewing a proposal (C14, I6; ARCHITECTURE, Write path: proposal previews): what its
 //! resolved mutations would do to its destination now, for the proposal layer over a
-//! journey, a route, the deployment, or a destination the proposal creates at revision 0. Items still unresolved are left out and listed; the candidate goes through the
+//! journey, a route, the deployment, or a destination the proposal creates at revision 0.
+//! Items still unresolved are left out and listed; the candidate goes through the
 //! same apply as the real thing, so every violation strict validation finds is listed; for a
 //! journey, the frontier after and the consequences (D7) come from one derive on each side.
 //!
@@ -11,10 +12,9 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    ConflictReview, Deployment, DeriveInputs, DestinationAfter, Domain, DomainDocument, Lineage,
-    Location, Mutation, Mutations, Patch, PatchTarget, ProposalDraft, ProposalOutline,
-    ProposalPreview, Rejection, ReviewItem, RevisionOf, Subject, UnresolvedItem, Violation,
-    ViolationCode,
+    Deployment, DeriveInputs, DestinationAfter, Domain, DomainDocument, Lineage, Location,
+    Mutation, Mutations, Patch, PatchTarget, ProposalDraft, ProposalOutline, ProposalPreview,
+    Rejection, RevisionOf, Subject, UnresolvedItem, Violation, ViolationCode,
 };
 
 use super::resolve_partial;
@@ -30,8 +30,6 @@ pub struct Candidate {
     pub mutations: Vec<Mutation>,
     /// The items still needing a choice, whose effect the candidate leaves out.
     pub unresolved: Vec<UnresolvedItem>,
-    /// What each conflict item offers.
-    pub conflicts: Vec<ConflictReview>,
     /// The records after the same apply as the real thing, or every violation found.
     pub after: Result<Records, Vec<Violation>>,
 }
@@ -97,37 +95,8 @@ pub fn candidate(
     Candidate {
         mutations,
         unresolved: resolved.unresolved,
-        conflicts: conflicts_of(draft),
         after,
     }
-}
-
-/// B7: what each conflict item of `draft` offers, from the one rule (`Conflict::offered`).
-fn conflicts_of(draft: &ProposalDraft) -> Vec<ConflictReview> {
-    draft
-        .items
-        .as_slice()
-        .iter()
-        .enumerate()
-        .filter_map(|(at, item)| {
-            let ReviewItem::Conflict { conflict, .. } = item else {
-                return None;
-            };
-            Some(ConflictReview {
-                item: u32::try_from(at).unwrap_or(u32::MAX),
-                offers: conflict.offered(),
-                removed_choices: match conflict {
-                    cairn_schema::Conflict::Answer {
-                        answer, choices, ..
-                    } => cairn_schema::removed_choices(answer, choices)
-                        .into_iter()
-                        .cloned()
-                        .collect(),
-                    _ => Vec::new(),
-                },
-            })
-        })
-        .collect()
 }
 
 /// C14: the destination once the candidate `after` applies: a journey's document with the
@@ -204,7 +173,6 @@ pub fn preview_of(
 ) -> ProposalPreview {
     let mut preview = ProposalPreview {
         unresolved: candidate.unresolved.clone(),
-        conflicts: candidate.conflicts.clone(),
         violations: Vec::new(),
         frontier: Vec::new(),
         consequences: None,

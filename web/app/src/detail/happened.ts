@@ -425,13 +425,6 @@ const SAY: Record<EventType, (c: Context) => Said> = {
   annotation_added: (c) => attachment(c, "added"),
   annotation_edited: (c) => attachment(c, "edited"),
   annotation_removed: (c) => ({ what: `removed a note or link from ${it(c)}` }),
-  journey_upgraded: () => ({ what: "moved the journey to a newer version of its route" }),
-  relinked: () => ({ what: "re-linked the journey to a route version" }),
-  provenance_changed: (c) => {
-    const provenance = stateRecord(c)?.state.provenance;
-    return { what: provenance === "local" ? `made ${it(c)} local to this journey` : provenance === "from_route" ? `returned ${it(c)} to the route's version` : `changed where ${it(c)} came from` };
-  },
-  local_edit_changed: (c) => ({ what: `changed what stays local on ${it(c)}` }),
   identity_created: (c) => ({ what: identityNamed(c) === undefined ? "added an identity" : `added ${quoted(identityNamed(c) ?? "")} to the identities` }),
   identity_edited: (c) => ({ what: identityNamed(c) === undefined ? "edited an identity" : `edited the identity ${quoted(identityNamed(c) ?? "")}` }),
   identities_merged: (c) => ({ what: identityNamed(c) === undefined ? "merged identities" : `merged identities into ${quoted(identityNamed(c) ?? "")}` }),

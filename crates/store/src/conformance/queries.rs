@@ -517,8 +517,8 @@ async fn index_fixture(store: &dyn Store) {
 }
 
 /// C16: the journey index filters by status, route, version, the identities referred to
-/// ("mine", narrowed), and whether an upgrade is available; every filter given must hold.
-pub async fn the_journey_index_filters_by_status_route_version_reference_and_upgrade<B: Backend>(
+/// ("mine", narrowed); every filter given must hold.
+pub async fn the_journey_index_filters_by_status_route_version_and_reference<B: Backend>(
     backend: &B,
 ) {
     let store = open(backend).await;
@@ -561,28 +561,6 @@ pub async fn the_journey_index_filters_by_status_route_version_reference_and_upg
             },
             vec!["j_d"],
         ),
-        (
-            JourneyQuery {
-                upgrade_available: Some(true),
-                ..query()
-            },
-            vec!["j_a"],
-        ),
-        (
-            JourneyQuery {
-                upgrade_available: Some(false),
-                ..query()
-            },
-            vec!["j_b", "j_c", "j_d"],
-        ),
-        (
-            JourneyQuery {
-                route: Some(id("vendor")),
-                upgrade_available: Some(false),
-                ..query()
-            },
-            vec!["j_b"],
-        ),
     ];
     for (query, expected) in cases {
         let page = store.journeys(&query).await.unwrap();
@@ -594,12 +572,6 @@ pub async fn the_journey_index_filters_by_status_route_version_reference_and_upg
         assert_eq!(found, keys(&expected), "{query:?}");
         assert_eq!(page.next, None);
     }
-    let page = store.journeys(&query()).await.unwrap();
-    let a = &page.items[0];
-    assert_eq!(
-        (a.revision, a.latest_version, a.upgrade_available()),
-        (revision(1), Some(version(2)), true)
-    );
 }
 
 /// The journey index, event history, and search page by a cursor: each page holds at most
@@ -696,7 +668,6 @@ pub async fn route_detail_lists_versions_with_their_journeys<B: Backend>(backend
                     graph: journey_graph("j_d"),
                     insertion: id("i_task"),
                     title: build::title("Task"),
-                    upgrade_available: true,
                 }],
             },
             VersionJourneys {

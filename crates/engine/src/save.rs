@@ -1,23 +1,44 @@
 //! Save as route (B8): a journey's structure (nodes, edges, roles, kinds, conditions, rules,
 //! weights, resources; no state, pins, answers, or notes) proposed as a new route's draft or
 //! a new draft of an existing route, keys preserved. The review maps each explicit identity to a
-//! role, drops it, or makes it the default owner, and may exclude nodes with their subtrees;
-//! children a breakdown of a placeholder created start excluded.
+//! role, drops it, or makes it the default owner, and may exclude nodes with their subtrees.
 //!
 //! Cost: one pass over the nodes and their participations, O(n log n), plus the trial apply
 //! that validates the draft once.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 
 use cairn_schema::{
-    Domain, DraftSource, IdentityKey, JourneyId, Mutation, ParticipationRef, ParticipationSource,
-    ProposalDraft, Provenance, ReviewItem, Revision, RouteId, Subject, Title, VersionNumber,
-    Violation, ViolationCode,
+    Domain, DraftSource, IdentityKey, JourneyId, Mutation, Mutations, ParticipationRef,
+    ParticipationSource, Patch, PatchTarget, ProposalDraft, Rejection, ReviewItem, Revision,
+    RouteId, Subject, Title, VersionNumber, Violation, ViolationCode,
 };
 
-use super::{DraftError, draft, trial, with_violations};
-use crate::pipeline::ApplyInputs;
+use crate::pipeline::{ApplyInputs, apply};
 use crate::records::Records;
+
+/// Why the engine cannot draft a proposal from what it was given.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DraftError {
+    /// The records do not hold the journey.
+    JourneyMissing(JourneyId),
+    /// The draft would hold more mutations or items than a proposal may.
+    TooLarge,
+}
+
+impl fmt::Display for DraftError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DraftError::JourneyMissing(id) => write!(formatter, "no journey {id}"),
+            DraftError::TooLarge => {
+                formatter.write_str("the draft passes a proposal's mutation or size limit")
+            }
+        }
+    }
+}
+
+impl std::error::Error for DraftError {}
 
 /// B8: the proposal that saves a journey as a draft of `route`: created with `name` when
 /// the records hold no such route, or a new draft of it (A11: rejected at apply while
@@ -62,9 +83,7 @@ pub fn save_as_route(
     let proposal = draft(&title, revision, mutations, items)?;
     let dropped = everything_dropped(&proposal);
     let remedy = latest_version(records, route).map(|version| {
-        format!(
-            "version {version} of route {route} retired it; upgrade the journey to version {version} first, or save it as a new route"
-        )
+        format!("version {version} of route {route} retired it; save it as a new route")
     });
     let violations = trial(records, &Domain::Route(route.clone()), &dropped, inputs)
         .into_iter()
@@ -124,28 +143,14 @@ fn participation_items(structure: &cairn_schema::Graph) -> Vec<ReviewItem> {
         .collect()
 }
 
-/// B8: one item per node; a journey-local node under a placeholder (a breakdown's child)
-/// starts excluded.
+/// B8: one item per node, all included to start.
 fn exclusion_items(journey: &cairn_schema::Graph) -> Vec<ReviewItem> {
-    let placeholder = |key: &cairn_schema::NodeKey| {
-        journey
-            .nodes
-            .get(key)
-            .is_some_and(|node| node.payload.placeholder())
-    };
     journey
         .nodes
         .values()
-        .map(|node| {
-            let local = journey
-                .state
-                .nodes
-                .get(&node.key)
-                .is_some_and(|state| state.provenance == Provenance::Local);
-            ReviewItem::Exclusion {
-                node: node.key.clone(),
-                excluded: local && node.parent.as_ref().is_some_and(placeholder),
-            }
+        .map(|node| ReviewItem::Exclusion {
+            node: node.key.clone(),
+            excluded: false,
         })
         .collect()
 }
@@ -166,5 +171,77 @@ fn everything_dropped(proposal: &ProposalDraft) -> ProposalDraft {
             ..proposal.clone()
         },
         Err(error) => unreachable!("the same number of items fits: {error}"),
+    }
+}
+
+pub(crate) fn draft(
+    title: &str,
+    destination_revision: cairn_schema::Revision,
+    mutations: Vec<Mutation>,
+    items: Vec<ReviewItem>,
+) -> Result<ProposalDraft, DraftError> {
+    let title = title.parse().map_err(|_| DraftError::TooLarge)?;
+    Ok(ProposalDraft {
+        title,
+        description: None,
+        destination_revision,
+        mutations: cairn_schema::BoundedVec::new(mutations).map_err(|_| DraftError::TooLarge)?,
+        items: cairn_schema::BoundedVec::new(items).map_err(|_| DraftError::TooLarge)?,
+    })
+}
+
+fn with_violations(
+    proposal: ProposalDraft,
+    violations: Vec<cairn_schema::Violation>,
+) -> Result<ProposalDraft, DraftError> {
+    if violations.is_empty() {
+        return Ok(proposal);
+    }
+    let mut items = proposal.items.as_slice().to_vec();
+    items.extend(
+        violations
+            .into_iter()
+            .map(|violation| ReviewItem::Violation { violation }),
+    );
+    Ok(ProposalDraft {
+        items: cairn_schema::BoundedVec::new(items).map_err(|_| DraftError::TooLarge)?,
+        ..proposal
+    })
+}
+
+/// B8: the invariants the proposal breaks with its items as they stand (one still needing a
+/// choice leaves the journey's side), by applying its resolved mutations to the records.
+pub(crate) fn trial(
+    records: &Records,
+    destination: &Domain,
+    proposal: &ProposalDraft,
+    inputs: &ApplyInputs,
+) -> Vec<cairn_schema::Violation> {
+    let resolved = crate::proposal::resolve_partial(proposal);
+    let Ok(mutations) = Mutations::new(resolved.mutations) else {
+        return Vec::new();
+    };
+    let target = match destination {
+        Domain::Journey(id) => PatchTarget::Journey(id.clone()),
+        Domain::Route(id) => PatchTarget::Route(id.clone()),
+        Domain::Deployment => PatchTarget::Deployment,
+    };
+    let patch = Patch {
+        id: trial_patch_id(),
+        target,
+        base_revision: proposal.destination_revision,
+        deployment_revision: None,
+        mutations,
+    };
+    match apply(records, &patch, inputs) {
+        Ok(_) | Err(Rejection::Stale { .. } | Rejection::PatchIdReused { .. }) => Vec::new(),
+        Err(Rejection::Invalid { violations }) => violations.as_slice().to_vec(),
+    }
+}
+
+fn trial_patch_id() -> cairn_schema::PatchId {
+    match "p_trial".parse() {
+        Ok(id) => id,
+        Err(error) => unreachable!("a fixed patch id parses: {error}"),
     }
 }

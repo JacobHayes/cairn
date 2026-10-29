@@ -9,8 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::attachment::Annotation;
 use crate::collections::{BoundedSet, ByDocumentSize, ChoiceCountPerDecision, Keyed};
-use crate::field::NodeField;
-use crate::id::{AttachmentKey, IdentityKey, KindKey, NodeKey, RoleKey, Slug};
+use crate::id::{IdentityKey, NodeKey, RoleKey, Slug};
 use crate::limits::{Limit, LimitExceeded};
 use crate::node::{AnswerType, IdentitySet, NodeKind};
 use crate::number::Revision;
@@ -100,48 +99,6 @@ impl State {
     }
 }
 
-// PRD: glossary, Provenance.
-/// A node's origin in a journey.
-#[derive(
-    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum Provenance {
-    /// Copied from the route version the journey follows.
-    FromRoute,
-    /// Created in the journey.
-    Local,
-    // PRD: B7.
-    /// Copied from a route version that no longer has it.
-    Orphaned,
-    // PRD: B13.
-    /// Copied in from a segment version: a member of an insertion.
-    FromSegment,
-}
-
-// PRD: B4.
-// PRD: glossary, Local edit.
-/// What a journey changed on a route-copied node, so an upgrade leaves it alone. A
-/// marker carries no reason.
-#[derive(
-    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub enum LocalEdit {
-    /// A field of the node.
-    Field(NodeField),
-    /// The node's explicit edge to the named requirement (added or removed).
-    Requires(NodeKey),
-    /// The node's participation of a kind.
-    Participation(KindKey),
-    /// One of the node's resources.
-    Resource(AttachmentKey),
-    // PRD: B7.
-    /// The node's kind or, for a decision, its answer type: what a replacement changes that
-    /// no single field edit can.
-    Shape,
-}
-
 /// One node's stored state in a journey.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -149,8 +106,6 @@ pub struct NodeState {
     // PRD: D1.
     /// The machine state.
     pub state: State,
-    /// Where the node came from.
-    pub provenance: Provenance,
     // PRD: B10.
     /// A placeholder marked atomic, so it can complete without children.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
@@ -197,10 +152,9 @@ pub struct Reopened {
 impl NodeState {
     /// B1: a node's state when it is created or copied into a journey.
     #[must_use]
-    pub fn initial(kind: NodeKind, provenance: Provenance) -> Self {
+    pub fn initial(kind: NodeKind) -> Self {
         Self {
             state: State::initial(kind),
-            provenance,
             atomic: false,
             started_on: None,
             finished_on: None,
@@ -448,16 +402,6 @@ pub struct JourneyState {
     )]
     #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub nodes: BTreeMap<NodeKey, NodeState>,
-    // PRD: B4, H5.
-    /// Each route-copied node's local edits, apart from its state so that an edit and
-    /// a transition on one node touch different records.
-    #[serde(
-        default,
-        skip_serializing_if = "BTreeMap::is_empty",
-        deserialize_with = "crate::serde_util::unique_map_per_node"
-    )]
-    #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
-    pub local_edits: BTreeMap<NodeKey, BTreeSet<LocalEdit>>,
     // PRD: G5.
     /// Each node's ticked checklist items. Each tick is its own record, kept apart from the
     /// node's state so that ticking two items, or ticking and a transition, touch different
@@ -525,10 +469,6 @@ pub struct JourneyState {
     )]
     #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub overrides: BTreeMap<NodeKey, Overrides>,
-    // PRD: B4.
-    /// Route-copied nodes the journey removed, so an upgrade does not re-add them.
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub tombstones: BTreeSet<NodeKey>,
     // PRD: G1.
     /// Notes and links: on each node, and on the journey itself, at most
     /// `note_count_per_node_max` notes and `link_count_per_node_max` links.
@@ -585,7 +525,6 @@ impl JourneyState {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
-            && self.local_edits.is_empty()
             && self.ticks.is_empty()
             && self.answers.is_empty()
             && self.rationales.is_empty()
@@ -593,7 +532,6 @@ impl JourneyState {
             && self.pins.is_empty()
             && self.snoozes.is_empty()
             && self.overrides.is_empty()
-            && self.tombstones.is_empty()
             && self.annotations.is_empty()
     }
 }

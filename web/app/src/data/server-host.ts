@@ -59,7 +59,6 @@ export function indexParams(query: JourneyIndexQuery = {}) {
     ...(query.version === undefined ? {} : { version: query.version }),
     ...(query.referencing === undefined || query.referencing.length === 0 ? {} : { referencing: query.referencing }),
     ...(query.owner === undefined || query.owner.length === 0 ? {} : { owner: query.owner }),
-    ...(query.upgrade_available === undefined ? {} : { upgrade_available: query.upgrade_available }),
     ...(query.after === undefined ? {} : { after: query.after }),
     ...(query.size === undefined ? {} : { size: query.size }),
   };

@@ -172,14 +172,14 @@ export function ResultBand({ words, notices, hrefOf, onDismiss }: { words: strin
   );
 }
 
-/** What every state of the route says: its description and the journeys that can upgrade. */
+/** What every state of the route says: its description. */
 function DraftFacts({ route }: { route: string }) {
   const read = useRouteRead(route);
   return read === undefined ? null : <RouteFacts read={read} />;
 }
 
 export interface DraftCardProps {
-  /** The route the draft belongs to: its description and its journeys that can upgrade lead the card. */
+  /** The route the draft belongs to: its description leads the card. */
   route: string;
   violations: readonly Violation[];
   notices: readonly Notice[];

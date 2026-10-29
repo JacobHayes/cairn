@@ -1,5 +1,5 @@
-// C16's filters over the journey index: status, lineage route and version, owner, "mine", and
-// "upgrade available". Every filter holds at once; each change is a new address.
+// C16's filters over the journey index: status, lineage route and version, owner, and "mine".
+// Every filter holds at once; each change is a new address.
 import { JOURNEY_STATUSES } from "@cairn/client";
 
 import { Check } from "../acting/Controls.tsx";
@@ -57,7 +57,6 @@ export function IndexFilterBar({ filters, routes, onChange }: { filters: IndexFi
         />
       )}
       <Check label="Mine" checked={filters.mine} testId="filter-mine" onChange={(mine) => { onChange({ ...filters, mine }); }} />
-      <Check label="Upgrade available" checked={filters.upgrade} testId="filter-upgrade" onChange={(upgrade) => { onChange({ ...filters, upgrade }); }} />
     </>
   );
 }

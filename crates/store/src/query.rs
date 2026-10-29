@@ -105,8 +105,6 @@ pub struct JourneyQuery {
     /// Journeys owned by any of these identities, directly or through an alias; with the
     /// other filters, every one holds.
     pub owners: Option<BTreeSet<IdentityKey>>,
-    /// Journeys whose route has, or has not, published a version newer than theirs.
-    pub upgrade_available: Option<bool>,
     /// The page starts after this journey.
     pub after: Option<JourneyId>,
     /// The page's size.
@@ -122,7 +120,6 @@ impl JourneyQuery {
         route: Option<RouteId>,
         version: Option<VersionNumber>,
         referencing: BTreeSet<IdentityKey>,
-        upgrade_available: Option<bool>,
         after: Option<JourneyId>,
         size: Option<u32>,
     ) -> Self {
@@ -132,7 +129,6 @@ impl JourneyQuery {
             version,
             referencing: (!referencing.is_empty()).then_some(referencing),
             owners: None,
-            upgrade_available,
             after,
             size: size.map_or(PageSize::MAX, PageSize::new),
         }
@@ -165,19 +161,6 @@ pub struct JourneySummary {
     pub revision: Revision,
     /// When it was created.
     pub created_at: Timestamp,
-    /// The latest version its route has published.
-    pub latest_version: Option<VersionNumber>,
-}
-
-impl JourneySummary {
-    /// C16: whether the journey's route has published a version newer than the journey's.
-    #[must_use]
-    pub fn upgrade_available(&self) -> bool {
-        match (&self.lineage, self.latest_version) {
-            (Some(lineage), Some(latest)) => latest > lineage.version,
-            _ => false,
-        }
-    }
 }
 
 /// C17: a route's published versions with the journeys on each.
@@ -218,8 +201,6 @@ pub struct InsertionUse {
     pub insertion: InsertionKey,
     /// The root member's current title.
     pub title: Title,
-    /// Whether the segment has a later published version.
-    pub upgrade_available: bool,
 }
 
 /// C14: which open proposals a listing holds.

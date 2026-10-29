@@ -17,7 +17,7 @@ export interface PatchCommand {
 }
 
 /**
- * A write to a proposal, or one that drafts one (I6, B7, B8, B9, C14): plain data, tagged by
+ * A write to a proposal, or one that drafts one (I6, B8, C14): plain data, tagged by
  * `op`, each `request` the API's body with its patch id (H5). The id of the proposal it is
  * about is in the call.
  */
@@ -27,9 +27,7 @@ export type ProposalCall =
   | { op: "discard"; destination: Domain; proposal: string; request: Schema<"ProposalStep"> }
   | { op: "refresh"; destination: Domain; proposal: string; request: Schema<"ProposalStep"> }
   | { op: "apply"; destination: Domain; proposal: string; request: Schema<"ProposalApply"> }
-  | { op: "upgrade"; journey: string; request: Schema<"UpgradeRequest"> }
-  | { op: "save_as_route"; journey: string; request: Schema<"SaveAsRouteRequest"> }
-  | { op: "relink"; journey: string; request: Schema<"RelinkRequest"> };
+  | { op: "save_as_route"; journey: string; request: Schema<"SaveAsRouteRequest"> };
 
 /** A proposal write. Never rebased: a stale proposal needs a person's renewed review. */
 export interface ProposalCommand {
@@ -66,9 +64,7 @@ export function proposalIdOf(call: ProposalCall): string {
   switch (call.op) {
     case "create":
       return call.request.id;
-    case "upgrade":
     case "save_as_route":
-    case "relink":
       return call.request.proposal;
     case "edit":
     case "discard":
@@ -78,12 +74,9 @@ export function proposalIdOf(call: ProposalCall): string {
   }
 }
 
-/** The destination a proposal call is about: the one named, the journey it upgrades or re-links, or the route it saves a journey as. */
+/** The destination a proposal call is about: the one named, or the route it saves a journey as. */
 export function destinationOf(call: ProposalCall | ProposalAsk): Domain {
   switch (call.op) {
-    case "upgrade":
-    case "relink":
-      return { journey: call.journey };
     case "save_as_route":
       return { route: call.request.route };
     default:

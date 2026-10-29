@@ -64,9 +64,8 @@ export interface NodeDetail {
   /** Its ancestors, root first. */
   ancestors: GraphNode[];
   children: Child[];
-  /** Its stored state, provenance, and recorded dates. */
+  /** Its stored state and recorded dates. */
   record: NodeState;
-  localEdits: Schema<"LocalEdit">[];
   answer: AnswerValue | undefined;
   /** B2: the markdown reason its recorded answer was given with. */
   rationale: string | undefined;
@@ -118,7 +117,7 @@ export function itemTitle(view: Ready, key: string, id: string): string {
 
 /** A node's stored state, or its kind's initial state. */
 export function recordOf(view: Ready, node: GraphNode): NodeState {
-  return view.journey.graph.state?.nodes?.[node.key] ?? { state: INITIAL_STATE[node.kind], provenance: "local" };
+  return view.journey.graph.state?.nodes?.[node.key] ?? { state: INITIAL_STATE[node.kind] };
 }
 
 /** B6: whether `key` holds a snooze of its own, whether or not it holds (a container's snooze holds its nodes through it). */
@@ -169,7 +168,6 @@ export function nodeDetail(view: Ready, key: string): NodeDetail | undefined {
     ancestors,
     children,
     record: recordOf(view, node),
-    localEdits: state?.local_edits?.[key] ?? [],
     answer: state?.answers?.[key],
     rationale: state?.rationales?.[key],
     pin: state?.pins?.[key],

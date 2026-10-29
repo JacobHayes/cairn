@@ -1,4 +1,4 @@
-// Proposal review's model (C14, B7, B8, B9, I6): what each conflict offers, the reviewer's
+// Proposal review's model (C14, B8, I6): the reviewer's
 // edits to a proposal's items and mutations, the diff between the destination's graph before
 // and after, and what stops an apply. Everything here is pure; the screen draws it and the
 // host commits it. Strict validation stays the engine's, at preview and at apply.
@@ -11,54 +11,12 @@ export type Proposal = Schema<"Proposal">;
 export type ProposalDraft = Schema<"ProposalDraft">;
 export type ProposalPreview = Schema<"ProposalPreview">;
 export type ReviewItem = Schema<"ReviewItem">;
-export type Conflict = Schema<"Conflict">;
-export type Resolution = Schema<"ConflictResolution">;
 export type Mapping = Schema<"ParticipationMapping">;
 export type UnresolvedReason = Schema<"UnresolvedReason">;
-
-/** The kinds of resolution a conflict can offer (B7). */
-export type ResolutionKind = Schema<"ResolutionKind">;
-export type ConflictReview = Schema<"ConflictReview">;
-
-/** Which kind of resolution `resolution` is. */
-export function kindOf(resolution: Resolution): ResolutionKind {
-  if (typeof resolution === "string") {
-    return resolution;
-  }
-  if ("remap_role" in resolution) {
-    return "remap_role";
-  }
-  return "remap_kind" in resolution ? "remap_kind" : "map_choices";
-}
-
-/** The node a conflict is about, when it is about one. */
-export function conflictNode(conflict: Conflict): string | undefined {
-  switch (conflict.about) {
-    case "field":
-    case "participation":
-    case "resource":
-      return conflict.node;
-    case "shape":
-      return conflict.journey.key;
-    case "answer":
-      return conflict.decision;
-    case "edge":
-      return conflict.edge.node;
-    case "role":
-    case "kind":
-    case "default_owner":
-      return undefined;
-  }
-}
 
 /** The node a review item is about, when it is about one. */
 export function itemNode(item: ReviewItem): string | undefined {
   switch (item.item) {
-    case "conflict":
-      return conflictNode(item.conflict);
-    case "kept_local_edit":
-      return typeof item.kept === "object" && "node" in item.kept ? item.kept.node.node : undefined;
-    case "orphan":
     case "exclusion":
       return item.node;
     case "cascade":
@@ -80,16 +38,6 @@ function mutations(draft: ProposalDraft): Mutation[] {
 
 function withItem(draft: ProposalDraft, index: number, change: (item: ReviewItem) => ReviewItem): ProposalDraft {
   return { ...draft, items: items(draft).map((item, at) => (at === index ? change(item) : item)) };
-}
-
-/** C14: the draft with conflict `index` resolved by `resolution`, or its choice cleared. */
-export function withResolution(draft: ProposalDraft, index: number, resolution: Resolution | null): ProposalDraft {
-  return withItem(draft, index, (item) => (item.item === "conflict" ? { ...item, resolution } : item));
-}
-
-/** B7: the draft with orphan `index` kept or removed with its descendants. */
-export function withOrphanKept(draft: ProposalDraft, index: number, keep: boolean): ProposalDraft {
-  return withItem(draft, index, (item) => (item.item === "orphan" ? { ...item, keep } : item));
 }
 
 /** B8: the draft with identity `index`'s participations mapped, or the mapping cleared. */
@@ -248,9 +196,7 @@ export type DiffKind = "added" | "changed" | "removed";
 /** C14: how the layer marks one node a proposal touches: the kind of change, whether it needs a choice, and what more there is to say of it. */
 export interface DiffMark {
   kind: DiffKind;
-  /** An unresolved choice is about it: it counts under Needs a choice. */
-  choice?: true;
-  /** What else holds of it (a conflict, an orphan), for the hover and the list's foot. */
+  /** What else holds of it (a node left out of a saved route), for the hover and the list's foot. */
   note?: string;
 }
 
@@ -263,20 +209,15 @@ export const DIFF_LABELS: Record<DiffKind, string> = {
 
 /** What a mark adds to its kind of change. */
 export const DIFF_NOTES = {
-  conflict: "Needs a choice",
-  orphan: "Orphaned, kept",
-  orphanRemoved: "Orphaned, removed",
   excluded: "Left out",
 } as const;
 
 /**
  * C14: the layer's mark for each node the proposal touches: added, removed, or changed by the
  * diff or by a state mutation the graph does not show (`stateful`: a pin, an answer, a
- * transition); an orphan or a node left out of a saved route, which the items say more of than
- * the diff; and, when an unresolved conflict (`open`, the indexes of the items still needing a
- * choice) is about it, a choice besides its kind. A resolved conflict leaves only its kind.
+ * transition); and a node left out of a saved route, which the items say more of than the diff.
  */
-export function diffMarks(diff: GraphDiff, reviewItems: readonly ReviewItem[], open: ReadonlySet<number>, stateful: readonly string[] = []): Record<string, DiffMark> {
+export function diffMarks(diff: GraphDiff, reviewItems: readonly ReviewItem[], stateful: readonly string[] = []): Record<string, DiffMark> {
   const marks: Record<string, DiffMark> = {};
   for (const key of stateful) {
     marks[key] = { kind: "changed" };
@@ -290,18 +231,11 @@ export function diffMarks(diff: GraphDiff, reviewItems: readonly ReviewItem[], o
   for (const key of diff.removed) {
     marks[key] = { kind: "removed" };
   }
-  reviewItems.forEach((item, index) => {
-    if (item.item === "orphan") {
-      marks[item.node] = item.keep ? { kind: "changed", note: DIFF_NOTES.orphan } : { kind: "removed", note: DIFF_NOTES.orphanRemoved };
-    } else if (item.item === "exclusion" && item.excluded) {
+  for (const item of reviewItems) {
+    if (item.item === "exclusion" && item.excluded) {
       marks[item.node] = { kind: "removed", note: DIFF_NOTES.excluded };
-    } else if (item.item === "conflict" && open.has(index)) {
-      const node = conflictNode(item.conflict);
-      if (node !== undefined) {
-        marks[node] = { kind: marks[node]?.kind ?? "changed", choice: true, note: DIFF_NOTES.conflict };
-      }
     }
-  });
+  }
   return marks;
 }
 
@@ -369,7 +303,7 @@ export function withFieldValue(node: GraphNode, value: Record<string, unknown>):
   return Object.fromEntries(kept) as GraphNode;
 }
 
-/** C14: whether the reviewer may owe `item` a choice (a conflict or an identity's mapping), so that while the edits are newer than the preview it shows as being checked rather than settled. */
+/** C14: whether the reviewer may owe `item` a choice (an identity's mapping), so that while the edits are newer than the preview it shows as being checked rather than settled. */
 export function needsChoice(item: ReviewItem): boolean {
-  return item.item === "conflict" || item.item === "participation";
+  return item.item === "participation";
 }

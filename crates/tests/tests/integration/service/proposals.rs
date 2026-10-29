@@ -51,7 +51,6 @@ on_both_stores!(
     a_discarded_proposal_is_never_applied,
     a_resubmitted_apply_is_answered_from_its_receipt,
     a_proposal_write_ticks_the_proposal_and_its_apply_ticks_both,
-    an_upgrade_or_relink_submitted_directly_is_refused,
     another_destinations_proposal_is_missing_never_rejected,
     a_proposal_discarding_a_draft_leaves_the_latest_version_on_show,
 );
@@ -613,30 +612,6 @@ async fn a_proposal_write_ticks_the_proposal_and_its_apply_ticks_both(store: Arc
     .into_iter()
     .collect();
     assert_eq!(ticks, expected);
-}
-
-/// B7, B9, I7: an upgrade or a re-link changes a journey only once confirmed through its
-/// proposal, so submitted directly each is refused, whoever submits it.
-async fn an_upgrade_or_relink_submitted_directly_is_refused(store: Arc<dyn Store>) {
-    let (service, _) = service_over(store);
-    journey(&service).await;
-    for (id, mutation) in [
-        ("p_upgrade", "- op: upgrade\n  to: 2\n"),
-        (
-            "p_relink",
-            "- op: relink\n  lineage: {route: elsewhere, version: 1}\n",
-        ),
-    ] {
-        let direct = patch(id, "{journey: j_p}", 2, mutation);
-        for caller in [call("u_lead", AT), agent_call("u_lead", "ag_helper", AT)] {
-            let refused = rejected(service.patch(&caller, &domain(direct.clone())).await);
-            assert_eq!(
-                codes(&refused),
-                [ViolationCode::MutationNotForTarget],
-                "{id}"
-            );
-        }
-    }
 }
 
 /// I6: a proposal is addressed under its destination, so under another one it is missing

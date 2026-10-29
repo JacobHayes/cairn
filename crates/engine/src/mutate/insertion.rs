@@ -17,9 +17,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::limits::NODE_COUNT_MAX;
 use cairn_schema::{
     AttachmentKey, Edge, EdgeEnd, Graph, GraphKey, GraphRecord, InsertedEdge, Insertion,
-    InsertionKey, KindChoice, KindKey, Limit, LocalEdit, Mutation, Node, NodeKey, NodeState,
-    ParticipationKind, Provenance, Role, RoleChoice, RoleKey, Slug, Subject, Title, ViolationCode,
-    Write,
+    InsertionKey, KindChoice, KindKey, Limit, Mutation, Node, NodeKey, NodeState,
+    ParticipationKind, Role, RoleChoice, RoleKey, Slug, Subject, Title, ViolationCode, Write,
 };
 
 use super::Session;
@@ -727,8 +726,8 @@ fn limits(
 }
 
 /// B13 steps 4 to 6: the records, in the order replay applies them: roles and kinds, the
-/// nodes (and in a journey their initial states), the wiring written on graph nodes with the
-/// marker B4 sets on a route-copied one, and the insertion.
+/// nodes (and in a journey their initial states), the wiring written on graph nodes, and
+/// the insertion.
 fn writes(session: &Session<'_>, planned: Plan) -> Vec<Write> {
     let journey = session.journey().is_some();
     let mut writes = Vec::new();
@@ -745,7 +744,7 @@ fn writes(session: &Session<'_>, planned: Plan) -> Vec<Write> {
             .map(|kind| session.put(GraphRecord::Kind(kind))),
     );
     for node in planned.nodes {
-        let state = NodeState::initial(node.kind(), Provenance::FromSegment);
+        let state = NodeState::initial(node.kind());
         let key = node.key.clone();
         writes.push(session.put(GraphRecord::Node(node)));
         if journey {
@@ -753,9 +752,7 @@ fn writes(session: &Session<'_>, planned: Plan) -> Vec<Write> {
         }
     }
     for edge in planned.host_edges {
-        let marker = session.marker(&edge.node, LocalEdit::Requires(edge.requires.clone()));
         writes.push(session.put(GraphRecord::Edge(edge)));
-        writes.extend(marker);
     }
     writes.push(session.put(GraphRecord::Insertion(planned.insertion)));
     writes

@@ -382,13 +382,6 @@ fn put_state(graph: &mut Graph, record: &GraphRecord) {
         GraphRecord::NodeState { node, state: value } => {
             state.nodes.insert(node.clone(), value.clone());
         }
-        GraphRecord::LocalEdit { node, edit } => {
-            state
-                .local_edits
-                .entry(node.clone())
-                .or_default()
-                .insert(edit.clone());
-        }
         GraphRecord::Tick { node, item } => {
             state
                 .ticks
@@ -419,9 +412,6 @@ fn put_state(graph: &mut Graph, record: &GraphRecord) {
         }
         GraphRecord::Overrides { node, overrides } => {
             state.overrides.insert(node.clone(), overrides.clone());
-        }
-        GraphRecord::Tombstone(node) => {
-            state.tombstones.insert(node.clone());
         }
         GraphRecord::Annotation(annotation) => {
             let put = state.annotations.put(annotation.clone());
@@ -481,14 +471,6 @@ fn remove_state(graph: &mut Graph, key: &GraphKey) {
         GraphKey::NodeState(node) => {
             state.nodes.remove(node);
         }
-        GraphKey::LocalEdit { node, edit } => {
-            if let Some(edits) = state.local_edits.get_mut(node) {
-                edits.remove(edit);
-                if edits.is_empty() {
-                    state.local_edits.remove(node);
-                }
-            }
-        }
         GraphKey::Tick { node, item } => {
             if let Some(ticked) = state.ticks.get_mut(node) {
                 ticked.remove(item);
@@ -513,9 +495,6 @@ fn remove_state(graph: &mut Graph, key: &GraphKey) {
         GraphKey::Overrides(node) => {
             state.overrides.remove(node);
         }
-        GraphKey::Tombstone(node) => {
-            state.tombstones.remove(node);
-        }
         GraphKey::Annotation { annotation, .. } => {
             state.annotations.remove(annotation);
         }
@@ -533,8 +512,8 @@ fn remove_state(graph: &mut Graph, key: &GraphKey) {
 }
 
 /// Removes a node and every record under it: its edges at both ends (an edge belongs to
-/// both, ARCHITECTURE: touched sets) and its state, notes, and links. Its retired key and any
-/// tombstone are written after.
+/// both, ARCHITECTURE: touched sets) and its state, notes, and links. Its retired key is
+/// written after.
 fn remove_node(graph: &mut Graph, key: &NodeKey) {
     graph.nodes.remove(key);
     let dependents: Vec<NodeKey> = graph
@@ -550,14 +529,12 @@ fn remove_node(graph: &mut Graph, key: &NodeKey) {
     }
     let state = &mut graph.state;
     state.nodes.remove(key);
-    state.local_edits.remove(key);
     state.ticks.remove(key);
     state.answers.remove(key);
     state.rationales.remove(key);
     state.pins.remove(key);
     state.snoozes.remove(key);
     state.overrides.remove(key);
-    state.tombstones.remove(key);
     let notes: Vec<_> = state
         .annotations
         .values()

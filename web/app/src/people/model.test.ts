@@ -23,7 +23,7 @@ describe("identities as sent (E6, H3)", () => {
 });
 
 describe("a merge (E6)", () => {
-  const summary = (id: string, revision: number): Schema<"JourneySummary"> => ({ id, name: id, status: "archived", revision, created_at: "2026-10-01T00:00:00Z", upgrade_available: false });
+  const summary = (id: string, revision: number): Schema<"JourneySummary"> => ({ id, name: id, status: "archived", revision, created_at: "2026-10-01T00:00:00Z" });
   const referencing = (...journeys: Schema<"JourneySummary">[]) => ({ journeys, routes: [] });
 
   it("names each referring journey at the revision it was read at, once when several identities share it, at the lower revision", () => {

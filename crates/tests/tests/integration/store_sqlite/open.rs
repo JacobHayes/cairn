@@ -213,9 +213,6 @@ mod open {
                 "overrides.bypass",
             ],
         ),
-        ("Local edit", &["local_edits"]),
-        ("Provenance", &["node_states.provenance"]),
-        ("Node tombstone", &["tombstones"]),
         ("Patch", &["patch_receipts"]),
         ("Mutation, Event", &["events", "event_nodes"]),
         (

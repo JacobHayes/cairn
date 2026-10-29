@@ -2,8 +2,7 @@
 // patch of one-field mutations (an answer-type change replaces the node whole). The draft is
 // kept per tab across reloads (ARCHITECTURE, Web UI: drafts survive a reload). What it would
 // send is previewed with the wasm engine as the author types, so every violation shows at its
-// field before Save (A15); the engine's checks of its values stop one before it is sent (PRACTICES), and a check that cannot be made says so and can be asked again; and a journey's
-// route-copied fields carry their local-edit marker (B4).
+// field before Save (A15); the engine's checks of its values stop one before it is sent (PRACTICES), and a check that cannot be made says so and can be asked again.
 import { useEffect } from "react";
 
 import { useDraft } from "../data/drafts.ts";
@@ -43,12 +42,6 @@ export function isKept(draft: unknown): draft is Kept {
   }
   const edits: Record<string, unknown> = { ...draft.edits };
   return [edits["due_by"], edits["not_before"]].every((rule) => rule === undefined || rule === null || (typeof rule === "object" && "sources" in rule && Array.isArray(rule.sources)));
-}
-
-/** Whether a local-edit marker names `field` of the node (B4). */
-function editedFields(authored: Authored, node: string): Set<string> {
-  const markers = authored.graph.state?.local_edits?.[node] ?? [];
-  return new Set(markers.flatMap((marker) => (typeof marker === "object" && "field" in marker ? [marker.field] : [])));
 }
 
 /** The violations the form shows: the live preview's, or the last attempt's when it is about these fields. */
@@ -169,8 +162,7 @@ export function NodeForm({ authored, node }: NodeFormProps) {
   const preview = useLivePreview(authored, sendable ? changes.map((change) => change.mutation) : undefined);
   const { violations, places: sent } = shownViolations(preview, write);
   const places = byPlace(violations, node.key, sent);
-  const edited = editedFields(authored, node.key);
-  const notes = (field: FormField): FieldNotes => ({ problem: problems[field], violations: places.get(field), edited: edited.has(field) });
+  const notes = (field: FormField): FieldNotes => ({ problem: problems[field], violations: places.get(field) });
   // A draft that says nothing the node does not already say (what was typed was typed back) is no draft: nothing is left unsaved.
   useDropped(kept !== undefined && changes.length === 0 && (kept.newItem ?? "").trim() === "", () => { setKept(undefined); });
   const change = (next: Partial<NodeDraft>) => {

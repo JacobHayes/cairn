@@ -5,8 +5,8 @@ use std::collections::BTreeSet;
 
 use cairn_schema::{
     DeletedId, Domain, Edge, EventType, Graph, GraphId, GraphKey, GraphRecord, Journey, JourneyId,
-    Limit, LocalEdit, NodeFieldValue, ProposalStatus, Record, RecordKey, Rejection,
-    RevisionConflict, RevisionOf, Subject, TouchedSet, ViolationCode, Write,
+    Limit, NodeFieldValue, ProposalStatus, Record, RecordKey, Rejection, RevisionConflict,
+    RevisionOf, Subject, TouchedSet, ViolationCode, Write,
 };
 use serde_json::json;
 
@@ -673,13 +673,6 @@ pub async fn writes_follow_the_reference_semantics<B: Backend>(backend: &B) {
             },
         ),
         remove_in(&graph, GraphKey::Node(node_key("n_kickoff"))),
-        remove_in(
-            &graph,
-            GraphKey::LocalEdit {
-                node: node_key("n_plan"),
-                edit: LocalEdit::Field(cairn_schema::NodeField::Title),
-            },
-        ),
     ];
     let edit = journey_patch("p_two", "j_one", 1).event(
         EventType::NodeChanged,
@@ -713,9 +706,6 @@ pub async fn writes_follow_the_reference_semantics<B: Backend>(backend: &B) {
     );
     assert!(after.nodes.get(&node_key("n_kickoff")).is_none());
     assert!(!after.state.nodes.contains_key(&node_key("n_kickoff")));
-    let edits: BTreeSet<_> = after.state.local_edits[&node_key("n_plan")].clone();
-    assert!(!edits.contains(&LocalEdit::Field(cairn_schema::NodeField::Title)));
-    assert_eq!(edits.len(), 3);
     let group = after.nodes.get(&node_key("n_work")).unwrap();
     assert_eq!(
         group,
@@ -726,7 +716,7 @@ pub async fn writes_follow_the_reference_semantics<B: Backend>(backend: &B) {
     );
 
     let clear = journey_patch("p_three", "j_one", 2).event(
-        EventType::JourneyUpgraded,
+        EventType::JourneyEdited,
         Subject::Journey(id("j_one")),
         vec![Write::Remove(RecordKey::Graph(graph.clone()))],
     );

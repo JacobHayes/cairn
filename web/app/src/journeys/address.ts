@@ -3,7 +3,7 @@
 // the back button. The path mirrors the API:
 //
 //   /                                       Home: what waits on the viewer, then their journeys
-//   /journeys?status=&route=&version=&owner=&mine=&upgrade=   the journey index; its filters in the query
+//   /journeys?status=&route=&version=&owner=&mine=   the journey index; its filters in the query
 //   /journeys/new?route=&version=           the new-journey form
 //   /journeys/<id>                          a journey
 //   /journeys/<id>/nodes/<key>              a node selected in it
@@ -37,15 +37,13 @@ export interface IndexFilters {
   owner: string | undefined;
   /** Only journeys the caller owns or holds something in ("mine", E4). */
   mine: boolean;
-  /** Only journeys whose route has published a newer version (C16, from the host). */
-  upgrade: boolean;
 }
 
 /**
  * The index opens on active journeys: completed ones leave "mine" and the cross-journey lists
  * (B11), and archived ones are out of the way until asked for.
  */
-export const DEFAULT_FILTERS: IndexFilters = { status: "active", route: undefined, version: undefined, owner: undefined, mine: false, upgrade: false };
+export const DEFAULT_FILTERS: IndexFilters = { status: "active", route: undefined, version: undefined, owner: undefined, mine: false };
 
 function positive(text: string | null): number | undefined {
   const number = Number(text);
@@ -61,7 +59,6 @@ export function filtersFrom(params: URLSearchParams): IndexFilters {
     version: route === undefined ? undefined : positive(params.get("version")),
     owner: params.get("owner") ?? undefined,
     mine: params.get("mine") === "1",
-    upgrade: params.get("upgrade") === "1",
   };
 }
 
@@ -81,9 +78,6 @@ export function filterParams(filters: IndexFilters): URLSearchParams {
   }
   if (filters.mine) {
     params.set("mine", "1");
-  }
-  if (filters.upgrade) {
-    params.set("upgrade", "1");
   }
   return params;
 }
@@ -108,9 +102,6 @@ export function queryOf(filters: IndexFilters, identities: readonly string[]): J
   }
   if (filters.owner !== undefined) {
     query.owner = [filters.owner];
-  }
-  if (filters.upgrade) {
-    query.upgrade_available = true;
   }
   if (filters.mine) {
     const current = JOURNEY_STATUSES.filter((status) => STATUS_HOLDS_CURRENT_WORK[status] && (filters.status === "any" || filters.status === status));

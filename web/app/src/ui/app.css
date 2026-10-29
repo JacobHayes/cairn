@@ -967,7 +967,7 @@ body {
 }
 
 /* On a phone each row is a block with an edge hairline, no inner cell borders. The header row stays
-   in the document for screen readers. Line 1 is the name; then the upgrade notice when there is one;
+   in the document for screen readers. Line 1 is the name;
    then the route and version it came from; then the context, a wrapping steel
    line (progress and next milestone) whose pieces flow as one; then one
    attention line, each fact in its own ink: what needs a look and what is yours, both, since they
@@ -1048,7 +1048,7 @@ body {
     height: 0;
     order: 1;
   }
-  /* Under the name: the upgrade notice first, then where the journey came from. */
+  /* Under the name: where the journey came from. */
   .index-table td[data-column="journey"] > .cell-second {
     display: flex;
     flex-direction: column-reverse;

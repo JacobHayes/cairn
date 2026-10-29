@@ -4,9 +4,7 @@
 
 use crate::engine::support;
 
-use cairn_schema::{
-    EventType, GuardFailure, LocalEdit, NodeField, Rejection, RevisionOf, ViolationCode,
-};
+use cairn_schema::{EventType, GuardFailure, Rejection, RevisionOf, ViolationCode};
 use support::{codes, key, vendor_after, vendor_graph, vendor_patch};
 
 #[test]
@@ -100,7 +98,7 @@ const REMOVE_PARTNER_LED: &str = "\
 - op: remove_node\n  removal:\n    node: n_partner_led\n    descendants: [n_criteria, n_partner_results]\n    edges: [{node: n_partner_results, requires: n_criteria}]\n";
 
 #[test]
-fn removing_a_route_copied_subtree_retires_its_keys_and_tombstones_it() {
+fn removing_a_route_copied_subtree_retires_its_keys() {
     let records = vendor_after(1);
     let applied = vendor_patch(&records, REMOVE_PARTNER_LED).unwrap();
     let graph = vendor_graph(applied.records());
@@ -109,10 +107,6 @@ fn removing_a_route_copied_subtree_retires_its_keys_and_tombstones_it() {
         assert!(
             graph.retired_keys.nodes.contains(&key(removed)),
             "{removed}"
-        );
-        assert!(
-            graph.state.tombstones.contains(&key(removed)),
-            "{removed} has a tombstone (B4)"
         );
         assert!(!graph.state.nodes.contains_key(&key(removed)), "{removed}");
     }
@@ -147,16 +141,6 @@ fn a_removal_takes_the_subtree_and_the_edges_into_it() {
             .requires
             .is_empty()
     );
-}
-
-#[test]
-fn removing_a_journey_local_node_leaves_no_tombstone() {
-    let records = vendor_after(5);
-    let removal = "- op: remove_node\n  removal: {node: n_workload_ingest}\n";
-    let applied = vendor_patch(&records, removal).unwrap();
-    let graph = vendor_graph(applied.records());
-    assert!(graph.retired_keys.nodes.contains(&key("n_workload_ingest")));
-    assert!(!graph.state.tombstones.contains(&key("n_workload_ingest")));
 }
 
 #[test]
@@ -257,33 +241,6 @@ fn a_retired_key_added_and_removed_in_one_patch_is_still_refused() {
 }
 
 #[test]
-fn edits_to_route_copied_nodes_set_markers_and_reset_clears_them() {
-    let records = vendor_after(5);
-    let edits = "\
-- op: set_node_field\n  node: n_access\n  value: {title: \"Environment access, granted\"}\n\
-- op: add_edge\n  edge: {node: n_findings, requires: n_access}\n\
-- op: set_participation\n  node: n_access\n  kind: k_owner\n  source: [who_k3d7qm2xw5tn6pfa]\n\
-- op: add_resource\n  node: n_access\n  resource: {key: a_tip, tip: Ask early.}\n\
-- op: set_node_field\n  node: n_workload_ingest\n  value: {title: Ingest the workload}\n";
-    let applied = vendor_patch(&records, edits).unwrap();
-    let markers = &vendor_graph(applied.records()).state.local_edits;
-    let on_access = &markers[&key("n_access")];
-    assert!(on_access.contains(&LocalEdit::Field(NodeField::Title)));
-    assert!(on_access.contains(&LocalEdit::Participation("k_owner".parse().unwrap())));
-    assert!(on_access.contains(&LocalEdit::Resource("a_tip".parse().unwrap())));
-    assert!(markers[&key("n_findings")].contains(&LocalEdit::Requires(key("n_access"))));
-    assert!(
-        !markers.contains_key(&key("n_workload_ingest")),
-        "a journey-local node has no markers"
-    );
-    let reset =
-        "- op: mark_local_edit\n  node: n_access\n  edit: {field: title}\n  marked: false\n";
-    let reset = vendor_patch(applied.records(), reset).unwrap();
-    let on_access = &vendor_graph(reset.records()).state.local_edits[&key("n_access")];
-    assert!(!on_access.contains(&LocalEdit::Field(NodeField::Title)));
-}
-
-#[test]
 fn a_journey_weight_edit_is_state() {
     let records = vendor_after(1);
     let applied = vendor_patch(
@@ -292,11 +249,6 @@ fn a_journey_weight_edit_is_state() {
     )
     .unwrap();
     assert_eq!(applied.events()[0].event_type, EventType::WeightChanged);
-    let markers = &vendor_graph(applied.records()).state.local_edits[&key("n_access")];
-    assert!(
-        markers.contains(&LocalEdit::Field(NodeField::Weight)),
-        "B5: tracked by the marker"
-    );
 }
 
 /// The vendor evaluation after its scenario, with the final review opened: every dependency
@@ -612,18 +564,6 @@ fn a_skip_keeps_its_reason_until_reopened() {
 }
 
 #[test]
-fn a_removal_marks_the_route_copied_nodes_that_lose_an_edge() {
-    let records = vendor_after(1);
-    let removal = "- op: remove_node\n  removal:\n    node: n_access\n    edges: [{node: n_plan, requires: n_access}]\n    resources: [a_access_request]\n";
-    let applied = vendor_patch(&records, removal).unwrap();
-    let markers = &vendor_graph(applied.records()).state.local_edits;
-    assert!(
-        markers[&key("n_plan")].contains(&LocalEdit::Requires(key("n_access"))),
-        "B4"
-    );
-}
-
-#[test]
 fn an_identity_create_rides_only_in_a_patch_to_something_that_exists() {
     let records = support::seeded("vendor-evaluation");
     let create = "- op: create_identity\n  identity: {key: who_new, name: New Person}\n";
@@ -652,15 +592,6 @@ fn applying_a_proposal_that_does_not_create_its_new_destination_is_rejected() {
 }
 
 // Review round 2 regressions.
-
-#[test]
-fn replacing_a_decision_with_another_answer_type_marks_its_shape() {
-    let records = vendor_after(1);
-    let replace = "- op: replace_node\n  node: {key: n_purpose, id: purpose, kind: decision, title: Purchase or research, prompt: Is this evaluation for a purchase or research only?, answer_type: text}\n";
-    let applied = vendor_patch(&records, replace).unwrap();
-    let markers = &vendor_graph(applied.records()).state.local_edits[&key("n_purpose")];
-    assert!(markers.contains(&LocalEdit::Shape), "B4, B7: {markers:?}");
-}
 
 #[test]
 fn bypassed_failures_are_recorded_on_the_completion_event() {

@@ -18,7 +18,6 @@ mod reason {
     const SKIPPED: &str = r#"
 UPDATE "node_states" SET state = 'skipped', skip_reason = 'Not needed.' WHERE node = 'n_reach';
 INSERT INTO "events" VALUES (20, 'p_skip', 0, 'journey', 'j_one', 'node_transitioned', 'u_lead', NULL, NULL, '{"node":"n_reach"}', 1791288000000000020, NULL, '[{"put":{"graph":{"graph":{"journey":"j_one"},"record":{"node_state":{"node":"n_reach","state":{"state":"skipped","provenance":"local","skip_reason":"Not needed."}}}}}}]');
-INSERT INTO "proposals" VALUES ('pr_map', 'journey', 'j_one', 1, 'open', 'Map', NULL, 1, '[]', '[{"item":"conflict","conflict":{"about":"answer","decision":"n_choice","answer":{"single_choice":"state"},"choices":["skip_reason"]},"resolution":{"map_choices":{"map":{"provenance":"local","state":"skipped","skip_reason":"needed"}}}}]', NULL, 'u_lead', 1791288000000000000);
 "#;
 
     fn run<F: std::future::Future>(future: F) -> F::Output {
@@ -85,29 +84,6 @@ INSERT INTO "proposals" VALUES ('pr_map', 'journey', 'j_one', 1, 'open', 'Map', 
             assert_eq!(
                 skipped.reason.as_ref().map(cairn_schema::Reason::as_str),
                 Some("Not needed.")
-            );
-        });
-    }
-
-    #[test]
-    fn a_map_between_choices_is_not_a_node_state() {
-        run(async {
-            let (path, store) = migrated("map");
-            drop(store);
-            let connection = rusqlite::Connection::open(&path).unwrap();
-            let items: String = connection
-                .query_row(
-                    "SELECT items FROM proposals WHERE id = 'pr_map'",
-                    [],
-                    |row| row.get(0),
-                )
-                .unwrap();
-            let items: serde_json::Value = serde_json::from_str(&items).unwrap();
-            assert_eq!(
-                items[0]["resolution"]["map_choices"]["map"],
-                serde_json::json!({
-                    "provenance": "local", "state": "skipped", "skip_reason": "needed"
-                })
             );
         });
     }

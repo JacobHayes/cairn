@@ -17,9 +17,7 @@ mod cost {
     use cairn_schema::limits::{
         CONTAINMENT_DEPTH_MAX, EXPLANATION_ENTRY_COUNT_MAX, NODE_COUNT_MAX, WEIGHT_MAX,
     };
-    use cairn_schema::{
-        Date, Deployment, NodeKey, NodeState, Payload, Provenance, Relevance, Score, Weight,
-    };
+    use cairn_schema::{Date, Deployment, NodeKey, NodeState, Payload, Relevance, Score, Weight};
 
     /// The limits graph with every node at the weight limit, and with every node in its
     /// initial state when `open`, so most of the graph is ranked and has something to unblock.
@@ -30,7 +28,7 @@ mod cost {
             let mut node = document.nodes.get(&key).unwrap().clone();
             node.weight = Some(Weight::try_from(WEIGHT_MAX).unwrap());
             if open {
-                let initial = NodeState::initial(node.kind(), Provenance::Local);
+                let initial = NodeState::initial(node.kind());
                 document.state.nodes.insert(key.clone(), initial);
                 document.state.answers.remove(&key);
             }

@@ -153,7 +153,6 @@ mod in_process {
         assert_eq!(deployment, service.deployment().await.unwrap());
         let index: JourneyPage = get(&ann, "/api/journeys?status=active&size=1").await;
         assert_eq!((index.items.len(), index.next), (1, None));
-        assert!(!index.items[0].upgrade_available);
         let none: JourneyPage = get(&ann, "/api/journeys?status=archived").await;
         assert_eq!(none.items.len(), 0);
         let found: SearchPage = get(&ann, "/api/search?text=ANALYTICS").await;

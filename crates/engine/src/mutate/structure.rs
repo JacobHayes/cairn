@@ -1,10 +1,9 @@
-//! Graph structure (A1, A3, A6, A7, A10, A18, B4, B5, B10): nodes, edges, roles, kinds,
-//! participations, and resources, in a journey or a route's draft. In a journey, an edit to a
-//! route-copied node sets its local-edit marker (B4) in the same event.
+//! Graph structure (A1, A3, A6, A7, A10, A18, B5, B10): nodes, edges, roles, kinds,
+//! participations, and resources, in a journey or a route's draft.
 
 use cairn_schema::{
-    Edge, GraphKey, GraphRecord, KeyRefs, Limit, LocalEdit, Mutation, Node, NodeFieldValue,
-    NodeKey, NodeState, Provenance, RetiredKey, Subject, ViolationCode, Write,
+    Edge, GraphKey, GraphRecord, KeyRefs, Limit, Mutation, Node, NodeFieldValue, NodeKey,
+    NodeState, RetiredKey, Subject, ViolationCode, Write,
 };
 
 use super::Session;
@@ -36,12 +35,7 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
                 kind: kind.clone(),
                 source: source.clone(),
             };
-            marked(
-                session,
-                node,
-                LocalEdit::Participation(kind.clone()),
-                session.put(record),
-            )
+            vec![session.put(record)]
         }
         Mutation::ClearParticipation { node, kind } => {
             if !session.require(node) {
@@ -62,27 +56,10 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
                 node: node.clone(),
                 kind: kind.clone(),
             };
-            marked(
-                session,
-                node,
-                LocalEdit::Participation(kind.clone()),
-                session.remove(key),
-            )
+            vec![session.remove(key)]
         }
         other => super::graph_parts::apply(session, other),
     }
-}
-
-/// The writes of an edit to a node, with its local-edit marker when one is due (B4).
-pub(super) fn marked(
-    session: &Session<'_>,
-    node: &NodeKey,
-    edit: LocalEdit,
-    write: Write,
-) -> Vec<Write> {
-    let mut writes = vec![write];
-    writes.extend(session.marker(node, edit));
-    writes
 }
 
 pub(super) fn limit(session: &mut Session<'_>, node: &NodeKey, limit: Limit) {
@@ -96,7 +73,7 @@ pub(super) fn limit(session: &mut Session<'_>, node: &NodeKey, limit: Limit) {
     }
 }
 
-/// A1: a new node, in its initial state with `local` provenance in a journey (B1, B4). A key
+/// A1: a new node, in its initial state in a journey (B1). A key
 /// the graph used or retired is never reused (Invariants).
 fn add_node(session: &mut Session<'_>, node: &Node<KeyRefs>) -> Vec<Write> {
     let Some(graph) = session.graph() else {
@@ -134,13 +111,13 @@ fn add_node(session: &mut Session<'_>, node: &Node<KeyRefs>) -> Vec<Write> {
     if session.journey().is_some() {
         writes.push(session.put(GraphRecord::NodeState {
             node: node.key.clone(),
-            state: NodeState::initial(node.kind(), Provenance::Local),
+            state: NodeState::initial(node.kind()),
         }));
     }
     writes
 }
 
-/// B4, B5: one field of a node; the kind must have it (A1a).
+/// B5: one field of a node; the kind must have it (A1a).
 fn set_field(
     session: &mut Session<'_>,
     key: &NodeKey,
@@ -175,7 +152,7 @@ fn set_field(
         node: key.clone(),
         value: value.clone(),
     };
-    let mut writes = marked(session, key, LocalEdit::Field(field), session.put(record));
+    let mut writes = vec![session.put(record)];
     // G5: an item the new list drops loses its tick in the same write.
     if let NodeFieldValue::Checklist(checklist) = value {
         writes.extend(dropped_ticks(session, key, Some(checklist)));
@@ -210,9 +187,8 @@ fn dropped_ticks(
     writes
 }
 
-/// B7: a node replaced whole, as a kind or answer-type change does. Every field, edge,
-/// participation, and resource that differs is marked (B4). A new kind has a new machine,
-/// so the node starts over in its initial state, keeping its provenance.
+/// A node replaced whole, as a kind or answer-type change does. A new kind has a new
+/// machine, so the node starts over in its initial state.
 fn replace_node(session: &mut Session<'_>, node: &Node<KeyRefs>) -> Vec<Write> {
     if !session.require(&node.key) {
         return Vec::new();
@@ -222,21 +198,16 @@ fn replace_node(session: &mut Session<'_>, node: &Node<KeyRefs>) -> Vec<Write> {
     };
     assert_eq!(old.key, node.key);
     let mut writes = vec![session.put(GraphRecord::Node(node.clone()))];
-    for edit in crate::edit::differences(&old, node) {
-        writes.extend(session.marker(&node.key, edit));
-    }
     // G5: an item the new node does not have (every item, for a kind with no checklist)
     // loses its tick in the same write.
     writes.extend(dropped_ticks(session, &node.key, node.payload.checklist()));
     let stored = session
         .journey()
-        .and_then(|journey| journey.graph.state.nodes.get(&node.key).cloned());
-    if let Some(stored) = stored
-        && old.kind() != node.kind()
-    {
+        .is_some_and(|journey| journey.graph.state.nodes.contains_key(&node.key));
+    if stored && old.kind() != node.kind() {
         writes.push(session.put(GraphRecord::NodeState {
             node: node.key.clone(),
-            state: NodeState::initial(node.kind(), stored.provenance),
+            state: NodeState::initial(node.kind()),
         }));
         let answered = session
             .journey()
@@ -248,7 +219,7 @@ fn replace_node(session: &mut Session<'_>, node: &Node<KeyRefs>) -> Vec<Write> {
     writes
 }
 
-/// A3: an explicit edge, stored on its dependent; a journey marks the dependent (B4).
+/// A3: an explicit edge, stored on its dependent.
 fn change_edge(session: &mut Session<'_>, edge: &Edge, add: bool) -> Vec<Write> {
     if !session.require(&edge.node) {
         return Vec::new();
@@ -281,12 +252,7 @@ fn change_edge(session: &mut Session<'_>, edge: &Edge, add: bool) -> Vec<Write> 
     } else {
         session.remove(GraphKey::Edge(edge.clone()))
     };
-    marked(
-        session,
-        &edge.node,
-        LocalEdit::Requires(edge.requires.clone()),
-        write,
-    )
+    vec![write]
 }
 
 /// The retired-key record a removal writes, so the key never comes back (Invariants).

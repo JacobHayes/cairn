@@ -32,7 +32,7 @@ export function InsertionCanvas({ preview, domain }: { preview: InsertPreview; d
   const deployment = useDeployment();
   const { deriver } = useSession();
   const diff = useMemo(() => graphDiff(preview.before, preview.after), [preview]);
-  const marks = useMemo(() => noteOrigins(diffMarks(diff, [], new Set()), preview.members), [diff, preview]);
+  const marks = useMemo(() => noteOrigins(diffMarks(diff, []), preview.members), [diff, preview]);
   const subject = useMemo(() => ({ graph: preview.after }), [preview.after]);
   const reads = `insert:${domain}`;
   const derivedRead = useKeyedRead(PREVIEW_DERIVED, deployment === undefined ? undefined : { of: [reads], freshness: [preview.after, deployment.revision], args: { deriver, subject, deployment, reads } }).view;

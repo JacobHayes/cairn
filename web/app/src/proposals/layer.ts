@@ -16,7 +16,7 @@ import type { Deployment } from "../data/host.ts";
 import type { Domain, ProposalReview } from "../data/proposals.ts";
 import type { Ready } from "../detail/model.ts";
 import type { Shown } from "../screens/route-reads.ts";
-import { diffMarks, graphDiff, reviewEntries, type DiffKind, type ConflictReview, type DiffMark, type GraphDiff, type ProposalDraft, type ProposalPreview, type ReviewEntry, type ReviewItem, type UnresolvedReason } from "./model.ts";
+import { diffMarks, graphDiff, reviewEntries, type DiffKind, type DiffMark, type GraphDiff, type ProposalDraft, type ProposalPreview, type ReviewEntry, type ReviewItem, type UnresolvedReason } from "./model.ts";
 import type { Blocker } from "./model.ts";
 import type { Names } from "./words.ts";
 import type { ProposalWrite } from "./write.ts";
@@ -71,8 +71,6 @@ export interface LayerModel {
   unresolved: ReadonlyMap<number, UnresolvedReason>;
   /** The edits are newer than the preview that says which items still need a choice. */
   checking: boolean;
-  /** What the engine offers for each conflict item, by position (the preview's). */
-  conflicts: ReadonlyMap<number, ConflictReview>;
   today: string;
   editable: boolean;
 }
@@ -142,11 +140,11 @@ export function applyRevision(latest: number, drawn: number | undefined): number
 }
 
 /** The marks, diff and entries of a proposal over a destination's graphs. */
-export function layerMarks(args: { before: Graph | undefined; after: Graph | undefined; items: readonly ReviewItem[]; unresolved: ReadonlySet<number>; known: boolean; members: Record<string, string> }): { diff: GraphDiff; marks: Record<string, DiffMark>; entries: ReviewEntry[] } {
-  const { before, after, items, unresolved, known, members } = args;
+export function layerMarks(args: { before: Graph | undefined; after: Graph | undefined; items: readonly ReviewItem[]; known: boolean; members: Record<string, string> }): { diff: GraphDiff; marks: Record<string, DiffMark>; entries: ReviewEntry[] } {
+  const { before, after, items, known, members } = args;
   const empty: GraphDiff = { added: [], removed: [], changed: {}, edgesAdded: [], edgesRemoved: [] };
   const diff = known ? graphDiff(before, after) : empty;
-  const marks = diffMarks(diff, items, unresolved);
+  const marks = diffMarks(diff, items);
   for (const [key, note] of Object.entries(members)) {
     const mark = marks[key];
     if (mark?.kind === "added") {

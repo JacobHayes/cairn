@@ -205,12 +205,6 @@ mutations:
     artifact: https://example.org/plan
 - op: remove_annotation
   annotation: a_note
-- op: upgrade
-  to: 2
-- op: relink
-  lineage:
-    route: sample
-    version: 3
 - op: insert_segment
   insertion: i_review
   segment:
@@ -231,14 +225,6 @@ mutations:
       segment: n_review
     requires:
       host: n_plan
-- op: set_provenance
-  node: n_plan
-  provenance: orphaned
-- op: mark_local_edit
-  node: n_plan
-  edit:
-    field: title
-  marked: false
 - op: create_identity
   identity:
     key: who_one

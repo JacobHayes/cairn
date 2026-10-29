@@ -18,13 +18,12 @@ pub mod project;
 pub mod proposal;
 pub mod records;
 pub mod replay;
-mod restore;
 pub mod rules;
+mod save;
 mod stages;
 #[cfg(feature = "testing")]
 pub mod testing;
 pub mod transition;
-pub mod upgrade;
 mod validate;
 
 pub use cascade::plan_removal;
@@ -39,5 +38,4 @@ pub use proposal::{
 };
 pub use records::Records;
 pub use replay::replay;
-pub use restore::restore_nodes;
-pub use upgrade::{DraftError, relink, save_as_route, upgrade};
+pub use save::{DraftError, save_as_route};

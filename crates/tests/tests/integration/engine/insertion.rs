@@ -5,8 +5,7 @@
 use crate::engine::support;
 
 use cairn_engine::Records;
-use cairn_schema::{NodeKey, ParticipationSource, Provenance, Rejection, Revision, ViolationCode};
-use support::key;
+use cairn_schema::{NodeKey, ParticipationSource, Rejection, Revision, ViolationCode};
 
 const HIRING: &str = "{journey: j_hiring}";
 
@@ -101,16 +100,17 @@ fn a_segment_inserted_twice_gets_its_own_keys_and_resolves_through_the_first_rol
     ids.sort_unstable();
     assert_eq!(ids, ["security-review", "security-review-2"]);
     let from_segment = |records: &Records| {
-        let states = hiring(records).state.nodes.values();
-        states
-            .filter(|s| s.provenance == Provenance::FromSegment)
+        let graph = hiring(records);
+        let inserted = graph.insertions.values().flat_map(|i| i.nodes.keys());
+        inserted
+            .filter(|key| graph.nodes.get(key).is_some())
             .count()
     };
     let segment = segment_size(&one);
     assert_eq!(
         from_segment(&one),
         segment,
-        "the first insertion copies every segment node, each with its initial state"
+        "the first insertion copies every segment node"
     );
     let added_by_two = from_segment(&two) - from_segment(&one);
     assert_eq!(
@@ -127,7 +127,7 @@ fn a_segment_inserted_twice_gets_its_own_keys_and_resolves_through_the_first_rol
             .unwrap()
             .nodes
             .len(),
-        "every node of the second insertion has its initial state"
+        "every node of the second insertion is in the graph"
     );
     for threat in titled(&two, "Threat model") {
         let owner = graph
@@ -140,7 +140,6 @@ fn a_segment_inserted_twice_gets_its_own_keys_and_resolves_through_the_first_rol
             .next();
         assert!(matches!(owner, Some(ParticipationSource::Role(role)) if *role == reviewer));
     }
-    assert!(graph.state.local_edits.contains_key(&key("n_make_offer")));
     let derived = support::derived(&two, "j_hiring");
     let mut frontier: Vec<_> = derived
         .blocking()
