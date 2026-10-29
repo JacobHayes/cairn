@@ -5,7 +5,8 @@
 import type { Schema } from "@cairn/client";
 
 import { countCheck } from "../authoring/form-problems.ts";
-import type { Deriver, IdentityReferences } from "../data/host.ts";
+import { askValues } from "../data/checks.ts";
+import type { IdentityReferences } from "../data/host.ts";
 import type { Mutation } from "../data/writes.ts";
 import type { ChipRules } from "../ui/chips.ts";
 import { identityLabel } from "./label.ts";
@@ -21,15 +22,15 @@ export function newIdentityKey(random: (length: number) => Uint8Array = (length)
 }
 
 /** H3: the rules for an email chip: shown as the store holds it (trimmed and lower-cased); the engine says whether it is an email address, within the limit, and not already in the list. */
-export function emailRules(deriver: Pick<Deriver, "valueProblems">): ChipRules {
+export function emailRules(session: Parameters<typeof askValues>[0]): ChipRules {
   return {
     normalize: (email) => email.trim().toLowerCase(),
     problem: async (email, held) => {
-      const [problem] = await deriver.valueProblems([
+      const problems = await askValues(session, [
         { field: "email", kind: "email", what: `"${email}"`, value: email, taken: [...held] },
         countCheck("count", "email_count_per_identity_max", "emails in an identity", held.length + 1),
       ]);
-      return problem?.message;
+      return problems["email"] ?? problems["count"];
     },
   };
 }

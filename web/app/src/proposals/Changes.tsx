@@ -11,10 +11,11 @@ import { removalMutations, useRemovalPlan } from "../authoring/removal.ts";
 import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
 import { draftOf, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
 import { useDraftProblems } from "../authoring/form-problems.ts";
-import { NewNodeFields, useNewNodeCheck } from "../authoring/NewNodeFields.tsx";
-import { moveTargets, newNode, nodesByPath, nodesFor, pathOf, rolesForFill, type GraphNode, type Mutation, type NodeField, type NodeKind, type ReferenceField, type Role, type Tree } from "../authoring/graph.ts";
+import { NewNodeFields, useNewNodeCheck, type NewNodeValues } from "../authoring/NewNodeFields.tsx";
+import { moveTargets, newNode, nodesByPath, nodesFor, pathOf, rolesForFill, type GraphNode, type Mutation, type NodeField, type ReferenceField, type Role, type Tree } from "../authoring/graph.ts";
 import { BasicsFields, ChecklistEditor, type NewItem, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
 import { CheckFailed, FieldBox, Picker } from "../authoring/parts.tsx";
+import { useDraft } from "../data/drafts.ts";
 import type { Deployment } from "../data/host.ts";
 import { subjectOf } from "../data/writes.ts";
 import { Input as AnswerInput } from "../detail/AnswerEditor.tsx";
@@ -24,6 +25,7 @@ import { fieldWords } from "../status/words.ts";
 import { NODE_FIELDS } from "@cairn/client";
 import { Button, Input, PickBox } from "../ui/kit.tsx";
 import { carryIds, withFieldValue, withMutation, withMutationsAdded, withoutMutation, type ProposalDraft } from "./model.ts";
+import { addNodeKey, isNewNodeValues, useNodeTyped } from "./typed.ts";
 import { mutationWords, type Names } from "./words.ts";
 
 /** What the change editors read and change. */
@@ -41,6 +43,8 @@ export interface ChangesContext {
   editable: boolean;
   /** The destination has a graph to add nodes and edges to (the deployment's identities have none). */
   hasGraph: boolean;
+  /** The proposal being reviewed: what a reviewer has typed and not yet added is kept under it. */
+  proposal: string;
   /** Where a new node goes unless another is picked (a breakdown's placeholder). */
   defaultParent: string | undefined;
   /** The editors holding a value with a problem, or one the engine has not passed yet. */
@@ -293,24 +297,22 @@ function MutationRow({ index, editor, mutation, context }: { index: number; edit
 function AddNode({ context }: { context: ChangesContext }) {
   const pending = (context.draft.mutations ?? []).flatMap((mutation) => (mutation.op === "add_node" ? [mutation.node] : []));
   const lastParent = pending.at(-1)?.parent ?? undefined;
-  const [kind, setKind] = useState<NodeKind>("action");
-  const [title, setTitle] = useState("");
-  const [parent, setParent] = useState(context.defaultParent ?? lastParent ?? "");
+  // What is typed is kept like any unsent form, so switching to another node's editor and back finds it.
+  const [kept, setKept] = useDraft<NewNodeValues>(addNodeKey(context.proposal), isNewNodeValues);
+  const { kind, title, parent } = kept ?? { kind: "action", title: "", parent: context.defaultParent ?? lastParent ?? "" };
   const check = useNewNodeCheck(title, context.tree.byKey.size);
   const unsendable = !check.ready;
-  // A node typed here and not yet added is left out of the proposal: Apply waits for it to be added or cleared.
-  useInvalid(context, "add-node", title.trim() !== "");
   const add = () => {
     if (unsendable) {
       return;
     }
     const node = newNode(context.tree, kind, title, parent === "" ? undefined : parent, pending);
     context.edit(withMutationsAdded(context.draft, [{ op: "add_node", node }]));
-    setTitle("");
+    setKept({ kind, title: "", parent });
   };
   return (
     <form className="stack" data-testid="proposal-add-node" onSubmit={(event) => { event.preventDefault(); add(); }}>
-      <NewNodeFields values={{ kind, title, parent }} onChange={(next) => { setKind(next.kind); setTitle(next.title); setParent(next.parent); }} tree={context.tree} check={check} />
+      <NewNodeFields values={{ kind, title, parent }} onChange={setKept} tree={context.tree} check={check} />
       <span>
         <Button type="submit" disabled={unsendable}>
           Add a node
@@ -371,7 +373,22 @@ function useCarriedIds(mutations: readonly Mutation[]): string[] {
   return held.current.ids;
 }
 
-/** C14: the proposal's changes, each editable, and what a reviewer can add; with `only`, just the changes whose node it keeps (and no additions). */
+/** What a reviewer can add to the proposal: a node, a removal, an edge. Opens on a node typed and not yet added, so it is never out of sight. */
+export function Additions({ context }: { context: ChangesContext }) {
+  const typed = useNodeTyped(context.proposal);
+  if (!context.editable || !context.hasGraph) {
+    return null;
+  }
+  return (
+    <Section title="Add a change" summary={typed ? "a node not yet added" : undefined} open={typed} testId="proposal-additions">
+      <AddNode context={context} />
+      <RemoveNode context={context} />
+      <AddEdge context={context} />
+    </Section>
+  );
+}
+
+/** C14: the proposal's changes, each editable; with `only`, just the changes whose node it keeps. */
 export function ChangeList({ context, only }: { context: ChangesContext; only?: (node: string | undefined) => boolean }) {
   const mutations = context.draft.mutations ?? [];
   const ids = useCarriedIds(mutations);
@@ -387,13 +404,6 @@ export function ChangeList({ context, only }: { context: ChangesContext; only?: 
           only !== undefined && !only(subjectOf(mutation)) ? null : <MutationRow key={ids[index]} editor={ids[index] ?? String(index)} index={index} mutation={mutation} context={context} />,
         )}
       </ol>
-      {context.editable && context.hasGraph && only === undefined ? (
-        <div className="stack" data-testid="proposal-additions">
-          <AddNode context={context} />
-          <RemoveNode context={context} />
-          <AddEdge context={context} />
-        </div>
-      ) : null}
     </div>
   );
 }

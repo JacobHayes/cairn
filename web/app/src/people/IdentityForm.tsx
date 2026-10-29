@@ -16,7 +16,8 @@ import { ChipsInput } from "../ui/ChipsInput.tsx";
 import { Button, Input } from "../ui/kit.tsx";
 import { CheckFailed, invalidAttrs, Problem } from "../authoring/parts.tsx";
 import { useSession } from "../data/react.ts";
-import { useValueProblems, type Checked } from "../authoring/form-problems.ts";
+import type { Checked } from "../data/react.ts";
+import { useValueProblems } from "../authoring/form-problems.ts";
 import { emailRules, identityOf, newIdentityKey, type Identity } from "./model.ts";
 
 /** What is typed in the form, and the email typed and not yet taken as a chip. */
@@ -63,8 +64,8 @@ function mayBeSent(typed: Typed, checks: Checked<Record<string, string | undefin
 function Fields({ typed, change, checks }: { typed: Typed; change: (next: Typed) => void; checks: Checked<Record<string, string | undefined>> }) {
   const problem = checks.problems.name;
   const message = useId();
-  const { deriver } = useSession();
-  const rules = useMemo(() => emailRules(deriver), [deriver]);
+  const session = useSession();
+  const rules = useMemo(() => emailRules(session), [session]);
   // The engine's answer to an email arrives later: it joins the form as it is then, not as it was when the email was taken.
   const latest = useRef(typed);
   latest.current = typed;

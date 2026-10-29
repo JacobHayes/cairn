@@ -7,28 +7,15 @@
 // sendable until the engine has answered.
 import type { CountLimit, NodeFormValues, ValueCheck } from "@cairn/wasm";
 
-import { DERIVE, type ReadError, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
-import { useKeyedRead, useSession } from "../data/react.ts";
+import { fieldProblems, type ProblemsByField } from "../data/checks.ts";
+import { useEngineCheck, type Checked } from "../data/react.ts";
 import type { Deriver } from "../data/host.ts";
 import { useConditionProblem } from "./condition-problem.ts";
-import { partsOf } from "./dates.ts";
 import { fieldsOf, type NodeDraft, type FormField } from "./fields.ts";
 import type { NodeKind } from "./graph.ts";
 
 /** Why each field cannot be sent, by field. */
 export type DraftProblems = Partial<Record<FormField, string>>;
-
-/** What a form is told by the engine's check of its values. */
-export interface Checked<Problems> {
-  /** The engine has answered for the values as they are now (nothing is sent before). */
-  checked: boolean;
-  /** Why each field cannot be sent; until the engine has answered, the last answer, so a message does not flicker as the author types. */
-  problems: Problems;
-  /** Why the check could not be made, when it could not. */
-  failure: ReadError | undefined;
-  /** Asks for the check again. */
-  retry: () => void;
-}
 
 /** The values of the fields a node of `kind` has, as the engine reads them. */
 export function formValues(kind: NodeKind, draft: NodeDraft): NodeFormValues {
@@ -38,8 +25,7 @@ export function formValues(kind: NodeKind, draft: NodeDraft): NodeFormValues {
     if (value === null) {
       return {};
     }
-    const { sources, offset } = partsOf(value);
-    return { [which]: { sources, offset: Number.isNaN(offset) ? null : offset } };
+    return { [which]: { sources: value.sources, offset: value.offset.trim() === "" ? null : Number(value.offset) } };
   };
   return {
     ...(has.has("id") ? { id: draft.id } : {}),
@@ -54,28 +40,6 @@ export function formValues(kind: NodeKind, draft: NodeDraft): NodeFormValues {
     ...rule("due_by"),
     ...rule("not_before"),
   };
-}
-
-type ProblemsByField = Record<string, string>;
-
-interface Args {
-  deriver: Deriver;
-  ask: (deriver: Deriver) => Promise<ProblemsByField>;
-}
-
-const PROBLEMS: ReadSource<Args, ProblemsByField> = {
-  policy: DERIVE,
-  read: ({ deriver, ask }) => ask(deriver),
-};
-
-/** Reads `ask` again whenever `freshness` (everything it is asked about) changes. */
-function useEngineCheck(of: string, freshness: unknown, ask: Args["ask"]): Checked<ProblemsByField> {
-  const { deriver } = useSession();
-  const key: ReadKey<Args> = { of: [of], freshness: [JSON.stringify(freshness)], args: { deriver, ask } };
-  const { view, refresh } = useKeyedRead(PROBLEMS, key);
-  const held = view.status === "current" || view.status === "refreshing" || view.status === "behind" ? view.value : {};
-  const failure = view.status === "failed" || view.status === "behind" ? view.error : undefined;
-  return { checked: view.status === "current", problems: held, failure, retry: refresh };
 }
 
 async function nodeProblems(deriver: Deriver, values: NodeFormValues): Promise<ProblemsByField> {
@@ -108,13 +72,7 @@ export function useDraftProblems(kind: NodeKind, draft: NodeDraft): Checked<Draf
 
 /** Why each of `checks` cannot be sent, by the check's `field`: the engine's, from the types the patch reader reads the same values with. */
 export function useValueProblems(checks: readonly ValueCheck[]): Checked<Record<string, string | undefined>> {
-  return useEngineCheck("values", checks, async (deriver) => {
-    const problems: ProblemsByField = {};
-    for (const problem of await deriver.valueProblems([...checks])) {
-      problems[problem.field] = problem.message;
-    }
-    return problems;
-  });
+  return useEngineCheck("values", checks, (deriver) => fieldProblems(deriver, checks));
 }
 
 /** The check that `count` things (what the graph or list would hold) are within `limit`; `what` completes "At most N ...". */

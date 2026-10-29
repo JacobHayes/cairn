@@ -59,7 +59,7 @@ export function Band() {
   }
   const reviewing = layer.reviewing;
   const held = proposal.status !== "open" || reviewing.blockers.length > 0 || reviewing.write.disabled;
-  const holds = holdsWords(reviewing.blockers);
+  const holds = holdsWords(reviewing.blockers, reviewing.invalid);
   const creates = layer.creates ? `, which creates this ${layer.kind === "route" ? "route" : "journey"}` : "";
   return (
     <div className="layer-band" data-testid="layer-band" data-mode="reviewing" data-revision={proposal.revision}>

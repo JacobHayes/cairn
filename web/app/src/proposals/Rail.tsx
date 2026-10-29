@@ -18,11 +18,11 @@ import { Inspector } from "../shell/frame.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
-import { ChangeList } from "./Changes.tsx";
+import { Additions, ChangeList } from "./Changes.tsx";
 import { Problem } from "./Entries.tsx";
 import { ItemList } from "./Items.tsx";
 import { identityDiff, useLayer, type Layer, type LayerModel } from "./layer.ts";
-import { DIFF_LABELS, itemNode, withMutationsAdded, type DiffKind, type DiffMark, type Proposal } from "./model.ts";
+import { ADD_NODE_EDITOR, DIFF_LABELS, itemNode, withMutationsAdded, type DiffKind, type DiffMark, type Proposal } from "./model.ts";
 import { rolesAddedBy } from "./review.ts";
 import { StalePanel } from "./Stale.tsx";
 import { subjectOf, violationNode } from "../data/writes.ts";
@@ -32,9 +32,8 @@ import { stateOf, type Blocker } from "./model.ts";
 import "./proposals.css";
 
 /** What each thing that stops an apply says, in the rail's "Apply waits for" line and on Apply's hover. */
-export const BLOCKER_WORDS: Record<Blocker, string> = {
+const BLOCKER_WORDS: Record<Exclude<Blocker, "editing">, string> = {
   not_open: "it is no longer open",
-  editing: "an edit with a problem to be fixed or dropped",
   unsaved: "your unsaved edits",
   stale: "a refresh",
   unresolved: "the choices below",
@@ -42,9 +41,17 @@ export const BLOCKER_WORDS: Record<Blocker, string> = {
   no_preview: "its preview",
 };
 
-/** "Apply waits for a refresh and the choices below": the holds in words, without counts; none when nothing holds. */
-export function holdsWords(blockers: readonly Blocker[]): string | undefined {
-  const words = blockers.filter((blocker) => blocker !== "not_open").map((blocker) => BLOCKER_WORDS[blocker]);
+/** What an editor still holding something is waiting on, said for what it holds: a node typed and not added, or an edit with a problem. */
+function editingWords(invalid: ReadonlySet<string>): string[] {
+  return [
+    ...(invalid.has(ADD_NODE_EDITOR) ? ["the node you are adding to be added or cleared"] : []),
+    ...([...invalid].some((editor) => editor !== ADD_NODE_EDITOR) ? ["an edit with a problem to be fixed or dropped"] : []),
+  ];
+}
+
+/** "Apply waits for a refresh and the choices below": the holds in words, without counts; none when nothing holds. `invalid` names the editors holding something. */
+export function holdsWords(blockers: readonly Blocker[], invalid: ReadonlySet<string>): string | undefined {
+  const words = blockers.flatMap((blocker) => (blocker === "not_open" ? [] : blocker === "editing" ? editingWords(invalid) : [BLOCKER_WORDS[blocker]]));
   if (words.length === 0) {
     return undefined;
   }
@@ -225,6 +232,7 @@ function useContexts(layer: Layer, model: LayerModel) {
       ready: layer.before,
       editable: model.editable,
       hasGraph: layer.kind !== "deployment",
+      proposal: layer.review?.proposal.id ?? "",
       defaultParent: placeholder,
       invalid,
       setInvalid,
@@ -386,6 +394,7 @@ function ProposalBody({ layer, model, onPick }: { layer: Layer; model: LayerMode
         <Section title="All its changes" testId="all-changes">
           <ChangeList context={contexts.changes} />
         </Section>
+        <Additions context={contexts.changes} />
       </div>
     </>
   );
@@ -442,7 +451,7 @@ export function Rail({ selected }: { selected: string | undefined }) {
     );
   }
   const onPick = (key: string) => void navigate(addresses.open(key), { state: { reveal: { key, how: "centre" } } });
-  const holds = holdsWords(reviewing.blockers);
+  const holds = holdsWords(reviewing.blockers, reviewing.invalid);
   const body: ReactNode =
     selected !== undefined && layer.kind !== "deployment" ? <NodeEditor layer={layer} model={model} node={selected} back={addresses.close()} /> : <ProposalBody layer={layer} model={model} onPick={onPick} />;
   return (

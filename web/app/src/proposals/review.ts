@@ -16,7 +16,8 @@ import type { Ready } from "../detail/model.ts";
 import { addedRoles, insertionMembers } from "../segments/model.ts";
 import { useSegmentNames } from "../segments/read.ts";
 import { applyRevision, layerMarks, type Kept, type LayerModel, type ProposalOutline, type Reviewing } from "./layer.ts";
-import { applyBlockers, type DiffMark, type Proposal, type ProposalDraft, type ProposalPreview, type UnresolvedReason } from "./model.ts";
+import { ADD_NODE_EDITOR, applyBlockers, type DiffMark, type Proposal, type ProposalDraft, type ProposalPreview, type UnresolvedReason } from "./model.ts";
+import { useNodeTyped } from "./typed.ts";
 import { namesOf } from "./words.ts";
 import { useProposalWrite } from "./write.ts";
 
@@ -46,7 +47,10 @@ export function useEdits(review: ProposalReview, refetch: () => void) {
   const id = proposal.id;
   const write = useProposalWrite(`proposal:${id}`, proposal.draft.title);
   const [kept, setKept] = useDraft<Kept>(`proposal:${id}`);
-  const { invalid, setInvalid } = useInvalidEditors();
+  const { invalid: problems, setInvalid } = useInvalidEditors();
+  // A node typed in the additions and not yet added is left out of the proposal: Apply waits for it, whichever editor is shown.
+  const typed = useNodeTyped(id);
+  const invalid = useMemo(() => (typed ? new Set([...problems, ADD_NODE_EDITOR]) : problems), [problems, typed]);
   /** Reads the proposal again once a write landed, if the review is still there to read it. */
   const reread = () => {
     if (write.mounted()) {

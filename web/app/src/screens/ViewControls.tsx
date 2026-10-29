@@ -18,12 +18,12 @@ import { useLocation } from "react-router";
 import { Check, Counted, FlagChecks } from "../acting/Controls.tsx";
 import { STEP_WORDS, stepOf, stepsFor } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
-import { useSession } from "../data/react.ts";
+import { useValueProblems } from "../authoring/form-problems.ts";
 import type { GraphNode, Ready } from "../detail/model.ts";
 import { identityName } from "../detail/sections.tsx";
 import type { Screen } from "../journeys/address.ts";
 import type { HiddenCounts } from "../journeys/requests.ts";
-import { canDraw, fadeOn, FILTER_FLAGS, JOURNEY_OFFERS, RELEVANCE_CLASSES, ROUTE_OFFERS, SCREEN_VIEWS, filterChanged, filterChips, isStock, stockView, useViewState, withViewState, type RelevanceClass, type ViewFilter, type ViewOffers } from "../journeys/view.ts";
+import { canDraw, fadeOn, FILTER_FLAGS, JOURNEY_OFFERS, RELEVANCE_CLASSES, ROUTE_OFFERS, SCREEN_VIEWS, filterChanged, filterChips, isStock, searchCheck, stockView, useViewState, withViewState, type RelevanceClass, type ViewFilter, type ViewOffers } from "../journeys/view.ts";
 import { useMedia, PHONE_WIDTH } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { ActiveFilters } from "./ActiveFilters.tsx";
@@ -232,39 +232,36 @@ function Search({ onDone }: { onDone?: () => void }) {
 
 function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) => void }) {
   const [typed, setTyped] = useState(text);
-  const { deriver } = useSession();
-  // The engine's answer applies only if nothing was typed since, and the screen is still here; it joins the view as it is by then.
-  const turn = useRef(0);
-  const latest = useRef(onSearch);
-  latest.current = onSearch;
-  useEffect(() => () => { turn.current += 1; }, []);
+  // The text submitted and waiting for the engine's reading of it; typing again drops it.
+  const [asked, setAsked] = useState<string | undefined>(undefined);
+  const input = useRef<HTMLInputElement>(null);
+  const check = useValueProblems([searchCheck(asked ?? "")]);
+  const problem = check.problems["q"];
+  // The engine reads the search as a title: one it refuses never leaves the box, and is said where it is typed.
+  useEffect(() => {
+    if (asked === undefined || !check.checked) {
+      return;
+    }
+    setAsked(undefined);
+    if (problem === undefined) {
+      onSearch(asked.trim());
+    } else {
+      input.current?.setCustomValidity(problem);
+      input.current?.reportValidity();
+    }
+  }, [asked, check.checked, problem, onSearch]);
   return (
     <form
       className="toolbar-search"
       role="search"
       onSubmit={(event) => {
         event.preventDefault();
-        // The engine reads the search as a title: one it refuses never leaves the box, and is said where it is typed.
-        const input = event.currentTarget.elements.namedItem("q");
-        const search = typed.trim();
-        turn.current += 1;
-        const mine = turn.current;
-        void deriver.valueProblems([{ field: "q", kind: "title", what: "The search", value: search, optional: true }]).then(([problem]) => {
-          if (mine !== turn.current) {
-            return;
-          }
-          if (input instanceof HTMLInputElement) {
-            input.setCustomValidity(problem?.message ?? "");
-            input.reportValidity();
-          }
-          if (problem === undefined) {
-            latest.current(search);
-          }
-        });
+        setAsked(typed);
       }}
     >
       <Tip tip="Search titles, descriptions, notes and resources, then Enter" keys="/">
         <input
+          ref={input}
           type="search"
           aria-label="Search"
           placeholder="Search"
@@ -274,7 +271,7 @@ function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) 
           value={typed}
           onChange={(event) => {
             event.target.setCustomValidity("");
-            turn.current += 1;
+            setAsked(undefined);
             setTyped(event.target.value);
             // Emptying the box (its own clear button too) takes an applied search off at once: no filter stays on unseen.
             if (event.target.value === "" && text !== "") {

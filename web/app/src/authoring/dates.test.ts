@@ -23,7 +23,7 @@ describe("date rules (A8)", () => {
     expect(options[0]?.source).toBe(CREATED_AT);
     expect(options.map((option) => option.source)).toEqual(expect.arrayContaining(["n_kickoff", "n_decision_meeting", "n_meeting_date"]));
     for (const { source } of options) {
-      const rule = ruleOf({ direction: "before", sources: [source], offset: 2 });
+      const rule = ruleOf({ direction: "before", sources: [source], offset: "2" });
       const outcome = applyToDraft(host.engine, host.deployment(), graph, [{ op: "add_node", node: { ...lone, due_by: rule } }]);
       expect([source, outcome.accepted]).toEqual([source, true]);
     }
@@ -44,11 +44,11 @@ describe("date rules (A8)", () => {
 });
 
 describe("a blank offset", () => {
-  it("is no number, not 0, in the parts, in the rule, and after a draft is kept as JSON", () => {
-    const rule = ruleOf({ direction: "before", sources: ["n_kickoff"], offset: Number.NaN });
-    expect(Number.isNaN(partsOf(rule).offset)).toBe(true);
-    expect(Number.isNaN(partsOf(JSON.parse(JSON.stringify(rule)) as typeof rule).offset)).toBe(true);
-    expect(partsOf({ before: "n_kickoff" }).offset).toBe(0);
+  it("stays blank as text in the parts, and makes a rule with no number, not 0", () => {
+    const parts = { direction: "before" as const, sources: ["n_kickoff"], offset: "" };
+    expect(partsOf(ruleOf(parts)).offset).not.toBe("0");
+    expect(ruleOf(parts).offset).toBeNaN();
+    expect(partsOf({ before: "n_kickoff" }).offset).toBe("0");
   });
 });
 

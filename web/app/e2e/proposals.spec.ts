@@ -218,6 +218,7 @@ test("C14, A1a: a node a reviewer adds to a proposal is checked as it is typed, 
   if ((await whenSettled(page, () => changes.getAttribute("open"))) === null) {
     await changes.locator("summary").first().click();
   }
+  await page.getByTestId("proposal-additions").locator("summary").first().click();
   const adder = page.getByTestId("proposal-add-node");
   const add = adder.getByRole("button", { name: "Add a node" });
   // Labels are visible, and a title past the limit says so at the box and holds the button.
@@ -241,4 +242,25 @@ test("C14, A1a: a node a reviewer adds to a proposal is checked as it is typed, 
   await title.fill("Renamed step");
   await added.getByRole("button", { name: "Done" }).click();
   await expect(page.locator('[data-testid="change"][data-op="add_node"]', { hasText: "Renamed step" })).toBeVisible();
+});
+
+test("C14: a node typed in a proposal's additions survives switching to another node's editor, and the hold says what it is", async ({ page }) => {
+  await draftUpgrade(page);
+  const changes = page.getByTestId("all-changes");
+  if ((await whenSettled(page, () => changes.getAttribute("open"))) === null) {
+    await changes.locator("summary").first().click();
+  }
+  const additions = page.getByTestId("proposal-additions");
+  await additions.locator("summary").first().click();
+  await page.getByTestId("proposal-add-node").getByLabel("New node title").fill("Kept while away");
+  // A node typed and not added is no problem to fix: the hold says to add or clear it.
+  await expect(page.getByTestId("apply-waits")).toContainText("the node you are adding to be added or cleared");
+  await expect(page.getByTestId("apply-waits")).not.toContainText("fixed or dropped");
+  // Another node's editor takes the rail; coming back finds the title and the additions open on it.
+  await pickNode(page, "n_access");
+  // The typed node still holds Apply while another editor is shown.
+  expect(await blockers(page)).toContain("editing");
+  await page.getByRole("link", { name: /The proposal/ }).click();
+  await expect(page.getByTestId("proposal-additions")).toHaveAttribute("open", "");
+  await expect(page.getByTestId("proposal-add-node").getByLabel("New node title")).toHaveValue("Kept while away");
 });

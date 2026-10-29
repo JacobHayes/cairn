@@ -1,11 +1,12 @@
 // The data layer as React hooks: every screen reads through these, never the host directly.
 import { streamStatus, type StreamStatus } from "@cairn/client";
 import { useActorRef, useSelector } from "@xstate/react";
-import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
 
 import type { Capabilities, Deployment, Caller } from "./host.ts";
 import { derivationOf, journeyView, MISSING, sameDerivation, type Derivation, type JourneyView } from "./journeys.ts";
-import { heldValue, keyedRead, readView, type ReadKey, type ReadSnapshot, type ReadSource, type ReadView } from "./keyed-read.ts";
+import { ENGINE_CHECK, fieldProblems, type EngineAsk, type ProblemsByField } from "./checks.ts";
+import { heldValue, keyedRead, readView, valueOf, type ReadError, type ReadKey, type ReadSnapshot, type ReadSource, type ReadView } from "./keyed-read.ts";
 import { liveSource, type LiveSpec } from "./live.ts";
 import type { SaveEvent } from "./activity.ts";
 import { aboutOf, inFlightOf, problemsOf, submitWrite, writeOf } from "./edit-manager.ts";
@@ -28,50 +29,40 @@ export function useSession(): Session {
   return session;
 }
 
-/** What the engine has said of each address that might be a journey id, and the questions it is still asked (one for any number of readers). */
-const shapeAnswers = new Map<string, boolean>();
-const shapeAsked = new Map<string, Promise<boolean>>();
-/** The most addresses remembered: a tab visits a handful, and the answer is one question to the engine again. */
-const SHAPE_COUNT_MAX = 256;
+/** What a form is told by the engine's check of its values. */
+export interface Checked<Problems> {
+  /** The engine has answered for the values as they are now (nothing is sent before). */
+  checked: boolean;
+  /** Why each field cannot be sent; until the engine has answered, the last answer, so a message does not flicker as the author types. */
+  problems: Problems;
+  /** Why the check could not be made, when it could not. */
+  failure: ReadError | undefined;
+  /** Asks for the check again. */
+  retry: () => void;
+}
 
-/** Whether `id` is a journey id, as the engine reads it; a check that cannot be made lets the read go ahead and say what failed. */
-function askShape(deriver: Session["deriver"], id: string): Promise<boolean> {
-  let asked = shapeAsked.get(id);
-  if (asked === undefined) {
-    if (shapeAsked.size >= SHAPE_COUNT_MAX) {
-      shapeAsked.clear();
-      shapeAnswers.clear();
-    }
-    asked = deriver.valueProblems([{ field: "id", kind: "journey_id", what: "The id", value: id }]).then(
-      (problems) => problems.length === 0,
-      () => true,
-    );
-    shapeAsked.set(id, asked);
-    void asked.then((shaped) => shapeAnswers.set(id, shaped));
-  }
-  return asked;
+/** Reads `ask` again whenever `freshness` (everything it is asked about) changes; `of` names what is checked. */
+export function useEngineCheck(of: string, freshness: unknown, ask: EngineAsk["ask"]): Checked<ProblemsByField> {
+  const { deriver } = useSession();
+  const key: ReadKey<EngineAsk> = { of: [of], freshness: [JSON.stringify(freshness)], args: { deriver, ask } };
+  const { view, refresh } = useKeyedRead(ENGINE_CHECK, key);
+  const held = valueOf(view) ?? {};
+  const failure = view.status === "failed" || view.status === "behind" ? view.error : undefined;
+  return { checked: view.status === "current", problems: held, failure, retry: refresh };
 }
 
 /**
  * Whether `id` is a journey id at all, as the engine reads it: undefined until it has answered.
  * An address that is not one names no journey, so nothing reads or watches it (a watch of a
- * malformed id would be refused for the whole stream).
+ * malformed id would be refused for the whole stream). A check that cannot be made lets the read
+ * go ahead and say what failed.
  */
 export function useIsJourneyId(id: string): boolean | undefined {
-  const { deriver } = useSession();
-  const [, answered] = useState(0);
-  useEffect(() => {
-    let current = true;
-    void askShape(deriver, id).then(() => {
-      if (current) {
-        answered((count) => count + 1);
-      }
-    });
-    return () => {
-      current = false;
-    };
-  }, [deriver, id]);
-  return shapeAnswers.get(id);
+  const check = useEngineCheck("journey-id", id, (deriver) => fieldProblems(deriver, [{ field: "id", kind: "journey_id", what: "The id", value: id }]));
+  if (check.failure !== undefined) {
+    return true;
+  }
+  return check.checked ? Object.keys(check.problems).length === 0 : undefined;
 }
 
 /** Journey `id`, derived in the worker and kept current while shown (H6). */

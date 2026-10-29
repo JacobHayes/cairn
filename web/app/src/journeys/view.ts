@@ -8,6 +8,7 @@
 // settings (the graph's open containers, the list's sort and columns, the timeline's range) ride
 // along in the query too, so switching back restores them. Every setting at its default leaves the address bare. Pure but for the context,
 // so the unit tests read the rules without a page.
+import type { ValueCheck } from "@cairn/wasm";
 import { createContext, useContext } from "react";
 
 import { NO_OWNER } from "../detail/sections.tsx";
@@ -108,6 +109,11 @@ export function viewStateFrom(params: URLSearchParams, offers: ViewOffers = JOUR
     },
     text: params.get("q") ?? "",
   };
+}
+
+/** The engine's check of a search: it reads the text as a title, so one it refuses never narrows a view. */
+export function searchCheck(text: string): ValueCheck {
+  return { field: "q", kind: "title", what: "The search", value: text.trim(), optional: true };
 }
 
 /** `state` as query parameters, in `VIEW_PARAMS` order, leaving out what is at its default. */

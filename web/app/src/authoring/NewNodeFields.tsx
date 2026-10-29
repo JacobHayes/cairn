@@ -5,7 +5,8 @@ import { useId } from "react";
 
 import { Input } from "../ui/kit.tsx";
 import { KINDS } from "../detail/model.ts";
-import { countCheck, useValueProblems, type Checked } from "./form-problems.ts";
+import type { Checked } from "../data/react.ts";
+import { countCheck, useValueProblems } from "./form-problems.ts";
 import { canHoldChildren, kindOption, nodesByPath, pathOf, type NodeKind, type Tree } from "./graph.ts";
 import { CheckFailed, invalidAttrs, Labelled, Picker, Problem } from "./parts.tsx";
 

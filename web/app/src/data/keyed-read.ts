@@ -33,7 +33,7 @@ import {
   type Tracked,
 } from "@cairn/client";
 import { HostFailure } from "@cairn/wasm";
-import { assign, enqueueActions, fromCallback, fromPromise, setup, type ActorRefFrom, type AnyActorRef, type SnapshotFrom } from "xstate";
+import { assign, createActor, enqueueActions, fromCallback, fromPromise, setup, waitFor, type ActorRefFrom, type AnyActorRef, type SnapshotFrom } from "xstate";
 
 import { Missing, ReadFailed, Skewed } from "./host.ts";
 
@@ -745,4 +745,25 @@ export function worstLag(lags: readonly (Lag | undefined)[]): Lag | undefined {
     }
   }
   return worst;
+}
+
+/**
+ * One read, for a caller that needs its answer at a moment of its own (a value taken on Enter)
+ * rather than shown: the same machine runs it, so it has the same policy and failures as a read a
+ * screen shows. Rejects with the failure when the read fails, never waiting out a retry.
+ */
+export async function readOnce<A, T>(source: ReadSource<A, T>, env: ReadEnv, key: ReadKey<A>): Promise<T> {
+  const actor = createActor(keyedRead, { input: { source, env } });
+  actor.start();
+  actor.send({ type: "want", key });
+  try {
+    const snapshot = await waitFor(actor, (each) => ["current", "failed", "behind"].includes(readView<T>(each, key.of, key.freshness).status));
+    const view = readView<T>(snapshot, key.of, key.freshness);
+    if (view.status === "current") {
+      return view.value;
+    }
+    throw new Error(view.status === "failed" || view.status === "behind" ? view.error.message : "the read did not answer");
+  } finally {
+    actor.stop();
+  }
 }

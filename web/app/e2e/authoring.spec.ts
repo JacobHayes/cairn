@@ -154,8 +154,8 @@ test("A1a, A15: Publish waits for every form holding input not yet sent, a blank
   const first = await addNode(page, "milestone", "Kickoff");
   const report = await addNode(page, "deliverable", "Report");
   const publish = page.getByTestId("publish-draft");
+  // A held Publish says why and points at what holds it: the form is drawn again, with the focus in it.
   const held = async (words: RegExp) => {
-    // A held Publish says why when it is pressed; the palette and the panels close under the press, their drafts stay.
     await publish.click({ force: true });
     await expect(page.getByText(words).first()).toBeVisible();
   };
@@ -171,23 +171,29 @@ test("A1a, A15: Publish waits for every form holding input not yet sent, a blank
     await expect(palette.locator(".label", { hasText: new RegExp(`^${label}$`, "i") })).toBeVisible();
   }
   await palette.getByLabel("New node title").fill("Another");
+  // The press closes the palette; the held Publish opens it again at the title.
+  await page.getByTestId("canvas").click({ position: { x: 5, y: 5 }, force: true });
+  await expect(palette).toHaveCount(0);
   await held(/Save or discard your changes to the node being added first/);
-  await page.getByTestId("add-menu").click();
+  await expect(palette.getByLabel("New node title")).toBeFocused();
   await palette.getByLabel("New node title").fill("");
   // A resource form with input.
   await nodeCard(page, report).getByTestId("card-open").click();
   await (await section(page, "author-resources")).getByRole("button", { name: "Add a resource" }).click();
   await structure(page).getByTestId("resource-form").getByLabel("Resource title").fill("A tip");
-  await held(/Save or discard your changes to a resource of Report first/);
-  await nodeCard(page, report).getByTestId("card-open").click();
+  // A click that arrives with no pointer or key (a screen reader's) points at the form as well.
+  await publish.evaluate((button) => { (button as HTMLElement).click(); });
+  await expect(page.getByText(/Save or discard your changes to a resource of Report first/).first()).toBeVisible();
+  await expect(structure(page).getByTestId("resource-form").getByLabel("Resource title")).toBeFocused();
   await structure(page).getByTestId("resource-form").getByRole("button", { name: "Cancel" }).click();
   // A role form with input.
   await page.getByTestId("roles-menu").click();
   const roles = page.getByTestId("roles-and-kinds").getByTestId("roles");
   await roles.getByRole("button", { name: "Add a role" }).click();
   await roles.getByTestId("role-form").getByLabel("role label").fill("Lead");
+  await page.getByTestId("canvas").click({ position: { x: 5, y: 5 }, force: true });
   await held(/Save or discard your changes to a role first/);
-  await page.getByTestId("roles-menu").click();
+  await expect(roles.getByTestId("role-form").getByLabel("role label")).toBeFocused();
   await roles.getByTestId("role-form").getByRole("button", { name: "Cancel" }).click();
   await expect(publish).not.toHaveAttribute("data-held", /.+/);
   // A blank offset is no number: the engine's message shows, and nothing is sent as 0.
@@ -212,4 +218,22 @@ test("A1a, A15: Publish waits for every form holding input not yet sent, a blank
   const id = await whenSettled(page, () => violation.getAttribute("id"));
   expect(id).not.toBeNull();
   await expect(formField(page, "final").getByRole("checkbox")).toHaveAttribute("aria-describedby", new RegExp(`(^| )${id ?? ""}( |$)`));
+});
+
+test("A6: a role's id follows its label until the author types over it, and an unsent form is not lost to another role's Edit", async ({ page }) => {
+  await newRoute(page, "browser", routeName("Roles"));
+  await addRole(page, "Lead");
+  const roles = page.getByTestId("roles-and-kinds").getByTestId("roles");
+  await roles.getByRole("button", { name: "Add a role" }).click();
+  const form = roles.getByTestId("role-form");
+  await form.getByLabel("role label").fill("Sponsor");
+  await expect(form.getByLabel("role id")).toHaveValue("sponsor");
+  await form.getByLabel("role id").fill("chief");
+  await form.getByLabel("role label").fill("Sponsor of the work");
+  await expect(form.getByLabel("role id")).toHaveValue("chief");
+  // Another role's Edit would replace the form: it waits, and the form keeps what was typed.
+  const edit = roles.getByTestId("role").filter({ hasText: "Lead" }).getByRole("button", { name: "Edit" });
+  await expect(edit).toHaveAttribute("aria-disabled", "true");
+  await edit.click({ force: true });
+  await expect(form.getByLabel("role label")).toHaveValue("Sponsor of the work");
 });

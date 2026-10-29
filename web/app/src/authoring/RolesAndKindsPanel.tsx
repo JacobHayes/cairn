@@ -10,6 +10,7 @@ import { useId, useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
 import { Button, Input } from "../ui/kit.tsx";
+import { isEditing, unsent, type Editing } from "./editing.ts";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { useRemovalPlan } from "./removal.ts";
 import { rolesForSlot, type Kind, type Mutation, type Role } from "./graph.ts";
@@ -21,7 +22,7 @@ import { domainOf, named, type Authored } from "./target.ts";
 import { useAuthorWrite, type AuthorWrite } from "./write.ts";
 
 /** A role or a kind: the same shape, a slot with an id, a label, and a cardinality. */
-type Slot = Role | Kind;
+export type Slot = Role | Kind;
 
 interface SlotKind {
   /** "role" or "kind", for test ids and words. */
@@ -58,23 +59,10 @@ const KINDS: SlotKind = {
   prefix: "k_",
 };
 
-/** A role or kind being edited, kept across reloads, with the revision its author opened it at (H5). */
-export interface Editing {
-  slot: Slot;
-  base: number;
-  /** The slot as it opened: what is unsent is what differs from it. */
-  opened: Slot;
-}
-
-/** Whether an open role or kind form holds input that Publish would leave out: it differs from how it opened. */
-export function slotUnsent(editing: Editing): boolean {
-  return JSON.stringify(editing.slot) !== JSON.stringify(editing.opened);
-}
-
-function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editing: Editing; setEditing: (next: Editing | undefined) => void; kind: SlotKind; slots: readonly Slot[]; write: AuthorWrite; revision: number }) {
-  const { slot, base, opened } = editing;
+function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editing: Editing<Slot>; setEditing: (next: Editing<Slot> | undefined) => void; kind: SlotKind; slots: readonly Slot[]; write: AuthorWrite; revision: number }) {
+  const { value: slot, base, opened } = editing;
   const setSlot = (next: Slot) => {
-    setEditing({ slot: next, base, opened });
+    setEditing({ value: next, base, opened });
   };
   const onClose = () => {
     setEditing(undefined);
@@ -86,13 +74,18 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
     { field: "label", kind: "title", what: "The label", value: slot.title ?? "", optional: true },
     ...(isNew ? [countCheck("count", kind.limit, kind.plural, slots.length + 1)] : []),
   ]);
+  // The id follows the label while it is the one the label suggests; typed over, it is the author's and stays.
+  const suggested = (label: string) => uniqueId(slugOf(label, kind.name), taken);
+  // Typing in the id box is the author's, whatever the label says after; a form restored from a reload knows only the two values.
+  const [idTyped, setIdTyped] = useState(false);
+  const follows = isNew && !idTyped && (slot.id === "" || slot.id === suggested(slot.title ?? ""));
   const idProblem = checks.problems.id ?? checks.problems.count;
   const labelProblem = checks.problems.label;
   const [idMessage, labelMessage] = [useId(), useId()];
   const sendable = checks.checked && idProblem === undefined && labelProblem === undefined;
   const save = (from = base) => {
     if (from !== base) {
-      setEditing({ slot, base: from, opened });
+      setEditing({ value: slot, base: from, opened });
     }
     // A label left blank is none: the engine reads a label as a title, which is never blank.
     const { title, ...unlabelled } = slot;
@@ -106,8 +99,8 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
   return (
     <span className="stack" data-testid={`${kind.name}-form`}>
       <span className="row">
-        <Labelled label="Label (optional)"><Input aria-label={`${kind.words} label`} placeholder="Label" {...invalidAttrs(labelMessage, labelProblem)} value={slot.title ?? ""} onChange={(event) => { setSlot({ ...slot, title: event.target.value, ...(isNew ? { id: uniqueId(slugOf(event.target.value, kind.name), taken) } : {}) }); }} /></Labelled>
-        <Labelled label="Id"><Input aria-label={`${kind.words} id`} {...invalidAttrs(idMessage, idProblem)} value={slot.id} onChange={(event) => { setSlot({ ...slot, id: event.target.value }); }} /></Labelled>
+        <Labelled label="Label (optional)"><Input aria-label={`${kind.words} label`} placeholder="Label" {...invalidAttrs(labelMessage, labelProblem)} value={slot.title ?? ""} onChange={(event) => { setSlot({ ...slot, title: event.target.value, ...(follows ? { id: suggested(event.target.value) } : {}) }); }} /></Labelled>
+        <Labelled label="Id"><Input aria-label={`${kind.words} id`} {...invalidAttrs(idMessage, idProblem)} value={slot.id} onChange={(event) => { setIdTyped(true); setSlot({ ...slot, id: event.target.value }); }} /></Labelled>
         <label className="row">
           <input type="checkbox" checked={slot.multi ?? false} onChange={(event) => { setSlot({ ...slot, multi: event.target.checked }); }} />
           Several at once
@@ -130,7 +123,7 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
 function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKind; slots: readonly Slot[] }) {
   const write = useAuthorWrite(authored, `slots:${kind.name}`);
   const room = useValueProblems([countCheck("count", kind.limit, kind.plural, slots.length + 1)]);
-  const [editing, setEditing] = useDraft<Editing>(`slot-form:${domainOf(authored)}:${kind.name}`);
+  const [editing, setEditing] = useDraft<Editing<Slot>>(`slot-form:${domainOf(authored)}:${kind.name}`, isEditing);
   const [removing, setRemoving] = useState<Slot | undefined>(undefined);
   const plan = useRemovalPlan(authored.graph, authored.tree, removing === undefined ? undefined : kind.name === "role" ? { role: removing.key } : { kind: removing.key });
   return (
@@ -140,7 +133,7 @@ function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKin
           <li key={slot.key} className="row" data-testid={kind.name} data-key={slot.key}>
             <strong>{named(slot)}</strong> <span className="muted mono">{slot.id}</span>
             {slot.multi === true ? <span className="badge">several</span> : <span className="badge">one</span>}
-            <Button onClick={() => { setEditing({ slot, base: authored.revision, opened: slot }); }}>Edit</Button>
+            <Button held={editing !== undefined && unsent(editing) ? "Save or cancel the form below first, or its changes are lost" : undefined} onClick={() => { setEditing({ value: slot, base: authored.revision, opened: slot }); }}>Edit</Button>
             <Button aria-label={`Remove the ${kind.words} ${named(slot)}`} onClick={() => { setRemoving(slot); }}>Remove</Button>
           </li>
         ))}
@@ -154,13 +147,19 @@ function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKin
           title={`Remove the ${kind.words} ${named(removing)}`}
           dangling={plan.dangling}
           mutations={[...plan.dangling.map((each) => each.mutation), kind.remove(removing.key)]}
-          onDone={() => { setRemoving(undefined); }}
+          onDone={() => {
+            // A form open on the removed one has nothing left to save to.
+            if (editing?.value.key === removing.key) {
+              setEditing(undefined);
+            }
+            setRemoving(undefined);
+          }}
           onCancel={() => { setRemoving(undefined); }}
         />
       )}
       {editing === undefined ? (
         <span className="row">
-          <Button disabled={room.problems.count !== undefined} onClick={() => { const blank: Slot = { key: mintKey(kind.prefix), id: "", title: "", multi: false }; setEditing({ slot: blank, base: authored.revision, opened: blank }); }}>
+          <Button disabled={room.problems.count !== undefined} onClick={() => { const blank: Slot = { key: mintKey(kind.prefix), id: "", title: "", multi: false }; setEditing({ value: blank, base: authored.revision, opened: blank }); }}>
             Add a {kind.words}
           </Button>
           {room.problems.count === undefined ? null : <span className="muted small">{room.problems.count}</span>}
@@ -195,10 +194,10 @@ function DefaultOwner({ authored }: { authored: Authored }) {
 export function RolesAndKindsPanel({ authored }: { authored: Authored }) {
   return (
     <div className="stack" data-testid="roles-and-kinds">
-      <strong>Roles</strong>
+      <strong className="label">Roles</strong>
       <SlotList authored={authored} kind={ROLES} slots={authored.graph.roles ?? []} />
       <DefaultOwner authored={authored} />
-      <strong>Participation kinds</strong>
+      <strong className="label">Participation kinds</strong>
       <span className="muted small">Owner is built in; these are informational.</span>
       <SlotList authored={authored} kind={KINDS} slots={authored.graph.participation_kinds ?? []} />
     </div>

@@ -8,10 +8,14 @@ import type { GraphNode } from "./graph.ts";
 import { RolesAndKindsPanel } from "./RolesAndKindsPanel.tsx";
 import type { Authored } from "./target.ts";
 
+/** The test ids of the two popovers, which an unfinished form inside one is pointed to by (unsaved.ts). */
+export const ADD_MENU = "add-menu";
+export const ROLES_MENU = "roles-menu";
+
 export function StructureTools({ authored, container, onAdded, onInsert }: { authored: Authored; container: string | undefined; onAdded: (node: GraphNode) => void; onInsert?: () => void }) {
   return (
     <>
-      <Menu label="Add a node" testId="add-menu" role="dialog" trigger="+ Add">
+      <Menu label="Add a node" testId={ADD_MENU} role="dialog" trigger="+ Add">
         {(close) => (
           <>
             <AddNode
@@ -30,7 +34,7 @@ export function StructureTools({ authored, container, onAdded, onInsert }: { aut
           </>
         )}
       </Menu>
-      <Menu label="Roles and kinds" testId="roles-menu" role="dialog" trigger="Roles and kinds">
+      <Menu label="Roles and kinds" testId={ROLES_MENU} role="dialog" trigger="Roles and kinds">
         {() => <RolesAndKindsPanel authored={authored} />}
       </Menu>
     </>

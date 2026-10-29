@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react";
 
 import { menuFocusTarget } from "../ui/menuKeys.ts";
+import { useOpenedOnRequest } from "../ui/reveal.ts";
 import { place, windowBounds } from "../ui/place.ts";
 import { Tip } from "../ui/Tip.tsx";
 
@@ -190,6 +191,7 @@ interface MenuProps {
 /** The menu's items are drawn by `children`, given the way to close it. */
 export function Menu({ trigger, label, tip, tipKind = "describe", keys, testId, align = "start", className = "", role = "menu", tour, children }: MenuProps) {
   const [open, setOpen] = useState(false);
+  useOpenedOnRequest(testId, useCallback(() => { setOpen(true); }, []));
   const root = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const popover = useRef<HTMLDivElement>(null);

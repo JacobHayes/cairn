@@ -17,7 +17,8 @@ export type Direction = "before" | "after";
 export interface RuleParts {
   direction: Direction;
   sources: string[];
-  offset: number;
+  /** The days as typed: a blank box is no number, which the engine refuses with its message, and is not read as 0. */
+  offset: string;
 }
 
 /** A source an editor offers, with what it is called. */
@@ -35,28 +36,27 @@ export function sourceOptions(tree: Tree, node: string | undefined, which: "due_
   ];
 }
 
-/** A rule's parts. */
+/** A rule's parts, the offset as text. */
 export function partsOf(rule: DateRule): RuleParts {
   const direction: Direction = rule.before === undefined ? "after" : "before";
   const raw = rule.before ?? rule.after ?? [];
-  // A blank offset box is NaN, which a kept draft holds as null: still no number, not 0.
-  const offset = rule.offset as number | null | undefined;
-  return { direction, sources: Array.isArray(raw) ? [...raw] : [raw], offset: offset === null ? Number.NaN : (offset ?? 0) };
+  return { direction, sources: Array.isArray(raw) ? [...raw] : [raw], offset: String(rule.offset ?? 0) };
 }
 
-/** The rule its parts make: one source written bare, several as a list. */
+/** The rule its parts make: one source written bare, several as a list; a blank offset is NaN, which no engine reading accepts. */
 export function ruleOf(parts: RuleParts): DateRule {
   const sources = parts.sources.length === 1 ? parts.sources[0] : parts.sources;
   const rule: DateRule = parts.direction === "before" ? { before: sources ?? [] } : { after: sources ?? [] };
-  return parts.offset === 0 ? rule : { ...rule, offset: parts.offset };
+  const offset = parts.offset.trim() === "" ? Number.NaN : Number(parts.offset);
+  return offset === 0 ? rule : { ...rule, offset };
 }
 
 /** A rule as people read it; `label` names a node by its title, and the journey's start is named here. */
 export function ruleWords(rule: DateRule, label: (source: string) => string): string {
   const parts = partsOf(rule);
   const sources = parts.sources.map((source) => (source === CREATED_AT ? "the journey's start" : label(source))).join(" and ");
-  const days = plural(parts.offset, "day");
-  return parts.offset === 0 ? `${parts.direction === "before" ? "by" : "from"} ${sources}` : `${days} ${parts.direction} ${sources}`;
+  const offset = rule.offset ?? 0;
+  return offset === 0 ? `${parts.direction === "before" ? "by" : "from"} ${sources}` : `${plural(offset, "day")} ${parts.direction} ${sources}`;
 }
 
 /**

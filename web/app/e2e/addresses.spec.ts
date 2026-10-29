@@ -51,3 +51,10 @@ test("C4: a selected node is a row in the list and the timeline, and drawn with 
   await expectAddress(page, "/journeys/j_vendor_eval/nodes/n_setup?depth=stages&q=nothing-is-called-this&shut=n_setup");
   await expect(nodeCard(page, "n_access")).toHaveCount(0);
 });
+
+test("C2: a search in the address that the engine refuses is dropped quietly, as any other parameter the view cannot read", async ({ page }) => {
+  await open(page, "browser", `/journeys/j_vendor_eval?view=graph&q=${"x".repeat(300)}`);
+  await expect(page.getByTestId("journey-frame")).toBeVisible();
+  await expect.poll(() => new URL(page.url()).search).not.toContain("q=");
+  await expect(page.getByTestId("toolbar-search")).toHaveValue("");
+});

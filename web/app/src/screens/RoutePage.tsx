@@ -20,7 +20,8 @@ import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { required } from "../address.ts";
 import { ConnectContext, DrawingBanner, useEdgeDrawing } from "../authoring/connect.tsx";
 import { RouteNodePanel } from "../authoring/RouteAuthoring.tsx";
-import { useUnsavedForms } from "../authoring/unsaved.ts";
+import { focusForm, openMenu } from "../ui/reveal.ts";
+import { useUnsavedForms, type UnsavedForm } from "../authoring/unsaved.ts";
 import { blockedWords, DraftCard, ResultBand, RouteHeader, unsavedWords, useDraftViolations } from "../authoring/RouteDraft.tsx";
 import { DeletingRoute } from "../routes/DeleteRoute.tsx";
 import { useRouteNotices } from "../authoring/RouteNotices.tsx";
@@ -47,7 +48,7 @@ import { useRouteRead, VersionCard } from "../routes/RouteCard.tsx";
 import { InsertionCanvas } from "../segments/Preview.tsx";
 import { useInserting } from "../segments/entry.ts";
 import { InsertStepper } from "../segments/Stepper.tsx";
-import { COLUMN, Inspector, PHONE_WIDTH, useFrameActions, useMedia, usePageKeys } from "../shell/frame.tsx";
+import { COLUMN, Inspector, PHONE_WIDTH, useFrameActions, useFrameState, useMedia, usePageKeys } from "../shell/frame.tsx";
 import { useEscapeTo } from "../shell/useEscapeTo.ts";
 import { treeOf } from "../authoring/graph.ts";
 import { RouteTimeline } from "../timeline/RouteTimeline.tsx";
@@ -185,6 +186,30 @@ function DraftInspector({ authored, held, selected, card, close, inserting }: { 
   );
 }
 
+/** How the held Publish and the draft card point at an unfinished form: its popover opens, or its node's panel (on the inspector's tab), and its field takes the focus. */
+function useShowUnsaved(unsaved: readonly UnsavedForm[], selected: string | undefined, here: (node: string | undefined) => string) {
+  const navigate = useNavigate();
+  const frame = useFrameActions();
+  const showing = useFrameState()?.inspectorShowing ?? true;
+  const show = (form: UnsavedForm) => {
+    if (form.menu !== undefined) {
+      openMenu(form.menu);
+    } else if (form.node !== undefined) {
+      // A sheet at its peek is inert: it comes up to half before the field can take the focus.
+      if (!showing) {
+        frame?.show("inspector");
+        frame?.snap("half");
+      }
+      if (form.node !== selected) {
+        void navigate(here(form.node));
+      }
+    }
+    focusForm(form.field);
+  };
+  const first = unsaved[0];
+  return { show, onBlocked: first === undefined ? undefined : () => { show(first); } };
+}
+
 /** A draft: the palette, the cards' forms, and the draft card in the inspector. */
 function DraftFrame({ shown, derived, authored, selected, edge, write, result, setResult, imports }: FrameProps & { authored: Authored }) {
   const navigate = useNavigate();
@@ -202,7 +227,8 @@ function DraftFrame({ shown, derived, authored, selected, edge, write, result, s
   const here = (node: string | undefined) => routePath(id, { screen, node }, search);
   const hrefOf = (key: string) => here(key);
   const titleOf = (key: string) => titleIn(authored.tree, key);
-  const blocked = unsavedWords(unsaved) ?? blockedWords(violations);
+  const blocked = unsavedWords(unsaved.map((form) => form.label)) ?? blockedWords(violations);
+  const { show, onBlocked } = useShowUnsaved(unsaved, selected, here);
   const target = { route: id };
   const publish = () =>
     void write.run({ target, baseRevision: shown.route.revision, mutations: [{ op: "publish_draft" }] }, (found) => {
@@ -210,7 +236,7 @@ function DraftFrame({ shown, derived, authored, selected, edge, write, result, s
       void navigate(here(undefined));
     });
   const discard = () => void write.run({ target, baseRevision: shown.route.revision, mutations: [{ op: "discard_draft" }] }, () => { void navigate(here(undefined)); });
-  const card = <DraftCard route={id} violations={violations} notices={notices} hrefOf={hrefOf} write={write} blocked={blocked} titleOf={titleOf} onPublish={publish} onDiscard={discard} />;
+  const card = <DraftCard route={id} violations={violations} notices={notices} hrefOf={hrefOf} write={write} blocked={blocked} unsaved={unsaved} onShow={show} titleOf={titleOf} onPublish={publish} onDiscard={discard} />;
   const close = here(undefined);
   // The line's card is the inspector's only while no node is open and no segment is being placed.
   const line = selected === undefined && inserting.at === undefined ? edge : undefined;
@@ -219,7 +245,7 @@ function DraftFrame({ shown, derived, authored, selected, edge, write, result, s
   const columned = wide || phone;
   const head = (
     <>
-      <RouteHeader route={shown.route} of="draft" screen={screen} node={selected} write={write} blocked={blocked} onPublish={publish} titleOf={titleOf} imports={imports} />
+      <RouteHeader route={shown.route} of="draft" screen={screen} node={selected} write={write} blocked={blocked} onBlocked={onBlocked} onPublish={publish} titleOf={titleOf} imports={imports} />
       <ResultOf result={result} setResult={setResult} hrefOf={hrefOf} />
       {wide || screen !== "graph" ? null : <DraftSummary violations={violations.length} notices={notices.length} list={routeSwitched(id, search, "list", undefined)} />}
       <div className="row route-tools">

@@ -9,6 +9,7 @@ import { ANSWER_TYPE_FIELDS, FLAG_DEFAULTS, KIND_FIELDS, NODE_FIELDS, type KindF
 import type { Schema } from "@cairn/client";
 
 import type { Choice } from "../status/answer.ts";
+import { partsOf, ruleOf, type RuleParts } from "./dates.ts";
 import type { AnswerType, GraphNode, Mutation, NodeField, NodeKind } from "./graph.ts";
 
 export type Condition = Schema<"ConditionResolved">;
@@ -55,8 +56,8 @@ export interface NodeDraft {
   gates: boolean;
   closes: boolean;
   relevant_when: Condition | null;
-  due_by: DateRule | null;
-  not_before: DateRule | null;
+  due_by: RuleParts | null;
+  not_before: RuleParts | null;
 }
 
 /** A node's current values as a form's draft. */
@@ -85,8 +86,8 @@ export function draftOf(node: GraphNode): NodeDraft {
     gates: node.gates ?? FLAG_DEFAULTS.gates,
     closes: node.closes ?? FLAG_DEFAULTS.closes,
     relevant_when: node.relevant_when ?? null,
-    due_by: node.due_by ?? null,
-    not_before: node.not_before ?? null,
+    due_by: node.due_by == null ? null : partsOf(node.due_by),
+    not_before: node.not_before == null ? null : partsOf(node.not_before),
   };
 }
 
@@ -103,8 +104,8 @@ export function valueOf(field: NodeField, draft: NodeDraft): Schema<"NodeFieldVa
     description: text(draft.description),
     weight: number(draft.weight),
     relevant_when: draft.relevant_when,
-    due_by: draft.due_by,
-    not_before: draft.not_before,
+    due_by: draft.due_by === null ? null : ruleOf(draft.due_by),
+    not_before: draft.not_before === null ? null : ruleOf(draft.not_before),
     estimate: number(draft.estimate),
     placeholder: draft.placeholder,
     requires_artifact: draft.requires_artifact,

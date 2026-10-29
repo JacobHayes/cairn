@@ -14,6 +14,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("a draft restored by another build", () => {
+  it("is none when it is not the shape the screen reads now", () => {
+    storing();
+    writeDraft("form:j_a:n_x", { form: { title: "Old shape" } });
+    const current = (draft: unknown): draft is { value: string } => typeof draft === "object" && draft !== null && "value" in draft;
+    expect(readDraft("form:j_a:n_x", current)).toBeUndefined();
+    writeDraft("form:j_a:n_x", { value: "New shape" });
+    expect(readDraft("form:j_a:n_x", current)).toEqual({ value: "New shape" });
+  });
+});
+
 describe("drafts kept per tab", () => {
   it("come back under their key, and go once sent", () => {
     storing();

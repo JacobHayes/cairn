@@ -319,6 +319,9 @@ function focusListeners({ actor, signal }: Listening): void {
   );
 }
 
+/** What a toggletip's trigger is sent when it is tapped by any means (a pointer, a key, a screen reader's click): its own click never reaches it, since the tip takes the click. */
+export const TIP_TAPPED = "cairn:tip-tapped";
+
 /** A press elsewhere dismisses; a click on a toggletip shows it and does nothing else. */
 function pressListeners({ actor, signal }: Listening): void {
   document.addEventListener(
@@ -342,6 +345,7 @@ function pressListeners({ actor, signal }: Listening): void {
         event.preventDefault();
         event.stopPropagation();
         actor.send({ type: "tap", target: targetOfElement(trigger) });
+        trigger.dispatchEvent(new Event(TIP_TAPPED));
       }
     },
     { capture: true, signal },

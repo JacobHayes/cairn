@@ -2,15 +2,15 @@
 // these render): what screens compose, so they share one look in light and dark. Graticule
 // styles `button`, `input`, `select` and `textarea` as elements, so these add a class only for
 // a variant (`primary`, `ghost`), and `.field` is its labelled wrapper.
-import { useId, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
+import { useCallback, useId, useRef, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
 
-import { Tip, type TipKind } from "./Tip.tsx";
+import { Tip, TIP_TAPPED, type TipKind } from "./Tip.tsx";
 
 /**
  * A button. `tip` is its tooltip (what pressing it does; `keys` is its key, `tipKind` is `name` for an
  * icon-only one). `held` is a button that cannot act now and says why: it stays focusable
  * (`aria-disabled`), a press does nothing but show the reason, and the reason is its description
- * (a control with no reason to give is plainly `disabled`).
+ * (a control with no reason to give is plainly `disabled`). `onHeld` runs on that press, to point at what holds it.
  */
 export function Button({
   primary = false,
@@ -20,17 +20,29 @@ export function Button({
   tipKind,
   keys,
   held,
+  onHeld,
   onClick,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { primary?: boolean; ghost?: boolean; tip?: ReactNode; tipKind?: TipKind; keys?: string; held?: string | undefined }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { primary?: boolean; ghost?: boolean; tip?: ReactNode; tipKind?: TipKind; keys?: string; held?: string | undefined; onHeld?: () => void }) {
   const classes = [primary ? "primary" : "", ghost ? "ghost" : "", className].filter(Boolean).join(" ");
   const isHeld = held !== undefined;
+  // The tip takes a held button's click, so what it is held for is told by the tip's own event.
+  const pressed = useRef(onHeld);
+  pressed.current = onHeld;
+  const heldRef = useCallback((element: HTMLButtonElement | null) => {
+    if (element === null) {
+      return undefined;
+    }
+    const listener = () => { pressed.current?.(); };
+    element.addEventListener(TIP_TAPPED, listener);
+    return () => { element.removeEventListener(TIP_TAPPED, listener); };
+  }, []);
   const button = (
     <button
       type="button"
       {...(classes === "" ? {} : { className: classes })}
       {...props}
-      {...(isHeld ? { "aria-disabled": true, onClick: (event: { preventDefault: () => void }) => { event.preventDefault(); } } : { onClick })}
+      {...(isHeld ? { "aria-disabled": true, onClick: (event: { preventDefault: () => void }) => { event.preventDefault(); }, ref: heldRef } : { onClick })}
     />
   );
   if (isHeld) {

@@ -14,7 +14,8 @@ import { Button, Input } from "../ui/kit.tsx";
 import type { Resource } from "./graph.ts";
 import { mintKey } from "./keys.ts";
 import { countCheck, useValueProblems } from "./form-problems.ts";
-import { CheckFailed, invalidAttrs, Picker, Problem } from "./parts.tsx";
+import { isEditing, unsent, type Editing } from "./editing.ts";
+import { CheckFailed, invalidAttrs, Labelled, Picker, Problem } from "./parts.tsx";
 import { placeholderOptions, useDraftStored } from "./placeholders.ts";
 import { Refusal, type NodeEditorProps } from "./StructureEditors.tsx";
 import { domainOf, type Authored } from "./target.ts";
@@ -32,7 +33,7 @@ const TYPES: { value: ResourceType; label: string }[] = [
 ];
 
 /** A resource as its form holds it. */
-interface ResourceForm {
+export interface ResourceForm {
   key: string | undefined;
   type: ResourceType;
   title: string;
@@ -67,14 +68,16 @@ function ResourceFields({ form, setForm, authored, titleAttrs, contentAttrs }: {
   return (
     <>
       <span className="row">
-        <Picker aria-label="Resource type" value={form.type} options={TYPES} disabled={form.key !== undefined} onChange={(event) => { setForm({ ...form, type: event.target.value as ResourceType }); }} />
-        <Input aria-label="Resource title" placeholder="Title" {...titleAttrs} value={form.title} onChange={(event) => { setForm({ ...form, title: event.target.value }); }} />
+        <Labelled label="Type"><Picker aria-label="Resource type" value={form.type} options={TYPES} disabled={form.key !== undefined} onChange={(event) => { setForm({ ...form, type: event.target.value as ResourceType }); }} /></Labelled>
+        <Labelled label="Title (optional)"><Input aria-label="Resource title" placeholder="Title" {...titleAttrs} value={form.title} onChange={(event) => { setForm({ ...form, title: event.target.value }); }} /></Labelled>
       </span>
-      {multiline ? (
-        <textarea aria-label={form.type === "tip" ? "Tip" : "Message draft"} {...contentAttrs} value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
-      ) : (
-        <Input aria-label="Address" placeholder="https://..." {...contentAttrs} value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
-      )}
+      <Labelled label={form.type === "tip" ? "Tip" : form.type === "message_draft" ? "Message draft" : "Address"}>
+        {multiline ? (
+          <textarea aria-label={form.type === "tip" ? "Tip" : "Message draft"} {...contentAttrs} value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
+        ) : (
+          <Input aria-label="Address" placeholder="https://..." {...contentAttrs} value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
+        )}
+      </Labelled>
       {form.type === "message_draft" ? (
         <Picker
           aria-label="Insert a placeholder"
@@ -88,25 +91,11 @@ function ResourceFields({ form, setForm, authored, titleAttrs, contentAttrs }: {
   );
 }
 
-/** One resource's form: a new one, or an edit of one the node has. */
-/** A resource's form as kept across reloads, with the revision its author opened it at (H5). */
-export interface Editing {
-  form: ResourceForm;
-  base: number;
-  /** The form as it opened: what is unsent is what differs from it. */
-  opened: ResourceForm;
-}
-
-/** Whether an open resource form holds input that Publish would leave out: it differs from how it opened. */
-export function resourceUnsent(editing: Editing): boolean {
-  return JSON.stringify(editing.form) !== JSON.stringify(editing.opened);
-}
-
-function ResourceFormView({ authored, node, editing, setEditing }: NodeEditorProps & { editing: Editing; setEditing: (next: Editing | undefined) => void }) {
+function ResourceFormView({ authored, node, editing, setEditing }: NodeEditorProps & { editing: Editing<ResourceForm>; setEditing: (next: Editing<ResourceForm> | undefined) => void }) {
   const write = useAuthorWrite(authored, `resource-form:${node.key}`, node.title);
-  const { form, base, opened } = editing;
+  const { value: form, base, opened } = editing;
   const setForm = (next: ResourceForm) => {
-    setEditing({ form: next, base, opened });
+    setEditing({ value: next, base, opened });
   };
   const onClose = () => {
     setEditing(undefined);
@@ -130,7 +119,7 @@ function ResourceFormView({ authored, node, editing, setEditing }: NodeEditorPro
       return;
     }
     if (from !== base) {
-      setEditing({ form, base: from, opened });
+      setEditing({ value: form, base: from, opened });
     }
     const mutation: Schema<"Mutation"> = form.key === undefined ? { op: "add_resource", node: node.key, resource: made } : { op: "edit_resource", node: node.key, resource: made };
     void write.run([mutation], from).then((landed) => {
@@ -161,7 +150,7 @@ export function ResourceEditor({ authored, node }: NodeEditorProps) {
   const { deriver } = useSession();
   // A draft is read before its form opens; nothing else opens one meanwhile, so a late answer cannot replace it.
   const [opening, setOpening] = useState(false);
-  const [editing, setEditing] = useDraft<Editing>(`resource-form:${domainOf(authored)}:${node.key}`);
+  const [editing, setEditing] = useDraft<Editing<ResourceForm>>(`resource-form:${domainOf(authored)}:${node.key}`, isEditing);
   const resources = node.resources ?? [];
   const room = useValueProblems([countCheck("count", "resource_count_per_node_max", "resources on a node", resources.length + 1)]);
   const full = room.problems.count !== undefined;
@@ -174,8 +163,8 @@ export function ResourceEditor({ authored, node }: NodeEditorProps) {
             <span>
               {resource.title ?? TYPES.find((each) => each.value === typeOf(resource))?.label} <span className="muted small">({typeOf(resource).replace("_", " ")})</span>
             </span>
-            <Button disabled={opening} onClick={() => { setOpening(true); void formOf(resource, authored, deriver).then((form) => { setEditing({ form, base: authored.revision, opened: form }); }).finally(() => { setOpening(false); }); }}>Edit</Button>
-            <Button aria-label={`Remove the resource ${resource.title ?? resource.key}`} disabled={write.disabled} onClick={() => void write.run([{ op: "remove_resource", node: node.key, resource: resource.key }])}>
+            <Button disabled={opening} held={editing !== undefined && unsent(editing) ? "Save or cancel the form below first, or its changes are lost" : undefined} onClick={() => { setOpening(true); void formOf(resource, authored, deriver).then((form) => { setEditing({ value: form, base: authored.revision, opened: form }); }).finally(() => { setOpening(false); }); }}>Edit</Button>
+            <Button aria-label={`Remove the resource ${resource.title ?? resource.key}`} disabled={write.disabled} onClick={() => void write.run([{ op: "remove_resource", node: node.key, resource: resource.key }]).then((landed) => { if (landed && editing?.value.key === resource.key) { setEditing(undefined); } })}>
               Remove
             </Button>
           </li>
@@ -183,7 +172,7 @@ export function ResourceEditor({ authored, node }: NodeEditorProps) {
       </ul>
       {editing === undefined ? (
         <span className="row">
-          <Button disabled={full || opening} onClick={() => { const blank: ResourceForm = { key: undefined, type: "tip", title: "", body: "" }; setEditing({ form: blank, base: authored.revision, opened: blank }); }}>Add a resource</Button>
+          <Button disabled={full || opening} onClick={() => { const blank: ResourceForm = { key: undefined, type: "tip", title: "", body: "" }; setEditing({ value: blank, base: authored.revision, opened: blank }); }}>Add a resource</Button>
           {room.problems.count === undefined ? null : <span className="muted small">{room.problems.count}</span>}
         </span>
       ) : (

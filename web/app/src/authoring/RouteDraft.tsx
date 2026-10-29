@@ -29,6 +29,7 @@ import type { ScreenWrite } from "../screens/write.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { NoticeList } from "./RouteNotices.tsx";
 import type { Authored } from "./target.ts";
+import type { UnsavedForm } from "./unsaved.ts";
 import { usePublishPreviewRead } from "./write.ts";
 import { namedList } from "../ui/words.ts";
 import { RetiredBadge } from "../routes/RetiredBadge.tsx";
@@ -54,6 +55,8 @@ export interface RouteHeaderProps {
   write: ScreenWrite;
   /** Why Publish is off, when it is. */
   blocked: string | undefined;
+  /** Pressing the held Publish points at what holds it, when something can be pointed at. */
+  onBlocked?: (() => void) | undefined;
   /** Publishes the draft, keeping its notices to show (A20); none for a version. */
   onPublish: (() => void) | undefined;
   /** The import workflow, owned above the frames so a discard that swaps the frame does not end it. */
@@ -114,7 +117,7 @@ function RouteMenu({ route, of, write, imports, send, onDelete }: { route: Route
  * and on the right the View picker, the primary (Publish on the draft, Open a draft on a version
  * when none is open) and the `⋯` (RouteMenu); deleting the route asks under the header.
  */
-export function RouteHeader({ route, of, screen, node, write, blocked, onPublish, imports, titleOf }: RouteHeaderProps) {
+export function RouteHeader({ route, of, screen, node, write, blocked, onBlocked, onPublish, imports, titleOf }: RouteHeaderProps) {
   const id = route.header.id;
   const { search } = useLocation();
   const drafting = of === "draft";
@@ -141,7 +144,7 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
         <AssistantDock target={{ route: id }} titleOf={titleOf} />
         {screen === undefined ? null : <ViewPicker screen={screen} screens={ROUTE_OFFERS.screens} to={(to) => routeSwitched(id, search, to, node, proposal)} tip={ROUTE_VIEW_TIP} />}
         {!writable || deleting.asking ? null : drafting ? (
-          <Button primary disabled={write.disabled} held={write.disabled ? undefined : blocked} data-testid="publish-draft" onClick={onPublish}>
+          <Button primary disabled={write.disabled} held={write.disabled ? undefined : blocked} {...(onBlocked === undefined ? {} : { onHeld: onBlocked })} data-testid="publish-draft" onClick={onPublish}>
             Publish
           </Button>
         ) : of !== undefined && route.draft == null ? (
@@ -185,6 +188,9 @@ export interface DraftCardProps {
   hrefOf: (node: string) => string;
   write: ScreenWrite;
   blocked: string | undefined;
+  /** The forms holding input not yet sent, each with the way to its place. */
+  unsaved: readonly UnsavedForm[];
+  onShow: (form: UnsavedForm) => void;
   onPublish: () => void;
   onDiscard: () => void;
   titleOf: (key: string) => string;
@@ -195,14 +201,14 @@ export interface DraftCardProps {
  * is only advisory (notices, A20, apart under their own label), Publish and Discard (set aside
  * while the route's deletion is asked).
  */
-export function DraftCard({ route, violations, notices, hrefOf, write, blocked, onPublish, onDiscard, titleOf }: DraftCardProps) {
+export function DraftCard({ route, violations, notices, hrefOf, write, blocked, unsaved, onShow, onPublish, onDiscard, titleOf }: DraftCardProps) {
   const deleting = use(DeletingRoute);
   return (
     <aside className="detail-panel panel stack draft-card" aria-label="The draft" data-testid="draft-card">
       <h2>The draft</h2>
       <DraftFacts route={route} />
       {violations.length === 0 ? (
-        blocked === undefined ? <p className="muted" data-testid="draft-clear">Nothing blocks publishing.</p> : <p data-testid="draft-held">{blocked}</p>
+        blocked === undefined ? <p className="muted" data-testid="draft-clear">Nothing blocks publishing.</p> : null
       ) : (
         <section className="stack" aria-label="Blocking publish" data-testid="draft-violations">
           <Badge tone="bad">Blocks publishing {violations.length}</Badge>
@@ -225,10 +231,23 @@ export function DraftCard({ route, violations, notices, hrefOf, write, blocked, 
           </ul>
         </section>
       )}
+      {unsaved.length === 0 ? null : (
+        <section className="stack" aria-label="Not yet saved" data-testid="draft-held">
+          <p>Save or discard your changes first:</p>
+          <ul className="stack">
+            {unsaved.map((form) => (
+              <li key={form.field}>
+                {form.label}{" "}
+                <Button ghost onClick={() => { onShow(form); }}>Show</Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <NoticeList notices={notices} hrefOf={hrefOf} />
       {deleting.asking ? null : (
         <span className="row">
-        <Button primary disabled={write.disabled} held={write.disabled ? undefined : blocked} onClick={onPublish}>
+        <Button primary disabled={write.disabled} held={write.disabled ? undefined : blocked} onHeld={() => { const first = unsaved[0]; if (first !== undefined) { onShow(first); } }} onClick={onPublish}>
           Publish
         </Button>
           <Button disabled={write.disabled} onClick={onDiscard}>

@@ -348,7 +348,7 @@
 }
 
 /* The controls keep their one line and their size; the title gives up its width first. */
-.route-header > .row > :not(h1) {
+.route-header > .row > :not(h1, .tip) {
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -369,7 +369,7 @@
     margin-left: auto;
   }
 
-  .route-header > .row > :not(h1, .route-menu) {
+  .route-header > .row > :not(h1, .route-menu, .tip) {
     order: 2;
   }
 

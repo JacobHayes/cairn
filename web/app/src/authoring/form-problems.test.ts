@@ -53,9 +53,9 @@ const cases: [string, GraphNode, Partial<NodeDraft>, string | undefined][] = [
   ["thirty-two choices", decision, { choices: many(32, (at) => `c${String(at)}`) }, undefined],
   ["fifty-one checklist items", deliverable, { checklist: many(51, item) }, "checklist"],
   ["fifty checklist items", deliverable, { checklist: many(50, item) }, undefined],
-  ["a date rule with no source", deliverable, { due_by: { before: [] } }, "due_by"],
-  ["a date rule offset past a year", deliverable, { not_before: { after: "journey.created_at", offset: 366 } }, "not_before"],
-  ["a date rule offset of a year", deliverable, { due_by: { before: "journey.created_at", offset: 365 } }, undefined],
+  ["a date rule with no source", deliverable, { due_by: { direction: "before", sources: [], offset: "0" } }, "due_by"],
+  ["a date rule offset past a year", deliverable, { not_before: { direction: "after", sources: ["journey.created_at"], offset: "366" } }, "not_before"],
+  ["a date rule offset of a year", deliverable, { due_by: { direction: "before", sources: ["journey.created_at"], offset: "365" } }, undefined],
   ["a checklist item with a blank title", deliverable, { checklist: [item(1), item(2, " ")] }, "checklist"],
 ];
 

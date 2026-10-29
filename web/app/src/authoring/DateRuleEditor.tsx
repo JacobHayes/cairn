@@ -5,16 +5,15 @@
 // constraints. F4: `StageBoundsEditor` sets a stage's opening and closing milestones, from the
 // milestones outside it, and whether each gates and closes.
 import { Button, Input } from "../ui/kit.tsx";
-import { boundOptions, partsOf, ruleOf, ruleWords, sourceOptions, type Direction, type RuleParts } from "./dates.ts";
-import type { DateRule } from "./fields.ts";
+import { boundOptions, ruleOf, ruleWords, sourceOptions, type Direction, type RuleParts } from "./dates.ts";
 import type { Tree } from "./graph.ts";
 import { FieldBox, Picker, type FieldNotes } from "./parts.tsx";
 
 export interface DateRuleEditorProps {
   /** `due_by` or `not_before`. */
   which: "due_by" | "not_before";
-  value: DateRule | null;
-  onChange: (next: DateRule | null) => void;
+  value: RuleParts | null;
+  onChange: (next: RuleParts | null) => void;
   tree: Tree;
   /** The node the rule is on, never offered as its own source. */
   node: string | undefined;
@@ -61,29 +60,26 @@ export function DateRuleEditor({ which, value, onChange, tree, node }: DateRuleE
     return (
       <span className="row" data-testid={`rule-${which}`}>
         <span className="muted small">No rule.</span>
-        <Button onClick={() => { onChange(ruleOf({ direction: which === "due_by" ? "before" : "after", sources: [options[0]?.source ?? "journey.created_at"], offset: 0 })); }}>
+        <Button onClick={() => { onChange({ direction: which === "due_by" ? "before" : "after", sources: [options[0]?.source ?? "journey.created_at"], offset: "0" }); }}>
           Add a rule
         </Button>
       </span>
     );
   }
-  const parts = partsOf(value);
-  const set = (next: RuleParts) => {
-    onChange(ruleOf(next));
-  };
+  const parts = value;
+  const set = onChange;
   return (
     <div className="stack" data-testid={`rule-${which}`}>
       <span className="muted small" data-testid="rule-words">
-        {Number.isNaN(parts.offset) ? WORDS[which] : `${WORDS[which]} ${ruleWords(value, label)}`}
+        {parts.offset.trim() === "" ? WORDS[which] : `${WORDS[which]} ${ruleWords(ruleOf(parts), label)}`}
       </span>
       <span className="row">
         <Input
           type="number"
           min={0}
           aria-label="Offset in days"
-          value={Number.isNaN(parts.offset) ? "" : String(parts.offset)}
-          // A blank box is no number, which the engine refuses with its message; it is not read as 0.
-          onChange={(event) => { set({ ...parts, offset: event.target.value === "" ? Number.NaN : Number(event.target.value) }); }}
+          value={parts.offset}
+          onChange={(event) => { set({ ...parts, offset: event.target.value }); }}
           style={{ width: "6rem" }}
         />
         <span>days</span>

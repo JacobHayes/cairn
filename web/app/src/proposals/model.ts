@@ -184,6 +184,9 @@ export function graphDiff(before: Graph | null | undefined, after: Graph | null 
   };
 }
 
+/** The editor of the node being typed in the additions: the one hold of an editor that is not a problem to fix. */
+export const ADD_NODE_EDITOR = "add-node";
+
 /** I6: why a proposal cannot be applied now, each a reason the screen names. */
 export type Blocker = "not_open" | "editing" | "unsaved" | "stale" | "unresolved" | "invalid" | "no_preview";
 
