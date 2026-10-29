@@ -97,7 +97,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  font-size: 14px;
+  font-size: var(--type-text-size);
   pointer-events: none;
 }
 
@@ -143,7 +143,6 @@
 /* No overlap onto the group's bottom border: inside the ladder's full border the active underline sits within it. */
 .canvas-panel .segmented :is(label, button) {
   margin: 0;
-  font: 500 14px / 1.4 var(--font-body);
   letter-spacing: 0;
   text-transform: none;
   background: var(--color-surface);
@@ -190,7 +189,7 @@
   margin: var(--space-2) 0 0;
   padding: 0;
   list-style: none;
-  font-size: 14px;
+  font-size: var(--type-text-size);
 }
 
 .canvas-key li {
@@ -215,7 +214,7 @@
   display: inline-flex;
   gap: var(--space-1);
   align-items: center;
-  font-size: 14px;
+  font-size: var(--type-text-size);
 }
 
 /* ---- cards (5.5) ------------------------------------------------------------------------------ */
@@ -434,7 +433,7 @@
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text);
-  font: 500 15px / 20px var(--font-mono);
+  font: 500 var(--type-text-size) / 20px var(--font-mono);
   text-align: center;
   text-decoration: none;
 }

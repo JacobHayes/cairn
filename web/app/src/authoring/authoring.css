@@ -14,7 +14,7 @@
 }
 
 .author-label {
-  font-size: 14px;
+  font-size: var(--type-text-size);
   font-weight: 600;
   color: var(--color-muted);
 }
@@ -26,7 +26,7 @@
 
 .author-problem {
   color: var(--color-error);
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 /* The banner's sentence takes what the button leaves, wrapping within it, so the button stays on the sentence's row. */

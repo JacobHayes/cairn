@@ -117,7 +117,7 @@ h3 {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font: 700 15px / 1.2 var(--font-heading);
+  font: 700 var(--type-text-size) / 1.2 var(--font-heading);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--chrome-brand);
@@ -196,7 +196,7 @@ h3 {
 /* ---- controls ------------------------------------------------------------------------------ */
 button,
 .button {
-  font: 500 14px / 1.4 var(--font-body);
+  font: 500 var(--type-text-size) / 1.4 var(--font-body);
   letter-spacing: var(--type-letter-spacing);
   min-height: var(--control-h);
   padding: 5px 12px;
@@ -234,7 +234,7 @@ button[aria-disabled="true"] {
 input,
 select,
 textarea {
-  font: 400 14px / 1.4 var(--font-body);
+  font: 400 var(--type-text-size) / 1.4 var(--font-body);
   padding: 4px 8px;
   /* A select is as wide as its longest option: never wider than the box it sits in. */
   max-width: 100%;
@@ -325,7 +325,7 @@ textarea {
   opacity: 1;
 }
 label {
-  font-size: 14px;
+  font-size: var(--type-text-size);
 }
 .toolbar {
   display: flex;
@@ -333,7 +333,7 @@ label {
   gap: var(--space-2);
   align-items: center;
   margin-bottom: var(--space-3);
-  font-size: 14px;
+  font-size: var(--type-text-size);
 }
 .grid {
   display: grid;
@@ -412,7 +412,7 @@ kbd {
 }
 .kv {
   border-collapse: collapse;
-  font-size: 14.5px;
+  font-size: var(--type-text-size);
 }
 .kv th {
   text-align: left;
@@ -507,7 +507,7 @@ table.data {
   border-spacing: 0;
   width: 100%;
   background: var(--color-surface);
-  font-size: 14.5px;
+  font-size: var(--type-text-size);
 }
 table.data th,
 table.data td {
@@ -764,7 +764,7 @@ svg.chart .datum-line {
   border-radius: 0;
   background: transparent;
   color: var(--color-error);
-  font: 700 14px / 1 var(--font-mono);
+  font: 700 var(--type-text-size) / 1 var(--font-mono);
 }
 .visually-hidden {
   position: absolute;
@@ -795,7 +795,7 @@ svg.chart .datum-line {
   border-radius: 0;
   background: transparent;
   color: var(--color-secondary);
-  font: 500 14px / 1.4 var(--font-body);
+  font: 500 var(--type-text-size) / 1.4 var(--font-body);
   letter-spacing: var(--type-letter-spacing);
   cursor: pointer;
 }
@@ -862,7 +862,7 @@ svg.chart .datum-line {
   border: 1px solid var(--color-frame);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
-  font: 400 14px / 1.4 var(--font-body);
+  font: 400 var(--type-text-size) / 1.4 var(--font-body);
   letter-spacing: 0;
   text-transform: none;
   white-space: normal;
@@ -919,7 +919,7 @@ svg.chart .datum-line {
   background: none;
   color: var(--color-text);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--type-text-size);
   text-align: left;
   text-decoration: none;
   cursor: pointer;
@@ -962,7 +962,6 @@ svg.chart .datum-line {
   gap: var(--space-1) var(--space-2);
   min-height: var(--control-h);
   padding: 6px 10px;
-  font-size: 14.5px;
   cursor: pointer;
 }
 .opt + .opt {
@@ -1174,7 +1173,7 @@ svg.chart .datum-line {
     padding: 0 10px;
     border-left: 0;
     border-bottom: 2px solid transparent;
-    font: 500 15px / 1.4 var(--font-body);
+    font: 500 var(--type-text-size) / 1.4 var(--font-body);
     letter-spacing: 0;
     text-transform: none;
   }

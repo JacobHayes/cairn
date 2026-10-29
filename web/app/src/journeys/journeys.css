@@ -32,7 +32,7 @@
 }
 
 .filter-label {
-  font-size: 15px;
+  font-size: var(--type-text-size);
   color: var(--color-secondary);
 }
 
@@ -44,7 +44,7 @@
 }
 
 .index-filters .check {
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 /* Home: one bounded panel for each journey, a group apart (DESIGN: groups sit 24px apart). */
@@ -60,18 +60,18 @@
 
 .home-count {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--type-text-size);
   color: var(--color-secondary);
 }
 
 .home-reading {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 /* A journey is named by a link, in the author's own words: a sentence-case heading at row size, not the uppercase section title. */
 .home-journey .node-panel-head {
-  font: 600 15px / 1.4 var(--font-body);
+  font: 600 var(--type-text-size) / 1.4 var(--font-body);
   letter-spacing: var(--type-letter-spacing);
 }
 
@@ -82,18 +82,18 @@
 
 .home .node-panel-head {
   padding: var(--space-3) var(--space-4);
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 .home .rows-fold > summary {
   padding: var(--space-3) var(--space-4);
-  font: 600 15px / 1.4 var(--font-body);
+  font: 600 var(--type-text-size) / 1.4 var(--font-body);
   cursor: pointer;
 }
 
 .home-failed-row {
   padding: var(--space-3) var(--space-4);
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 /* What Home says in place of its groups: a paper panel with its ticks, the statement first. */
@@ -104,7 +104,7 @@
 
 .home-statement p {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 .home-statement-title {

@@ -184,7 +184,7 @@
   min-height: 32px;
   padding: 0 var(--space-3);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--type-text-size);
   line-height: 1;
 }
 
@@ -206,7 +206,7 @@
   align-items: center;
   gap: var(--space-3);
   margin-left: auto;
-  font-size: 14px;
+  font-size: var(--type-text-size);
 }
 
 /* A menu button whose setting is off its stock value (Signal not Off, the Filter changed) is pressed:
@@ -418,7 +418,7 @@
 
 /* The route page's List: paper rows in a bordered panel, a container's row banded with a 600-weight title, as the Plan list is (DESIGN, Table). The kind is a quiet word at the row's end, not a column ahead of the title. */
 .route-tree {
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 .route-tree > .route-list-row {

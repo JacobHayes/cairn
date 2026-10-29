@@ -8,7 +8,6 @@
 
 /* Sentence case in the body face, like the switcher beside them: these are toolbar text, not labels. */
 .view-controls-end .segmented label {
-  font: 500 14px / 1.4 var(--font-body);
   letter-spacing: 0;
   text-transform: none;
 }
@@ -66,7 +65,7 @@
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-edge);
   padding-inline-end: var(--space-3);
-  font-size: 15px;
+  font-size: var(--type-text-size);
   line-height: 1.4;
 }
 
@@ -295,7 +294,7 @@
 }
 
 .timeline-undated {
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 .timeline-undated summary {
@@ -317,10 +316,6 @@
   /* Nesting stops indenting after two levels, so a deep title keeps its room (it ends in an ellipsis, and a tap opens the node). */
   .timeline-labels {
     --tree-cap: 2;
-  }
-
-  .timeline-label {
-    font-size: 14px;
   }
 }
 

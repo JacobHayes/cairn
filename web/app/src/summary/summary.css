@@ -18,7 +18,7 @@
 
 .summary-lead > p {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 .summary-lead-head {
@@ -97,11 +97,6 @@
   margin: 0;
 }
 
-/* The dates and flags of the Summary's own lines are row text too: 15px (DESIGN, Typography). */
-.summary :is(.summary-date-when, .summary-date-short, .summary-flags) {
-  font-size: 15px;
-}
-
 /* What the viewer holds next is a plain paper line here, not the tinted block of the other screens: the accent is for selection and focus. */
 .summary .for-you {
   position: relative;
@@ -155,20 +150,20 @@
 }
 
 .summary-date .node-title {
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 .summary-date-when {
-  font-size: 14px;
+  font-size: var(--type-text-size);
 }
 
 .summary-date-short {
   flex-basis: 100%;
-  font-size: 14px;
+  font-size: var(--type-text-size);
 }
 
 .summary-flags {
-  font-size: 14px;
+  font-size: var(--type-text-size);
 }
 
 .summary-empty {

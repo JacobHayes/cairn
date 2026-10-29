@@ -56,7 +56,7 @@
   flex: 1;
 }
 .small {
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 /* A phrase kept whole on its line, as an action's name in a sentence. */
 .nowrap {
@@ -185,7 +185,7 @@ body {
   padding: var(--space-2) var(--space-5);
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
-  font-size: 14px;
+  font-size: var(--type-text-size);
 }
 /* The head's own rule is the canvas's top edge; the bar under it does not draw a second. */
 .ws-head + .ws-canvas > .row:first-child {
@@ -232,7 +232,7 @@ body {
 .sync-popover {
   position: fixed;
   width: var(--popover-w);
-  font: 400 14px / 1.5 var(--font-body);
+  font: 400 var(--type-text-size) / 1.5 var(--font-body);
   letter-spacing: 0;
   text-transform: none;
   white-space: normal;
@@ -554,7 +554,7 @@ body {
     border: 1px solid var(--chrome-border);
     background: var(--chrome-bg);
     box-shadow: var(--shadow-lg);
-    font: 500 15px / 1 var(--font-body);
+    font: 500 var(--type-text-size) / 1 var(--font-body);
   }
   .rail-show .fold-icon {
     transform: rotate(90deg);
@@ -693,7 +693,7 @@ body {
 /* A receipt is only ever a warning the write caused ("Kickoff is now overdue."). */
 .receipt {
   color: var(--color-warning);
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 .callout {
@@ -779,9 +779,6 @@ body {
     display: block;
   }
 }
-table.data {
-  font-size: 14.5px;
-}
 /* Dates and numbers stay whole rather than breaking mid-token, where the table has the room. */
 @media (min-width: 1100px) {
   table.data td.mono {
@@ -815,7 +812,7 @@ table.data {
   padding: var(--space-4);
   border: 1px solid var(--color-edge);
   background: var(--color-surface);
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 .index-state p {
   margin: 0;
@@ -870,9 +867,6 @@ table.data {
     var(--tick) right 3px bottom 3px / 8px 1px no-repeat,
     var(--tick) right 3px bottom 3px / 1px 8px no-repeat;
 }
-.index-table table.data {
-  font-size: 15px;
-}
 .index-table table.data th {
   padding: var(--space-2) var(--space-4);
   vertical-align: middle;
@@ -896,7 +890,7 @@ table.data {
 .index-table table.data td .mono,
 .index-table table.data td.mono {
   font-family: var(--font-mono);
-  font-size: 15px;
+  font-size: var(--type-text-size);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 }
@@ -1123,7 +1117,7 @@ table.data {
 }
 .agents .panel-body p {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--type-text-size);
   line-height: 1.55;
 }
 .agents details > p {
@@ -1175,7 +1169,7 @@ table.data {
   gap: var(--space-3);
   min-height: var(--touch-target);
   padding: var(--space-2) var(--space-4);
-  font-size: 15px;
+  font-size: var(--type-text-size);
   border-bottom: 1px solid var(--color-edge);
   background: var(--color-surface);
 }
@@ -1349,7 +1343,7 @@ button.failed-details {
   background: none;
   min-height: 0;
   padding: 0 var(--space-1);
-  font-size: 14px;
+  font-size: var(--type-text-size);
   color: var(--color-secondary);
   text-decoration: underline;
 }
@@ -1390,7 +1384,7 @@ button.failed-details {
   border: 0;
   background-color: transparent;
   color: var(--color-secondary);
-  font-size: 14px;
+  font-size: var(--type-text-size);
   cursor: pointer;
 }
 .chips-input[data-invalid] {
@@ -1439,7 +1433,7 @@ button.failed-details {
   color: var(--color-text);
 }
 .chips-reason {
-  font-size: 15px;
+  font-size: var(--type-text-size);
   color: var(--color-error);
 }
 .chips-reason::before {

@@ -33,7 +33,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 .layer-band > button,
@@ -211,7 +211,7 @@
 
 .proposals-none {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--type-text-size);
   line-height: 1.5;
 }
 

@@ -3,7 +3,7 @@
   min-width: 0;
   overflow-wrap: anywhere;
   gap: var(--space-5);
-  font-size: 15px;
+  font-size: var(--type-text-size);
   line-height: 1.55;
 }
 
@@ -67,7 +67,7 @@
 /* The sentence: what the node's state means, in words. */
 .sentence {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 /* The answer form: the question, what each choice does beside it, a reason, one Save. */
@@ -76,7 +76,7 @@
 }
 
 .question {
-  font-size: 15px;
+  font-size: var(--type-text-size);
   font-weight: 500;
 }
 
@@ -152,7 +152,7 @@ textarea.grow {
   min-height: var(--touch-target);
   cursor: pointer;
   list-style: none;
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 .detail-section > summary::-webkit-details-marker {
@@ -329,7 +329,7 @@ dl.kv dd {
   align-items: center;
   position: relative;
   min-height: 32px;
-  font-size: 15px;
+  font-size: var(--type-text-size);
   cursor: pointer;
 }
 
@@ -401,7 +401,7 @@ dl.kv dd {
 .done-ticks-list {
   margin: 0;
   padding-left: var(--space-4);
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 .done-ticks-list li {

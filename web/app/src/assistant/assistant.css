@@ -37,7 +37,7 @@
 /* The composer's label says what to ask, in the inspector's text size. */
 .assistant-ask {
   gap: var(--space-2);
-  font-size: 15px;
+  font-size: var(--type-text-size);
 }
 
 .assistant-transcript {
