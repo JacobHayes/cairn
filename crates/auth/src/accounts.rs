@@ -2,13 +2,16 @@
 //! (ARCHITECTURE, Auth; Store trait). Creating a user on first sign-in and linking an
 //! login are auth operations, written to the auth log rather than to any domain (J2).
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use cairn_schema::{Login, Title, UserId};
 use cairn_store::{
-    AuthEvent, AuthLogEntry, AuthLogQuery, LoggedAuthEntry, LoginRecord, Page, SessionRecord,
-    Store, UserRecord,
+    AuthEvent, AuthLogEntry, AuthLogQuery, LoggedAuthEntry, LoginRecord, OAuthStateKind,
+    OAuthStateRecord, Page, SessionRecord, Store, UserRecord,
 };
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use tokio::sync::Mutex;
 
 use crate::clock::Clock;
@@ -51,10 +54,10 @@ impl Accounts {
     }
 
     /// H1, H3: the user a login signs in as. A known login is its user, with the name and
-    /// verified emails the provider lists now; a new one is a new user (people who sign in
-    /// two ways meet in their identity, found by email). A login with no verified email is
-    /// refused: an identity is found by email, so a user without one could never be matched
-    /// again (H3).
+    /// verified emails the provider lists now; a new one joins the one user whose login has
+    /// a verified email of its own, else is a new user (emails held by two users link to
+    /// neither). A login with no verified email is refused: an identity is found by email,
+    /// so a user without one could never be matched again (H3).
     ///
     /// # Errors
     ///
@@ -84,7 +87,10 @@ impl Accounts {
             }
             return Ok(user);
         }
-        let user = self.create_user().await?;
+        let user = match self.holder(login).await? {
+            Some(user) => user,
+            None => self.create_user().await?,
+        };
         self.store
             .put_login(LoginRecord {
                 provider: login.provider.clone(),
@@ -100,6 +106,16 @@ impl Accounts {
         Ok(user)
     }
 
+    /// The one user whose logins hold a verified email of `login`'s, if exactly one does.
+    async fn holder(&self, login: &Login) -> Result<Option<UserId>, AuthError> {
+        let mut holders = BTreeSet::new();
+        for email in &login.verified_emails {
+            holders.extend(self.store.users_with_email(email).await?);
+        }
+        let mut holders = holders.into_iter();
+        Ok(holders.next().filter(|_| holders.next().is_none()))
+    }
+
     async fn create_user(&self) -> Result<UserId, AuthError> {
         let user: UserId = mint_id()?;
         self.store
@@ -110,6 +126,48 @@ impl Accounts {
             .await?;
         self.log(AuthEvent::UserCreated, &user, None).await?;
         Ok(user)
+    }
+
+    /// Holds `pending` of `kind` under the digest of `secret` for `lifetime`: a step of a
+    /// sign-in or an authorization that its secret's holder finishes once.
+    ///
+    /// # Errors
+    ///
+    /// `pending` is too large to hold, or the store failed.
+    pub async fn hold<T: Serialize>(
+        &self,
+        secret: &str,
+        kind: OAuthStateKind,
+        pending: &T,
+        lifetime: std::time::Duration,
+    ) -> Result<(), AuthError> {
+        let payload = serde_json::to_string(pending)
+            .ok()
+            .and_then(|json| json.parse().ok())
+            .ok_or_else(|| AuthError::Upstream("the request is too large to hold".to_owned()))?;
+        let record = OAuthStateRecord {
+            key_hash: digest(secret),
+            kind,
+            payload,
+            expires_at: self.clock.after(lifetime),
+        };
+        Ok(self.store.put_oauth_state(record).await?)
+    }
+
+    /// Takes what [`Accounts::hold`] holds for `secret`: used once, whatever comes of it.
+    ///
+    /// # Errors
+    ///
+    /// The store failed.
+    pub async fn take<T: DeserializeOwned>(
+        &self,
+        secret: &str,
+        kind: OAuthStateKind,
+    ) -> Result<Option<T>, AuthError> {
+        let now = self.clock.now();
+        let record = self.store.take_oauth_state(&digest(secret), now).await?;
+        let record = record.filter(|record| record.kind == kind);
+        Ok(record.and_then(|record| serde_json::from_str(record.payload.as_str()).ok()))
     }
 
     /// Starts a browser session for `user`; the token is the cookie's value, handed over

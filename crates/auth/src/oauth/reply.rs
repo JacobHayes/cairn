@@ -74,7 +74,7 @@ pub(crate) fn registered(registered: Result<Client, ClientError>, policy: &Polic
             });
             (StatusCode::CREATED, Json(body)).into_response()
         }
-        Err(error) => oauth_error(StatusCode::BAD_REQUEST, error.code(), error.description()),
+        Err(error) => oauth_error(StatusCode::BAD_REQUEST, error.code, &error.description),
     }
 }
 
@@ -127,34 +127,4 @@ pub(crate) fn escape(text: &str) -> String {
         }
     }
     escaped
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn page_text_is_escaped() {
-        let escaped = escape("<script>\"a\" & 'b'</script>");
-        assert!(!escaped.contains(['<', '>', '"', '\'']), "{escaped}");
-    }
-
-    /// A redirect URI's own query survives beside the answer, which carries one issuer.
-    #[test]
-    fn an_answer_keeps_the_redirect_query_and_names_one_issuer() {
-        let back = Back {
-            issuer: "https://cairn.example",
-            redirect_uri: "http://localhost:1/cb?next=x",
-            state: Some("s"),
-        };
-        let response = back.send(&[("code", "c")]);
-        let location = response.headers()[LOCATION].to_str().unwrap();
-        let url = Url::parse(location).unwrap();
-        let pairs: Vec<(String, String)> = url.query_pairs().into_owned().collect();
-        let named = |name: &str| pairs.iter().filter(|(key, _)| key == name).count();
-        assert_eq!(
-            (named("next"), named("code"), named("state"), named("iss")),
-            (1, 1, 1, 1)
-        );
-    }
 }

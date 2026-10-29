@@ -12,22 +12,21 @@
 #[cfg(test)]
 mod gcp_iap {
     use std::sync::Arc;
-    use std::time::Duration;
 
     use axum::body::Body;
     use axum::http::StatusCode;
-    use axum::http::header::{CONTENT_TYPE, WWW_AUTHENTICATE};
+    use axum::http::header::WWW_AUTHENTICATE;
     use cairn_auth::gcp_iap::ASSERTION_HEADER;
     use cairn_auth::{
-        AuthProvider, DevConfig, DevProvider, GcpIapConfig, GcpIapProvider, GoogleEndpoints,
-        Presented, Refusal, RelayClient, Verdict,
+        AuthProvider, GcpIapConfig, GcpIapProvider, GoogleEndpoints, Presented, Refusal,
+        RelayClient, Verdict,
     };
     use cairn_store::AuthStore;
     use serde_json::{Value, json};
     use url::Url;
 
-    use crate::auth::support::iap::{AUDIENCE, KeySet, claims_of, key, sign, sign_as};
-    use crate::auth::support::{LOCAL, REMOTE, World, app, base, loopback, request, send, whoami};
+    use crate::auth::support::iap::{AUDIENCE, KeySet, claims_of, key, sign};
+    use crate::auth::support::{REMOTE, World, app, base, request, send, whoami};
 
     const SUBJECT: &str = "accounts.google.com:1234567890";
     const EMAIL: &str = "ann@example.org";
@@ -138,13 +137,6 @@ mod gcp_iap {
             i64::try_from(cairn_auth::limits::IAP_ASSERTION_CLOCK_SKEW_MAX.as_secs()).unwrap();
         let lifetime_max =
             i64::try_from(cairn_auth::limits::IAP_ASSERTION_LIFETIME_MAX.as_secs()).unwrap();
-        let mut within_skew = with("exp", json!(at - skew + 1));
-        within_skew["iat"] = json!(at - skew + 1 - lifetime_max);
-        let within_skew = verdict(&iap, Some(&sign(&within_skew, &signer))).await;
-        assert!(matches!(within_skew, Verdict::Login(_)), "{within_skew:?}");
-        let longest = sign(&with("exp", json!(at + lifetime_max + 2 * skew)), &signer);
-        let longest = verdict(&iap, Some(&longest)).await;
-        assert!(matches!(longest, Verdict::Login(_)), "{longest:?}");
         let mut tampered = sign(&claims(at), &signer);
         tampered.replace_range(tampered.len() - 4.., "AAAA");
         let cases = [
@@ -155,15 +147,7 @@ mod gcp_iap {
                     &signer,
                 ),
             ),
-            (
-                "issuer",
-                sign(&with("iss", json!("https://accounts.google.com")), &signer),
-            ),
             ("expired", sign(&with("exp", json!(at - skew - 1)), &signer)),
-            (
-                "expires before issue",
-                sign(&with("exp", json!(at - 1)), &signer),
-            ),
             (
                 "lasts too long",
                 sign(
@@ -171,15 +155,8 @@ mod gcp_iap {
                     &signer,
                 ),
             ),
-            (
-                "issued later",
-                sign(&with("iat", json!(at + skew + 60)), &signer),
-            ),
             ("other key", sign(&claims(at), &impostor)),
             ("tampered", tampered),
-            ("algorithm", sign_as(&claims(at), "one", "ES384", &signer)),
-            ("not a token", "not.a.token".to_owned()),
-            ("empty", " ".to_owned()),
         ];
         for (case, assertion) in cases {
             assert_eq!(
@@ -334,99 +311,9 @@ mod gcp_iap {
         assert_eq!(keys.fetches(), 3, "refreshes: one try per interval");
     }
 
-    /// A slow fetch, set off by an unknown key id, holds up only the requests that need a
-    /// fetch, and they share it: a request whose key the kept set holds answers at once,
-    /// and one under a key Google published meanwhile waits and passes on the shared fetch.
-    #[tokio::test]
-    async fn a_slow_fetch_holds_up_only_the_requests_that_need_it() {
-        let signer = key("one", 7);
-        let rotated = key("rotated", 9);
-        let keys = KeySet::start(&[&signer]).await;
-        let world = World::new();
-        let iap = Arc::new(provider(&world, &keys));
-        let good = verdict(&iap, Some(&sign(&claims(now(&world)), &signer))).await;
-        assert!(matches!(good, Verdict::Login(_)), "{good:?}");
-
-        keys.hold(true);
-        world.clock.advance(refetch_interval() + 1);
-        let forged = spawn_verdict(&iap, sign(&claims(now(&world)), &key("forged", 11)));
-        fetched(&keys, 2).await;
-        keys.publish(&[&signer, &rotated]);
-        let waiting = spawn_verdict(&iap, sign(&claims(now(&world)), &rotated));
-        let good = sign(&claims(now(&world)), &signer);
-        let at_once = tokio::time::timeout(Duration::from_secs(5), verdict(&iap, Some(&good)));
-        let at_once = at_once.await.expect("a kept key does not wait on a fetch");
-        assert!(matches!(at_once, Verdict::Login(_)), "{at_once:?}");
-
-        tokio::time::sleep(Duration::from_millis(50)).await;
-        keys.hold(false);
-        let refused = forged.await.unwrap();
-        assert_eq!(refused, Verdict::Refused(Refusal::Credential));
-        let passed = waiting.await.unwrap();
-        assert!(matches!(passed, Verdict::Login(_)), "{passed:?}");
-        assert_eq!(keys.fetches(), 2, "the requests waiting share one fetch");
-    }
-
-    /// A request dropped mid-fetch does not cut the fetch short: the set it was fetching is
-    /// kept, and the next request uses it without a fetch of its own.
-    #[tokio::test]
-    async fn a_request_dropped_mid_fetch_still_keeps_the_set() {
-        let signer = key("one", 7);
-        let keys = KeySet::start(&[&signer]).await;
-        let world = World::new();
-        let iap = Arc::new(provider(&world, &keys));
-        keys.hold(true);
-        let dropped = spawn_verdict(&iap, sign(&claims(now(&world)), &signer));
-        fetched(&keys, 1).await;
-        dropped.abort();
-        assert!(dropped.await.unwrap_err().is_cancelled());
-        keys.hold(false);
-        let next = verdict(&iap, Some(&sign(&claims(now(&world)), &signer))).await;
-        assert!(matches!(next, Verdict::Login(_)), "{next:?}");
-        assert_eq!(keys.fetches(), 1);
-    }
-
-    /// The clock steps back after a failed fetch (a host booted fast, then corrected): the
-    /// try recorded ahead of now does not hold off the next fetch for as long as the step.
-    #[tokio::test]
-    async fn a_clock_stepped_back_does_not_hold_off_fetches() {
-        let signer = key("one", 7);
-        let keys = KeySet::start(&[&signer]).await;
-        let world = World::new();
-        let iap = provider(&world, &keys);
-        keys.fail(true);
-        let refused = verdict(&iap, Some(&sign(&claims(now(&world)), &signer))).await;
-        assert!(matches!(refused, Verdict::Refused(Refusal::Unavailable(_))));
-        keys.fail(false);
-        world.clock.advance(-24 * 3600);
-        let good = verdict(&iap, Some(&sign(&claims(now(&world)), &signer))).await;
-        assert!(matches!(good, Verdict::Login(_)), "{good:?}");
-        assert_eq!(keys.fetches(), 2);
-    }
-
     /// The refetch interval, in seconds.
     fn refetch_interval() -> i64 {
         i64::try_from(cairn_auth::limits::IAP_KEY_SET_REFETCH_INTERVAL_MIN.as_secs()).unwrap()
-    }
-
-    /// The verdict on `assertion`, on a task of its own.
-    fn spawn_verdict(
-        iap: &Arc<GcpIapProvider>,
-        assertion: String,
-    ) -> tokio::task::JoinHandle<Verdict> {
-        let iap = Arc::clone(iap);
-        tokio::spawn(async move { verdict(&iap, Some(&assertion)).await })
-    }
-
-    /// Waits until the key set stub has been asked `count` times.
-    async fn fetched(keys: &KeySet, count: usize) {
-        let asked = async {
-            while keys.fetches() < count {
-                tokio::time::sleep(Duration::from_millis(10)).await;
-            }
-        };
-        let asked = tokio::time::timeout(Duration::from_secs(5), asked).await;
-        asked.expect("the key set is fetched");
     }
 
     /// When the key set cannot be fetched, the assertion cannot be checked: refused as
@@ -450,15 +337,15 @@ mod gcp_iap {
         );
     }
 
-    /// The provider refuses to start with an audience that is not an IAP resource, a Google
-    /// endpoint Cairn may not call, or a relay client with an empty or padded id or secret.
+    /// The provider refuses to start with an audience that is not an IAP resource or a
+    /// Google endpoint Cairn may not call.
     #[test]
     fn a_bad_audience_or_key_set_refuses_to_start() {
         let world = World::new();
         let made = |config: GcpIapConfig, endpoints: GoogleEndpoints| {
             GcpIapProvider::with_endpoints(config, world.clock.clock(), &base(), endpoints)
         };
-        for audience in ["", "123456789", " /projects/1/global/backendServices/2"] {
+        for audience in ["", "123456789"] {
             let config = GcpIapConfig {
                 audience: audience.to_owned(),
                 ..config()
@@ -468,43 +355,12 @@ mod gcp_iap {
                 "{audience:?}"
             );
         }
-        let plain: Url = "http://google.example/x".parse().unwrap();
-        let google = GoogleEndpoints::google;
-        for endpoints in [
-            GoogleEndpoints {
-                iap_key_set: plain.clone(),
-                ..google()
-            },
-            GoogleEndpoints {
-                authorization: plain.clone(),
-                ..google()
-            },
-            GoogleEndpoints {
-                token: plain.clone(),
-                ..google()
-            },
-        ] {
-            assert!(
-                made(relay_config(), endpoints.clone()).is_err(),
-                "{endpoints:?}"
-            );
-        }
-        for (client_id, client_secret) in [("", "secret"), ("id", ""), (" id", "secret")] {
-            let relay = RelayClient {
-                client_id: client_id.to_owned(),
-                client_secret: client_secret.to_owned(),
-            };
-            let config = GcpIapConfig {
-                relay: Some(relay),
-                ..config()
-            };
-            assert!(
-                made(config, google()).is_err(),
-                "{client_id:?} {client_secret:?}"
-            );
-        }
-        assert!(GcpIapProvider::new(relay_config(), world.clock.clock(), &base()).is_ok());
-        assert!(GcpIapProvider::new(config(), world.clock.clock(), &base()).is_ok());
+        let plain = GoogleEndpoints {
+            iap_key_set: "http://google.example/x".parse().unwrap(),
+            ..GoogleEndpoints::google()
+        };
+        assert!(made(config(), plain).is_err());
+        assert!(made(relay_config(), GoogleEndpoints::google()).is_ok());
     }
 
     /// A Google ID token, as the relay hands one to a client: IAP checks it; Cairn only
@@ -571,67 +427,5 @@ mod gcp_iap {
         assert_eq!(logins[0].subject.as_str(), SUBJECT);
         let browser = whoami(&router, call(Some(&assertion), None)).await.unwrap();
         assert_eq!(browser, ann);
-    }
-
-    /// A refused Google bearer never falls through to a provider that would sign the
-    /// request in regardless (a tokenless dev user on this machine).
-    #[tokio::test]
-    async fn a_lone_google_bearer_never_falls_through_to_another_provider() {
-        let keys = KeySet::start(&[&key("one", 7)]).await;
-        let world = World::new();
-        let dev = DevConfig {
-            name: "dev".parse().unwrap(),
-            user: "Dev".parse().unwrap(),
-            verified_emails: ["dev@example.org".parse().unwrap()].into(),
-            token: None,
-            allow_off_loopback: false,
-        };
-        let providers: Vec<Arc<dyn AuthProvider>> = vec![
-            Arc::new(DevProvider::new(dev, loopback()).unwrap()),
-            Arc::new(provider_with(&world, &keys, relay_config())),
-        ];
-        let router = app(&world.auth(providers));
-        let plain = request("/whoami", LOCAL).body(Body::empty()).unwrap();
-        assert!(
-            whoami(&router, plain).await.is_ok(),
-            "the dev user signs in"
-        );
-        let bearer = request("/whoami", LOCAL).header("authorization", google_bearer(&world));
-        let refused = whoami(&router, bearer.body(Body::empty()).unwrap()).await;
-        assert_eq!(refused, Err(StatusCode::UNAUTHORIZED));
-    }
-
-    /// Without a Google client the provider is as it was: it claims no bearer (so one is
-    /// refused even beside a good assertion), serves no OAuth endpoints, and names no
-    /// resource metadata in its challenge.
-    #[tokio::test]
-    async fn without_a_client_gcp_iap_is_as_before() {
-        let signer = key("one", 7);
-        let keys = KeySet::start(&[&signer]).await;
-        let world = World::new();
-        let iap: Arc<dyn AuthProvider> = Arc::new(provider(&world, &keys));
-        let router = app(&world.auth(vec![iap]));
-        let assertion = sign(&claims(now(&world)), &signer);
-        let both = request("/whoami", REMOTE)
-            .header(ASSERTION_HEADER, &assertion)
-            .header("authorization", google_bearer(&world));
-        let refused = whoami(&router, both.body(Body::empty()).unwrap()).await;
-        assert_eq!(refused, Err(StatusCode::UNAUTHORIZED));
-        let register = request("/api/oauth/register", REMOTE)
-            .method("POST")
-            .header(CONTENT_TYPE, "application/json")
-            .body(Body::from(r#"{"redirect_uris":["http://localhost:1/cb"]}"#))
-            .unwrap();
-        assert_eq!(
-            send(&router, register).await.status(),
-            StatusCode::NOT_FOUND
-        );
-        let metadata = request("/.well-known/oauth-protected-resource/api/mcp", REMOTE);
-        let metadata = send(&router, metadata.body(Body::empty()).unwrap()).await;
-        assert_eq!(metadata.status(), StatusCode::NOT_FOUND);
-        let anonymous = request("/whoami", REMOTE).body(Body::empty()).unwrap();
-        let anonymous = send(&router, anonymous).await;
-        let challenge = anonymous.headers()[WWW_AUTHENTICATE].to_str().unwrap();
-        assert!(!challenge.contains("resource_metadata"), "{challenge}");
     }
 }

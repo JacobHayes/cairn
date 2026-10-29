@@ -19,7 +19,7 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use cairn_schema::{Email, Login, Slug, Title};
-use cairn_store::{OAuthStateKind, OAuthStateRecord};
+use cairn_store::OAuthStateKind;
 use openidconnect::core::{
     CoreAuthenticationFlow, CoreClient, CoreClientAuthMethod, CoreIdTokenClaims,
     CoreProviderMetadata,
@@ -155,18 +155,11 @@ impl Inner {
             verifier_digest: digest(verifier.secret()).to_string(),
             return_to: return_to.to_owned(),
         };
-        let payload = serde_json::to_string(&pending).map_err(|error| Failure::bug(&error))?;
-        let record = OAuthStateRecord {
-            key_hash: digest(state.secret()),
-            kind: OAuthStateKind::LoginState,
-            payload: payload.parse().map_err(|error| Failure::bug(&error))?,
-            expires_at: self.accounts.clock().after(BROWSER_STEP_LIFETIME),
-        };
-        self.accounts
-            .store()
-            .put_oauth_state(record)
-            .await
-            .map_err(AuthError::from)?;
+        let kind = OAuthStateKind::LoginState;
+        let held = self
+            .accounts
+            .hold(state.secret(), kind, &pending, BROWSER_STEP_LIFETIME);
+        held.await?;
         let path = format!("/api/auth/{}", self.config.name);
         let cookie = cookies::set(
             &self.login_cookie,
@@ -213,14 +206,11 @@ impl Inner {
     /// The pending sign-in `state` names, which only the browser holding its verifier
     /// cookie may finish. Taken either way, so a state is used once.
     async fn take_pending(&self, headers: &HeaderMap, state: &str) -> Result<Pending, Failure> {
-        let now = self.accounts.clock().now();
-        let store = self.accounts.store();
-        let record = store.take_oauth_state(&digest(state), now).await;
-        let record = record.map_err(AuthError::from)?;
-        let pending = record
-            .filter(|record| record.kind == OAuthStateKind::LoginState)
-            .and_then(|record| serde_json::from_str::<Pending>(record.payload.as_str()).ok())
-            .filter(|pending| pending.provider == self.config.name.as_str());
+        let pending = self
+            .accounts
+            .take::<Pending>(state, OAuthStateKind::LoginState)
+            .await?;
+        let pending = pending.filter(|pending| pending.provider == self.config.name.as_str());
         let Some(pending) = pending else {
             return Err(Failure::BadRequest("no sign-in is waiting for this state"));
         };
@@ -325,12 +315,6 @@ enum Failure {
     Refused(&'static str),
     /// An operation failed.
     Auth(AuthError),
-}
-
-impl Failure {
-    fn bug(error: &dyn std::fmt::Display) -> Self {
-        Failure::Auth(AuthError::Upstream(error.to_string()))
-    }
 }
 
 impl From<AuthError> for Failure {

@@ -17,7 +17,7 @@ use axum::extract::{Form, Query, State};
 use axum::http::{Extensions, HeaderMap, StatusCode, Uri};
 use axum::response::{Html, IntoResponse, Json, Response};
 use cairn_schema::{Actor, Title, UserId};
-use cairn_store::{OAuthStateKind, OAuthStateRecord};
+use cairn_store::OAuthStateKind;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use url::Url;
@@ -31,7 +31,7 @@ use super::reply::{escape, framed_never, no_store, oauth_error, page, redirect, 
 use crate::error::{AuthError, Refusal};
 use crate::layer::Authenticate;
 use crate::lifetimes::{AUTHORIZATION_CODE_LIFETIME, BROWSER_STEP_LIFETIME};
-use crate::secret::{Secret, SecretKind, digest};
+use crate::secret::{Secret, SecretKind};
 
 /// What the endpoints share.
 pub(super) struct Flow {
@@ -204,7 +204,9 @@ impl Flow {
             request: request.clone(),
         };
         let kind = OAuthStateKind::LoginState;
-        self.store(&step, kind, &pending, BROWSER_STEP_LIFETIME)
+        let accounts = &self.server.accounts;
+        accounts
+            .hold(step.expose(), kind, &pending, BROWSER_STEP_LIFETIME)
             .await?;
         let name = client
             .name
@@ -217,49 +219,23 @@ impl Flow {
         let code = Secret::mint(SecretKind::Code)?;
         let pending = Pending::Code { user, request };
         let kind = OAuthStateKind::AuthorizationCode;
-        self.store(&code, kind, &pending, AUTHORIZATION_CODE_LIFETIME)
+        let accounts = &self.server.accounts;
+        accounts
+            .hold(code.expose(), kind, &pending, AUTHORIZATION_CODE_LIFETIME)
             .await?;
         Ok(code)
-    }
-
-    async fn store(
-        &self,
-        secret: &Secret,
-        kind: OAuthStateKind,
-        pending: &Pending,
-        lifetime: std::time::Duration,
-    ) -> Result<(), AuthError> {
-        let accounts = &self.server.accounts;
-        let payload = serde_json::to_string(pending)
-            .ok()
-            .and_then(|json| json.parse().ok())
-            .ok_or_else(|| AuthError::Upstream("the request is too large to hold".to_owned()))?;
-        let record = OAuthStateRecord {
-            key_hash: secret.digest(),
-            kind,
-            payload,
-            expires_at: accounts.clock().after(lifetime),
-        };
-        Ok(accounts.store().put_oauth_state(record).await?)
     }
 
     /// Takes a pending step of `kind` by its secret: used once, whatever comes of it.
     async fn take(&self, secret: &str, kind: OAuthStateKind) -> Result<Option<Pending>, AuthError> {
         let expected = match kind {
             OAuthStateKind::AuthorizationCode => SecretKind::Code,
-            _ => SecretKind::Step,
+            OAuthStateKind::LoginState => SecretKind::Step,
         };
         if !expected.matches(secret) {
             return Ok(None);
         }
-        let accounts = &self.server.accounts;
-        let now = accounts.clock().now();
-        let record = accounts
-            .store()
-            .take_oauth_state(&digest(secret), now)
-            .await?;
-        let record = record.filter(|record| record.kind == kind);
-        Ok(record.and_then(|record| serde_json::from_str(record.payload.as_str()).ok()))
+        self.server.accounts.take(secret, kind).await
     }
 
     /// The agent token for the client, named after it.

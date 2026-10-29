@@ -1,30 +1,19 @@
 //! The Google Cloud IAP provider (H1; ARCHITECTURE, Auth): Cairn behind Identity-Aware
 //! Proxy, which signs every request it lets through with a JWT in the
-//! `x-goog-iap-jwt-assertion` header. Each request's assertion is verified (signature
-//! against Google's published IAP keys, issuer, the configured audience, expiry) and names
-//! its user; nothing is trusted because of where the request came from, so the provider
-//! runs on any listener (decisions/2026-10-08-behind-iap-cairn-verifies-the-signed-assertion.md).
+//! `x-goog-iap-jwt-assertion` header. Each assertion is verified by `openidconnect`'s
+//! verifier (ES256 signature against Google's published IAP keys, issuer, the configured
+//! audience, expiry, and a lifetime no longer than IAP's own) and names its user; nothing is
+//! trusted because of where the request came from, so the provider runs on any listener.
 //!
-//! An assertion has the shape of an ID token (`iss`, `aud`, `sub`, `exp`, `iat`, `email`),
-//! so `openidconnect`'s verifier checks it, as it checks the OIDC provider's ID tokens;
-//! nothing here validates a token by hand. IAP signs with ES256 only. Beyond what the
-//! verifier checks, an assertion may last no longer than IAP's own do, with the skew at
-//! either end.
-//!
-//! The key set is fetched on first use and kept for at most `IAP_KEY_SET_AGE_MAX`, so a key
-//! Google withdraws stops being trusted at the next fetch. A token naming a key the kept set
-//! lacks (Google rotated its keys) fetches it again too. Any try, failed or not, holds off
-//! the next for `IAP_KEY_SET_REFETCH_INTERVAL_MIN`, so neither a stream of forged key ids
-//! nor an outage at Google makes Cairn fetch on every request. One fetch runs at a time, on
-//! its own task so a request dropped meanwhile cannot cut it short, and the requests that
-//! need it wait for it, at most an outbound call; a request whose key the kept set holds,
-//! while the set is within its age, never waits, and no lock is held across the call.
+//! The key set is fetched on first use and kept for at most `IAP_KEY_SET_AGE_MAX`; a token
+//! naming a key the kept set lacks fetches it again. Any try, failed or not, holds off the
+//! next for `IAP_KEY_SET_REFETCH_INTERVAL_MIN`, so forged key ids or an outage at Google
+//! never make Cairn fetch on every request.
 //!
 //! Given the Google OAuth client IAP's programmatic access allows, the provider also relays
 //! an MCP client's sign-in to Google (`relay`), so the bearer the client ends up holding is
 //! a Google ID token IAP accepts. Such a bearer counts only beside a valid assertion on the
-//! same request, which names the user; Cairn never reads login from the bearer itself
-//! (decisions/2026-10-16-mcp-clients-behind-iap-sign-in-through-a-relay-to-google.md).
+//! same request, which names the user; Cairn never reads login from the bearer itself.
 
 mod relay;
 
@@ -262,10 +251,11 @@ impl GcpIapProvider {
             .then(|| Arc::clone(&kept.set))
     }
 
-    /// The key set fetched now. When a fetch was tried within the refetch interval (most
-    /// often the one this request waited behind), none is made: the answer is the current
-    /// kept set, or unavailable without one. The try is recorded before the call, so a
-    /// failed one holds off the next as a good one does.
+    /// The key set fetched now, one fetch at a time. When a fetch was tried within the
+    /// refetch interval (most often the one this request waited behind), none is made: the
+    /// answer is the current kept set, or unavailable without one. The try is recorded
+    /// before the call, so a failed one holds off the next as a good one does, and the
+    /// fetch runs on a task of its own, so a request dropped meanwhile cannot cut it short.
     async fn refresh(&self) -> Result<Arc<CoreJsonWebKeySet>, Refusal> {
         let fetching = Arc::clone(&self.fetching).lock_owned().await;
         let now = self.clock.now();
@@ -284,29 +274,28 @@ impl GcpIapProvider {
                 Refusal::Unavailable("the IAP key set: the last fetch failed".to_owned())
             });
         }
-        // The fetch keeps what it gets and lets the next one start itself, so a request
-        // dropped mid-fetch cannot leave the try recorded and nothing kept.
         let (keys, url, http) = (
             Arc::clone(&self.keys),
             self.key_set_url.clone(),
             self.http.clone(),
         );
         let fetch = tokio::spawn(async move {
+            let _fetching = fetching;
             let fetched = CoreJsonWebKeySet::fetch_async(&url, &http).await;
             let set = Arc::new(fetched.map_err(|error| error.to_string())?);
             lock(&keys).kept = Some(Kept {
                 set: Arc::clone(&set),
                 fetched_at: now,
             });
-            drop(fetching);
             Ok::<_, String>(set)
         });
         match fetch.await {
             Ok(Ok(set)) => Ok(set),
-            Ok(Err(error)) => Err(format!("the IAP key set: {error}")),
-            Err(error) => Err(format!("the IAP key set fetch: {error}")),
+            Ok(Err(error)) => Err(Refusal::Unavailable(format!("the IAP key set: {error}"))),
+            Err(error) => Err(Refusal::Unavailable(format!(
+                "the IAP key set fetch: {error}"
+            ))),
         }
-        .map_err(Refusal::Unavailable)
     }
 
     /// Whether `since` is less than `interval` ago. A `since` ahead of now (the clock

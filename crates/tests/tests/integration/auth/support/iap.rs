@@ -65,7 +65,7 @@ impl Key {
 }
 
 /// A stub of Google's IAP key set, counting fetches. It can fail every fetch, as Google
-/// down does, or hold each until released, as a slow Google does.
+/// down does.
 pub struct KeySet {
     pub url: Url,
     served: Served,
@@ -76,13 +76,10 @@ struct Served {
     keys: Arc<Mutex<Vec<Value>>>,
     fetches: Arc<AtomicUsize>,
     failing: Arc<AtomicBool>,
-    held: tokio::sync::watch::Sender<bool>,
 }
 
 async fn serve_keys(State(served): State<Served>) -> Response {
     served.fetches.fetch_add(1, Ordering::SeqCst);
-    let mut held = served.held.subscribe();
-    held.wait_for(|held| !held).await.unwrap();
     if served.failing.load(Ordering::SeqCst) {
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     }
@@ -97,7 +94,6 @@ impl KeySet {
             keys: Arc::new(Mutex::new(keys.iter().map(|key| key.jwk()).collect())),
             fetches: Arc::new(AtomicUsize::new(0)),
             failing: Arc::new(AtomicBool::new(false)),
-            held: tokio::sync::watch::Sender::new(false),
         };
         let router = Router::new()
             .route("/keys", get(serve_keys))
@@ -120,11 +116,6 @@ impl KeySet {
     /// Whether every fetch fails.
     pub fn fail(&self, failing: bool) {
         self.served.failing.store(failing, Ordering::SeqCst);
-    }
-
-    /// Whether fetches are held, unanswered, until released.
-    pub fn hold(&self, held: bool) {
-        self.served.held.send_replace(held);
     }
 }
 

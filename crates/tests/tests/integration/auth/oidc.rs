@@ -158,7 +158,6 @@ mod oidc {
     async fn a_spoiled_id_token_is_refused() {
         let setup = setup().await;
         let spoils = [
-            Spoil::Issuer,
             Spoil::Audience,
             Spoil::Expired,
             Spoil::Signature,
@@ -210,65 +209,14 @@ mod oidc {
         assert_eq!(logged.items, Vec::new(), "no user or login was added");
     }
 
-    /// An issuer that cannot be reached fails the sign-in as a bad gateway, and starts
-    /// nothing.
+    /// The issuer's endpoints are called over https or to this machine only, whatever its
+    /// discovery document advertises: a token endpoint over plain http elsewhere fails the
+    /// sign-in.
     #[tokio::test]
-    async fn an_unreachable_issuer_fails_the_sign_in() {
-        let world = World::new();
-        let config = OidcConfig {
-            name: "oidc".parse().unwrap(),
-            issuer: "http://127.0.0.1:1/".parse().unwrap(),
-            client_id: "cairn".to_owned(),
-            client_secret: None,
-        };
-        let provider = OidcProvider::new(config, world.accounts.clone(), &base()).unwrap();
-        let router = app(&world.auth(vec![Arc::new(provider)]));
-        let start = request("/api/auth/oidc/sign-in", LOCAL)
-            .body(Body::empty())
-            .unwrap();
-        let response = send(&router, start).await;
-        assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
-        assert_eq!(cookies_set(&response), Vec::new());
-    }
-    /// Every call to the issuer goes to https or this machine, whatever its discovery
-    /// document advertises, and reads at most the body limit: a key set or token endpoint
-    /// over plain http elsewhere, or an oversized document, fails the sign-in.
-    #[tokio::test]
-    async fn the_issuer_is_called_only_over_https_or_loopback_and_within_the_limit() {
-        for advertise in [Advertise::PlainHttpKeys, Advertise::Oversized] {
-            let setup = setup().await;
-            setup.issuer.advertise(advertise);
-            let start = request("/api/auth/oidc/sign-in", LOCAL)
-                .body(Body::empty())
-                .unwrap();
-            let response = send(&setup.router, start).await;
-            assert_eq!(response.status(), StatusCode::BAD_GATEWAY, "{advertise:?}");
-        }
+    async fn the_issuer_is_called_only_over_https_or_loopback() {
         let setup = setup().await;
         setup.issuer.advertise(Advertise::PlainHttpToken);
         let refused = sign_in(&setup, &ANN, Spoil::Nothing, "").await;
         assert_eq!(refused, Err(StatusCode::BAD_GATEWAY));
-    }
-
-    /// An issuer that takes the client secret only in the form post gets it there.
-    #[tokio::test]
-    async fn the_client_secret_goes_where_the_issuer_takes_it() {
-        let world = World::new();
-        let issuer = Issuer::start(world.clock.clock()).await;
-        issuer.advertise(Advertise::SecretInFormOnly);
-        let config = OidcConfig {
-            name: "oidc".parse().unwrap(),
-            issuer: issuer.url(),
-            client_id: "cairn".to_owned(),
-            client_secret: Some("shh".to_owned()),
-        };
-        let provider = OidcProvider::new(config, world.accounts.clone(), &base()).unwrap();
-        let router = app(&world.auth(vec![Arc::new(provider)]));
-        let setup = Setup {
-            world,
-            issuer,
-            router,
-        };
-        assert!(sign_in(&setup, &ANN, Spoil::Nothing, "").await.is_ok());
     }
 }

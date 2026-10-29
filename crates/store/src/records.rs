@@ -94,8 +94,6 @@ pub struct SessionRecord {
 pub enum OAuthStateKind {
     /// An authorization code awaiting exchange.
     AuthorizationCode,
-    /// A PKCE verifier awaiting its callback.
-    PkceVerifier,
     /// A login's state parameter awaiting its callback.
     LoginState,
 }

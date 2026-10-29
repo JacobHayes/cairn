@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{ConversationId, Slug, Timestamp, Title, UserId};
+use cairn_schema::{ConversationId, Email, Slug, Timestamp, Title, UserId};
 use cairn_store::backend;
 use cairn_store::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationMessage, ConversationRecord,
@@ -136,6 +136,18 @@ pub(crate) fn logins_of(
     user: &UserId,
 ) -> Result<Vec<LoginRecord>, StoreError> {
     logins(connection, "user_id = ?1", vec![text(user)])
+}
+
+pub(crate) fn users_with_email(
+    connection: &Connection,
+    email: &Email,
+) -> Result<Vec<UserId>, StoreError> {
+    let select = "SELECT DISTINCT user_id FROM user_logins JOIN login_emails \
+                  USING (provider, subject) WHERE email = ?1 ORDER BY user_id";
+    rows(connection, select, vec![text(email)])?
+        .iter()
+        .map(|row| row.parse(0))
+        .collect()
 }
 
 pub(crate) fn put_session(

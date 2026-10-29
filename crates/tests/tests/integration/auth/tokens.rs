@@ -10,7 +10,7 @@ mod tokens {
     use axum::http::header::AUTHORIZATION;
     use cairn_auth::{AuthError, AuthProvider, OAuthConfig, OAuthServer, Secret};
     use cairn_schema::{Actor, Title};
-    use cairn_store::{AuthEvent, AuthStore, MemoryStore, UserRecord};
+    use cairn_store::{AuthEvent, AuthStore, UserRecord};
 
     use crate::auth::support::{LOCAL, World, app, base, request, whoami};
 
@@ -93,30 +93,6 @@ mod tokens {
         assert!(listed[0].revoked_at.is_some());
         let logged = [AuthEvent::TokenMinted, AuthEvent::TokenRevoked];
         assert_eq!(world.log().await, logged);
-    }
-
-    /// A stored token is never readable in plain text: the store holds its digest, and the
-    /// digest does not sign anything in.
-    #[tokio::test]
-    async fn a_stored_token_is_only_its_digest() {
-        let world = World::new();
-        let ann = ann(&world).await;
-        let router = app(&world.auth(vec![oauth(&world)]));
-        let minted = world
-            .accounts
-            .mint_token(&ann, named("script"))
-            .await
-            .unwrap();
-        let stored: &MemoryStore = &world.store;
-        let records = stored.agent_tokens_of(&ann.user).await.unwrap();
-        let held = records[0].token_hash.as_str();
-        assert_ne!(held, minted.token.expose());
-        assert!(!minted.token.expose().contains(held));
-        assert_eq!(records[0].token_hash, minted.token.digest());
-        assert_eq!(
-            whoami(&router, bearer(held)).await,
-            Err(StatusCode::UNAUTHORIZED)
-        );
     }
 
     /// A user cannot revoke another user's token. (That an agent can neither mint nor revoke

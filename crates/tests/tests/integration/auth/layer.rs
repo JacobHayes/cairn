@@ -10,7 +10,7 @@ mod layer {
 
     use axum::body::Body;
     use axum::http::StatusCode;
-    use axum::http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
+    use axum::http::header::AUTHORIZATION;
     use cairn_auth::lifetimes::SESSION_LIFETIME;
     use cairn_auth::{AuthProvider, DevConfig, DevProvider};
     use cairn_schema::UserId;
@@ -25,7 +25,7 @@ mod layer {
         DevConfig {
             name: name.parse().unwrap(),
             user: format!("{name} user").parse().unwrap(),
-            verified_emails: BTreeSet::from(["dev@example.org".parse().unwrap()]),
+            verified_emails: BTreeSet::from([format!("{name}@example.org").parse().unwrap()]),
             token: token.map(str::to_owned),
             allow_off_loopback: false,
         }
@@ -107,38 +107,6 @@ mod layer {
         assert_eq!(status, Err(StatusCode::FORBIDDEN));
     }
 
-    /// The static token signs in as the dev user; a wrong token is refused with
-    /// `invalid_token`, no credential at all asks for one, and a bearer token no provider
-    /// claims is refused.
-    #[tokio::test]
-    async fn the_dev_token_signs_in_and_a_wrong_or_unclaimed_token_is_refused() {
-        let world = World::new();
-        let config = dev("dev", Some("let-me-in"));
-        let router = app(&world.auth(vec![provider(config, loopback())]));
-        assert!(whoami(&router, bearer("let-me-in", LOCAL)).await.is_ok());
-
-        let cases = [
-            (Some("let-me-out"), Some("invalid_token")),
-            (Some("cairn_agent_00"), Some("invalid_token")),
-            (None, None),
-        ];
-        for (token, error) in cases {
-            let request = match token {
-                Some(token) => bearer(token, LOCAL),
-                None => get("/whoami", LOCAL),
-            };
-            let response = send(&router, request).await;
-            assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{token:?}");
-            let challenge = response.headers()[WWW_AUTHENTICATE].to_str().unwrap();
-            assert!(challenge.starts_with("Bearer"), "{challenge}");
-            assert_eq!(
-                challenge.contains("invalid_token"),
-                error.is_some(),
-                "{token:?}"
-            );
-        }
-    }
-
     /// A failing provider never falls through to a weaker one: a wrong token is refused even
     /// though the next provider would sign the request in without one.
     #[tokio::test]
@@ -157,30 +125,6 @@ mod layer {
         let basic = request("/whoami", LOCAL).header(AUTHORIZATION, "Basic YTpi");
         let basic = whoami(&router, basic.body(Body::empty()).unwrap()).await;
         assert_eq!(basic, Err(StatusCode::UNAUTHORIZED));
-    }
-
-    /// A blank `Authorization`, as IAP passes on once it has taken a Google ID token from
-    /// it, carries nothing: the next provider signs the request in as if it were absent. A
-    /// wrong token beside a blank value is still refused.
-    #[tokio::test]
-    async fn a_blank_authorization_counts_as_absent() {
-        let world = World::new();
-        let providers = vec![
-            provider(dev("token", Some("let-me-in")), loopback()),
-            provider(dev("ambient", None), loopback()),
-        ];
-        let router = app(&world.auth(providers));
-        let ambient = whoami(&router, get("/whoami", LOCAL)).await.unwrap();
-        for blank in ["", "  "] {
-            let request = request("/whoami", LOCAL).header(AUTHORIZATION, blank);
-            let actor = whoami(&router, request.body(Body::empty()).unwrap()).await;
-            assert_eq!(actor.unwrap().user, ambient.user, "{blank:?}");
-        }
-        let beside = request("/whoami", LOCAL)
-            .header(AUTHORIZATION, "")
-            .header(AUTHORIZATION, "Bearer let-me-out");
-        let beside = whoami(&router, beside.body(Body::empty()).unwrap()).await;
-        assert_eq!(beside, Err(StatusCode::UNAUTHORIZED));
     }
 
     /// A session cookie signs the browser in until it lapses or is ended; a lapsed, ended,

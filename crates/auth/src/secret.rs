@@ -144,36 +144,3 @@ fn hex(bytes: &[u8]) -> String {
     }
     text
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_minted_secret_has_its_kind_and_is_stored_as_its_digest() {
-        for kind in [
-            SecretKind::Session,
-            SecretKind::Agent,
-            SecretKind::Code,
-            SecretKind::Step,
-        ] {
-            let secret = Secret::mint(kind).unwrap();
-            assert!(kind.matches(secret.expose()));
-            assert!(secret.expose().starts_with(SECRET_PREFIX));
-            assert_ne!(secret.digest().as_str(), secret.expose());
-            assert_eq!(secret.digest(), digest(secret.expose()));
-            assert_ne!(Secret::mint(kind).unwrap(), secret);
-        }
-        let session = Secret::mint(SecretKind::Session).unwrap();
-        assert!(!SecretKind::Agent.matches(session.expose()));
-        assert!(!format!("{session:?}").contains(session.expose()));
-    }
-
-    #[test]
-    fn secrets_compare_equal_only_when_identical() {
-        assert!(secrets_equal("open sesame", "open sesame"));
-        for other in ["open sesame ", "open", "", "OPEN SESAME"] {
-            assert!(!secrets_equal(other, "open sesame"), "{other:?}");
-        }
-    }
-}

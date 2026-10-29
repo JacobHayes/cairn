@@ -1,8 +1,9 @@
 //! What the auth tests share: a memory store, a clock the test moves, a bare router behind
 //! the layer, and requests from a chosen peer.
 
-#![allow(dead_code)]
+// ALLOW
 
+pub mod flow;
 pub mod iap;
 pub mod issuer;
 

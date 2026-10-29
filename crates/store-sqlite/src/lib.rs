@@ -329,6 +329,10 @@ impl AuthStore for SqliteStore {
         read!(self, [user] connection => records::logins_of(connection, &user))
     }
 
+    async fn users_with_email(&self, email: &Email) -> Result<Vec<UserId>, StoreError> {
+        read!(self, [email] connection => records::users_with_email(connection, &email))
+    }
+
     async fn put_session(&self, session: SessionRecord) -> Result<(), StoreError> {
         in_transaction!(self, [] connection => records::put_session(connection, &session))
     }

@@ -11,6 +11,7 @@
 //! it records what it was sent.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use axum::extract::State;
@@ -30,7 +31,6 @@ use openidconnect::{
     SubjectIdentifier,
 };
 use serde_json::json;
-use tokio::sync::Notify;
 use url::Url;
 
 /// The issuer Google's ID tokens name.
@@ -51,7 +51,6 @@ pub struct Person {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spoil {
     Nothing,
-    Issuer,
     Audience,
     Expired,
     Signature,
@@ -63,16 +62,10 @@ pub enum Spoil {
 pub enum Advertise {
     /// Its own endpoints, on loopback.
     Honest,
-    /// A key set over plain http to an address that is not loopback (`0.0.0.0`, which
-    /// Linux connects to this machine, so a client that ignored the rule would succeed).
-    PlainHttpKeys,
-    /// A token endpoint the same way.
+    /// A token endpoint over plain http to an address that is not loopback (`0.0.0.0`,
+    /// which Linux connects to this machine, so a client that ignored the rule would
+    /// succeed).
     PlainHttpToken,
-    /// A document past the body limit.
-    Oversized,
-    /// Only `client_secret_post` at the token endpoint, which then refuses a secret sent
-    /// any other way.
-    SecretInFormOnly,
 }
 
 struct Grant {
@@ -93,15 +86,6 @@ struct Google {
     secret: String,
 }
 
-/// How the token endpoint misbehaves, if at all.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Switches {
-    /// Answers without an ID token.
-    pub omit_id_token: bool,
-    /// Records the request, signals `entered`, and never answers.
-    pub hang: bool,
-}
-
 struct Inner {
     url: Url,
     clock: Clock,
@@ -111,11 +95,10 @@ struct Inner {
     advertise: Mutex<Advertise>,
     google: Option<Google>,
     refreshes: Mutex<HashMap<String, Grant>>,
-    switches: Mutex<Switches>,
+    omit_id_token: AtomicBool,
     token_forms: Mutex<Vec<HashMap<String, String>>>,
     authorizations: Mutex<Vec<HashMap<String, String>>>,
     id_tokens: Mutex<Vec<String>>,
-    entered: Notify,
 }
 
 /// Who a Google ID token names.
@@ -167,11 +150,10 @@ impl Issuer {
             advertise: Mutex::new(Advertise::Honest),
             google,
             refreshes: Mutex::new(HashMap::new()),
-            switches: Mutex::new(Switches::default()),
+            omit_id_token: AtomicBool::new(false),
             token_forms: Mutex::new(Vec::new()),
             authorizations: Mutex::new(Vec::new()),
             id_tokens: Mutex::new(Vec::new()),
-            entered: Notify::new(),
         });
         let router = Router::new()
             .route("/.well-known/openid-configuration", get(discovery))
@@ -229,17 +211,6 @@ impl Issuer {
         back.into()
     }
 
-    /// The person declines at Google: where Google sends the browser back.
-    pub fn decline(&self, location: &str) -> String {
-        let query = self.authorization(location);
-        let mut back: Url = query["redirect_uri"].parse().unwrap();
-        back.query_pairs_mut()
-            .append_pair("error", "access_denied")
-            .append_pair("state", &query["state"])
-            .append_pair("iss", GOOGLE_ISSUER);
-        back.into()
-    }
-
     /// The authorization request at `location`, recorded.
     fn authorization(&self, location: &str) -> HashMap<String, String> {
         let location: Url = location.parse().unwrap();
@@ -272,14 +243,9 @@ impl Issuer {
         self.inner.token_forms.lock().unwrap().clone()
     }
 
-    /// From now on, the token endpoint misbehaves as `switches` say.
-    pub fn switch(&self, switches: Switches) {
-        *self.inner.switches.lock().unwrap() = switches;
-    }
-
-    /// Waits until a token request has reached a hanging token endpoint.
-    pub async fn entered(&self) {
-        self.inner.entered.notified().await;
+    /// From now on, the token endpoint answers without an ID token.
+    pub fn omit_id_token(&self) {
+        self.inner.omit_id_token.store(true, Ordering::SeqCst);
     }
 
     /// Who a Google ID token names, if this stub signed it for `audience` and it has not
@@ -330,21 +296,15 @@ async fn discovery(State(inner): State<Arc<Inner>>) -> Json<serde_json::Value> {
     let advertise = *inner.advertise.lock().unwrap();
     let plain = |path: &str| format!("http://0.0.0.0:{}/{path}", url.port().unwrap());
     let own = |path: &str| url.join(path).unwrap().to_string();
-    let mut document = json!({
+    let document = json!({
         "issuer": url.as_str(),
         "authorization_endpoint": own("authorize"),
         "token_endpoint": if advertise == Advertise::PlainHttpToken { plain("token") } else { own("token") },
-        "jwks_uri": if advertise == Advertise::PlainHttpKeys { plain("jwks") } else { own("jwks") },
+        "jwks_uri": own("jwks"),
         "response_types_supported": ["code"],
         "subject_types_supported": ["public"],
         "id_token_signing_alg_values_supported": ["EdDSA"],
     });
-    if advertise == Advertise::Oversized {
-        document["padding"] = json!("x".repeat(100_000));
-    }
-    if advertise == Advertise::SecretInFormOnly {
-        document["token_endpoint_auth_methods_supported"] = json!(["client_secret_post"]);
-    }
     Json(document)
 }
 
@@ -362,20 +322,9 @@ fn refused(status: StatusCode, error: &str) -> Response {
 /// Google, also the client's secret, the code's redirect URI, and the refresh grant.
 async fn token(
     State(inner): State<Arc<Inner>>,
-    headers: axum::http::HeaderMap,
     Form(form): Form<HashMap<String, String>>,
 ) -> Response {
     inner.token_forms.lock().unwrap().push(form.clone());
-    let switches = *inner.switches.lock().unwrap();
-    if switches.hang {
-        inner.entered.notify_one();
-        return std::future::pending().await;
-    }
-    if *inner.advertise.lock().unwrap() == Advertise::SecretInFormOnly
-        && (headers.contains_key("authorization") || !form.contains_key("client_secret"))
-    {
-        return refused(StatusCode::UNAUTHORIZED, "invalid_client");
-    }
     if let Some(google) = &inner.google {
         let field = |name: &str| form.get(name).map(String::as_str);
         if field("client_id") != Some(&google.client_id)
@@ -397,7 +346,7 @@ async fn token(
         "token_type": "Bearer",
         "expires_in": 3599,
     });
-    if !switches.omit_id_token {
+    if !inner.omit_id_token.load(Ordering::SeqCst) {
         let id_token = id_token(&inner, &grant).to_string();
         inner.id_tokens.lock().unwrap().push(id_token.clone());
         body["id_token"] = json!(id_token);
@@ -444,9 +393,7 @@ fn id_token(inner: &Inner, grant: &Grant) -> CoreIdToken {
     let now = inner.clock.now().as_second();
     let at = |seconds: i64| chrono::DateTime::from_timestamp(now + seconds, 0).unwrap();
     let spoiled = |spoil: Spoil| grant.spoil == spoil;
-    let issuer = if spoiled(Spoil::Issuer) {
-        "http://127.0.0.1:1/".to_owned()
-    } else if inner.google.is_some() {
+    let issuer = if inner.google.is_some() {
         GOOGLE_ISSUER.to_owned()
     } else {
         inner.url.to_string()

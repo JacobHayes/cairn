@@ -62,7 +62,7 @@ fn token(agent: &str, digit: char, user: &str) -> AgentTokenRecord {
 fn oauth(digit: char, expires_at: Timestamp) -> OAuthStateRecord {
     OAuthStateRecord {
         key_hash: digest(digit),
-        kind: OAuthStateKind::PkceVerifier,
+        kind: OAuthStateKind::LoginState,
         payload: id(r#"{"verifier": "opaque"}"#),
         expires_at,
     }
@@ -115,6 +115,27 @@ pub async fn auth_records_round_trip<B: Backend>(backend: &B) {
             "{orphan:?}"
         );
     }
+}
+
+/// H3: users are found by a verified email, and a put replaces a login's emails.
+pub async fn users_are_found_by_verified_email<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    store.put_user(user("u_ann")).await.unwrap();
+    let mut held = login("oidc", "sub-1", "u_ann");
+    held.verified_emails = BTreeSet::from([id("ann@example.org")]);
+    store.put_login(held.clone()).await.unwrap();
+    let found = store
+        .users_with_email(&id("ann@example.org"))
+        .await
+        .unwrap();
+    assert_eq!(found, vec![held.user.clone()]);
+    held.verified_emails = BTreeSet::from([id("a@example.org")]);
+    store.put_login(held).await.unwrap();
+    let found = store
+        .users_with_email(&id("ann@example.org"))
+        .await
+        .unwrap();
+    assert_eq!(found, Vec::new());
 }
 
 /// Transient OAuth state is used once, and sessions and state are gone once expired.

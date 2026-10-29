@@ -38,6 +38,36 @@ mod accounts {
         assert_eq!(world.log().await, logged);
     }
 
+    /// H3: a new login whose verified email another user's login holds joins that user; one
+    /// sharing no email is a new user, and emails held by two users link to neither.
+    #[tokio::test]
+    async fn a_new_login_joins_the_user_holding_its_verified_email() {
+        let world = World::new();
+        let ann = sign_in(&world, &login("oidc", "ann", &["ann@example.org"])).await;
+        let bob = sign_in(&world, &login("oidc", "bob", &["bob@example.org"])).await;
+        let cases = [
+            (
+                "joined",
+                &["ann@example.org", "x@example.org"][..],
+                Some(&ann),
+            ),
+            ("no-shared-email", &["ann@elsewhere.org"][..], None),
+            (
+                "two-users",
+                &["ann@example.org", "bob@example.org"][..],
+                None,
+            ),
+        ];
+        for (subject, emails, expected) in cases {
+            let user = sign_in(&world, &login("tailscale", subject, emails)).await;
+            match expected {
+                Some(expected) => assert_eq!(&user, expected, "{subject}"),
+                None => assert!(user != ann && user != bob, "{subject}"),
+            }
+        }
+        assert_eq!(world.store.logins_of(&ann).await.unwrap().len(), 2);
+    }
+
     /// H3: a login with no verified email is refused
     /// before a user or a login is stored, new or known.
     #[tokio::test]

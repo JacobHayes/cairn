@@ -277,7 +277,7 @@ Optional (I5): a server-side loop over the in-process MCP tool set, so it differ
 
 Only one provider may own the OAuth endpoints (built-in or IAP relay); shared OAuth pieces live in the auth crate's `oauth` module.
 
-A user owns many logins keyed by (provider, subject). A login never moves between users: a login no user holds creates a user, and people who sign in two ways meet in their identity, found by verified email. User creation and token mint and revoke are auth-log operations, not patches. Once per request, before any handler, the caller's verified emails are matched to an identity (H3); if none matches, one is created by a deployment patch under a random key (at most three attempts against a concurrent first request). A login with no verified email is refused at sign-in.
+A user owns many logins keyed by (provider, subject). A login never moves between users. A new login whose verified email another user's login holds joins that user (always on; emails held by two users link to neither), else it creates a user; people who sign in two ways also meet in their identity, found by verified email. User creation and token mint and revoke are auth-log operations, not patches. Once per request, before any handler, the caller's verified emails are matched to an identity (H3); if none matches, one is created by a deployment patch under a random key (at most three attempts against a concurrent first request). A login with no verified email is refused at sign-in.
 
 ## Web UI
 

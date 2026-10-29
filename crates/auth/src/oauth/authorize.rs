@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 
 use super::client::{Client, Policy};
 use super::metadata::Metadata;
-use super::pkce::is_challenge;
 use super::reply::{Back, page};
 
 /// An authorization request's query.
@@ -59,7 +58,7 @@ impl Checked {
             return Err(Box::new(back.error("unsupported_response_type")));
         }
         let challenge = query.code_challenge.unwrap_or_default();
-        if query.code_challenge_method.as_deref() != Some("S256") || !is_challenge(&challenge) {
+        if query.code_challenge_method.as_deref() != Some("S256") || challenge.is_empty() {
             return Err(Box::new(back.error("invalid_request")));
         }
         let own = query

@@ -5,25 +5,19 @@
 //! and logs no credential.
 #![cfg(test)]
 
-use std::collections::HashMap;
-use std::net::SocketAddr;
-
 use axum::Router;
 use axum::body::Body;
-use axum::extract::ConnectInfo;
-use axum::http::header::{
-    AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, COOKIE, LOCATION, SET_COOKIE,
-};
-use axum::http::{Request, Response, StatusCode};
-use http_body_util::BodyExt;
+use axum::http::header::{AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, SET_COOKIE};
+use axum::http::{Response, StatusCode};
 use openidconnect::PkceCodeChallenge;
 use serde_json::{Value, json};
-use tower::ServiceExt;
 use url::Url;
 
 use crate::api::support::{GOOGLE_CLIENT, World};
+use crate::auth::support::flow::{get, json_of, local, location, post_form, query, register};
 use crate::auth::support::iap::BROWSER_COOKIE;
 use crate::auth::support::issuer::{Issuer, Person};
+use crate::auth::support::{LOCAL, request, send};
 
 /// Where the client listens for its answer.
 const REDIRECT: &str = "http://localhost:59411/callback";
@@ -40,63 +34,9 @@ const PAT: Person = Person {
 /// The person whose browser holds the IAP session during the sign-in.
 const BROWSER: &str = "ann";
 
-async fn call(
-    router: &Router,
-    request: axum::http::request::Builder,
-    body: Body,
-) -> Response<Body> {
-    let mut request = request.body(body).unwrap();
-    let peer = SocketAddr::from(([203, 0, 113, 9], 40_000));
-    request.extensions_mut().insert(ConnectInfo(peer));
-    router.clone().oneshot(request).await.unwrap()
-}
-
-async fn get(router: &Router, uri: &str, cookies: &str) -> Response<Body> {
-    let request = Request::builder().uri(uri).header(COOKIE, cookies);
-    call(router, request, Body::empty()).await
-}
-
-async fn post_form(router: &Router, form: &[(&str, &str)]) -> Response<Body> {
-    let encoded = url::form_urlencoded::Serializer::new(String::new())
-        .extend_pairs(form)
-        .finish();
-    let request = Request::builder()
-        .method("POST")
-        .uri("/api/oauth/token")
-        .header(CONTENT_TYPE, "application/x-www-form-urlencoded");
-    call(router, request, Body::from(encoded)).await
-}
-
-async fn bytes(response: Response<Body>) -> Vec<u8> {
-    response
-        .into_body()
-        .collect()
-        .await
-        .unwrap()
-        .to_bytes()
-        .to_vec()
-}
-
-async fn json_of(response: Response<Body>) -> Value {
-    serde_json::from_slice(&bytes(response).await).unwrap()
-}
-
-fn location(response: &Response<Body>) -> String {
-    response.headers()[LOCATION].to_str().unwrap().to_owned()
-}
-
-fn query(url: &str) -> HashMap<String, String> {
-    Url::parse(url)
-        .unwrap()
-        .query_pairs()
-        .into_owned()
-        .collect()
-}
-
-/// The path and query of `url`.
-fn local(url: &str) -> String {
-    let url = Url::parse(url).unwrap();
-    format!("{}?{}", url.path(), url.query().unwrap_or_default())
+/// The token endpoint's answer to `form`.
+async fn token(router: &Router, form: &[(&str, &str)]) -> Response<Body> {
+    post_form(router, "/api/oauth/token", "", form).await
 }
 
 /// A bare MCP request, as a client sends first.
@@ -104,15 +44,18 @@ async fn mcp_post(router: &Router, bearer: Option<&str>) -> Response<Body> {
     let initialize = json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
         "protocolVersion": "2025-06-18", "capabilities": {},
         "clientInfo": { "name": "test", "version": "1" } } });
-    let mut request = Request::builder()
+    let mut call = request("/api/mcp", LOCAL)
         .method("POST")
-        .uri("/api/mcp")
         .header(CONTENT_TYPE, "application/json")
         .header("accept", "application/json, text/event-stream");
     if let Some(bearer) = bearer {
-        request = request.header(AUTHORIZATION, format!("Bearer {bearer}"));
+        call = call.header(AUTHORIZATION, format!("Bearer {bearer}"));
     }
-    call(router, request, Body::from(initialize.to_string())).await
+    send(
+        router,
+        call.body(Body::from(initialize.to_string())).unwrap(),
+    )
+    .await
 }
 
 /// What the client holds after signing in, and what it held on the way.
@@ -139,18 +82,7 @@ async fn sign_in(world: &World, google: &Issuer) -> SignedIn {
         .to_owned();
     let server = json_of(get(router, "/.well-known/oauth-authorization-server", "").await).await;
     assert_eq!(server["issuer"], issuer.as_str());
-    let registration = json!({
-        "client_name": "Claude Code (cairn)",
-        "redirect_uris": [REDIRECT],
-        "grant_types": ["authorization_code", "refresh_token"],
-        "response_types": ["code"],
-        "token_endpoint_auth_method": "none",
-    });
-    let request = Request::builder()
-        .method("POST")
-        .uri(local(server["registration_endpoint"].as_str().unwrap()))
-        .header(CONTENT_TYPE, "application/json");
-    let registered = call(router, request, Body::from(registration.to_string())).await;
+    let registered = register(router, REDIRECT).await;
     assert_eq!(registered.status(), StatusCode::CREATED);
     let client = json_of(registered).await["client_id"]
         .as_str()
@@ -167,7 +99,7 @@ async fn sign_in(world: &World, google: &Issuer) -> SignedIn {
         ("code_verifier", verifier.secret().as_str()),
         ("resource", resource["resource"].as_str().unwrap()),
     ];
-    let answered = post_form(router, &form).await;
+    let answered = token(router, &form).await;
     assert_eq!(answered.status(), StatusCode::OK);
     assert_eq!(answered.headers()[CACHE_CONTROL], "no-store");
     let answered = json_of(answered).await;
@@ -245,21 +177,6 @@ async fn stored_nothing(world: &World) -> bool {
     log.items.is_empty() && state == 0
 }
 
-/// The relay's public token endpoint takes only a small form: a body past the body limit
-/// (far under the API's request limit) is refused before Google is asked.
-#[tokio::test]
-async fn an_oversized_token_request_is_refused_before_google() {
-    let (world, google) = World::behind_iap().await;
-    let size = usize::try_from(cairn_schema::limits::BODY_BYTES_MAX).unwrap() + 1;
-    let request = Request::builder()
-        .method("POST")
-        .uri("/api/oauth/token")
-        .header(CONTENT_TYPE, "application/x-www-form-urlencoded");
-    let refused = call(&world.router, request, Body::from(vec![b'a'; size])).await;
-    assert_eq!(refused.status(), StatusCode::PAYLOAD_TOO_LARGE);
-    assert_eq!(google.token_forms().len(), 0, "Google was not asked");
-}
-
 #[cfg(test)]
 mod mcp_in_process {
     use std::io::Write;
@@ -272,7 +189,6 @@ mod mcp_in_process {
     use super::*;
     use crate::api::support::GOOGLE_SECRET;
     use crate::api::support::mcp::Agent;
-    use crate::auth::support::issuer::Switches;
 
     /// Every log line written, at every level and target.
     #[derive(Clone, Default)]
@@ -319,11 +235,8 @@ mod mcp_in_process {
             ("refresh_token", signed_in.refresh_token.as_str()),
             ("client_id", signed_in.client.as_str()),
         ];
-        let refreshed = json_of(post_form(&world.router, &refresh).await).await;
-        google.switch(Switches {
-            omit_id_token: true,
-            hang: false,
-        });
+        let refreshed = json_of(token(&world.router, &refresh).await).await;
+        google.omit_id_token();
         let failed = sign_in_failing(&world, &google, &signed_in).await;
         let logs = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
         assert!(
@@ -369,7 +282,7 @@ mod mcp_in_process {
             ("client_id", signed_in.client.as_str()),
             ("code_verifier", verifier.secret().as_str()),
         ];
-        let failed = post_form(&world.router, &form).await;
+        let failed = token(&world.router, &form).await;
         assert_eq!(failed.status(), StatusCode::BAD_GATEWAY);
         vec![code, verifier.secret().clone()]
     }
@@ -422,7 +335,7 @@ mod mcp_in_process {
             ("refresh_token", signed_in.refresh_token.as_str()),
             ("client_id", signed_in.client.as_str()),
         ];
-        let refreshed = json_of(post_form(&world.router, &refresh).await).await;
+        let refreshed = json_of(token(&world.router, &refresh).await).await;
         let renewed = refreshed["access_token"].as_str().unwrap();
         assert_ne!(renewed, signed_in.access_token);
         let agent = Agent::through(&world.router, Some(renewed)).await.unwrap();

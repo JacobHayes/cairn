@@ -1,31 +1,21 @@
 //! The IAP provider's OAuth relay (I2): an MCP client behind Google Cloud IAP signs in with
-//! Google through the standard MCP handshake, and the bearer it ends up holding is
-//! Google's ID token, which IAP's programmatic access accepts. Google stays the only
-//! issuer and IAP keeps deciding, on every MCP call, who may reach Cairn; the relay only
-//! carries the handshake. It mints nothing and stores nothing: Google's refresh token
-//! lives with the client.
+//! Google through the standard MCP handshake, and the bearer it ends up holding is Google's
+//! ID token, which IAP's programmatic access accepts. The relay mints and stores nothing:
+//! Google's refresh token lives with the client.
 //!
-//! The handshake, against Cairn's own metadata so the client hears Cairn as the issuer
-//! (RFC 9207):
+//! The handshake runs against Cairn's own metadata, so the client hears Cairn as the issuer:
+//! registration is the shared one (loopback redirects only); authorize checks the request as
+//! the built-in server does, then sends the browser to Google with Cairn's callback, the
+//! client's PKCE challenge, and the client's request carried in Google's `state`, bound to
+//! the browser by a cookie holding the state's digest; the callback checks the cookie and
+//! the client's redirect URI again and forwards Google's code; the token endpoint exchanges
+//! the code (or a refresh token) at Google with the client secret, which never leaves the
+//! server, and answers with Google's ID token as the access token. `resource` is checked
+//! here and never sent to Google.
 //!
-//! - Registration is the shared one under the relay's policy: loopback redirects only.
-//! - Authorize checks the client and its redirect URI, then sends the browser to Google
-//!   with Cairn's callback, the client's PKCE challenge, and the client's request carried
-//!   in Google's `state`. A cookie holding the state's digest binds that state to the
-//!   browser, so the round trip cannot be altered to send a code anywhere else.
-//! - The callback checks the cookie and the client's redirect URI again, and forwards
-//!   Google's code to the client with the client's `state` and Cairn's `iss`; Google's own
-//!   `iss` never reaches the client.
-//! - The token endpoint exchanges the code (with the client's PKCE verifier, which Google
-//!   checks) or a refresh token at Google, adding the client secret, which never leaves
-//!   the server, and answers with Google's ID token as the access token. No ID token, no
-//!   success.
-//!
-//! `resource` (RFC 8707) is checked here against the deployment and never sent to Google.
-//! Every request to these endpoints ends within `PROVIDER_CALL_DURATION_MAX`, its body
-//! read included, and at most `RELAY_REQUEST_IN_FLIGHT_COUNT_MAX` are in flight: the token
-//! endpoint, registration and the metadata are reachable without IAP, so a flood of them
-//! holds only those of the process's request slots and signed-in requests keep the rest.
+//! Every request to these endpoints ends within `PROVIDER_CALL_DURATION_MAX`, and at most
+//! `RELAY_REQUEST_IN_FLIGHT_COUNT_MAX` are in flight: the token endpoint, registration and
+//! the metadata are reachable without IAP, so a flood of them holds only those slots.
 
 use std::sync::Arc;
 
@@ -59,7 +49,6 @@ use crate::limits::{PROVIDER_CALL_DURATION_MAX, RELAY_REQUEST_IN_FLIGHT_COUNT_MA
 use crate::oauth::authorize::{AuthorizeQuery, Checked};
 use crate::oauth::client::{Client, RELAY, Registration};
 use crate::oauth::metadata::{AUTHORIZE, Metadata, REGISTER, TOKEN};
-use crate::oauth::pkce::is_verifier;
 use crate::oauth::reply::{Back, no_store, oauth_error, page, redirect, registered};
 use crate::outbound::Outbound;
 use crate::secret::{digest, random_hex, secrets_equal};
@@ -374,9 +363,7 @@ async fn token(State(relay): State<Arc<Relay>>, Form(form): Form<TokenForm>) -> 
             let code = form.code.unwrap_or_default();
             let verifier = form.code_verifier.unwrap_or_default();
             let redirect_uri = form.redirect_uri.unwrap_or_default();
-            if code.is_empty()
-                || !is_verifier(&verifier)
-                || !client.redirects_to(&redirect_uri, &RELAY)
+            if code.is_empty() || verifier.is_empty() || !client.redirects_to(&redirect_uri, &RELAY)
             {
                 return refuse("invalid_grant", "the code, verifier, or redirect URI");
             }

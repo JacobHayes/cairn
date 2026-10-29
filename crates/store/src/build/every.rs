@@ -208,8 +208,7 @@ pub fn bypass() -> Bypass {
 #[must_use]
 pub fn oauth_state_kinds() -> Vec<OAuthStateKind> {
     chain(OAuthStateKind::AuthorizationCode, |kind| match kind {
-        OAuthStateKind::AuthorizationCode => Some(OAuthStateKind::PkceVerifier),
-        OAuthStateKind::PkceVerifier => Some(OAuthStateKind::LoginState),
+        OAuthStateKind::AuthorizationCode => Some(OAuthStateKind::LoginState),
         OAuthStateKind::LoginState => None,
     })
 }
