@@ -554,6 +554,23 @@ test("The journey card's Stages list: a row per stage, choosing one selects and 
   await expect(page.getByTestId("card-stages")).toHaveCount(0);
 });
 
+test("A route's Stages list: a row per stage with its days, choosing one selects and frames it", async ({ page }) => {
+  await visit(page, "browser", "/routes/product-launch?version=1&view=graph&depth=actions");
+  await expect(nodeCard(page, "n_beta")).toBeVisible();
+  const stages = page.getByTestId("card-stages");
+  await stages.locator("summary").click();
+  await expect(stages.getByTestId("stage-row")).toHaveCount(3);
+  // A route's stage has no state or progress to show: its title and the days it spans.
+  const row = stages.locator('[data-testid="stage-row"][data-node="n_beta"]');
+  await expect(row).toContainText(/Days? \d/);
+  await expect(row.locator(".badge")).toHaveCount(0);
+  await row.hover();
+  await expect(nodeCard(page, "n_beta")).toHaveClass(/node-edge-end/);
+  await row.click({ position: { x: 4, y: 4 } });
+  await expect(page).toHaveURL(/nodes\/n_beta/);
+  await expect(page.getByTestId("route-node")).toBeVisible();
+});
+
 test("The Stages list on a phone: choosing a stage from the sheet lowers the sheet and frames the stage above it", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");

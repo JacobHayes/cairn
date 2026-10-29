@@ -109,7 +109,7 @@ function insertionRows(uses: readonly InsertionUse[], hostOf: ReturnType<typeof 
 }
 
 /** The card of published version `version`: when, who is on it, and (a route) where to start from it. */
-export function VersionCard({ read, version }: { read: RouteRead; version: number }) {
+export function VersionCard({ read, version, stages }: { read: RouteRead; version: number; stages?: ReactNode }) {
   const { header } = read.route;
   const segment = header.kind === "segment";
   const rows = versionRows(read);
@@ -130,6 +130,7 @@ export function VersionCard({ read, version }: { read: RouteRead; version: numbe
           </Link>
         )}
       </RouteFacts>
+      {stages}
       {segment ? (
         uses.length === 0 ? null : (
           <RowsPanel title="Inserted in" testId="insertions-panel" rows={insertionRows(uses, hostOf)} />

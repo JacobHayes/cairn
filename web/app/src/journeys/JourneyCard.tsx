@@ -5,8 +5,6 @@
 // (H6): both read the journey's local derivation.
 import { STATUS_HOLDS_CURRENT_WORK } from "@cairn/client";
 
-import { usePointRow } from "../canvas/pointed.tsx";
-import { useFrameActions } from "../shell/frame.tsx";
 import { useProjected } from "../canvas/hooks.ts";
 import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { AnnotationList } from "../detail/Attachments.tsx";
@@ -14,14 +12,13 @@ import type { Ready } from "../detail/model.ts";
 import { NodeLink, Section } from "../detail/parts.tsx";
 import { summaryModel, type SummaryModel } from "../summary/model.ts";
 import { dateInk, inkClass, originWord, whenWords } from "../status/when.ts";
-import { statusTone, statusWord } from "../status/words.ts";
-import { Badge, Meter } from "../ui/kit.tsx";
-import { progressWords } from "../canvas/words.ts";
+import { Meter } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { yoursOf } from "./figures-model.ts";
 import { Flags, LineageBlock, OwnersLine, useLineage } from "./JourneyFacts.tsx";
 import { useMineOf } from "./mine.ts";
 import { stagesOf } from "./stages.ts";
+import { StagesSection } from "./StagesSection.tsx";
 import { useMemo } from "react";
 import "./journeys.css";
 import { Failed } from "../ui/Failed.tsx";
@@ -106,45 +103,6 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
   );
 }
 
-type StageRowData = ReturnType<typeof stagesOf>[number];
-
-/** One stage as a row, the whole row a target: choosing it selects the stage and frames it on the canvas; pointing at it outlines the stage there. */
-function StageRow({ ready, stage, lower }: { ready: Ready; stage: StageRowData; lower: () => void }) {
-  const pointing = usePointRow({ kind: "node", id: stage.key });
-  return (
-    <li className="stage-row" data-testid="stage-row" data-node={stage.key} data-state={stage.displayState} {...pointing}>
-      <span className="stage-row-head">
-        <NodeLink view={ready} node={stage.key} state={{ reveal: { key: stage.key, how: "frame" } }} onClick={lower} />
-        <Badge tone={statusTone(stage.displayState)}>{statusWord(stage.displayState, stage.kind)}</Badge>
-      </span>
-      <span className="stage-row-foot muted">
-        <Meter done={stage.done} of={stage.total} />
-        <span>{progressWords(stage.done, stage.total)}</span>
-        {stage.due === undefined ? null : <span className={["stage-row-due", stage.dueInk].filter(Boolean).join(" ")}>{stage.due}</span>}
-      </span>
-    </li>
-  );
-}
-
-function StagesFold({ ready, framing }: { ready: Ready; framing: boolean }) {
-  const stages = stagesOf(ready);
-  const actions = useFrameActions();
-  // Where the stage is framed on a canvas under a sheet, it would be framed in no room at all: the sheet drops to its peek, where a card picked on the canvas opens it too.
-  const lower = () => { if (framing) { actions?.snap("peek"); } };
-  if (stages.length === 0) {
-    return null;
-  }
-  return (
-    <Section title="Stages" summary={String(stages.length)} testId="card-stages">
-      <ul className="plain-list stage-rows">
-        {stages.map((stage) => (
-          <StageRow key={stage.key} ready={ready} stage={stage} lower={lower} />
-        ))}
-      </ul>
-    </Section>
-  );
-}
-
 function Folds({ ready, model, selected, framing }: { ready: Ready; model: SummaryModel; selected: string | undefined; framing: boolean }) {
   const { header } = ready.journey;
   const { caller } = useCaller();
@@ -163,7 +121,7 @@ function Folds({ ready, model, selected, framing }: { ready: Ready; model: Summa
           </ul>
         </Section>
       )}
-      <StagesFold ready={ready} framing={framing} />
+      <StagesSection stages={stagesOf(ready)} framing={framing} />
       <Section title="Description" testId="card-description">
         {header.description == null ? <span className="muted">No description.</span> : <Markdown text={header.description} data-testid="overview-description" />}
       </Section>

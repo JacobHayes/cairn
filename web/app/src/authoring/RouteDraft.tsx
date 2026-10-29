@@ -4,7 +4,7 @@
 // under the header, and the List projection. A route has no state or dates, so its cards say
 // the date rule in words and no status.
 import type { Schema } from "@cairn/client";
-import { use } from "react";
+import { use, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { AssistantDock } from "../assistant/AssistantPanel.tsx";
@@ -194,6 +194,8 @@ export interface DraftCardProps {
   onPublish: () => void;
   onDiscard: () => void;
   titleOf: (key: string) => string;
+  /** The draft's Stages list, when it has stages. */
+  stages?: ReactNode;
 }
 
 /**
@@ -201,12 +203,13 @@ export interface DraftCardProps {
  * is only advisory (notices, A20, apart under their own label), Publish and Discard (set aside
  * while the route's deletion is asked).
  */
-export function DraftCard({ route, violations, notices, hrefOf, write, blocked, unsaved, onShow, onPublish, onDiscard, titleOf }: DraftCardProps) {
+export function DraftCard({ route, violations, notices, hrefOf, write, blocked, unsaved, onShow, onPublish, onDiscard, titleOf, stages }: DraftCardProps) {
   const deleting = use(DeletingRoute);
   return (
     <aside className="detail-panel panel stack draft-card" aria-label="The draft" data-testid="draft-card">
       <h2>The draft</h2>
       <DraftFacts route={route} />
+      {stages}
       {violations.length === 0 ? (
         blocked === undefined ? <p className="muted" data-testid="draft-clear">Nothing blocks publishing.</p> : null
       ) : (

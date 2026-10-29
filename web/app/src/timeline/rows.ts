@@ -345,7 +345,7 @@ export function chartOf(view: Ready, timeline: Timeline, options: ChartOptions):
 }
 
 /** The days a node and what lies beneath it reach: from the earliest start to the latest finish. */
-interface Reach {
+export interface Reach {
   from: number;
   to: number;
 }
@@ -354,12 +354,12 @@ const reachUnion = (left: Reach | undefined, right: Reach | undefined): Reach | 
   left === undefined ? right : right === undefined ? left : { from: Math.min(left.from, right.from), to: Math.max(left.to, right.to) };
 
 /** A route row's days in words: "Day 7" for a point, "Days 3 to 7" for a stretch. */
-function routeWords(reach: Reach): string {
+export function routeWords(reach: Reach): string {
   return reach.from === reach.to ? dayWords(reach.from) : `Days ${String(reach.from)} to ${String(reach.to)}`;
 }
 
 /** The days each node of a route spans: its own earliest start and finish, or for a container the span of what it holds. */
-function reachesOf(tree: Tree, entries: ReadonlyMap<string, ScheduleEntry>): (key: string) => Reach | undefined {
+export function reachesOf(tree: Tree, entries: ReadonlyMap<string, ScheduleEntry>): (key: string) => Reach | undefined {
   const reaches = new Map<string, Reach | undefined>();
   const reachOf = (key: string): Reach | undefined => {
     if (!reaches.has(key)) {

@@ -186,7 +186,10 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
   journeyProposalNode: [{ name: "item", reach: async (page, on) => { await indexAt(page, `/journeys/${on.journey}/proposals/${proposalsOf(on).upgrade}/nodes/n_access`); await reviewOpen(page); }, ready: (page) => page.getByTestId("item-editor") }],
   routes: [{ name: "index", reach: (page) => indexAt(page, "/routes"), ready: (page) => page.getByTestId("routes") }],
   routeNew: [{ name: "form", reach: (page) => indexAt(page, "/routes/new"), ready: (page) => page.getByTestId("new-route-kinds") }],
-  route: nonEmpty(viewsOf(ROUTE_OFFERS.screens, async (page, on, view) => { await routeAt(page, on.route, view); if (view === "graph") { await fitGraph(page); } }, routeReady)),
+  route: [
+    ...nonEmpty(viewsOf(ROUTE_OFFERS.screens, async (page, on, view) => { await routeAt(page, on.route, view); if (view === "graph") { await fitGraph(page); } }, routeReady)),
+    { name: "stages-open", reach: async (page, on) => { await routeAt(page, on.route, "list"); await page.getByTestId("card-stages").locator("summary").click(); }, ready: (page) => page.getByTestId("stage-row").first(), only: "desktop" },
+  ],
   routeNode: [{ name: "list", reach: (page, on) => routeAt(page, on.route, "list", `/nodes/${on.node}`), ready: (page) => page.getByTestId("route-node") }],
   routeEdge: [{ name: "edge-card", reach: async (page, on) => { await routeAt(page, on.route, "graph", `/edges/${on.edge}`); await fitGraph(page); }, ready: (page) => page.getByTestId("edge-card") }],
   routeProposals: [{ name: "tab", reach: (page, on) => indexAt(page, `/routes/${on.route}/proposals`), ready: (page) => page.getByTestId("proposals-pane") }],

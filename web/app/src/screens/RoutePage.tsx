@@ -45,6 +45,7 @@ import { useImportFlow, useOnImported, type ImportFlow } from "../routes/ImportF
 import { ROUTES_PATH, routePath, routeScreenOf, routeSwitched, versionIn } from "../routes/address.ts";
 import { openDraft } from "../routes/model.ts";
 import { useRouteRead, VersionCard } from "../routes/RouteCard.tsx";
+import { RouteStages } from "../routes/RouteStages.tsx";
 import { InsertionCanvas } from "../segments/Preview.tsx";
 import { useInserting } from "../segments/entry.ts";
 import { InsertStepper } from "../segments/Stepper.tsx";
@@ -236,7 +237,7 @@ function DraftFrame({ shown, derived, authored, selected, edge, write, result, s
       void navigate(here(undefined));
     });
   const discard = () => void write.run({ target, baseRevision: shown.route.revision, mutations: [{ op: "discard_draft" }] }, () => { void navigate(here(undefined)); });
-  const card = <DraftCard route={id} violations={violations} notices={notices} hrefOf={hrefOf} write={write} blocked={blocked} unsaved={unsaved} onShow={show} titleOf={titleOf} onPublish={publish} onDiscard={discard} />;
+  const card = <DraftCard route={id} violations={violations} notices={notices} hrefOf={hrefOf} write={write} blocked={blocked} unsaved={unsaved} onShow={show} titleOf={titleOf} onPublish={publish} onDiscard={discard} stages={<RouteStages shown={valueOf(derived)} framing={screen === "graph"} />} />;
   const close = here(undefined);
   // The line's card is the inspector's only while no node is open and no segment is being placed.
   const line = selected === undefined && inserting.at === undefined ? edge : undefined;
@@ -285,7 +286,7 @@ function VersionFrame({ shown, derived, selected, edge, write, result, setResult
   // The same address the canvas's background goes to: a bare address stays bare, a named version stays named.
   const close = useNodeAddresses().close();
   useEscapeTo(selected === undefined && edge === undefined ? undefined : close);
-  const card = read === undefined ? null : <VersionCard read={read} version={version} />;
+  const card = read === undefined ? null : <VersionCard read={read} version={version} stages={<RouteStages shown={valueOf(derived)} framing={screen === "graph"} />} />;
   const head = (
     <>
       <RouteHeader route={shown.route} of={shown.of} screen={screen} node={selected} write={write} blocked={undefined} onPublish={undefined} titleOf={draftTitle} imports={imports} />

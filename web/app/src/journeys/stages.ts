@@ -3,13 +3,12 @@
 // by what they wait on, which their dates follow), each with what the stage's own card says: its
 // state, how much is done and when it is due.
 import { inkClass, dateInk } from "../status/when.ts";
-import { dueWordsOf, isStage, recordOf, type Ready } from "../detail/model.ts";
+import { dueWordsOf, isStage, recordOf, titleOf, type Ready } from "../detail/model.ts";
 import type { DisplayState } from "../status/words.ts";
 
 export interface StageRow {
   key: string;
-  /** The node's kind, for its status word. */
-  kind: "group";
+  title: string;
   displayState: DisplayState;
   done: number;
   total: number;
@@ -30,6 +29,6 @@ export function stagesOf(view: Ready): StageRow[] {
     const { done, total } = derived?.progress ?? { done: 0, total: 0 };
     const due = dueWordsOf(view, { key: node.key, kind: node.kind, state: recordOf(view, node).state, displayState });
     const date = due === undefined ? undefined : derived?.dates.due?.date;
-    return { key: node.key, kind: "group", displayState, done, total, due, dueInk: date === undefined ? undefined : inkClass(dateInk(date, view.derived.today)) };
+    return { key: node.key, title: titleOf(view, node.key), displayState, done, total, due, dueInk: date === undefined ? undefined : inkClass(dateInk(date, view.derived.today)) };
   });
 }
