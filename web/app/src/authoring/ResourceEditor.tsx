@@ -5,6 +5,7 @@
 // references), so renaming a role or moving a decision breaks nothing. The engine checks
 // a resource's values (limits, a link's form) before it is sent.
 import type { Schema } from "@cairn/client";
+import { ENGINE_CHECK } from "../data/checks.ts";
 import { useDraft } from "../data/drafts.ts";
 import { useId, useState } from "react";
 import { useSession } from "../data/react.ts";
@@ -152,7 +153,7 @@ export function ResourceEditor({ authored, node }: NodeEditorProps) {
   const [opening, setOpening] = useState(false);
   const [editing, setEditing] = useDraft<Editing<ResourceForm>>(`resource-form:${domainOf(authored)}:${node.key}`, isEditing);
   const resources = node.resources ?? [];
-  const room = useValueProblems([countCheck("count", "resource_count_per_node_max", "resources on a node", resources.length + 1)]);
+  const room = useValueProblems([countCheck("count", "resource_count_per_node_max", "resources on a node", resources.length + 1)], ENGINE_CHECK);
   const full = room.problems.count !== undefined;
   return (
     <div className="stack" data-testid="resource-editor">

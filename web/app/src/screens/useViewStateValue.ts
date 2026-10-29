@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
+import { ENGINE_CHECK } from "../data/checks.ts";
 import { useValueProblems } from "../authoring/form-problems.ts";
 import { searchCheck, withViewState, type ViewState, type ViewStateValue } from "../journeys/view.ts";
 
@@ -21,7 +22,7 @@ export function useViewStateValue(state: ViewState): ViewStateValue {
     [navigate, pathname, search],
   );
   // A search the address carries that the engine refuses (one typed in the box never gets here) is dropped quietly, as any other parameter the view cannot read is.
-  const check = useValueProblems([searchCheck(state.text)]);
+  const check = useValueProblems([searchCheck(state.text)], ENGINE_CHECK);
   const refused = check.checked && check.problems["q"] !== undefined;
   useEffect(() => {
     if (refused) {

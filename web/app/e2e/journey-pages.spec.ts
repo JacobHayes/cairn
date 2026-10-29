@@ -9,7 +9,7 @@
 // every view, Fade moves nothing, and the walk through at Decisions is the decision walkthrough.
 import { type Locator, type Page } from "@playwright/test";
 
-import { allowHoldingChecks, holdChecks, releaseChecks } from "./held-checks.ts";
+import { allowHoldingChecks, checksAsked, holdChecks, releaseChecks } from "./held-checks.ts";
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
 
@@ -641,10 +641,32 @@ test("C9: a search the engine refuses is said at the box and not applied; one it
   const box = page.getByTestId("toolbar-search");
   await box.fill("s".repeat(300));
   await box.press("Enter");
-  await expect.poll(() => box.evaluate((input: HTMLInputElement) => input.validationMessage)).toContain("256");
+  await expect(page.getByTestId("problem")).toContainText("256");
   expect(new URL(page.url()).searchParams.has("q")).toBe(false);
   await search(page, "kickoff");
   expect(new URL(page.url()).searchParams.get("q")).toBe("kickoff");
+});
+
+test("C9: a search is read as it is typed: the reason shows once the typing rests, clears when fixed, and typing asks once", async ({ page }) => {
+  await allowHoldingChecks(page);
+  await page.clock.install();
+  await openJourney(page, "browser", "j_launch", "?view=graph");
+  const box = page.getByTestId("toolbar-search");
+  await page.clock.runFor(1000);
+  const before = await checksAsked(page);
+  await box.pressSequentially("s".repeat(300), { delay: 0 });
+  expect(await checksAsked(page)).toBe(before);
+  await page.clock.runFor(1000);
+  await expect.poll(() => checksAsked(page)).toBe(before + 1);
+  await page.clock.runFor(1000);
+  expect(await checksAsked(page)).toBe(before + 1);
+  // No Enter: the typing alone brings the reason.
+  await expect(box).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByTestId("problem")).toContainText("256");
+  await box.fill("kickoff");
+  await expect(page.getByTestId("problem")).toHaveCount(0);
+  await expect(box).not.toHaveAttribute("aria-invalid", "true");
+  expect(new URL(page.url()).searchParams.has("q")).toBe(false);
 });
 
 test("C9: a search the engine is still reading is dropped when the box is cleared meanwhile", async ({ page }) => {

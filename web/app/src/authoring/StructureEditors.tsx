@@ -6,6 +6,7 @@
 import { OWNER_KIND } from "@cairn/client";
 import { useId, useState } from "react";
 
+import { ENGINE_CHECK } from "../data/checks.ts";
 import { useDraft } from "../data/drafts.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
@@ -51,7 +52,7 @@ export function EdgesEditor({ authored, node }: NodeEditorProps) {
   const connecting = useConnecting();
   const [picked, setPicked] = useState("");
   const requires = node.requires ?? [];
-  const room = useValueProblems([countCheck("count", "edge_count_per_node_max", "explicit edges on a node", edgeCount(authored, node.key) + 1)]);
+  const room = useValueProblems([countCheck("count", "edge_count_per_node_max", "explicit edges on a node", edgeCount(authored, node.key) + 1)], ENGINE_CHECK);
   const full = room.problems.count !== undefined;
   const candidates = nodesByPath(authored.tree).filter((each) => each.key !== node.key && !requires.includes(each.key));
   return (

@@ -12,13 +12,14 @@
 // in its title or, inside the Filter, under it. State shows as a fixed-size badge on the control,
 // with the words in its tooltip, so no control changes width; a Filter off its stock settings is
 // pressed.
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
 import { Check, Counted, FlagChecks } from "../acting/Controls.tsx";
 import { STEP_WORDS, stepOf, stepsFor } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
 import { useValueProblems } from "../authoring/form-problems.ts";
+import { invalidAttrs, Problem } from "../authoring/parts.tsx";
 import type { GraphNode, Ready } from "../detail/model.ts";
 import { identityName } from "../detail/sections.tsx";
 import type { Screen } from "../journeys/address.ts";
@@ -234,20 +235,16 @@ function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) 
   const [typed, setTyped] = useState(text);
   // The text submitted and waiting for the engine's reading of it; typing again drops it.
   const [asked, setAsked] = useState<string | undefined>(undefined);
-  const input = useRef<HTMLInputElement>(null);
-  const check = useValueProblems([searchCheck(asked ?? "")]);
+  const reason = useId();
+  // The engine reads the search as a title as it is typed (once the text rests): one it refuses never leaves the box, and is said where it is typed. The text submitted is applied when the engine has read it.
+  const check = useValueProblems([searchCheck(typed)]);
   const problem = check.problems["q"];
-  // The engine reads the search as a title: one it refuses never leaves the box, and is said where it is typed.
   useEffect(() => {
-    if (asked === undefined || !check.checked) {
-      return;
-    }
-    setAsked(undefined);
-    if (problem === undefined) {
-      onSearch(asked.trim());
-    } else {
-      input.current?.setCustomValidity(problem);
-      input.current?.reportValidity();
+    if (asked !== undefined && check.checked) {
+      setAsked(undefined);
+      if (problem === undefined) {
+        onSearch(asked.trim());
+      }
     }
   }, [asked, check.checked, problem, onSearch]);
   return (
@@ -261,16 +258,15 @@ function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) 
     >
       <Tip tip="Search titles, descriptions, notes and resources, then Enter" keys="/">
         <input
-          ref={input}
           type="search"
           aria-label="Search"
           placeholder="Search"
           data-testid="toolbar-search"
           data-search-input=""
           name="q"
+          {...invalidAttrs(reason, problem)}
           value={typed}
           onChange={(event) => {
-            event.target.setCustomValidity("");
             setAsked(undefined);
             setTyped(event.target.value);
             // Emptying the box (its own clear button too) takes an applied search off at once: no filter stays on unseen.
@@ -280,6 +276,11 @@ function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) 
           }}
         />
       </Tip>
+      {problem === undefined ? null : (
+        <div className="popover toolbar-search-reason" data-overhang="">
+          <Problem id={reason}>{problem}</Problem>
+        </div>
+      )}
     </form>
   );
 }

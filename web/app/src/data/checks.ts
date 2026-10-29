@@ -5,7 +5,14 @@
 import type { ValueCheck } from "@cairn/wasm";
 
 import type { Deriver } from "./host.ts";
-import { DERIVE, readOnce, type ReadEnv, type ReadSource } from "./keyed-read.ts";
+import { DERIVE, previewPolicy, readOnce, type ReadEnv, type ReadSource } from "./keyed-read.ts";
+
+/**
+ * How long a value rests after the last keystroke before the engine is asked about it: every
+ * check of a typed value (a form's field, the search box, an email being typed) waits this long
+ * (or until the field is left), so the worker is asked about what was typed, not about every key.
+ */
+export const CHECK_DELAY_MS = 350;
 
 /** What the engine says is wrong, by the check's field (a field it has no problem with is absent). */
 export type ProblemsByField = Record<string, string>;
@@ -20,6 +27,9 @@ export const ENGINE_CHECK: ReadSource<EngineAsk, ProblemsByField> = {
   policy: DERIVE,
   read: ({ deriver, ask }) => ask(deriver),
 };
+
+/** The check of a value being typed: it settles for `CHECK_DELAY_MS` after the last change, so it is asked about what rests (a read that begins at once is `ENGINE_CHECK`). */
+export const TYPED_CHECK: ReadSource<EngineAsk, ProblemsByField> = { ...ENGINE_CHECK, policy: previewPolicy(CHECK_DELAY_MS) };
 
 /** The engine's problems with `checks`, by field. */
 export async function fieldProblems(deriver: Deriver, checks: readonly ValueCheck[]): Promise<ProblemsByField> {

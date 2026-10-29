@@ -220,6 +220,8 @@ export type ReadEvent =
   | { type: "want"; key: ReadKey<unknown> | undefined }
   /** Reads again: after a write this screen made, or a click on Retry. */
   | { type: "refresh" }
+  /** The person has finished what they were typing: a read still settling goes ahead now. */
+  | { type: "flush" }
   /** The read stays but listens to nothing, and starts again when shown. */
   | { type: "park" }
   | { type: "show" }
@@ -585,7 +587,10 @@ export const keyedRead = setup({
           tags: "busy",
           invoke: { src: "work", input: ({ context }) => ({ stream: context.env.stream }) },
           after: { settle: { target: "deciding", actions: "settle" } },
-          on: { want: { guard: "newFreshness", target: "settling", reenter: true, actions: "wantMore" } },
+          on: {
+            want: { guard: "newFreshness", target: "settling", reenter: true, actions: "wantMore" },
+            flush: { target: "deciding", actions: "settle" },
+          },
         },
         reading: {
           tags: "busy",

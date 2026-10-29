@@ -7,9 +7,10 @@
 // sendable until the engine has answered.
 import type { CountLimit, NodeFormValues, ValueCheck } from "@cairn/wasm";
 
-import { fieldProblems, type ProblemsByField } from "../data/checks.ts";
+import { fieldProblems, TYPED_CHECK, type EngineAsk, type ProblemsByField } from "../data/checks.ts";
 import { useEngineCheck, type Checked } from "../data/react.ts";
 import type { Deriver } from "../data/host.ts";
+import type { ReadSource } from "../data/keyed-read.ts";
 import { useConditionProblem } from "./condition-problem.ts";
 import { fieldsOf, type NodeDraft, type FormField } from "./fields.ts";
 import type { NodeKind } from "./graph.ts";
@@ -56,7 +57,7 @@ async function nodeProblems(deriver: Deriver, values: NodeFormValues): Promise<P
  */
 export function useDraftProblems(kind: NodeKind, draft: NodeDraft): Checked<DraftProblems> {
   const values = formValues(kind, draft);
-  const engine = useEngineCheck("node-form", values, (deriver) => nodeProblems(deriver, values));
+  const engine = useEngineCheck("node-form", values, (deriver) => nodeProblems(deriver, values), TYPED_CHECK);
   const condition = useConditionProblem(draft.relevant_when);
   const problems: DraftProblems = { ...engine.problems, ...(condition.problem === undefined ? {} : { relevant_when: condition.problem }) };
   return {
@@ -71,8 +72,8 @@ export function useDraftProblems(kind: NodeKind, draft: NodeDraft): Checked<Draf
 }
 
 /** Why each of `checks` cannot be sent, by the check's `field`: the engine's, from the types the patch reader reads the same values with. */
-export function useValueProblems(checks: readonly ValueCheck[]): Checked<Record<string, string | undefined>> {
-  return useEngineCheck("values", checks, (deriver) => fieldProblems(deriver, checks));
+export function useValueProblems(checks: readonly ValueCheck[], source: ReadSource<EngineAsk, ProblemsByField> = TYPED_CHECK): Checked<Record<string, string | undefined>> {
+  return useEngineCheck("values", checks, (deriver) => fieldProblems(deriver, checks), source);
 }
 
 /** The check that `count` things (what the graph or list would hold) are within `limit`; `what` completes "At most N ...". */

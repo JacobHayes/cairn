@@ -272,6 +272,19 @@
   flex: 0 0 9rem;
 }
 
+/* The engine's reason for a search it refuses, under the box and over what follows it, so the row does not grow. */
+.toolbar-search {
+  position: relative;
+}
+
+.toolbar-search-reason {
+  top: 100%;
+  left: 0;
+  min-width: 0;
+  max-width: 24rem;
+  padding: var(--space-1) var(--space-2);
+}
+
 .toolbar-search input {
   width: 100%;
   min-width: 0;

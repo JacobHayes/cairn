@@ -41,11 +41,32 @@ export interface Checked<Problems> {
   retry: () => void;
 }
 
-/** Reads `ask` again whenever `freshness` (everything it is asked about) changes; `of` names what is checked. */
-export function useEngineCheck(of: string, freshness: unknown, ask: EngineAsk["ask"]): Checked<ProblemsByField> {
+/**
+ * Reads `ask` again whenever `freshness` (everything it is asked about) has stopped changing for
+ * `CHECK_DELAY_MS`, or the person leaves the field (a value being typed is asked about once it
+ * rests; the answer of an older value never shows against a newer one, which the keyed read
+ * guarantees); `of` names what is checked. `checked` is false while a newer value waits. `source`
+ * is `TYPED_CHECK` for a value being typed and `ENGINE_CHECK` for one that is not (an address, a
+ * count of what is held), which is asked at once.
+ */
+export function useEngineCheck(of: string, freshness: unknown, ask: EngineAsk["ask"], source: ReadSource<EngineAsk, ProblemsByField>): Checked<ProblemsByField> {
   const { deriver } = useSession();
   const key: ReadKey<EngineAsk> = { of: [of], freshness: [JSON.stringify(freshness)], args: { deriver, ask } };
-  const { view, refresh } = useKeyedRead(ENGINE_CHECK, key);
+  const { view, refresh, flush } = useKeyedRead(source, key);
+  useEffect(() => {
+    // Leaving a field, or Enter in it, is typing done: whatever follows (a press of Save) finds the check already under way.
+    const enter = (event: KeyboardEvent) => {
+      if (event.key === "Enter") {
+        flush();
+      }
+    };
+    document.addEventListener("focusout", flush);
+    document.addEventListener("keydown", enter, true);
+    return () => {
+      document.removeEventListener("focusout", flush);
+      document.removeEventListener("keydown", enter, true);
+    };
+  }, [flush]);
   const held = valueOf(view) ?? {};
   const failure = view.status === "failed" || view.status === "behind" ? view.error : undefined;
   return { checked: view.status === "current", problems: held, failure, retry: refresh };
@@ -58,7 +79,8 @@ export function useEngineCheck(of: string, freshness: unknown, ask: EngineAsk["a
  * go ahead and say what failed.
  */
 export function useIsJourneyId(id: string): boolean | undefined {
-  const check = useEngineCheck("journey-id", id, (deriver) => fieldProblems(deriver, [{ field: "id", kind: "journey_id", what: "The id", value: id }]));
+  // The id comes from the address, not from typing: nothing to wait for.
+  const check = useEngineCheck("journey-id", id, (deriver) => fieldProblems(deriver, [{ field: "id", kind: "journey_id", what: "The id", value: id }]), ENGINE_CHECK);
   if (check.failure !== undefined) {
     return true;
   }
@@ -407,7 +429,7 @@ export function useKeyedRead<A, T>(
   source: ReadSource<A, T>,
   key: ReadKey<A> | undefined,
   shown: readonly unknown[] | undefined = key?.of,
-): { view: ReadView<T>; refresh: () => void } {
+): { view: ReadView<T>; refresh: () => void; flush: () => void } {
   const session = useSession();
   const ref = useActorRef(keyedRead, { input: { source, env: session.readEnv } });
   useEffect(() => {
@@ -417,7 +439,10 @@ export function useKeyedRead<A, T>(
   const refresh = useCallback(() => {
     ref.send({ type: "refresh" });
   }, [ref]);
-  return { view: readView<T>(snapshot, shown, key?.freshness), refresh };
+  const flush = useCallback(() => {
+    ref.send({ type: "flush" });
+  }, [ref]);
+  return { view: readView<T>(snapshot, shown, key?.freshness), refresh, flush };
 }
 
 /**

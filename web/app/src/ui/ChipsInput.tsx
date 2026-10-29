@@ -5,6 +5,8 @@
 // a value is (chips.ts).
 import { useEffect, useId, useRef, useState, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type RefObject } from "react";
 
+import { TYPED_CHECK } from "../data/checks.ts";
+import { useEngineCheck } from "../data/react.ts";
 import { Chip, Cross } from "./Chip.tsx";
 import { hasSeparator, takeChips, type ChipRules } from "./chips.ts";
 
@@ -33,6 +35,20 @@ function useGate() {
     },
     alive: () => live.current,
   };
+}
+
+/**
+ * The engine's reason for the text being typed (before any separator, Enter or blur takes it),
+ * read as it rests; taking it asks again, so nothing joins the list unchecked. Only an answer for
+ * the text and list as they are now shows.
+ */
+function useTypedReason(text: string, values: readonly string[], rules: ChipRules, taking: boolean): string | undefined {
+  const active = !taking && text.trim() !== "" && !hasSeparator(text);
+  const check = useEngineCheck("typed-chip", { text, values, active }, async () => {
+    const reason = active ? await rules.problem(rules.normalize(text), values) : undefined;
+    return reason === undefined ? {} : { text: reason };
+  }, TYPED_CHECK);
+  return active && check.checked ? check.problems["text"] : undefined;
 }
 
 /** Taking text into the list (its input handlers) and the reason the last take refused something; refused text is selected so the next key replaces it. */
@@ -136,7 +152,9 @@ export function ChipsInput({
   const input = useRef<HTMLInputElement>(null);
   const reasonId = useId();
   const inputId = useId();
-  const { problem, setProblem, handlers, taking } = useTaking(chips, input);
+  const { problem: taken, setProblem, handlers, taking } = useTaking(chips, input);
+  const typedReason = useTypedReason(text, values, chips.rules, taking);
+  const problem = taken ?? typedReason;
   return (
     <div className="field">
       <label className="label" htmlFor={inputId}>

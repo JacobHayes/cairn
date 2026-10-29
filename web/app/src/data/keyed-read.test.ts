@@ -549,6 +549,17 @@ describe("a settle policy", () => {
     h.clock.increment(1);
     expect(h.calls.map((call) => call.args)).toEqual(["C"]);
   });
+
+  it("reads at once, with the last key, when the person has finished typing", () => {
+    const h = harness({ policy: previewPolicy(250) });
+    h.want(h.keyed("A"));
+    h.clock.increment(100);
+    h.want(h.keyed("B"));
+    h.ref.send({ type: "flush" });
+    expect(h.calls.map((call) => call.args)).toEqual(["B"]);
+    h.clock.increment(1000);
+    expect(h.calls).toHaveLength(1);
+  });
 });
 
 describe("the work it reports", () => {

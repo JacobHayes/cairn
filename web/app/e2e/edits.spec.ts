@@ -296,3 +296,11 @@ test("an authoring edit the engine refuses stays at its field across a reload, u
   await problems(page).getByRole("button", { name: "Discard" }).click();
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
 });
+
+test("an Enter pressed before the engine has read the typed title saves it as soon as it has", async ({ page }) => {
+  await openJourney(page, "browser", "j_launch");
+  const title = fresh("Quick");
+  await startRename(page, "n_docs", title);
+  await renameOf(page, "n_docs").getByRole("textbox").press("Enter");
+  await expect(nodeCard(page, "n_docs").getByTestId("title")).toHaveText(title);
+});

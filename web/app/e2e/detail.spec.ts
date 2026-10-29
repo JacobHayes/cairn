@@ -210,6 +210,8 @@ test("a checklist is written in the node form, ticked in place, finished with Ma
   await add.fill("Status page drafted");
   // One press of Save, with the typed item still in the field, saves it too.
   await checkpoint(page);
+  // Save waits for the engine to have read what is typed.
+  await expect(page.getByTestId("node-form-save")).toBeEnabled();
   await press(page, page.getByTestId("node-form-save"));
   await expect(page.getByTestId("node-form-save")).toHaveCount(0);
   await settled(page);

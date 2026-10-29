@@ -4,6 +4,8 @@
 // manager and kept across screens and reloads, and the form shows it until it lands or is
 // discarded. Text typed after a rejection is a newer draft beside the write, and Keep my edit
 // takes that, else what the write sent.
+import { useEffect, useState } from "react";
+
 import { useValueProblems } from "../authoring/form-problems.ts";
 import type { ReadError } from "../data/keyed-read.ts";
 import { useDraft } from "../data/drafts.ts";
@@ -62,6 +64,31 @@ function sentTitle(write: WriteView | undefined): string | undefined {
   return first?.op === "set_node_field" && "title" in first.value ? first.value.title : undefined;
 }
 
+/** A save asked for before the engine has read what was typed (Enter within the settling wait) goes ahead as soon as it has, if the text is still fine; typing again drops it. */
+function useSaveWhenChecked(checked: boolean, fine: boolean, send: () => void): { request: () => void; cancel: () => void } {
+  const [queued, setQueued] = useState(false);
+  useEffect(() => {
+    if (queued && checked) {
+      setQueued(false);
+      if (fine) {
+        send();
+      }
+    }
+  });
+  return {
+    request: () => {
+      if (checked) {
+        send();
+      } else {
+        setQueued(true);
+      }
+    },
+    cancel: () => {
+      setQueued(false);
+    },
+  };
+}
+
 /** The node's rename: its draft and the write the edit manager holds for it. */
 export function useRename(view: Ready, node: string, title: string): Rename {
   const journey = view.journey.header.id;
@@ -75,6 +102,16 @@ export function useRename(view: Ready, node: string, title: string): Rename {
   const text = draft?.text ?? sentTitle(write) ?? "";
   const checks = useValueProblems([{ field: "title", kind: "title", what: "The title", value: draft?.text ?? "", optional: true }]);
   const problem = draft === undefined ? undefined : checks.problems.title;
+  const mayAsk = writable && draft !== undefined && draft.text.trim() !== "" && !edit.disabled;
+  const sendNow = () => {
+    if (draft === undefined) {
+      return;
+    }
+    const patch = patchOf({ target: { journey }, baseRevision: draft.base, mutations: [{ op: "set_node_field", node, value: { title: draft.text } }] });
+    void edit.submit({ kind: "patch", patch });
+    setDraft(undefined);
+  };
+  const queue = useSaveWhenChecked(checks.checked, mayAsk && problem === undefined, sendNow);
   return {
     write,
     open,
@@ -91,6 +128,7 @@ export function useRename(view: Ready, node: string, title: string): Rename {
       }
     },
     change: (next) => {
+      queue.cancel();
       setDraft({ text: next, base: draft?.base ?? sentPatch(write)?.base_revision ?? view.journey.revision });
     },
     keep: (base) => {
@@ -104,12 +142,9 @@ export function useRename(view: Ready, node: string, title: string): Rename {
       }
     },
     save: () => {
-      if (!writable || draft === undefined || draft.text.trim() === "" || !checks.checked || problem !== undefined || edit.disabled) {
-        return;
+      if (mayAsk && problem === undefined) {
+        queue.request();
       }
-      const patch = patchOf({ target: { journey }, baseRevision: draft.base, mutations: [{ op: "set_node_field", node, value: { title: draft.text } }] });
-      void edit.submit({ kind: "patch", patch });
-      setDraft(undefined);
     },
     receipt: edit.receipt,
   };
