@@ -54,7 +54,7 @@ mod property {
             ListFlag::NextUp,
             ListFlag::Blocked,
             ListFlag::Active,
-            ListFlag::OpenDecision,
+            ListFlag::DecisionsNeeded,
         ]
         .into_iter()
         .enumerate()

@@ -5766,8 +5766,8 @@
             "type": "string"
           },
           {
-            "const": "open_decision",
-            "description": "An open decision, blocked or not (it may be answered ahead of what it waits on); counted\nin the snapshot.",
+            "const": "decisions_needed",
+            "description": "An open decision nothing blocks: answerable now; counted in the snapshot.",
             "type": "string"
           },
           {
@@ -14362,6 +14362,12 @@
             "description": "In-scope nodes by stored state; they add up to `in_scope`.",
             "type": "object"
           },
+          "decisions_needed": {
+            "description": "Decisions that can be answered now: the `decisions_needed` filter.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
           "frontier": {
             "description": "The frontier.",
             "format": "uint32",
@@ -14382,12 +14388,6 @@
           },
           "not_relevant": {
             "description": "Not-relevant nodes.",
-            "format": "uint32",
-            "minimum": 0,
-            "type": "integer"
-          },
-          "open_decisions": {
-            "description": "Decisions still open, ready to answer or not: the `open_decision` filter.",
             "format": "uint32",
             "minimum": 0,
             "type": "integer"
@@ -14418,7 +14418,7 @@
           "by_display_state",
           "frontier",
           "acting_frontier",
-          "open_decisions",
+          "decisions_needed",
           "needs_breakdown",
           "unassigned",
           "shortfalls",

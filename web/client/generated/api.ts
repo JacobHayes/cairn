@@ -2866,7 +2866,7 @@ export interface components {
             verified_emails: components["schemas"]["Email"][];
         };
         /** @description A list filter that needs no argument. */
-        ListFlag: "mine" | "unassigned" | "next_up" | "open_decision" | "needs_breakdown" | "active" | "blocked" | "overdue" | "stale" | "snoozed" | "snoozed_and_overdue" | "shortfall" | "stalled";
+        ListFlag: "mine" | "unassigned" | "next_up" | "decisions_needed" | "needs_breakdown" | "active" | "blocked" | "overdue" | "stale" | "snoozed" | "snoozed_and_overdue" | "shortfall" | "stalled";
         /** @description A page of the list. */
         ListPage: {
             /** @description Where the next page starts, when there is one. */
@@ -5429,6 +5429,11 @@ export interface components {
             };
             /**
              * Format: uint32
+             * @description Decisions that can be answered now: the `decisions_needed` filter.
+             */
+            decisions_needed: number;
+            /**
+             * Format: uint32
              * @description The frontier.
              */
             frontier: number;
@@ -5447,11 +5452,6 @@ export interface components {
              * @description Not-relevant nodes.
              */
             not_relevant: number;
-            /**
-             * Format: uint32
-             * @description Decisions still open, ready to answer or not: the `open_decision` filter.
-             */
-            open_decisions: number;
             /**
              * Format: uint32
              * @description Nodes whose plan can no longer be met: the `shortfall` filter.

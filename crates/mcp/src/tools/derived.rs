@@ -28,7 +28,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "get_snapshot",
         description: "Read this first on a journey: name, status, revision, whether completing it \
-            is suggested, and counts (by state and display state; open decisions, placeholders \
+            is suggested, and counts (by state and display state; decisions to answer now, placeholders \
             to break down, unassigned, shortfalls, stalled). No nodes: `list_nodes` with the \
             matching `filters` entry lists a count's.",
         writes: Writes::Nothing,

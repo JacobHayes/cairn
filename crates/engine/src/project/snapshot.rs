@@ -74,7 +74,7 @@ impl DerivedJourney<'_> {
             by_display_state,
             frontier: count(derived.ranking().frontier().len()),
             acting_frontier: flagged(ListFlag::NextUp),
-            open_decisions: flagged(ListFlag::OpenDecision),
+            decisions_needed: flagged(ListFlag::DecisionsNeeded),
             needs_breakdown: flagged(ListFlag::NeedsBreakdown),
             unassigned: flagged(ListFlag::Unassigned),
             shortfalls: flagged(ListFlag::Shortfall),

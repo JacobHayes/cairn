@@ -8,10 +8,10 @@ Offer this whenever a journey has open decisions: right after it is created, and
 return to it later.
 
 Open decisions gate the work behind them: until one is answered, what depends on it is
-undecided. Walking them in rank order unblocks the most first.
+undecided. Walking them in rank order unblocks the most first. The list holds the ones that can be answered now.
 
-1. **List them.** `get_snapshot`'s `counts.open_decisions` says how many; `list_nodes` with
-   `filters` `["open_decision"]` gives them in rank order with their breadcrumbs.
+1. **List them.** `get_snapshot`'s `counts.decisions_needed` says how many; `list_nodes` with
+   `filters` `["decisions_needed"]` gives them in rank order with their breadcrumbs.
 2. **Take one at a time.** For each, `get_node` shows its prompt, its answer type, its
    choices, who owns it, and what its answer affects (the nodes whose relevance it
    decides, a role it fills, a milestone it pins). Its `answer_effects` say, per choice, how
@@ -23,7 +23,7 @@ undecided. Walking them in rank order unblocks the most first.
    the next question, read again whenever an answer changes which questions apply (it
    made work relevant or not, filled a role, pinned a date, or opened a decision that was
    undecided before): the write's consequences say so, and `list_nodes` with
-   `open_decision` has the decisions now open.
+   `decisions_needed` has the decisions now answerable.
 4. **Move on.** Take the next decision in rank order. Stop when the person wants to, and
    summarize what was decided and what is now next.
 

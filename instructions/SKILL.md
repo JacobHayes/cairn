@@ -14,7 +14,7 @@ as the user who connected you, and every write records you and that user.
 ## The loop
 
 1. **Read first.** `get_snapshot` before anything else on a journey: facts and counts, no
-   nodes. Each count is the total of a `list_nodes` filter (`next_up`, `open_decision`,
+   nodes. Each count is the total of a `list_nodes` filter (`next_up`, `decisions_needed`,
    `needs_breakdown`, `unassigned`, `shortfall`, `stalled`); list the ones you need. Look
    closer with `get_node`, `get_level`.
 2. **Write in small, named steps** (below).

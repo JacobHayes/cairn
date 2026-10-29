@@ -768,9 +768,8 @@ pub enum ListFlag {
     /// On the acting frontier.
     NextUp,
     // PRD: B2.
-    /// An open decision, blocked or not (it may be answered ahead of what it waits on); counted
-    /// in the snapshot.
-    OpenDecision,
+    /// An open decision nothing blocks: answerable now; counted in the snapshot.
+    DecisionsNeeded,
     // PRD: B10.
     /// Placeholders that still need to be broken down.
     NeedsBreakdown,
@@ -1007,8 +1006,8 @@ pub struct SnapshotCounts {
     pub frontier: u32,
     /// The acting frontier: `list_nodes` with the `next_up` filter.
     pub acting_frontier: u32,
-    /// Decisions still open, ready to answer or not: the `open_decision` filter.
-    pub open_decisions: u32,
+    /// Decisions that can be answered now: the `decisions_needed` filter.
+    pub decisions_needed: u32,
     /// Placeholders needing breakdown: the `needs_breakdown` filter.
     pub needs_breakdown: u32,
     /// Open, in-scope nodes no one owns: the `unassigned` filter.

@@ -332,7 +332,7 @@ mod mcp_in_process {
     }
 
     /// The PRD's success criterion, as an agent session through the endpoint: over the
-    /// vendor evaluation, the agent reads the snapshot first, lists the open decisions,
+    /// vendor evaluation, the agent reads the snapshot first, lists the decisions needed,
     /// answers each, is refused a patch with every violation, proposes a breakdown for the
     /// placeholder, and applies it; its acting frontier is then the next list (I3, I6,
     /// A15, B10, C10).
@@ -369,7 +369,7 @@ mod mcp_in_process {
             expected,
             "the frontier is the next list"
         );
-        let open = json!({ "journey": JOURNEY, "filters": ["open_decision"] });
+        let open = json!({ "journey": JOURNEY, "filters": ["decisions_needed"] });
         let open = keys(&agent.ok("list_nodes", open).await["items"]);
         let answers = scenario_answers();
         assert!(
@@ -384,10 +384,10 @@ mod mcp_in_process {
     async fn answer_what_is_needed(agent: &Agent) -> u64 {
         let snapshot = json!({ "journey": JOURNEY });
         let snapshot = agent.ok("get_snapshot", snapshot).await;
-        let open = json!({ "journey": JOURNEY, "filters": ["open_decision"] });
+        let open = json!({ "journey": JOURNEY, "filters": ["decisions_needed"] });
         let open = agent.ok("list_nodes", open).await;
         assert_eq!(
-            snapshot["snapshot"]["counts"]["open_decisions"], open["total"],
+            snapshot["snapshot"]["counts"]["decisions_needed"], open["total"],
             "the count is the filter's total"
         );
         let answers = scenario_answers();

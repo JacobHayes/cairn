@@ -128,10 +128,8 @@ fn each_state_filter_keeps_what_it_names() {
     let cases: Vec<(Derive, ListFlag, Vec<&str>)> = vec![
         (
             Derive::vendor(1),
-            ListFlag::OpenDecision,
+            ListFlag::DecisionsNeeded,
             vec![
-                "n_comparison_set",
-                "n_findings_reviewer",
                 "n_meeting_date",
                 "n_partner_runs",
                 "n_purpose",

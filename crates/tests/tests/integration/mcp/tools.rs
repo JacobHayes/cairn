@@ -456,7 +456,7 @@ async fn the_snapshot_counts_are_the_node_list_totals() {
     let counts = &snapshot["snapshot"]["counts"];
     for (count, filter) in [
         ("acting_frontier", "next_up"),
-        ("open_decisions", "open_decision"),
+        ("decisions_needed", "decisions_needed"),
         ("needs_breakdown", "needs_breakdown"),
         ("unassigned", "unassigned"),
         ("shortfalls", "shortfall"),

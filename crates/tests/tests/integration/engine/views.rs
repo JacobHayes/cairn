@@ -400,7 +400,7 @@ fn an_effectively_skipped_decision_is_not_open() {
     assert!(!derive.derived.open(&key("n_d")));
     assert_eq!(journey.status_summary().open_decisions.len(), 0);
     let snapshot = journey.snapshot(&derive.header().header);
-    assert_eq!(snapshot.counts.open_decisions, 0);
+    assert_eq!(snapshot.counts.decisions_needed, 0);
 }
 
 /// C12, E6: an identity answer given before a merge names the survivor in the decision view, as

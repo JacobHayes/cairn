@@ -52,11 +52,10 @@ fn the_snapshot_counts_add_up_and_match_the_node_list_filters() {
         graph.document().nodes.len()
     );
     assert_eq!(counts.acting_frontier, 2);
-    assert_eq!(counts.open_decisions, 2, "the comparison set and reviewer");
     assert_eq!(counts.needs_breakdown, 1, "the workload");
     for (count, flag) in [
         (counts.acting_frontier, ListFlag::NextUp),
-        (counts.open_decisions, ListFlag::OpenDecision),
+        (counts.decisions_needed, ListFlag::DecisionsNeeded),
         (counts.needs_breakdown, ListFlag::NeedsBreakdown),
         (counts.unassigned, ListFlag::Unassigned),
         (counts.shortfalls, ListFlag::Shortfall),

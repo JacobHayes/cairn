@@ -10,7 +10,7 @@ description: Summarize where a journey stands and what to do next, from its snap
    order. Name the top few frontier items with their owners and why
    they rank high (a deadline, how much waits on them). `get_node` explains one item's
    rank, blocking, and dates when the person asks why.
-3. **Then what needs attention.** The counts say whether any exist: open decisions that
+3. **Then what needs attention.** The counts say whether any exist: decisions to answer now, which
    block work; placeholders that need breakdown; unassigned items; shortfalls (plans that
    can no longer be met); then list those with a count above zero, and overdue and stale
    items, with `list_nodes` and the matching `filters`.
