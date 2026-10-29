@@ -69,18 +69,10 @@ export interface Step {
   reveal: Reveal;
   /** Disclosures the tour opens on arrival so what the step is about is in view (CSS selectors of `details`). */
   opens?: string[];
-  /** A menu the step has the person open: while it is open the callout steps aside, so nothing of the menu is under it. */
-  aside?: string;
-  /** The sheet height a state of the step opens at where the inspector is a sheet and the step's menu needs the room above it. */
-  menuSheet?: "peek";
-  /** On reveal, an element to press if it is there (a menu the action left open). */
-  revealClose?: string;
   /** On reveal, the height the sheet takes where the inspector is one: up to show the inspector's change, down to show the graph's. */
   revealSheet?: "half" | "peek";
   /** The step's pane is the assistant's (this selector matches it): once the reply has been shown, a revisit opens the pane again (it is mounted only while open). */
   assistantPane?: string;
-  /** What the sentence in each state is about, apart from the hole and the anchor themselves: the callout never covers these. Selectors, like `area`. */
-  names?: (facts: Facts, state: "spotlight" | "reveal") => string[];
   /** What changed, once done: the callout sits beside the first match, on `anchorSide`. */
   anchor?: (facts: Facts, where: Where) => string[];
   anchorSide?: Side;
@@ -101,8 +93,6 @@ const { decision, draft, comments, review, summary, meeting } = PRACTICE;
 export const cardOf = (key: string): string => `[data-testid="node-card"][data-node="${key}"]`;
 /** A node's inspector panel. */
 export const panelOf = (key: string): string => `[data-testid="node-detail"][data-node="${key}"]`;
-/** A node's label and its bar on the timeline. */
-export const trackOf = (key: string): string[] => [`[data-testid="timeline-entry"][data-node="${key}"]`, `[data-testid="timeline-track"][data-node="${key}"]`];
 /** A node's row in the list. */
 export const rowOf = (key: string): string => `[data-testid="list-row"][data-node="${key}"]`;
 
@@ -134,7 +124,6 @@ const STEPS: Record<StepId, Step> = {
     anchorSide: "left",
     revealFrame: () => [decision],
     revealSheet: "half",
-    names: (_facts, state) => (state === "spotlight" ? [cardOf(draft), cardOf(review)] : [cardOf(decision)]),
     done: (_facts, where) => where.selected === decision,
     waits: "Select the decision first",
     instruction: (facts, { phone, short }) => {
@@ -165,12 +154,6 @@ const STEPS: Record<StepId, Step> = {
     anchorSide: "top",
     revealFrame: (facts) => (facts.answer === false ? [summary, comments] : [review, draft]),
     revealSheet: "peek",
-    names: (facts, state) => {
-      if (state === "spotlight") {
-        return [cardOf(decision), cardOf(review)];
-      }
-      return facts.answer === false ? [cardOf(summary), cardOf(comments)] : [cardOf(review), cardOf(draft)];
-    },
     done: (facts) => facts.answer !== undefined,
     waits: "Choose Yes or No and save first",
     instruction: (facts) => `Choose Yes or No and save. Your answer decides whether ${said(facts, review)} applies.`,
@@ -189,17 +172,13 @@ const STEPS: Record<StepId, Step> = {
     frame: [draft, decision, review, comments],
     // On a phone the chip is in the Controls menu: the button, then the menu's item once it is open.
     area: () => ['[data-tour="frontier"]', '[data-tour="controls"]', CONTROLS_MENU],
-    aside: CONTROLS_MENU,
-    menuSheet: "peek",
     side: "bottom",
     reveal: "lift",
     // The emphasis is the whole graph: the first of what can move now is the one to look at.
     anchor: (facts) => (facts.frontier[0] === undefined ? [] : [cardOf(facts.frontier[0])]),
     anchorSide: "bottom",
     revealFrame: (facts) => [...new Set([...facts.frontier, decision, review, comments])],
-    revealClose: '[data-tour="controls"][aria-expanded="true"]',
     revealSheet: "peek",
-    names: (facts, state) => (state === "reveal" ? facts.frontier.map(cardOf) : []),
     done: (_facts, where) => where.frontier,
     waits: "Turn Frontier on first",
     instruction: (_facts, { phone }) => `Frontier highlights what you can act on right now. ${phone ? "Open Controls and turn it on." : "Turn it on."}`,
@@ -214,14 +193,10 @@ const STEPS: Record<StepId, Step> = {
     area: () => [rowOf(draft)],
     side: "right",
     reveal: "lift",
-    // Done re-sorts the list, so the freed rows and the done draft land apart: the change to look at is the first freed row.
-    anchor: (facts) => {
-      const first = freed(facts)[0];
-      return first === undefined ? [] : [rowOf(first)];
-    },
+    // The change to look at is the rows it freed.
+    anchor: (facts) => freed(facts).map(rowOf),
     anchorSide: "right",
     revealSheet: "peek",
-    names: (facts, state) => (state === "reveal" ? freed(facts).map(rowOf) : []),
     done: (facts) => facts.state(draft) === "done",
     waits: "Mark the draft done first",
     instruction: (facts) => `The list is the same journey as rows. Mark ${said(facts, draft)} done.`,
@@ -240,7 +215,6 @@ const STEPS: Record<StepId, Step> = {
     pane: true,
     area: () => [`${panelOf(summary)} [data-testid="dates"]`],
     opens: [`${panelOf(summary)} [data-testid="dates"]`, `${panelOf(summary)} [data-testid="date"][data-label="Due"] details`],
-    names: () => [...trackOf(meeting), ...trackOf(summary)],
     side: "top",
     reveal: "none",
     instruction: (facts) => `${said(facts, meeting)} is pinned. ${said(facts, summary)} is due the day before it, worked out from that pin and its rule. Dates shows why.`,

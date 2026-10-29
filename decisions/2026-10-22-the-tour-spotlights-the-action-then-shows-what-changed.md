@@ -6,12 +6,12 @@ Call: steps that ask for an action have two states. While the action waits, the 
 
 Calls made while building it:
 
-- The overlay reads the target rectangles once per animation frame and re-places only when one changed, rather than subscribing to each source (canvas pans, scrolls, sheet drags, disclosures and mounts). One loop covers every way a target can move, and a state is drawn once its rectangles have held for a few frames.
-- A target that is missing is told as loading, closed (the sheet is lowered) or missing (after two seconds), with a button that shows the control; the finer diagnoses of the plan collapse into these.
-- Each step also names what its sentence is about, and the callout is placed so it never covers those: it tries each side and alignment beside its anchor, then docks across the foot of the room above the sheet, then across its head. A phone, a window too short for it to sit beside a card, and an anchor inside the sheet dock at once; in a window under 480px high the guidance moves to the side of a card instead of above or below it, so the card keeps room to be read.
-- The canvas, which owns its camera, frames the step's cards in the room the callout leaves, down to a near zoom where a card still shows what it is. The overlay judges docking only after the canvas has framed.
-- Under the sheet (below 1100px) the hole takes in the sheet's handle with the target, so the person can still resize it; Escape on the paused card resumes. The callout is paper, the app's open layer: it blocks the app's keys and keeps focus.
-- The unit tests of geometry, focus order and step facts run in Vitest's node environment (there is no DOM there); what the screen does is covered by the browser tests.
+- The overlay reads the target rectangles when something that could move them happens (a resize of the window or the callout, a scroll, a change of the page's markup), coalesced to one read per animation frame, never on a clock. The callout is placed once per read, beside its target or docked across the foot (or head) of the room above the sheet.
+- A target that is not on the screen shows the callout docked after a short wait; where the sheet is lowered over a step that needs its pane, a button raises it.
+- The callout is placed so it never covers its hole or its anchor: beside its anchor on the preferred side or the opposite, else docked across the foot of the room above the sheet, else across its head. A phone docks at once; in a window under 480px high the guidance moves to the side of a card instead of above or below it.
+- The canvas, which owns its camera, frames the step's cards in the room the callout leaves, down to a near zoom where a card still shows what it is.
+- The callout is paper, the app's open layer: it blocks the app's keys, and arriving at a step puts the focus on its title. Escape on the paused card resumes.
+- The unit tests of step facts run in Vitest's node environment (there is no DOM there); what the screen does is covered by the browser tests.
 
 Alternatives: the band above the screen (it kept the screen whole but put the instruction far from the action and took a fifth of the workspace); a spotlight that stays dimmed after the action (it hides the consequence the step exists to show); a dedicated practice screen (a reduced app shown to the person).
 

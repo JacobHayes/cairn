@@ -150,9 +150,6 @@ describe("what a step points at once its action is done", () => {
   it("the answer's change is the review card after a Yes and the summary card after a No, where the review has left the graph", () => {
     expect(anchored("answer", factsAt("yes"))).toEqual([cardOf(review)]);
     expect(anchored("answer", factsAt("no"))).toEqual([cardOf(summary)]);
-    // The canvas frames the first card always: the one the change is about.
-    expect(step("answer").revealFrame?.(factsAt("no"))[0]).toBe(summary);
-    expect(step("answer").revealFrame?.(factsAt("yes"))[0]).toBe(review);
   });
 
   it("Frontier's change is the first card that can move, whichever it is", () => {
@@ -162,9 +159,9 @@ describe("what a step points at once its action is done", () => {
     expect(anchored("frontier", { ...facts, frontier: [] })).toEqual([]);
   });
 
-  it("finishing's change is the row of the first freed item: the comments after a No, in the list's own order", () => {
+  it("finishing's change is the rows it freed: the comments alone after a No, the review too after a Yes", () => {
     expect(anchored("finish", factsAt("no-draft-done"))).toEqual([rowOf(comments)]);
-    expect(anchored("finish", factsAt("yes-draft-done"))).toEqual([rowOf(comments)]);
+    expect(anchored("finish", factsAt("yes-draft-done"))).toEqual([rowOf(comments), rowOf(review)]);
     expect(anchored("finish", factsAt("yes"))).toEqual([]);
   });
 

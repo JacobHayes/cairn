@@ -625,7 +625,7 @@ function useTourFraming(framing: Framing | undefined, layout: Layout): void {
       const asked = { left: framing.room.left - canvas.left, right: framing.room.left + framing.room.width - canvas.left, top: framing.room.top - canvas.top, bottom: framing.room.top + framing.room.height - canvas.top };
       // The tour frames its cards as far down as the near zoom, where a card still shows what it is and its state.
       const frame = firstFrame(boxes, { left: Math.max(room.left, asked.left), right: Math.min(room.right, asked.right), top: Math.max(room.top, asked.top), bottom: Math.min(room.bottom, asked.bottom) }, NEAR_ZOOM);
-      return frame === undefined ? undefined : flow.setViewport(frame).then(() => { framing.applied(); });
+      return frame === undefined ? undefined : flow.setViewport(frame);
     });
     // A card drawn later (the layout of a revision) is a reason to look again; the camera's own moves are not.
   }, [framing, layout, initialized, sized, flow, store, sheet, work]);
