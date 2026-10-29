@@ -402,6 +402,10 @@ test.describe("under 1100px, where the inspector is a sheet", () => {
     // Back and forward again, with the decision still open, puts the sheet up for the action once more.
     await page.getByTestId("tour-back").click();
     await openFromCanvas(page, "n_outside");
+    // The map step has taken the opened node and settled, so Next is pressed on it and not on the step being left.
+    await expect(callout(page)).toHaveAttribute("data-step", "map");
+    await expect(callout(page)).toHaveAttribute("data-done", "true");
+    await expect(callout(page)).toHaveAttribute("data-ready", "true");
     await next(page);
     await expectAt(page, "answer", "spotlight");
     await expect(frame).toHaveAttribute("data-sheet", "half");
@@ -411,6 +415,10 @@ test.describe("under 1100px, where the inspector is a sheet", () => {
     // Answered, the step arrives in its reveal: the sheet is down for the change.
     await page.getByTestId("tour-back").click();
     await openFromCanvas(page, "n_outside");
+    // The map step has taken the opened node and settled, so Next is pressed on it and not on the step being left.
+    await expect(callout(page)).toHaveAttribute("data-step", "map");
+    await expect(callout(page)).toHaveAttribute("data-done", "true");
+    await expect(callout(page)).toHaveAttribute("data-ready", "true");
     await next(page);
     await expectAt(page, "answer", "reveal");
     await expect(frame).toHaveAttribute("data-sheet", "peek");
