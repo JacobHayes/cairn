@@ -64,6 +64,7 @@ const IGNORED: &[&str] = &[
     "uniqueItems",
     "pattern",
     "format",
+    "x-sketch",
 ];
 
 /// Keywords the renderer reads.
@@ -356,7 +357,7 @@ impl Sketch<'_> {
         }
         let mut parts = Vec::new();
         for member in members {
-            parts.push(self.render(member)?);
+            parts.push(format!("{}{}", self.render(member)?, note(member)));
         }
         Ok(parts.join(" | "))
     }
@@ -447,11 +448,19 @@ impl Sketch<'_> {
                 continue;
             }
             if required.contains(&name.as_str()) {
-                fields.push(format!("{name}: {}", self.render(property)?));
+                fields.push(format!(
+                    "{name}: {}{}",
+                    self.render(property)?,
+                    note(property)
+                ));
             } else {
                 // Absent and null mean the same on an optional field.
                 let (inner, _) = split_null(property)?;
-                fields.push(format!("{name}?: {}", self.inner(&inner)?));
+                fields.push(format!(
+                    "{name}?: {}{}",
+                    self.inner(&inner)?,
+                    note(property)
+                ));
             }
         }
         if !group.is_empty() {
@@ -496,6 +505,20 @@ impl Sketch<'_> {
             _ => unsupported(format_args!("a map: {}", Value::Object(map.clone()))),
         }
     }
+}
+
+/// The description of a field or union member that marks itself `x-sketch`, as a trailing
+/// comment: the rule a caller would get wrong from the type alone.
+fn note(schema: &Value) -> String {
+    if schema.get("x-sketch") != Some(&Value::Bool(true)) {
+        return String::new();
+    }
+    schema
+        .get("description")
+        .and_then(Value::as_str)
+        .map(|text| text.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|text| !text.is_empty())
+        .map_or_else(String::new, |text| format!(" /* {text} */"))
 }
 
 /// A schema without its `null` alternative, and whether it had one.
@@ -741,8 +764,16 @@ mod tests {
 
     /// The fields of an object type written `{a: T, b?: U}`, as (name, optional, type).
     fn fields(object: &str) -> Vec<(String, bool, String)> {
-        let end = object.rfind('}').expect("a closing brace");
-        let inner = &object[1..end];
+        let mut bare = String::new();
+        let mut rest = object;
+        while let Some(at) = rest.find(" /* ") {
+            bare.push_str(&rest[..at]);
+            let close = rest[at..].find(" */").expect("a closed note");
+            rest = &rest[at + close + 3..];
+        }
+        bare.push_str(rest);
+        let end = bare.rfind('}').expect("a closing brace");
+        let inner = &bare[1..end];
         let (mut depth, mut start, mut parts) = (0_i32, 0, Vec::new());
         for (at, byte) in inner.bytes().enumerate() {
             match byte {
@@ -832,7 +863,10 @@ mod tests {
                 continue;
             }
             let body = line.split(" = ").nth(1).expect("a body");
-            let body = body.split(" /*").next().expect("a body");
+            // The trailing comment is the kind rules; field notes stay for `fields` to strip.
+            let body = body
+                .rsplit_once(" /* fields beyond")
+                .map_or(body, |(fields, _)| fields);
             let group: Vec<&str> =
                 one_of_group(definition.as_object().expect("an object")).expect("a group");
             let object = body.split(", one of ").next().expect("fields");
@@ -1029,7 +1063,7 @@ mod tests {
         let comment = text
             .lines()
             .find(|line| line.starts_with("type Node = "))
-            .and_then(|line| line.split("/* ").nth(1))
+            .and_then(|line| line.rsplit("/* ").next())
             .map(|rules| rules.trim_end_matches(" */"))
             .expect("the node's rules");
         let names: Vec<&String> = node["properties"]

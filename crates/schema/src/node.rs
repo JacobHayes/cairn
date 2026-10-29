@@ -1289,6 +1289,8 @@ struct NodeWire<R: References> {
     )]
     #[schemars(with = "bool")]
     requires_artifact: Option<bool>,
+    /// Completing needs a note on the node itself, not a child's or the journey's.
+    #[schemars(extend("x-sketch" = true))]
     #[serde(
         default,
         deserialize_with = "crate::serde_util::present",
@@ -1296,6 +1298,8 @@ struct NodeWire<R: References> {
     )]
     #[schemars(with = "bool")]
     requires_note: Option<bool>,
+    /// Setting it replaces the whole list.
+    #[schemars(extend("x-sketch" = true))]
     #[serde(
         default,
         deserialize_with = "crate::serde_util::present",
@@ -1303,6 +1307,8 @@ struct NodeWire<R: References> {
     )]
     #[schemars(with = "Checklist")]
     checklist: Option<Checklist>,
+    /// Completing needs every checklist item ticked.
+    #[schemars(extend("x-sketch" = true))]
     #[serde(
         default,
         deserialize_with = "crate::serde_util::present",
@@ -1318,6 +1324,9 @@ struct NodeWire<R: References> {
     )]
     #[schemars(with = "bool")]
     is_final: Option<bool>,
+    /// A milestone reads `scheduled` until its date, then ready to mark done; with this it is done
+    /// by itself. Marking it done early records when.
+    #[schemars(extend("x-sketch" = true))]
     #[serde(
         default,
         deserialize_with = "crate::serde_util::present",
@@ -1325,6 +1334,8 @@ struct NodeWire<R: References> {
     )]
     #[schemars(with = "bool")]
     auto_done: Option<bool>,
+    /// The milestone that opens the stage: the contents wait for it unless `gates` is false.
+    #[schemars(extend("x-sketch" = true))]
     #[serde(
         default,
         deserialize_with = "crate::serde_util::present",
@@ -1332,6 +1343,9 @@ struct NodeWire<R: References> {
     )]
     #[schemars(with = "R::Node")]
     opens_at: Option<R::Node>,
+    /// The milestone that closes the stage: it bounds the group's finish and its contents' due
+    /// dates unless `closes` is false. Consecutive stages share one.
+    #[schemars(extend("x-sketch" = true))]
     #[serde(
         default,
         deserialize_with = "crate::serde_util::present",
@@ -1339,6 +1353,10 @@ struct NodeWire<R: References> {
     )]
     #[schemars(with = "R::Node")]
     closes_at: Option<R::Node>,
+    /// False lets the contents be done before the opening milestone. A stage holds the work done
+    /// during it; work that can as well be done ahead goes in a stage with this false; prep that
+    /// must come first sits outside, due before the opening milestone.
+    #[schemars(extend("x-sketch" = true))]
     #[serde(
         default,
         deserialize_with = "crate::serde_util::present",
@@ -1357,8 +1375,13 @@ struct NodeWire<R: References> {
     requires: Requires<R>,
     #[serde(skip_serializing_if = "Option::is_none")]
     relevant_when: Option<Condition<R>>,
+    /// The latest finish: a deadline only, it never holds work back.
+    #[schemars(extend("x-sketch" = true))]
     #[serde(skip_serializing_if = "Option::is_none")]
     due_by: Option<DateRule<R>>,
+    /// The earliest start: until then the node reads `scheduled` and stays off the next list, yet
+    /// can be started early. What waits on it is `blocked`, its `waits_on` carrying the date.
+    #[schemars(extend("x-sketch" = true))]
     #[serde(skip_serializing_if = "Option::is_none")]
     not_before: Option<DateRule<R>>,
     #[serde(default, skip_serializing_if = "Participations::is_empty")]

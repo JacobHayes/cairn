@@ -3113,7 +3113,7 @@ export interface components {
         } | {
             /** @constant */
             op: "set_journey_status";
-            /** @description The new status. */
+            /** @description The new status. Completing or archiving a journey is the person's call. */
             status: components["schemas"]["JourneyStatus"];
         } | {
             /** @description The description. */
@@ -3167,7 +3167,12 @@ export interface components {
         } | {
             /** @constant */
             op: "remove_node";
-            /** @description What it removes. */
+            /**
+             * @description Exactly what the removal takes with it. In a journey, get it from `get_node` with
+             *     `removal` true and clear its `outside_references` in the same patch
+             *     (`set_node_field` on the holder's field, `edit_resource`, or `unsnooze`). In a
+             *     route draft, assemble it from `get_route`.
+             */
             removal: components["schemas"]["Removal"];
         } | {
             /** @description The edge. */
@@ -3346,7 +3351,11 @@ export interface components {
             node: components["schemas"]["NodeKey"];
             /** @constant */
             op: "snooze";
-            /** @description Until a date or a node. */
+            /**
+             * @description Until a date or another node is done; no plan date changes. On a container it sets
+             *     the whole subtree aside, still blocking and counting for priority; any transition
+             *     on the container clears it.
+             */
             until: components["schemas"]["SnoozeTarget"];
         } | {
             /** @description The node. */
@@ -3468,7 +3477,10 @@ export interface components {
             op: "delete_route";
             /** @description The route's revision, as read. */
             revision: components["schemas"]["Revision"];
-            /** @description The route. */
+            /**
+             * @description The route. Delete the journeys using it in the same patch, or retire the route
+             *     instead.
+             */
             route: components["schemas"]["RouteId"];
         } | {
             /** @constant */
@@ -3509,23 +3521,43 @@ export interface components {
         /** @description A node. */
         Node: {
             answer_type?: components["schemas"]["AnswerType"];
+            /**
+             * @description A milestone reads `scheduled` until its date, then ready to mark done; with this it is done
+             *     by itself. Marking it done early records when.
+             */
             auto_done?: boolean;
+            /** @description Setting it replaces the whole list. */
             checklist?: components["schemas"]["Checklist"];
             choices?: components["schemas"]["Choices"];
             closes?: boolean;
+            /**
+             * @description The milestone that closes the stage: it bounds the group's finish and its contents' due
+             *     dates unless `closes` is false. Consecutive stages share one.
+             */
             closes_at?: components["schemas"]["NodeKey"];
             description?: components["schemas"]["Markdown"] | null;
+            /** @description The latest finish: a deadline only, it never holds work back. */
             due_by?: components["schemas"]["DateRule"] | null;
             estimate?: components["schemas"]["Days"];
             feeds_milestone?: components["schemas"]["NodeKey"];
             fills_role?: components["schemas"]["RoleKey"];
             final?: boolean;
+            /**
+             * @description False lets the contents be done before the opening milestone. A stage holds the work done
+             *     during it; work that can as well be done ahead goes in a stage with this false; prep that
+             *     must come first sits outside, due before the opening milestone.
+             */
             gates?: boolean;
             help?: components["schemas"]["Markdown"];
             id: components["schemas"]["Slug"];
             key: components["schemas"]["NodeKey"];
             kind: components["schemas"]["NodeKind"];
+            /**
+             * @description The earliest start: until then the node reads `scheduled` and stays off the next list, yet
+             *     can be started early. What waits on it is `blocked`, its `waits_on` carrying the date.
+             */
             not_before?: components["schemas"]["DateRule"] | null;
+            /** @description The milestone that opens the stage: the contents wait for it unless `gates` is false. */
             opens_at?: components["schemas"]["NodeKey"];
             parent?: components["schemas"]["NodeKey"] | null;
             participations?: components["schemas"]["ParticipationsResolved"];
@@ -3534,7 +3566,9 @@ export interface components {
             relevant_when?: components["schemas"]["ConditionResolved"] | null;
             requires?: components["schemas"]["NodeKey"][];
             requires_artifact?: boolean;
+            /** @description Completing needs every checklist item ticked. */
             requires_checklist?: boolean;
+            /** @description Completing needs a note on the node itself, not a child's or the journey's. */
             requires_note?: boolean;
             resources?: components["schemas"]["Resource"][];
             title: components["schemas"]["Title"];
@@ -3543,23 +3577,43 @@ export interface components {
         /** @description A node. */
         Node2: {
             answer_type?: components["schemas"]["AnswerType"];
+            /**
+             * @description A milestone reads `scheduled` until its date, then ready to mark done; with this it is done
+             *     by itself. Marking it done early records when.
+             */
             auto_done?: boolean;
+            /** @description Setting it replaces the whole list. */
             checklist?: components["schemas"]["Checklist"];
             choices?: components["schemas"]["Choices"];
             closes?: boolean;
+            /**
+             * @description The milestone that closes the stage: it bounds the group's finish and its contents' due
+             *     dates unless `closes` is false. Consecutive stages share one.
+             */
             closes_at?: components["schemas"]["Path"];
             description?: components["schemas"]["Markdown"] | null;
+            /** @description The latest finish: a deadline only, it never holds work back. */
             due_by?: components["schemas"]["DateRule2"] | null;
             estimate?: components["schemas"]["Days"];
             feeds_milestone?: components["schemas"]["Path"];
             fills_role?: components["schemas"]["Slug"];
             final?: boolean;
+            /**
+             * @description False lets the contents be done before the opening milestone. A stage holds the work done
+             *     during it; work that can as well be done ahead goes in a stage with this false; prep that
+             *     must come first sits outside, due before the opening milestone.
+             */
             gates?: boolean;
             help?: components["schemas"]["Markdown"];
             id: components["schemas"]["Slug"];
             key?: components["schemas"]["NodeKey"] | null;
             kind: components["schemas"]["NodeKind"];
+            /**
+             * @description The earliest start: until then the node reads `scheduled` and stays off the next list, yet
+             *     can be started early. What waits on it is `blocked`, its `waits_on` carrying the date.
+             */
             not_before?: components["schemas"]["DateRule2"] | null;
+            /** @description The milestone that opens the stage: the contents wait for it unless `gates` is false. */
             opens_at?: components["schemas"]["Path"];
             parent?: components["schemas"]["Path"] | null;
             participations?: components["schemas"]["Participations"];
@@ -3568,7 +3622,9 @@ export interface components {
             relevant_when?: components["schemas"]["Condition"] | null;
             requires?: components["schemas"]["Path"][];
             requires_artifact?: boolean;
+            /** @description Completing needs every checklist item ticked. */
             requires_checklist?: boolean;
+            /** @description Completing needs a note on the node itself, not a child's or the journey's. */
             requires_note?: boolean;
             resources?: components["schemas"]["Resource2"][];
             title: components["schemas"]["Title"];

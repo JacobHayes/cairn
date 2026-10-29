@@ -27,11 +27,10 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "get_snapshot",
-        description: "Read this first on a journey: its name, status and revision, whether \
-            completing it is suggested, and counts (by state and display state; open \
-            decisions, placeholders to break down, unassigned, shortfalls, stalled). No \
-            nodes: `list_nodes` with the matching `filters` entry lists the ones a count \
-            totals.",
+        description: "Read this first on a journey: name, status, revision, whether completing it \
+            is suggested, and counts (by state and display state; open decisions, placeholders \
+            to break down, unassigned, shortfalls, stalled). No nodes: `list_nodes` with the \
+            matching `filters` entry lists a count's.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetSnapshot>,
@@ -39,9 +38,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "list_nodes",
-        description: "Nodes in rank order, paged, each with its rank (`get_node` says why): \
-            every node, or those matching every `filters` entry (`next_up` is the acting \
-            frontier). Scope with `within` and `depth`.",
+        description: "Nodes in rank order, paged: all, or those matching every `filters` entry \
+            (`next_up` is the acting frontier). Scope with `within` and `depth`.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListNodes>,
@@ -49,10 +47,9 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "get_node",
-        description: "One node in full: as written, its state, answer, notes, children, and \
-            each derived value with why (status, relevance, blocking, dates, \
-            priority). `removal` answers the exact `remove_node` removal instead; \
-            `explanations` pages a cut list.",
+        description: "One node in full: as written, state, answer, notes, children, and each \
+            derived value with why, rank included. `removal` answers the exact `remove_node` \
+            removal instead; `explanations` pages a cut list.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetNode>,

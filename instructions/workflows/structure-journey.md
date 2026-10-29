@@ -12,7 +12,7 @@ but on the journey itself.
    `owners` if the person named who owns it.
 2. **Understand the situation.** Ask what has to happen, what has to be decided first, who
    is involved, and what dates are fixed. Keep it small: a few groups with the decisions,
-   deliverables, actions, and milestones under them. For phases bounded by milestones, see the stage rules in `apply_patch`.
+   deliverables, actions, and milestones under them. For phases bounded by milestones, see `opens_at` and `closes_at` in `apply_patch`'s node type.
 3. **Draft one proposal.** `create_proposal` with `destination` `{"journey": "<journey>"}`,
    the journey's revision as `destination_revision`, and the `add_role`, `add_node`, and
    `add_edge` mutations in order. People involved who are not yet identities are created in

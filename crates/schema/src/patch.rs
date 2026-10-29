@@ -250,11 +250,14 @@ pub enum Transition {
     Start,
     /// `active` to `todo`.
     Stop,
-    /// To `done` (deliverable, action, milestone).
+    /// To `done` (deliverable, action, milestone). A guard's evidence must exist once the
+    /// patch applies: add the note or ticks in the same patch.
+    #[schemars(extend("x-sketch" = true))]
     Complete,
     // PRD: D4.
-    /// To `done` going ahead anyway: the guards it fails are bypassed, and the engine
-    /// records which. Only a deliverable or action has guards to bypass.
+    /// To `done` without the evidence the guards need, recording which; only when the
+    /// person says to. A deliverable or action only.
+    #[schemars(extend("x-sketch" = true))]
     CompleteAnyway {
         /// Why, when the person gave a reason. Leave the field out for none.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -267,8 +270,9 @@ pub enum Transition {
         reason: Reason,
     },
     // PRD: D1, D1a.
-    /// A group to `done`, with the reason that requires: it reads done, and the unfinished
-    /// work inside it reads skipped, as under a skip, until it is reopened.
+    /// A group to `done`, with a reason: it reads done and its unfinished work reads
+    /// skipped, until `reopen`.
+    #[schemars(extend("x-sketch" = true))]
     MarkDone {
         /// Why.
         reason: Reason,
@@ -414,7 +418,8 @@ pub enum Mutation {
     // PRD: B11.
     /// Change the journey's status.
     SetJourneyStatus {
-        /// The new status.
+        /// The new status. Completing or archiving a journey is the person's call.
+        #[schemars(extend("x-sketch" = true))]
         status: JourneyStatus,
     },
 
@@ -470,7 +475,7 @@ pub enum Mutation {
         value: NodeFieldValue<KeyRefs>,
     },
     // PRD: B7.
-    /// Replace a node whole, as a kind or answer-type change does.
+    /// Replace a node whole, `requires` included, as a kind or answer-type change does.
     ReplaceNode {
         /// The node, with its key.
         node: Node<KeyRefs>,
@@ -478,7 +483,11 @@ pub enum Mutation {
     // PRD: A18.
     /// Remove a node and everything its removal names.
     RemoveNode {
-        /// What it removes.
+        /// Exactly what the removal takes with it. In a journey, get it from `get_node` with
+        /// `removal` true and clear its `outside_references` in the same patch
+        /// (`set_node_field` on the holder's field, `edit_resource`, or `unsnooze`). In a
+        /// route draft, assemble it from `get_route`.
+        #[schemars(extend("x-sketch" = true))]
         removal: Removal,
     },
     /// Add an explicit edge.
@@ -676,7 +685,10 @@ pub enum Mutation {
     Snooze {
         /// The node.
         node: NodeKey,
-        /// Until a date or a node.
+        /// Until a date or another node is done; no plan date changes. On a container it sets
+        /// the whole subtree aside, still blocking and counting for priority; any transition
+        /// on the container clears it.
+        #[schemars(extend("x-sketch" = true))]
         until: SnoozeTarget,
     },
     // PRD: B6.
@@ -828,7 +840,9 @@ pub enum Mutation {
     /// versions. Its id is never used again. Rejected when the route is not at `revision`; the
     /// commit rechecks the revision and that nothing has started using it.
     DeleteRoute {
-        /// The route.
+        /// The route. Delete the journeys using it in the same patch, or retire the route
+        /// instead.
+        #[schemars(extend("x-sketch" = true))]
         route: RouteId,
         /// The route's revision, as read.
         revision: Revision,

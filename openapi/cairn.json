@@ -6574,7 +6574,8 @@
               },
               "status": {
                 "$ref": "#/components/schemas/JourneyStatus",
-                "description": "The new status."
+                "description": "The new status. Completing or archiving a journey is the person's call.",
+                "x-sketch": true
               }
             },
             "required": [
@@ -6758,7 +6759,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "Replace a node whole, as a kind or answer-type change does.",
+            "description": "Replace a node whole, `requires` included, as a kind or answer-type change does.",
             "properties": {
               "node": {
                 "$ref": "#/components/schemas/Node",
@@ -6785,7 +6786,8 @@
               },
               "removal": {
                 "$ref": "#/components/schemas/Removal",
-                "description": "What it removes."
+                "description": "Exactly what the removal takes with it. In a journey, get it from `get_node` with\n`removal` true and clear its `outside_references` in the same patch\n(`set_node_field` on the holder's field, `edit_resource`, or `unsnooze`). In a\nroute draft, assemble it from `get_route`.",
+                "x-sketch": true
               }
             },
             "required": [
@@ -7407,7 +7409,8 @@
               },
               "until": {
                 "$ref": "#/components/schemas/SnoozeTarget",
-                "description": "Until a date or a node."
+                "description": "Until a date or another node is done; no plan date changes. On a container it sets\nthe whole subtree aside, still blocking and counting for priority; any transition\non the container clears it.",
+                "x-sketch": true
               }
             },
             "required": [
@@ -7821,7 +7824,8 @@
               },
               "route": {
                 "$ref": "#/components/schemas/RouteId",
-                "description": "The route."
+                "description": "The route. Delete the journeys using it in the same patch, or retire the route\ninstead.",
+                "x-sketch": true
               }
             },
             "required": [
@@ -8236,10 +8240,14 @@
             "$ref": "#/components/schemas/AnswerType"
           },
           "auto_done": {
-            "type": "boolean"
+            "description": "A milestone reads `scheduled` until its date, then ready to mark done; with this it is done\nby itself. Marking it done early records when.",
+            "type": "boolean",
+            "x-sketch": true
           },
           "checklist": {
-            "$ref": "#/components/schemas/Checklist"
+            "$ref": "#/components/schemas/Checklist",
+            "description": "Setting it replaces the whole list.",
+            "x-sketch": true
           },
           "choices": {
             "$ref": "#/components/schemas/Choices"
@@ -8248,7 +8256,9 @@
             "type": "boolean"
           },
           "closes_at": {
-            "$ref": "#/components/schemas/NodeKey"
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The milestone that closes the stage: it bounds the group's finish and its contents' due\ndates unless `closes` is false. Consecutive stages share one.",
+            "x-sketch": true
           },
           "description": {
             "anyOf": [
@@ -8268,7 +8278,9 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The latest finish: a deadline only, it never holds work back.",
+            "x-sketch": true
           },
           "estimate": {
             "$ref": "#/components/schemas/Days"
@@ -8283,7 +8295,9 @@
             "type": "boolean"
           },
           "gates": {
-            "type": "boolean"
+            "description": "False lets the contents be done before the opening milestone. A stage holds the work done\nduring it; work that can as well be done ahead goes in a stage with this false; prep that\nmust come first sits outside, due before the opening milestone.",
+            "type": "boolean",
+            "x-sketch": true
           },
           "help": {
             "$ref": "#/components/schemas/Markdown"
@@ -8305,10 +8319,14 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The earliest start: until then the node reads `scheduled` and stays off the next list, yet\ncan be started early. What waits on it is `blocked`, its `waits_on` carrying the date.",
+            "x-sketch": true
           },
           "opens_at": {
-            "$ref": "#/components/schemas/NodeKey"
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The milestone that opens the stage: the contents wait for it unless `gates` is false.",
+            "x-sketch": true
           },
           "parent": {
             "anyOf": [
@@ -8351,10 +8369,14 @@
             "type": "boolean"
           },
           "requires_checklist": {
-            "type": "boolean"
+            "description": "Completing needs every checklist item ticked.",
+            "type": "boolean",
+            "x-sketch": true
           },
           "requires_note": {
-            "type": "boolean"
+            "description": "Completing needs a note on the node itself, not a child's or the journey's.",
+            "type": "boolean",
+            "x-sketch": true
           },
           "resources": {
             "items": {
@@ -8676,10 +8698,14 @@
             "$ref": "#/components/schemas/AnswerType"
           },
           "auto_done": {
-            "type": "boolean"
+            "description": "A milestone reads `scheduled` until its date, then ready to mark done; with this it is done\nby itself. Marking it done early records when.",
+            "type": "boolean",
+            "x-sketch": true
           },
           "checklist": {
-            "$ref": "#/components/schemas/Checklist"
+            "$ref": "#/components/schemas/Checklist",
+            "description": "Setting it replaces the whole list.",
+            "x-sketch": true
           },
           "choices": {
             "$ref": "#/components/schemas/Choices"
@@ -8688,7 +8714,9 @@
             "type": "boolean"
           },
           "closes_at": {
-            "$ref": "#/components/schemas/Path"
+            "$ref": "#/components/schemas/Path",
+            "description": "The milestone that closes the stage: it bounds the group's finish and its contents' due\ndates unless `closes` is false. Consecutive stages share one.",
+            "x-sketch": true
           },
           "description": {
             "anyOf": [
@@ -8708,7 +8736,9 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The latest finish: a deadline only, it never holds work back.",
+            "x-sketch": true
           },
           "estimate": {
             "$ref": "#/components/schemas/Days"
@@ -8723,7 +8753,9 @@
             "type": "boolean"
           },
           "gates": {
-            "type": "boolean"
+            "description": "False lets the contents be done before the opening milestone. A stage holds the work done\nduring it; work that can as well be done ahead goes in a stage with this false; prep that\nmust come first sits outside, due before the opening milestone.",
+            "type": "boolean",
+            "x-sketch": true
           },
           "help": {
             "$ref": "#/components/schemas/Markdown"
@@ -8752,10 +8784,14 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The earliest start: until then the node reads `scheduled` and stays off the next list, yet\ncan be started early. What waits on it is `blocked`, its `waits_on` carrying the date.",
+            "x-sketch": true
           },
           "opens_at": {
-            "$ref": "#/components/schemas/Path"
+            "$ref": "#/components/schemas/Path",
+            "description": "The milestone that opens the stage: the contents wait for it unless `gates` is false.",
+            "x-sketch": true
           },
           "parent": {
             "anyOf": [
@@ -8798,10 +8834,14 @@
             "type": "boolean"
           },
           "requires_checklist": {
-            "type": "boolean"
+            "description": "Completing needs every checklist item ticked.",
+            "type": "boolean",
+            "x-sketch": true
           },
           "requires_note": {
-            "type": "boolean"
+            "description": "Completing needs a note on the node itself, not a child's or the journey's.",
+            "type": "boolean",
+            "x-sketch": true
           },
           "resources": {
             "items": {
@@ -15639,12 +15679,13 @@
           },
           {
             "const": "complete",
-            "description": "To `done` (deliverable, action, milestone).",
-            "type": "string"
+            "description": "To `done` (deliverable, action, milestone). A guard's evidence must exist once the\npatch applies: add the note or ticks in the same patch.",
+            "type": "string",
+            "x-sketch": true
           },
           {
             "additionalProperties": false,
-            "description": "To `done` going ahead anyway: the guards it fails are bypassed, and the engine\nrecords which. Only a deliverable or action has guards to bypass.",
+            "description": "To `done` without the evidence the guards need, recording which; only when the\nperson says to. A deliverable or action only.",
             "properties": {
               "complete_anyway": {
                 "additionalProperties": false,
@@ -15667,7 +15708,8 @@
             "required": [
               "complete_anyway"
             ],
-            "type": "object"
+            "type": "object",
+            "x-sketch": true
           },
           {
             "additionalProperties": false,
@@ -15694,7 +15736,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "A group to `done`, with the reason that requires: it reads done, and the unfinished\nwork inside it reads skipped, as under a skip, until it is reopened.",
+            "description": "A group to `done`, with a reason: it reads done and its unfinished work reads\nskipped, until `reopen`.",
             "properties": {
               "mark_done": {
                 "additionalProperties": false,
@@ -15713,7 +15755,8 @@
             "required": [
               "mark_done"
             ],
-            "type": "object"
+            "type": "object",
+            "x-sketch": true
           },
           {
             "const": "reopen",
