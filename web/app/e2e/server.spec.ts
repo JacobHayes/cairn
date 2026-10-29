@@ -198,7 +198,7 @@ test("a nameless identity of the user is asked for its name; signing in with the
   await open(page, "/identities");
   const identity = await addIdentity(page, fresh("Linked person"), [email]);
   await open(page, "/me");
-  await expect(page.getByTestId("login")).toHaveCount(1);
+  await expect(page.locator('[data-testid="login"][data-provider="stub"]')).toHaveCount(0);
   await expect(page.locator(`[data-testid="your-identity"][data-identity="${identity}"]`)).toHaveCount(0);
   await page.goto("/api/auth/stub/sign-in?return_to=%2Fme");
   await page.getByLabel("Email").fill(email);
