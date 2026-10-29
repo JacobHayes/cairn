@@ -571,6 +571,15 @@ test("A route's Stages list: a row per stage with its days, choosing one selects
   await expect(page.getByTestId("route-node")).toBeVisible();
 });
 
+test("A route's Stages list: choosing a stage scrolls its row into view in the List", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await visit(page, "browser", "/routes/product-launch?version=1&view=list&depth=actions");
+  const stages = page.getByTestId("card-stages");
+  await stages.locator("summary").click();
+  await stages.getByTestId("stage-row").last().click({ position: { x: 4, y: 4 } });
+  await expect(page.locator('[data-testid="route-row"][aria-current="true"]')).toBeInViewport();
+});
+
 test("The Stages list on a phone: choosing a stage from the sheet lowers the sheet and frames the stage above it", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");

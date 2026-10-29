@@ -45,8 +45,8 @@ function StageRow({ stage, lower }: { stage: StageRowData; lower: () => void }) 
   );
 }
 
-/** The folded Stages section; nothing for a graph without stages. `framing`: the view is the graph, where choosing a stage frames it. */
-export function StagesSection({ stages, framing }: { stages: readonly StageRowData[]; framing: boolean }) {
+/** The folded Stages section; nothing for a graph without stages. `note`: a line that says what a row's fact counts. `framing`: the view is the graph, where choosing a stage frames it. */
+export function StagesSection({ stages, framing, note }: { stages: readonly StageRowData[]; framing: boolean; note?: string }) {
   const actions = useFrameActions();
   // Where the stage is framed on a canvas under a sheet, it would be framed in no room at all: the sheet drops to its peek, where a card picked on the canvas opens it too.
   const lower = () => { if (framing) { actions?.snap("peek"); } };
@@ -55,6 +55,7 @@ export function StagesSection({ stages, framing }: { stages: readonly StageRowDa
   }
   return (
     <Section title="Stages" summary={String(stages.length)} testId="card-stages">
+      {note === undefined ? null : <p className="muted small">{note}</p>}
       <ul className="plain-list stage-rows">
         {stages.map((stage) => (
           <StageRow key={stage.key} stage={stage} lower={lower} />

@@ -3,7 +3,7 @@
 // (a route has no state or dates), folded by the ladder with the viewer's own folds, and faded
 // below the depth as the other views fade it. A title selects the node: a draft's opens its form, a version's its read-only panel.
 import type { Schema } from "@cairn/client";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router";
 
 import { ruleFoot } from "../authoring/dates.ts";
@@ -90,12 +90,20 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
   const { tree, level } = useWithRemoved(shown, own, ownLevel, request);
   const rows = useListRows(tree, level, open);
   const containers = useMemo(() => containerKeys(nodes), [nodes]);
+  const list = useRef<HTMLUListElement>(null);
+  // A node chosen elsewhere (the card's Stages, the canvas) has its row brought into view.
+  const drawn = rows !== undefined;
+  useEffect(() => {
+    if (selected !== undefined && drawn) {
+      [...(list.current?.children ?? [])].find((row) => row instanceof HTMLElement && row.dataset["node"] === selected)?.scrollIntoView({ block: "nearest" });
+    }
+  }, [selected, drawn]);
   return (
     <section className="stack list" aria-label="List" data-testid="list">
       <ViewBar subject={routeSubject(nodes)} screen="list" badges={badges} />
       {error === undefined ? null : <p className="callout callout-bad"><Failed what="The list" error={error} /></p>}
       <div className="node-panel list-panel" data-testid="list-panel">
-        <ul className="plain-list route-list route-tree" data-testid="route-list">
+        <ul ref={list} className="plain-list route-list route-tree" data-testid="route-list">
           {(rows ?? []).map(({ node, depth: indent, holds, guides }) => {
             const foot = ruleFoot(node, tree);
             const diff = layer?.model?.marks[node.key];

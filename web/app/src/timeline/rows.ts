@@ -353,9 +353,23 @@ export interface Reach {
 const reachUnion = (left: Reach | undefined, right: Reach | undefined): Reach | undefined =>
   left === undefined ? right : right === undefined ? left : { from: Math.min(left.from, right.from), to: Math.max(left.to, right.to) };
 
-/** A route row's days in words: "Day 7" for a point, "Days 3 to 7" for a stretch. */
+/** A route row's days in words: "Day 7" for a point, "Days 3 to 7" for a stretch; the first day is the start, as the axis names it, never "Day 0". */
 export function routeWords(reach: Reach): string {
-  return reach.from === reach.to ? dayWords(reach.from) : `Days ${String(reach.from)} to ${String(reach.to)}`;
+  const first = reach.from === 0 ? "Start" : null;
+  if (reach.from === reach.to) {
+    return first ?? dayWords(reach.from);
+  }
+  return first === null ? `Days ${String(reach.from)} to ${String(reach.to)}` : `Start to day ${String(reach.to)}`;
+}
+
+/** How a route's siblings are ordered, as the timeline and the Stages list both do: by the earliest day each starts, then finishes (those with no day last), then as the graph lists them. */
+export function byReach(tree: Tree, reachOf: (key: string) => Reach | undefined): (left: string, right: string) => number {
+  const place = new Map(nodesByPath(tree).map((node, at) => [node.key, at]));
+  const last = Number.MAX_SAFE_INTEGER;
+  return (left, right) =>
+    (reachOf(left)?.from ?? last) - (reachOf(right)?.from ?? last) ||
+    (reachOf(left)?.to ?? last) - (reachOf(right)?.to ?? last) ||
+    (place.get(left) ?? last) - (place.get(right) ?? last);
 }
 
 /** The days each node of a route spans: its own earliest start and finish, or for a container the span of what it holds. */
@@ -418,9 +432,8 @@ function routeRowOf(tree: Tree, schedule: RouteSchedule, options: ChartOptions, 
  */
 export function routeChartOf(tree: Tree, schedule: RouteSchedule, options: ChartOptions): Chart {
   const entries = new Map(schedule.entries.map((entry) => [entry.node, entry]));
-  const order = new Map(nodesByPath(tree).map((node, at) => [node.key, at]));
-  const place = (key: string) => order.get(key) ?? Number.MAX_SAFE_INTEGER;
   const reachOf = reachesOf(tree, entries);
+  const byDays = byReach(tree, reachOf);
   const parents = new Map(options.drawn.map((node) => [node.key, node.parent ?? undefined]));
   const dated = (key: string) => reachOf(key) !== undefined;
   const above = (key: string): string | undefined => {
@@ -438,7 +451,7 @@ export function routeChartOf(tree: Tree, schedule: RouteSchedule, options: Chart
     }
   }
   for (const kids of children.values()) {
-    kids.sort((left, right) => (reachOf(left)?.from ?? 0) - (reachOf(right)?.from ?? 0) || (reachOf(left)?.to ?? 0) - (reachOf(right)?.to ?? 0) || place(left) - place(right));
+    kids.sort(byDays);
   }
   const rows: ChartRow[] = [];
   const visit = (key: string, depth: number, guides: boolean[]) => {

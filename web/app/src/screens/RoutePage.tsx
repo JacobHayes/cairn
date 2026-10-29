@@ -11,6 +11,7 @@
 // address says which (routes/address.ts) and the page follows the route live (H6). The shown graph
 // is derived once (route-reads.ts) and every view draws from that derivation. The assistant panel
 // (5.8) talks about the route's draft.
+import type { RouteSchedule } from "@cairn/wasm";
 import "./screens.css";
 
 import type { Schema } from "@cairn/client";
@@ -57,7 +58,7 @@ import { Button } from "../ui/kit.tsx";
 import { KeySheet } from "./KeySheet.tsx";
 import { keyBindingsFor, useViewKeys } from "./keys.ts";
 import { nodesOf, ROUTE_GRAPH, routeGraphKey, type Derived, type Shown } from "./route-reads.ts";
-import { useRouteDerived } from "./route-views.ts";
+import { useRouteDerived, useRouteSchedule } from "./route-views.ts";
 import { RouteList } from "./RouteList.tsx";
 import { useViewStateValue } from "./useViewStateValue.ts";
 import { withViewState } from "../journeys/view.ts";
@@ -77,7 +78,7 @@ interface Result {
 const NONE: ReadonlySet<string> = new Set();
 
 /** The body under the head: the view the address names, over the shown graph as derived. */
-function RouteBody({ derived, screen, selected, edge, unanchored, onPick }: { derived: ReadView<Derived<Shown>>; screen: Screen; selected: string | undefined; edge: string | undefined; unanchored: ReadonlySet<string>; onPick: ((key: string) => boolean) | undefined }) {
+function RouteBody({ derived, schedule, screen, selected, edge, unanchored, onPick }: { derived: ReadView<Derived<Shown>>; schedule: ReadView<RouteSchedule>; screen: Screen; selected: string | undefined; edge: string | undefined; unanchored: ReadonlySet<string>; onPick: ((key: string) => boolean) | undefined }) {
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
   const frame = useFrameActions();
@@ -98,7 +99,7 @@ function RouteBody({ derived, screen, selected, edge, unanchored, onPick }: { de
     case "list":
       return <RouteList shown={shown} state={state} picks={picks} selected={selected} unanchored={unanchored} onOpen={onOpen} />;
     case "timeline":
-      return <RouteTimeline shown={shown} state={state} picks={picks} selected={selected} onOpen={onOpen} />;
+      return <RouteTimeline shown={shown} schedule={schedule} state={state} picks={picks} selected={selected} onOpen={onOpen} />;
     default:
       return <RouteCanvas shown={shown} view={view} selected={selected} edge={edge} unanchored={unanchored} onPick={onPick} />;
   }
@@ -153,6 +154,8 @@ function useScreen() {
 interface FrameProps {
   shown: Shown;
   derived: ReadView<Derived<Shown>>;
+  /** The derived graph's schedule, read once for the timeline and the card's Stages. */
+  schedule: ReadView<RouteSchedule>;
   selected: string | undefined;
   /** The line whose card is open, `<from>~<to>`, when no node is; the canvas draws it in the inspector. */
   edge: string | undefined;
@@ -212,7 +215,7 @@ function useShowUnsaved(unsaved: readonly UnsavedForm[], selected: string | unde
 }
 
 /** A draft: the palette, the cards' forms, and the draft card in the inspector. */
-function DraftFrame({ shown, derived, authored, selected, edge, write, result, setResult, imports }: FrameProps & { authored: Authored }) {
+function DraftFrame({ shown, derived, schedule, authored, selected, edge, write, result, setResult, imports }: FrameProps & { authored: Authored }) {
   const navigate = useNavigate();
   const { search } = useLocation();
   const { screen } = useScreen();
@@ -237,7 +240,7 @@ function DraftFrame({ shown, derived, authored, selected, edge, write, result, s
       void navigate(here(undefined));
     });
   const discard = () => void write.run({ target, baseRevision: shown.route.revision, mutations: [{ op: "discard_draft" }] }, () => { void navigate(here(undefined)); });
-  const card = <DraftCard route={id} violations={violations} notices={notices} hrefOf={hrefOf} write={write} blocked={blocked} unsaved={unsaved} onShow={show} titleOf={titleOf} onPublish={publish} onDiscard={discard} stages={<RouteStages shown={valueOf(derived)} framing={screen === "graph"} />} />;
+  const card = <DraftCard route={id} violations={violations} notices={notices} hrefOf={hrefOf} write={write} blocked={blocked} unsaved={unsaved} onShow={show} titleOf={titleOf} onPublish={publish} onDiscard={discard} stages={<RouteStages shown={valueOf(derived)} schedule={schedule} framing={screen === "graph"} />} />;
   const close = here(undefined);
   // The line's card is the inspector's only while no node is open and no segment is being placed.
   const line = selected === undefined && inserting.at === undefined ? edge : undefined;
@@ -258,7 +261,7 @@ function DraftFrame({ shown, derived, authored, selected, edge, write, result, s
   const body = (
     <>
       {inserting.preview === undefined ? (
-        <RouteBody derived={derived} screen={screen} selected={selected} edge={line} unanchored={unanchored} onPick={drawing.pick} />
+        <RouteBody derived={derived} schedule={schedule} screen={screen} selected={selected} edge={line} unanchored={unanchored} onPick={drawing.pick} />
       ) : (
         <InsertionCanvas preview={inserting.preview} domain={id} />
       )}
@@ -273,7 +276,7 @@ function DraftFrame({ shown, derived, authored, selected, edge, write, result, s
 }
 
 /** A published version: read only, with its card in the inspector, or the open node's read-only panel. */
-function VersionFrame({ shown, derived, selected, edge, write, result, setResult, imports }: FrameProps) {
+function VersionFrame({ shown, derived, schedule, selected, edge, write, result, setResult, imports }: FrameProps) {
   const { screen } = useScreen();
   const id = shown.route.header.id;
   const read = useRouteRead(id);
@@ -286,7 +289,7 @@ function VersionFrame({ shown, derived, selected, edge, write, result, setResult
   // The same address the canvas's background goes to: a bare address stays bare, a named version stays named.
   const close = useNodeAddresses().close();
   useEscapeTo(selected === undefined && edge === undefined ? undefined : close);
-  const card = read === undefined ? null : <VersionCard read={read} version={version} stages={<RouteStages shown={valueOf(derived)} framing={screen === "graph"} />} />;
+  const card = read === undefined ? null : <VersionCard read={read} version={version} stages={<RouteStages shown={valueOf(derived)} schedule={schedule} framing={screen === "graph"} />} />;
   const head = (
     <>
       <RouteHeader route={shown.route} of={shown.of} screen={screen} node={selected} write={write} blocked={undefined} onPublish={undefined} titleOf={draftTitle} imports={imports} />
@@ -295,7 +298,7 @@ function VersionFrame({ shown, derived, selected, edge, write, result, setResult
   );
   const body = (
     <>
-      <RouteBody derived={derived} screen={screen} selected={selected} edge={edge} unanchored={NONE} onPick={undefined} />
+      <RouteBody derived={derived} schedule={schedule} screen={screen} selected={selected} edge={edge} unanchored={NONE} onPick={undefined} />
       {wide || phone || fills || selected !== undefined ? null : card}
     </>
   );
@@ -356,7 +359,8 @@ function LayerFrame({ shown, route, selected, imports, write }: { shown: Shown; 
   useEscapeTo(selected === undefined ? undefined : routePath(id, { screen, proposal: layer?.id }, search));
   const fills = screen === "graph";
   const derived = useRouteDerived(shown);
-  const body = <RouteBody derived={derived} screen={screen} selected={selected} edge={undefined} unanchored={NONE} onPick={undefined} />;
+  const schedule = useRouteSchedule(valueOf(derived));
+  const body = <RouteBody derived={derived} schedule={schedule} screen={screen} selected={selected} edge={undefined} unanchored={NONE} onPick={undefined} />;
   return (
     <div className="ws-fill journey-frame route-frame" data-testid="route-frame" data-screen={screen} data-layer={layer?.mode} data-exit={exit}>
       <div className="ws-head stack journey-head">{head}</div>
@@ -436,6 +440,7 @@ function Loaded({ shown, selected, edge, write, imports, result, setResult }: { 
   const steps = useMemo(() => stepsFor(nodesOf(shown)), [shown.graph]);
   // The shown graph is derived once, and every view draws from that derivation with the graph it was derived from.
   const derived = useRouteDerived(shown);
+  const schedule = useRouteSchedule(valueOf(derived));
   // What a route does not offer (Only mine, an owner, flags, Frontier, not relevant) is not kept.
   const clean = withViewState(search, viewState);
   const dirty = new URLSearchParams(clean).toString() !== params.toString();
@@ -456,7 +461,7 @@ function Loaded({ shown, selected, edge, write, imports, result, setResult }: { 
     unavailable: {},
     viewAddress: (to) => routeSwitched(id, search, to, selected),
   });
-  const frame = { selected, edge, derived, write, result, setResult, imports };
+  const frame = { selected, edge, derived, schedule, write, result, setResult, imports };
   const bindings = useMemo(() => keyBindingsFor(ROUTE_OFFERS, { screen, acts: false }), [screen]);
   usePageKeys(bindings, setSheetOpen);
   const authored = useAuthored(shown);

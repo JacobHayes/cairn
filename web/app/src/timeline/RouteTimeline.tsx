@@ -7,17 +7,17 @@
 // themselves are on the Graph. A node with no earliest day gathers in a folded list, and a row
 // whose date rule waits on a date decision says so. A row's title opens the node's form on a
 // draft, and the node of a version is selected and read.
+import type { RouteSchedule } from "@cairn/wasm";
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
 
 import { titleIn, treeOf } from "../authoring/graph.ts";
 import { useFolds } from "../canvas/hooks.ts";
 
-import { errorWords, valueOf } from "../data/keyed-read.ts";
+import { errorWords, valueOf, type ReadView } from "../data/keyed-read.ts";
 import { useNodeAddresses } from "../journeys/address.ts";
 
 import type { ViewState } from "../journeys/view.ts";
-import { useRouteSchedule } from "../screens/route-views.ts";
 import { nodesOf, type Derived, type Shown } from "../screens/route-reads.ts";
 import { NothingMatches, routeSubject, ViewBar } from "../screens/ViewControls.tsx";
 import { routeSpec } from "./model.ts";
@@ -31,6 +31,8 @@ import { useLayer } from "../proposals/layer.ts";
 
 
 export interface RouteTimelineProps {
+  /** The schedule of the shown graph, read once by the page. */
+  schedule: ReadView<RouteSchedule>;
   shown: Derived<Shown>;
   state: ViewState;
   /** How many times a depth was picked: a pick drops the viewer's folds. */
@@ -40,14 +42,13 @@ export interface RouteTimelineProps {
   onOpen: (key: string) => void;
 }
 
-export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTimelineProps) {
+export function RouteTimeline({ shown, schedule: scheduleRead, state, picks, selected, onOpen }: RouteTimelineProps) {
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
   const nodes = nodesOf(shown);
   const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
   const { step, current, level, error: levelError, dimmed: faded, badges } = useViewLevel({ screen: "timeline", state, nodes, selected, held: shown });
   const layered = useLayer();
-  const scheduleRead = useRouteSchedule(shown);
   const schedule = valueOf(scheduleRead);
   const { open, fold: onFold } = useFolds(nodes, current, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
   const error = levelError ?? errorWords(scheduleRead);
