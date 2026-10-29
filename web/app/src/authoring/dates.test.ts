@@ -43,6 +43,15 @@ describe("date rules (A8)", () => {
   });
 });
 
+describe("a blank offset", () => {
+  it("is no number, not 0, in the parts, in the rule, and after a draft is kept as JSON", () => {
+    const rule = ruleOf({ direction: "before", sources: ["n_kickoff"], offset: Number.NaN });
+    expect(Number.isNaN(partsOf(rule).offset)).toBe(true);
+    expect(Number.isNaN(partsOf(JSON.parse(JSON.stringify(rule)) as typeof rule).offset)).toBe(true);
+    expect(partsOf({ before: "n_kickoff" }).offset).toBe(0);
+  });
+});
+
 describe("stage bounds (F4)", () => {
   it("offers the milestones outside the stage first, and those inside it marked", () => {
     const nodes: GraphNode[] = [

@@ -5,7 +5,7 @@
 // (`useConditionProblem`) joins a node form's, so a form and the proposal editor read one set of
 // problems by field. A check that cannot be made is a `failure` with a way to `retry`; nothing is
 // sendable until the engine has answered.
-import type { NodeFormValues, ValueCheck } from "@cairn/wasm";
+import type { CountLimit, NodeFormValues, ValueCheck } from "@cairn/wasm";
 
 import { DERIVE, type ReadError, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
 import { useKeyedRead, useSession } from "../data/react.ts";
@@ -115,4 +115,9 @@ export function useValueProblems(checks: readonly ValueCheck[]): Checked<Record<
     }
     return problems;
   });
+}
+
+/** The check that `count` things (what the graph or list would hold) are within `limit`; `what` completes "At most N ...". */
+export function countCheck(field: string, limit: CountLimit, what: string, count: number): ValueCheck {
+  return { field, kind: { count: { limit } }, what, value: String(count) };
 }

@@ -53,7 +53,7 @@ export function useEdits(review: ProposalReview, refetch: () => void) {
       refetch();
     }
   };
-  return { write, kept, setKept, editing: invalid.size > 0, setInvalid, reread };
+  return { write, kept, setKept, invalid, editing: invalid.size > 0, setInvalid, reread };
 }
 
 export type Edits = ReturnType<typeof useEdits>;
@@ -64,7 +64,7 @@ export type Edits = ReturnType<typeof useEdits>;
  * applied or discarded, under the same address, with the band to Close it.
  */
 export function reviewing(edits: Edits, review: ProposalReview, preview: ProposalPreview | undefined, drawn: number | undefined): Reviewing {
-  const { write, kept, setKept, editing, setInvalid, reread } = edits;
+  const { write, kept, invalid, setKept, editing, setInvalid, reread } = edits;
   const proposal = review.proposal;
   const id = proposal.id;
   const done = () => {
@@ -74,6 +74,7 @@ export function reviewing(edits: Edits, review: ProposalReview, preview: Proposa
     write,
     kept,
     editing,
+    invalid,
     setInvalid,
     blockers: applyBlockers({ proposal, dirty: kept !== undefined, editing, stale: review.stale != null, preview: drawn === undefined ? undefined : preview }),
     edit: (next) => {

@@ -3,7 +3,7 @@
 // removed), where it sits (A2: moved into another container), who participates
 // by role (A6, A7, E2), its breakdown by hand (B10: children added; a journey's placeholder
 // marked atomic), and its removal with the cascade shown first (A18).
-import { EDGE_COUNT_PER_NODE_MAX, OWNER_KIND } from "@cairn/client";
+import { OWNER_KIND } from "@cairn/client";
 import { useId, useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
@@ -13,7 +13,7 @@ import { Button, Input } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { removalMutations, useRemovalPlan } from "./removal.ts";
 import { useConnecting } from "./connect.tsx";
-import { useValueProblems } from "./form-problems.ts";
+import { countCheck, useValueProblems } from "./form-problems.ts";
 import { canHoldChildren, childrenOf, kindOption, moveTargets, nodesByPath, pathOf, rolesForSlot, titleIn, type GraphNode, type Mutation, type NodeKind } from "./graph.ts";
 import { mintKey, slugOf, uniqueId } from "./keys.ts";
 import { CheckFailed, invalidAttrs, Picker, Problem } from "./parts.tsx";
@@ -51,7 +51,8 @@ export function EdgesEditor({ authored, node }: NodeEditorProps) {
   const connecting = useConnecting();
   const [picked, setPicked] = useState("");
   const requires = node.requires ?? [];
-  const full = edgeCount(authored, node.key) >= EDGE_COUNT_PER_NODE_MAX;
+  const room = useValueProblems([countCheck("count", "edge_count_per_node_max", "explicit edges on a node", edgeCount(authored, node.key) + 1)]);
+  const full = room.problems.count !== undefined;
   const candidates = nodesByPath(authored.tree).filter((each) => each.key !== node.key && !requires.includes(each.key));
   return (
     <div className="stack" data-testid="edges-editor">
@@ -80,7 +81,7 @@ export function EdgesEditor({ authored, node }: NodeEditorProps) {
           </Button>
         )}
       </span>
-      {full ? <span className="author-problem">At most {EDGE_COUNT_PER_NODE_MAX} explicit edges touch one node.</span> : null}
+      {room.problems.count === undefined ? null : <span className="author-problem">{room.problems.count}</span>}
       <Refusal write={write} />
     </div>
   );

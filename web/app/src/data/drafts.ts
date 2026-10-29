@@ -69,16 +69,39 @@ export function draftKeys(prefix: string): string[] {
   return [...kept].sort();
 }
 
+/** Calls `notify` whenever a draft is kept or forgotten; stops when the returned function is called. */
+function watch(notify: () => void): () => void {
+  watchers.add(notify);
+  return () => watchers.delete(notify);
+}
+
 /** The keys, after `prefix`, of the drafts kept under it, read again whenever a draft is kept or forgotten. */
 export function useDraftKeys(prefix: string): string[] {
-  const joined = useSyncExternalStore(
-    (notify) => {
-      watchers.add(notify);
-      return () => watchers.delete(notify);
-    },
-    () => draftKeys(prefix).join("\n"),
-  );
+  const joined = useSyncExternalStore(watch, () => draftKeys(prefix).join("\n"));
   return joined === "" ? [] : joined.split("\n");
+}
+
+/**
+ * The keys, after `prefix`, of the drafts kept under it that `holds` something worth keeping, read
+ * again whenever any draft is written (a draft's contents change while its key stays).
+ */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller's draft shape fixes T
+export function useDraftKeysHolding<T>(prefix: string, holds: (draft: T) => boolean): string[] {
+  // A JSON list, so a key that is empty is still one.
+  const kept = useSyncExternalStore(watch, () => JSON.stringify(draftKeys(prefix).filter((key) => holdsAt(prefix + key, holds))));
+  return JSON.parse(kept) as string[];
+}
+
+/** Whether the draft kept under exactly `key` holds something worth keeping (a single draft, not a family sharing a prefix). */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller's draft shape fixes T
+export function useDraftHolding<T>(key: string, holds: (draft: T) => boolean): boolean {
+  return useSyncExternalStore(watch, () => holdsAt(key, holds));
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller's draft shape fixes T
+function holdsAt<T>(key: string, holds: (draft: T) => boolean): boolean {
+  const draft = readDraft<T>(key);
+  return draft !== undefined && holds(draft);
 }
 
 /** A draft held with the key it was read under. */

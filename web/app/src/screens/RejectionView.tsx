@@ -51,10 +51,10 @@ export function useRecordWords(): (keys: readonly RecordKey[]) => string[] {
 }
 
 /** One rule an invalid change breaks (A15), in words: the engine's message, led by the node's title when it is about one. */
-export function ViolationLine({ violation, titleOf }: { violation: Violation; titleOf?: ((node: string) => string) | undefined }) {
+export function ViolationLine({ violation, titleOf, id }: { violation: Violation; titleOf?: ((node: string) => string) | undefined; id?: string | undefined }) {
   const node = violationNode(violation);
   return (
-    <span className="author-problem" role="alert" data-testid="violation" data-code={violation.code} data-node={node}>
+    <span id={id} className="author-problem" role="alert" data-testid="violation" data-code={violation.code} data-node={node}>
       {node === undefined || titleOf === undefined ? null : <strong>{titleOf(node)}: </strong>}
       {violation.message}
     </span>
@@ -62,8 +62,13 @@ export function ViolationLine({ violation, titleOf }: { violation: Violation; ti
 }
 
 /** Every rule an invalid change breaks (A15), one line each. */
-export function ViolationLines({ violations, titleOf }: { violations: readonly Violation[]; titleOf?: ((node: string) => string) | undefined }) {
-  return violations.map((violation, at) => <ViolationLine key={at} violation={violation} titleOf={titleOf} />);
+export function ViolationLines({ violations, titleOf, idPrefix }: { violations: readonly Violation[]; titleOf?: ((node: string) => string) | undefined; idPrefix?: string | undefined }) {
+  return violations.map((violation, at) => <ViolationLine key={at} violation={violation} titleOf={titleOf} id={violationId(idPrefix, at)} />);
+}
+
+/** The id of the `at`th line of a list whose lines are pointed to from a control (`idPrefix`); none when nothing points to them. */
+export function violationId(idPrefix: string | undefined, at: number): string | undefined {
+  return idPrefix === undefined ? undefined : `${idPrefix}-v${String(at)}`;
 }
 
 /** A refusal's first sentence: the fact in bold, its reason in plain type. */

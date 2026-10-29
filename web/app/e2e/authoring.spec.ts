@@ -9,7 +9,7 @@ import { expect, test } from "./test.ts";
 
 import { importIntoDraft, openRoute, publishDraft, routeMenuItem, savedText, versionSelect } from "./around.ts";
 import { addNode, addRole, formField, newRoute, nodeForm, openEditing, openForm, pickByTitle, routeName, saveForm, section, structure } from "./authoring.ts";
-import { nodeCard, open, openFromCanvas, openJourney, readable } from "./shell.ts";
+import { nodeCard, open, openFromCanvas, openJourney, readable, whenSettled } from "./shell.ts";
 
 /** Opens a draft node's structure from its card. */
 async function openNode(page: Page, key: string): Promise<void> {
@@ -147,4 +147,69 @@ test("A3: Edit is one state entered from the journey menu, with the name editor 
   await open(page, "browser", "/journeys/j_launch?view=graph&edit=on");
   await expect(page.getByTestId("authoring-bar")).toBeVisible();
   await expect(banner).toHaveCount(0);
+});
+
+test("A1a, A15: Publish waits for every form holding input not yet sent, a blank offset is refused rather than read as 0, and a violation at a field is reachable from its control", async ({ page }) => {
+  const route = await newRoute(page, "browser", routeName("Waits"));
+  const first = await addNode(page, "milestone", "Kickoff");
+  const report = await addNode(page, "deliverable", "Report");
+  const publish = page.getByTestId("publish-draft");
+  const held = async (words: RegExp) => {
+    // A held Publish says why when it is pressed; the palette and the panels close under the press, their drafts stay.
+    await publish.click({ force: true });
+    await expect(page.getByText(words).first()).toBeVisible();
+  };
+  // A palette typed in another route whose id only begins with this one's holds nothing here.
+  await page.evaluate((id) => { sessionStorage.setItem(`cairn:draft:add-node:route:${id}-more`, JSON.stringify({ kind: "action", title: "Typed elsewhere", parent: "" })); }, route);
+  await page.getByTestId("add-menu").click();
+  await page.getByTestId("add-menu").click();
+  await expect(publish).not.toHaveAttribute("data-held", /.+/);
+  // The add-node palette's visible labels, and its typed title.
+  await page.getByTestId("add-menu").click();
+  const palette = page.getByTestId("add-node");
+  for (const label of ["Kind", "Title", "Inside"]) {
+    await expect(palette.locator(".label", { hasText: new RegExp(`^${label}$`, "i") })).toBeVisible();
+  }
+  await palette.getByLabel("New node title").fill("Another");
+  await held(/Save or discard your changes to the node being added first/);
+  await page.getByTestId("add-menu").click();
+  await palette.getByLabel("New node title").fill("");
+  // A resource form with input.
+  await nodeCard(page, report).getByTestId("card-open").click();
+  await (await section(page, "author-resources")).getByRole("button", { name: "Add a resource" }).click();
+  await structure(page).getByTestId("resource-form").getByLabel("Resource title").fill("A tip");
+  await held(/Save or discard your changes to a resource of Report first/);
+  await nodeCard(page, report).getByTestId("card-open").click();
+  await structure(page).getByTestId("resource-form").getByRole("button", { name: "Cancel" }).click();
+  // A role form with input.
+  await page.getByTestId("roles-menu").click();
+  const roles = page.getByTestId("roles-and-kinds").getByTestId("roles");
+  await roles.getByRole("button", { name: "Add a role" }).click();
+  await roles.getByTestId("role-form").getByLabel("role label").fill("Lead");
+  await held(/Save or discard your changes to a role first/);
+  await page.getByTestId("roles-menu").click();
+  await roles.getByTestId("role-form").getByRole("button", { name: "Cancel" }).click();
+  await expect(publish).not.toHaveAttribute("data-held", /.+/);
+  // A blank offset is no number: the engine's message shows, and nothing is sent as 0.
+  await nodeCard(page, report).getByTestId("card-open").click();
+  await openForm(page, "dates");
+  await formField(page, "due_by").getByRole("button", { name: "Add a rule" }).click();
+  const offset = formField(page, "due_by").getByLabel("Offset in days");
+  await offset.fill("");
+  await expect(offset).toHaveValue("");
+  await expect(formField(page, "due_by").getByTestId("problem")).toContainText("whole number");
+  await expect(page.getByTestId("node-form-save")).toBeDisabled();
+  await offset.fill("3");
+  await expect(formField(page, "due_by").getByTestId("problem")).toHaveCount(0);
+  // The engine's violation at a field is reachable from the field's control.
+  await nodeCard(page, first).getByTestId("card-open").click();
+  await formField(page, "final").getByRole("checkbox").check();
+  await saveForm(page);
+  await nodeCard(page, await addNode(page, "milestone", "Second")).getByTestId("card-open").click();
+  await formField(page, "final").getByRole("checkbox").check();
+  const violation = formField(page, "final").getByTestId("violation");
+  await expect(violation).toBeVisible();
+  const id = await whenSettled(page, () => violation.getAttribute("id"));
+  expect(id).not.toBeNull();
+  await expect(formField(page, "final").getByRole("checkbox")).toHaveAttribute("aria-describedby", new RegExp(`(^| )${id ?? ""}( |$)`));
 });

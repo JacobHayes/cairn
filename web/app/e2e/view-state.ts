@@ -24,6 +24,10 @@ export async function search(page: Page, text: string): Promise<void> {
   const box = page.getByTestId("toolbar-search");
   await box.fill(text);
   await box.press("Enter");
+  // The engine reads the search before it is applied, so it reaches the address a moment after Enter.
+  if (text.trim() !== "") {
+    await expect(box.page()).toHaveURL((url) => url.searchParams.get("q") === text.trim());
+  }
 }
 
 /** Turns the checkbox inside `check` on or off, once its new state has come back from the address. */

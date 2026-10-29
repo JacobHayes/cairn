@@ -5,6 +5,7 @@
 import type { Page } from "@playwright/test";
 
 import { open, openSheet } from "./shell.ts";
+import { allowHoldingChecks, holdChecks, releaseChecks } from "./held-checks.ts";
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
 
@@ -69,4 +70,21 @@ test("H3: emails are chips taken from the keyboard, refused with a reason, repla
   await expect(detail.getByTestId("identity-emails")).toHaveText("bob@example.org");
   await detail.getByRole("button", { name: "Edit" }).click();
   await expect(detail.getByRole("button", { name: "Remove bob@example.org" })).toBeVisible();
+});
+
+test("H3: what is typed while the engine reads an email is kept, and its answer joins the form as it is then", async ({ page }) => {
+  await allowHoldingChecks(page);
+  await open(page, "browser", "/identities/new");
+  await expect(page.getByTestId("create-identity")).toBeAttached();
+  await openSheet(page);
+  await holdChecks(page);
+  await field(page).fill("ann@example.org");
+  await field(page).press("Enter");
+  // While it is read, the text stays in the box and holds the save, and a name typed meanwhile is not undone by the answer.
+  await expect(field(page)).toHaveValue("ann@example.org");
+  await expect(page.getByRole("button", { name: "Add identity" })).toBeDisabled();
+  await page.getByTestId("create-identity").getByLabel("Name").fill("Ann");
+  await releaseChecks(page);
+  await expect(chips(page)).toHaveText(["ann@example.org"]);
+  await expect(page.getByTestId("create-identity").getByLabel("Name")).toHaveValue("Ann");
 });

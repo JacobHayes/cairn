@@ -243,16 +243,6 @@ describe("a journey that cannot be read", () => {
     await turn();
     expect(deriver.released.map((handle) => handle.journey)).toEqual(ids.slice(0, 2));
   });
-
-  it("shows an address that names no journey as missing, and never watches it", async () => {
-    const { host, session, mount, turn } = await started();
-    mount("not-a-journey");
-    mount("j_one");
-    await turn();
-    expect(viewOf(session, "not-a-journey").status).toBe("missing");
-    expect(host.streams.at(-1)?.watching).toEqual(["deployment", "journey:j_one"]);
-    expect(host.fetches.has("not-a-journey")).toBe(false);
-  });
 });
 
 describe("the first fetch of a journey", () => {

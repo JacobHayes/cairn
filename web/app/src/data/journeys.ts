@@ -10,11 +10,10 @@
 // A derivation is owned by the load that made it (the worker numbers loads): the read that
 // derived a document holds its handle, and the handle is released when the read drops the value,
 // so an owner that was evicted and a successor that replaced it never free each other's.
-import { KEY_PREFIX, type RevisionOf, type Schema } from "@cairn/client";
+import type { RevisionOf, Schema } from "@cairn/client";
 import type { DerivationHandle, DerivationKey, Derived } from "@cairn/wasm";
 import { assign, enqueueActions, setup, type ActorRefFrom, type SnapshotFrom } from "xstate";
 
-import { isKey } from "../authoring/keys.ts";
 import type { Deriver, DomainDocument, Host } from "./host.ts";
 import {
   DERIVE,
@@ -70,9 +69,6 @@ export interface Derivation {
   deployment: number;
   today: string;
 }
-
-/** Whether `id` is what an address must name to be a journey at all: a journey id (the schema's `JourneyId`). */
-const isJourneyId = (id: string): boolean => isKey(KEY_PREFIX.JourneyId, id);
 
 export const journeyOf = (id: string): RevisionOf => ({ domain: { journey: id } });
 
@@ -165,9 +161,6 @@ const idOf = (event: JourneysEvent): string => (event as Extract<JourneysEvent, 
 export const journeyManager = setup({
   types: { context: {} as JourneysContext, events: {} as JourneysEvent, input: {} as JourneysInput },
   actors: { read: keyedRead },
-  guards: {
-    valid: ({ event }) => isJourneyId(idOf(event)),
-  },
   actions: {
     // The journey is shown once more: its read is started on the first mount.
     mount: assign(({ context, event, spawn }) => {
@@ -256,9 +249,9 @@ export const journeyManager = setup({
     running: { after: { [ROLLOVER_CHECK_MS]: { target: "running", reenter: true, actions: "rollover" } } },
   },
   on: {
-    mount: { guard: "valid", actions: ["mount", "greet"] },
+    mount: { actions: ["mount", "greet"] },
     unmount: { actions: "park" },
-    retry: { guard: "valid", actions: "retry" },
+    retry: { actions: "retry" },
     "xstate.snapshot.*": { actions: "relay" },
   },
 });
@@ -267,7 +260,7 @@ export type JourneysRef = ActorRefFrom<typeof journeyManager>;
 export type JourneysSnapshot = SnapshotFrom<typeof journeyManager>;
 
 const LOADING: JourneyView = { status: "loading" };
-const MISSING: JourneyView = { status: "missing" };
+export const MISSING: JourneyView = { status: "missing" };
 const SKEW: JourneyView = { status: "skew" };
 const ready = new WeakMap<JourneyHeld, JourneyView>();
 const failures = new WeakMap<ReadError, JourneyView>();
@@ -306,11 +299,8 @@ function viewOf(snapshot: ReadSnapshot, id: string): JourneyView {
   }
 }
 
-/** What journey `id`'s view shows. A malformed id names no journey, and nothing watches it. */
+/** What journey `id`'s view shows. A malformed id is read like any other and found missing. */
 export function journeyView(snapshot: JourneysSnapshot, id: string): JourneyView {
-  if (!isJourneyId(id)) {
-    return MISSING;
-  }
   const entry = snapshot.context.entries[id];
   return entry === undefined ? LOADING : viewOf(entry.snapshot, id);
 }

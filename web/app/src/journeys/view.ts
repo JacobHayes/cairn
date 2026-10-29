@@ -13,8 +13,6 @@ import { createContext, useContext } from "react";
 import { NO_OWNER } from "../detail/sections.tsx";
 
 import type { ListFlag } from "../acting/address.ts";
-import { TITLE_BYTES_MAX } from "@cairn/client";
-import { overBytes } from "../authoring/limits.ts";
 import { STEPS, type Step } from "../canvas/model.ts";
 import { journeyPath, PROJECTIONS, type Screen } from "./address.ts";
 
@@ -87,11 +85,6 @@ export function stepFrom(params: URLSearchParams): Step | undefined {
   return STEPS.find((each) => each === step && each !== "actions");
 }
 
-/** The search an address names, or none when it is longer than the engine reads one (a title, PRACTICES, Explicit limits). */
-function searchFrom(text: string): string {
-  return overBytes(text.trim(), TITLE_BYTES_MAX, "The search") === undefined ? text : "";
-}
-
 /**
  * The view state in an address's query, less what the subject does not `offer`. `show=` absent
  * draws the conditional class and hides the not-relevant one; present, it lists the classes
@@ -113,7 +106,7 @@ export function viewStateFrom(params: URLSearchParams, offers: ViewOffers = JOUR
       notRelevant: offers.notRelevant && (shown?.includes("notrelevant") ?? DEFAULT_FILTER.notRelevant),
       conditional: shown === undefined ? DEFAULT_FILTER.conditional : shown.includes("conditional"),
     },
-    text: searchFrom(params.get("q") ?? ""),
+    text: params.get("q") ?? "",
   };
 }
 

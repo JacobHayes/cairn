@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { identityLabel } from "./label.ts";
 import { linkable } from "./You.tsx";
-import { aliasesOf, emailProblem, identityOf, mergeMutation, newIdentityKey } from "./model.ts";
+import { aliasesOf, identityOf, mergeMutation, newIdentityKey } from "./model.ts";
 
 describe("identities as sent (E6, H3)", () => {
   it("mints keys the host accepts that differ from one another and carry no name", () => {
@@ -20,19 +20,6 @@ describe("identities as sent (E6, H3)", () => {
   it("holds the emails it is given, none when none", () => {
     expect(identityOf("who_a", " Ann ", [])).toEqual({ key: "who_a", name: "Ann" });
     expect(identityOf("who_a", "Ann", ["ann@example.org"])).toEqual({ key: "who_a", name: "Ann", emails: ["ann@example.org"] });
-  });
-
-  it.each([
-    ["ann@example.org", false],
-    ["a@b", false],
-    ["ann", true],
-    ["@example.org", true],
-    ["ann@", true],
-    ["a@b@c.org", true],
-    ["a b@c.org", true],
-    [`${"x".repeat(250)}@e.org`, true],
-  ])("judges %j a bad email: %s", (email, bad) => {
-    expect(emailProblem(email) !== undefined).toBe(bad);
   });
 });
 

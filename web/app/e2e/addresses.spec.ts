@@ -19,6 +19,9 @@ test("C14: a proposal that is not there links somewhere that is: its journey's o
   await open(page, "browser", "/journeys/j_gone/proposals");
   await expect(page.getByTestId("journey-missing")).toBeVisible();
   await expect(page.getByTestId("proposals-pane")).toHaveCount(0);
+  // An address that is not a journey id at all is a journey that is not there, and is never watched.
+  await open(page, "browser", "/journeys/not-a-journey");
+  await expect(page.getByTestId("journey-missing")).toBeVisible();
   // A path that is gone is no page.
   await open(page, "browser", "/mine");
   await expect(page.getByTestId("no-such-page")).toBeVisible();

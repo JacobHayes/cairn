@@ -198,6 +198,8 @@ function Origin({ proposal }: { proposal: Proposal }) {
   );
 }
 
+const NO_EDITORS: ReadonlySet<string> = new Set();
+
 /** The contexts the item and change lists read, over the proposal as edited. */
 function useContexts(layer: Layer, model: LayerModel) {
   const deployment = useDeployment();
@@ -209,6 +211,7 @@ function useContexts(layer: Layer, model: LayerModel) {
   const placeholder = (model.draft.mutations ?? []).find((mutation) => mutation.op === "add_node")?.node.parent ?? undefined;
   const edit = reviewing?.edit ?? (() => undefined);
   const setInvalid = reviewing?.setInvalid ?? (() => undefined);
+  const invalid = reviewing?.invalid ?? NO_EDITORS;
   return {
     items: { draft: model.draft, edit, names: model.names, roles, kinds, unresolved: model.unresolved, checking: model.checking, conflicts: model.conflicts, editable: model.editable },
     changes: {
@@ -223,6 +226,7 @@ function useContexts(layer: Layer, model: LayerModel) {
       editable: model.editable,
       hasGraph: layer.kind !== "deployment",
       defaultParent: placeholder,
+      invalid,
       setInvalid,
     },
   };

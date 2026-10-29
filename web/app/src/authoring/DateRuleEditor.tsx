@@ -74,15 +74,16 @@ export function DateRuleEditor({ which, value, onChange, tree, node }: DateRuleE
   return (
     <div className="stack" data-testid={`rule-${which}`}>
       <span className="muted small" data-testid="rule-words">
-        {WORDS[which]} {ruleWords(value, label)}
+        {Number.isNaN(parts.offset) ? WORDS[which] : `${WORDS[which]} ${ruleWords(value, label)}`}
       </span>
       <span className="row">
         <Input
           type="number"
           min={0}
           aria-label="Offset in days"
-          value={String(parts.offset)}
-          onChange={(event) => { set({ ...parts, offset: event.target.value === "" ? 0 : Number(event.target.value) }); }}
+          value={Number.isNaN(parts.offset) ? "" : String(parts.offset)}
+          // A blank box is no number, which the engine refuses with its message; it is not read as 0.
+          onChange={(event) => { set({ ...parts, offset: event.target.value === "" ? Number.NaN : Number(event.target.value) }); }}
           style={{ width: "6rem" }}
         />
         <span>days</span>

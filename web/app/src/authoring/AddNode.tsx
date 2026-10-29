@@ -3,18 +3,14 @@
 // unique among its siblings (Keys and references). A new decision asks its title as a
 // yes-or-no question until its form changes the answer type. In a journey it is local (B4).
 // The new node opens in its form once it lands.
-import { NODE_COUNT_MAX } from "@cairn/client";
-import { useId } from "react";
 import { useDraft } from "../data/drafts.ts";
 import { wrapRoots } from "../segments/model.ts";
-import { Button, Input } from "../ui/kit.tsx";
-import { canHoldChildren, childrenOf, kindOption, newNode, nodesByPath, pathOf, type GraphNode, type NodeKind } from "./graph.ts";
-import { useValueProblems } from "./form-problems.ts";
-import { CheckFailed, invalidAttrs, Picker, Problem } from "./parts.tsx";
+import { Button } from "../ui/kit.tsx";
+import { canHoldChildren, childrenOf, newNode, type GraphNode, type NodeKind } from "./graph.ts";
+import { NewNodeFields, useNewNodeCheck } from "./NewNodeFields.tsx";
 import { Refusal } from "./StructureEditors.tsx";
 import { domainOf, type Authored } from "./target.ts";
 import { useAuthorWrite } from "./write.ts";
-import { KINDS } from "../detail/model.ts";
 
 export interface AddNodeProps {
   authored: Authored;
@@ -44,21 +40,12 @@ export function AddNode({ authored, container, onAdded }: AddNodeProps) {
   // The palette's choices are kept across reloads like any unsent form (ARCHITECTURE, Web UI).
   const [kept, setKept] = useDraft<{ kind: NodeKind; title: string; parent: string }>(`add-node:${domainOf(authored)}`);
   const { kind, title, parent } = kept ?? { kind: "deliverable", title: "", parent: container ?? "" };
-  const setKind = (next: NodeKind) => {
-    setKept({ kind: next, title, parent });
-  };
+  const values = { kind, title, parent };
+  const check = useNewNodeCheck(title, authored.tree.byKey.size);
+  const unsendable = write.disabled || !check.ready;
   const setTitle = (next: string) => {
-    setKept({ kind, title: next, parent });
+    setKept({ ...values, title: next });
   };
-  const setParent = (next: string) => {
-    setKept({ kind, title, parent: next });
-  };
-  const containers = nodesByPath(authored.tree).filter((node) => canHoldChildren(node.kind));
-  const full = authored.tree.byKey.size >= NODE_COUNT_MAX;
-  const checks = useValueProblems([{ field: "title", kind: "title", what: "The title", value: title.trim(), optional: true }]);
-  const message = useId();
-  const problem = full ? `A graph holds at most ${String(NODE_COUNT_MAX)} nodes.` : checks.problems.title;
-  const unsendable = write.disabled || title.trim() === "" || !checks.checked || problem !== undefined;
   const added = (node: GraphNode) => (landed: boolean) => {
     if (landed) {
       setTitle("");
@@ -87,11 +74,7 @@ export function AddNode({ authored, container, onAdded }: AddNodeProps) {
   };
   return (
     <form className="stack" data-testid="add-node" onSubmit={(event) => { event.preventDefault(); add(); }}>
-      <Picker aria-label="Kind" value={kind} options={KINDS.map(kindOption)} onChange={(event) => { setKind(event.target.value as NodeKind); }} />
-      <Input aria-label="New node title" placeholder="Title" {...invalidAttrs(message, problem)} value={title} onChange={(event) => { setTitle(event.target.value); }} />
-      {problem === undefined ? null : <Problem id={message}>{problem}</Problem>}
-      <CheckFailed failure={checks.failure} retry={checks.retry} />
-      <Picker aria-label="Inside" value={parent} none="At the top level" options={containers.map((node) => ({ value: node.key, label: `${node.title} (${pathOf(authored.tree, node.key)})` }))} onChange={(event) => { setParent(event.target.value); }} />
+      <NewNodeFields values={values} onChange={setKept} tree={authored.tree} check={check} />
       {second ? (
         <OneRoot root={root} disabled={unsendable} onUnder={() => { addUnder(root); }} onWrap={() => { wrap(root); }} />
       ) : (

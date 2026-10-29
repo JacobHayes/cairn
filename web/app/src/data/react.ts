@@ -1,10 +1,10 @@
 // The data layer as React hooks: every screen reads through these, never the host directly.
 import { streamStatus, type StreamStatus } from "@cairn/client";
 import { useActorRef, useSelector } from "@xstate/react";
-import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type { Capabilities, Deployment, Caller } from "./host.ts";
-import { derivationOf, journeyView, sameDerivation, type Derivation, type JourneyView } from "./journeys.ts";
+import { derivationOf, journeyView, MISSING, sameDerivation, type Derivation, type JourneyView } from "./journeys.ts";
 import { heldValue, keyedRead, readView, type ReadKey, type ReadSnapshot, type ReadSource, type ReadView } from "./keyed-read.ts";
 import { liveSource, type LiveSpec } from "./live.ts";
 import type { SaveEvent } from "./activity.ts";
@@ -28,16 +28,68 @@ export function useSession(): Session {
   return session;
 }
 
+/** What the engine has said of each address that might be a journey id, and the questions it is still asked (one for any number of readers). */
+const shapeAnswers = new Map<string, boolean>();
+const shapeAsked = new Map<string, Promise<boolean>>();
+/** The most addresses remembered: a tab visits a handful, and the answer is one question to the engine again. */
+const SHAPE_COUNT_MAX = 256;
+
+/** Whether `id` is a journey id, as the engine reads it; a check that cannot be made lets the read go ahead and say what failed. */
+function askShape(deriver: Session["deriver"], id: string): Promise<boolean> {
+  let asked = shapeAsked.get(id);
+  if (asked === undefined) {
+    if (shapeAsked.size >= SHAPE_COUNT_MAX) {
+      shapeAsked.clear();
+      shapeAnswers.clear();
+    }
+    asked = deriver.valueProblems([{ field: "id", kind: "journey_id", what: "The id", value: id }]).then(
+      (problems) => problems.length === 0,
+      () => true,
+    );
+    shapeAsked.set(id, asked);
+    void asked.then((shaped) => shapeAnswers.set(id, shaped));
+  }
+  return asked;
+}
+
+/**
+ * Whether `id` is a journey id at all, as the engine reads it: undefined until it has answered.
+ * An address that is not one names no journey, so nothing reads or watches it (a watch of a
+ * malformed id would be refused for the whole stream).
+ */
+export function useIsJourneyId(id: string): boolean | undefined {
+  const { deriver } = useSession();
+  const [, answered] = useState(0);
+  useEffect(() => {
+    let current = true;
+    void askShape(deriver, id).then(() => {
+      if (current) {
+        answered((count) => count + 1);
+      }
+    });
+    return () => {
+      current = false;
+    };
+  }, [deriver, id]);
+  return shapeAnswers.get(id);
+}
+
 /** Journey `id`, derived in the worker and kept current while shown (H6). */
 export function useJourney(id: string): JourneyView {
   const { journeys } = useSession();
+  const shaped = useIsJourneyId(id);
   useEffect(() => {
+    if (shaped !== true) {
+      return undefined;
+    }
     journeys.send({ type: "mount", id });
     return () => {
       journeys.send({ type: "unmount", id });
     };
-  }, [journeys, id]);
-  return useSelector(journeys, (snapshot) => journeyView(snapshot, id));
+  }, [journeys, id, shaped]);
+  const view = useSelector(journeys, (snapshot) => journeyView(snapshot, id));
+  // Until the engine has answered nothing is mounted, so a journey held from before shows and any other is loading.
+  return shaped === false ? MISSING : view;
 }
 
 /** Asks again for a journey that could not be read: its read looks again, and the view follows. */

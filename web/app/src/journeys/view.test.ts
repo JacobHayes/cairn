@@ -48,11 +48,6 @@ describe("the view state in the address", () => {
     expect([read("show=").filter.conditional, read("show=").filter.notRelevant]).toEqual([false, false]);
   });
 
-  it("drops a search longer than the engine reads", () => {
-    expect(read(`q=${"a".repeat(256)}`).text).toHaveLength(256);
-    expect(read(`q=${"a".repeat(257)}`).text).toBe("");
-  });
-
   it("drops the flags the Filter does not offer", () => {
     expect(read("flag=mine,blocked,overdue").filter.flags).toEqual(["overdue"]);
   });

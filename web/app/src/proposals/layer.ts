@@ -33,6 +33,8 @@ export interface Reviewing {
   write: ProposalWrite;
   kept: Kept | undefined;
   editing: boolean;
+  /** The editors holding a value with a problem, or one the engine has not passed yet. */
+  invalid: ReadonlySet<string>;
   setInvalid: (editor: string, held: boolean) => void;
   blockers: Blocker[];
   edit: (next: ProposalDraft) => void;

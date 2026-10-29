@@ -1439,7 +1439,7 @@ button.failed-details {
   color: var(--color-text);
 }
 .chips-reason {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--color-error);
 }
 .chips-reason::before {

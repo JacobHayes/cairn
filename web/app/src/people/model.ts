@@ -3,10 +3,9 @@
 // journey referring to any of the identities at the revision it was checked against, so the host
 // can recheck the set when it commits; reads resolve the merged key through its alias afterwards.
 import type { Schema } from "@cairn/client";
-import { EMAIL_BYTES_MAX, EMAIL_COUNT_PER_IDENTITY_MAX } from "@cairn/client";
 
-import { overBytes } from "../authoring/limits.ts";
-import type { IdentityReferences } from "../data/host.ts";
+import { countCheck } from "../authoring/form-problems.ts";
+import type { Deriver, IdentityReferences } from "../data/host.ts";
 import type { Mutation } from "../data/writes.ts";
 import type { ChipRules } from "../ui/chips.ts";
 import { identityLabel } from "./label.ts";
@@ -21,19 +20,18 @@ export function newIdentityKey(random: (length: number) => Uint8Array = (length)
   return `who_${Array.from(random(16), (byte) => BASE32[byte % 32]).join("")}`;
 }
 
-/** H3: the rules for an email chip: trimmed and lower-cased as the store holds it, shaped local@domain, at most 16 to an identity. */
-export const EMAIL_RULES: ChipRules = {
-  normalize: (email) => email.trim().toLowerCase(),
-  problem: emailProblem,
-  max: EMAIL_COUNT_PER_IDENTITY_MAX,
-  maxProblem: `An identity holds at most ${String(EMAIL_COUNT_PER_IDENTITY_MAX)} emails.`,
-};
-
-/** H3: why `email` (normalized) is not an email address as the schema takes one (local@domain, no spaces), or undefined. */
-export function emailProblem(email: string): string | undefined {
-  const [local, domain, ...more] = email.split("@");
-  const shaped = local !== undefined && local !== "" && domain !== undefined && domain !== "" && more.length === 0 && !/\s/.test(email);
-  return shaped ? overBytes(email, EMAIL_BYTES_MAX, "The email") : `${email} is not an email address: write it as name@example.org.`;
+/** H3: the rules for an email chip: shown as the store holds it (trimmed and lower-cased); the engine says whether it is an email address, within the limit, and not already in the list. */
+export function emailRules(deriver: Pick<Deriver, "valueProblems">): ChipRules {
+  return {
+    normalize: (email) => email.trim().toLowerCase(),
+    problem: async (email, held) => {
+      const [problem] = await deriver.valueProblems([
+        { field: "email", kind: "email", what: `"${email}"`, value: email, taken: [...held] },
+        countCheck("count", "email_count_per_identity_max", "emails in an identity", held.length + 1),
+      ]);
+      return problem?.message;
+    },
+  };
 }
 
 /** E6, H3: an identity as it should be: its name trimmed (none when blank) and its emails (already normalized chips) as the list it holds. */

@@ -11,11 +11,11 @@ use crate::collections::{
     EdgeCountPerNode, OneOrMany,
 };
 use crate::field::NodeField;
-use crate::id::{RouteId, Slug};
+use crate::id::{JourneyId, RouteId, Slug};
 use crate::limits::Limit;
 use crate::node::{Checklist, ChecklistItem, Choice, Choices};
 use crate::number::{Days, NumberError, Weight};
-use crate::text::{Markdown, Title, Url};
+use crate::text::{Email, Markdown, Title, Url};
 
 /// A choice as the form holds it: a bare id, or an id with a label.
 #[derive(Clone, Debug, Deserialize)]
@@ -189,6 +189,17 @@ pub enum ValueKind {
     Markdown,
     /// A link's target ([`Url`]).
     Url,
+    /// An email address ([`Email`]); equal addresses compare as the store holds them
+    /// (trimmed, lower-cased).
+    Email,
+    /// A journey's id ([`JourneyId`]).
+    JourneyId,
+    /// How many of something a graph, node or list would hold, as a whole number in `value`,
+    /// against `limit`: "At most 32 roles."
+    Count {
+        /// The limit the count is held to.
+        limit: Limit,
+    },
 }
 
 /// One value of a form that is not a node's: what it is read as and what the form calls it.
@@ -206,6 +217,10 @@ pub struct ValueCheck {
     /// Whether a blank value is left out rather than refused.
     #[serde(default)]
     pub optional: bool,
+    /// Values the value must not equal: its siblings' (an id is unique among them). Compared
+    /// as the kind reads them. Empty for a value that has no siblings.
+    #[serde(default)]
+    pub taken: Vec<String>,
 }
 
 /// Why one value of a form cannot be sent.
@@ -230,16 +245,43 @@ pub fn value_problems(checks: &[ValueCheck]) -> Vec<ValueProblem> {
             let message = match check.kind {
                 ValueKind::Id => value.parse::<Slug>().err().map(|e| e.words(what)),
                 ValueKind::RouteId => value.parse::<RouteId>().err().map(|e| e.words(what)),
+                ValueKind::JourneyId => value.parse::<JourneyId>().err().map(|e| e.words(what)),
                 ValueKind::Title => value.parse::<Title>().err().map(|e| e.words(what)),
                 ValueKind::Markdown => value.parse::<Markdown>().err().map(|e| e.words(what)),
                 ValueKind::Url => value.parse::<Url>().err().map(|e| e.words(what)),
-            };
+                ValueKind::Email => value.parse::<Email>().err().map(|e| e.words(what)),
+                ValueKind::Count { limit } => count_problem(value, limit, what),
+            }
+            .or_else(|| taken_problem(check));
             message.map(|message| ValueProblem {
                 field: check.field.clone(),
                 message,
             })
         })
         .collect()
+}
+
+/// A count past its limit, in words that say what was counted (`what` follows "At most 32").
+fn count_problem(value: &str, limit: Limit, what: &str) -> Option<String> {
+    let count = value.trim().parse::<usize>().ok()?;
+    limit
+        .check(count)
+        .err()
+        .map(|_| format!("At most {} {what}.", limit.max()))
+}
+
+/// A value that equals one of its siblings, read as its kind reads it.
+fn taken_problem(check: &ValueCheck) -> Option<String> {
+    let normal = |text: &str| match check.kind {
+        ValueKind::Email => text.trim().to_lowercase(),
+        _ => text.trim().to_owned(),
+    };
+    let value = normal(&check.value);
+    check
+        .taken
+        .iter()
+        .any(|other| normal(other) == value)
+        .then(|| format!("{} is already in use: pick another.", check.what))
 }
 
 /// A date rule that measures from nothing, from too many sources, or by an offset out of range.
@@ -471,6 +513,12 @@ mod tests {
             ("markdown", &long_body, false),
             ("url", "https://example.org", true),
             ("url", "no scheme", false),
+            ("email", " Ann@Example.org ", true),
+            ("email", "no-at-sign", false),
+            ("email", "a b@example.org", false),
+            ("journey_id", "j_abc123", true),
+            ("journey_id", "n_abc123", false),
+            ("journey_id", "j_", false),
         ];
         for (kind, value, ok) in cases {
             let failed = value_fields(&check(kind, value, false));
@@ -482,6 +530,38 @@ mod tests {
             Vec::<String>::new()
         );
         assert_eq!(value_fields(&check("title", "  ", false)), ["f"]);
+    }
+
+    #[test]
+    fn a_value_equal_to_a_sibling_is_taken_as_its_kind_reads_it() {
+        let taken = |kind: &str, value: &str| {
+            let checks = serde_json::json!([{
+                "field": "f", "kind": kind, "what": "An id", "value": value,
+                "taken": ["a", "Ann@Example.org"],
+            }]);
+            value_fields(&checks.to_string())
+        };
+        assert_eq!(taken("id", "a"), ["f"]);
+        assert_eq!(taken("id", "b"), Vec::<String>::new());
+        assert_eq!(taken("email", "ann@example.org"), ["f"]);
+        assert_eq!(taken("email", "bob@example.org"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_count_fails_one_past_its_limit_naming_what_it_counts() {
+        let count = |value: u32| {
+            let checks = serde_json::json!([{
+                "field": "f", "kind": {"count": {"limit": "role_count_max"}},
+                "what": "roles", "value": value.to_string(),
+            }]);
+            let checks: Vec<ValueCheck> = serde_json::from_value(checks).unwrap();
+            value_problems(&checks)
+                .into_iter()
+                .map(|problem| problem.message)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(count(32), Vec::<String>::new());
+        assert_eq!(count(33), ["At most 32 roles."]);
     }
 
     #[test]

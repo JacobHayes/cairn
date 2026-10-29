@@ -12,14 +12,13 @@
 // in its title or, inside the Filter, under it. State shows as a fixed-size badge on the control,
 // with the words in its tooltip, so no control changes width; a Filter off its stock settings is
 // pressed.
-import { TITLE_BYTES_MAX } from "@cairn/client";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
 import { Check, Counted, FlagChecks } from "../acting/Controls.tsx";
-import { overBytes } from "../authoring/limits.ts";
 import { STEP_WORDS, stepOf, stepsFor } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
+import { useSession } from "../data/react.ts";
 import type { GraphNode, Ready } from "../detail/model.ts";
 import { identityName } from "../detail/sections.tsx";
 import type { Screen } from "../journeys/address.ts";
@@ -233,22 +232,35 @@ function Search({ onDone }: { onDone?: () => void }) {
 
 function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) => void }) {
   const [typed, setTyped] = useState(text);
+  const { deriver } = useSession();
+  // The engine's answer applies only if nothing was typed since, and the screen is still here; it joins the view as it is by then.
+  const turn = useRef(0);
+  const latest = useRef(onSearch);
+  latest.current = onSearch;
+  useEffect(() => () => { turn.current += 1; }, []);
   return (
     <form
       className="toolbar-search"
       role="search"
       onSubmit={(event) => {
         event.preventDefault();
-        // The engine reads the search as a title (PRACTICES, Explicit limits): a longer one never leaves the box.
-        const problem = overBytes(typed.trim(), TITLE_BYTES_MAX, "The search");
+        // The engine reads the search as a title: one it refuses never leaves the box, and is said where it is typed.
         const input = event.currentTarget.elements.namedItem("q");
-        if (input instanceof HTMLInputElement) {
-          input.setCustomValidity(problem ?? "");
-          input.reportValidity();
-        }
-        if (problem === undefined) {
-          onSearch(typed.trim());
-        }
+        const search = typed.trim();
+        turn.current += 1;
+        const mine = turn.current;
+        void deriver.valueProblems([{ field: "q", kind: "title", what: "The search", value: search, optional: true }]).then(([problem]) => {
+          if (mine !== turn.current) {
+            return;
+          }
+          if (input instanceof HTMLInputElement) {
+            input.setCustomValidity(problem?.message ?? "");
+            input.reportValidity();
+          }
+          if (problem === undefined) {
+            latest.current(search);
+          }
+        });
       }}
     >
       <Tip tip="Search titles, descriptions, notes and resources, then Enter" keys="/">
@@ -262,6 +274,7 @@ function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) 
           value={typed}
           onChange={(event) => {
             event.target.setCustomValidity("");
+            turn.current += 1;
             setTyped(event.target.value);
             // Emptying the box (its own clear button too) takes an applied search off at once: no filter stays on unseen.
             if (event.target.value === "" && text !== "") {

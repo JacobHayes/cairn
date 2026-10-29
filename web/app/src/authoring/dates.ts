@@ -39,7 +39,9 @@ export function sourceOptions(tree: Tree, node: string | undefined, which: "due_
 export function partsOf(rule: DateRule): RuleParts {
   const direction: Direction = rule.before === undefined ? "after" : "before";
   const raw = rule.before ?? rule.after ?? [];
-  return { direction, sources: Array.isArray(raw) ? [...raw] : [raw], offset: rule.offset ?? 0 };
+  // A blank offset box is NaN, which a kept draft holds as null: still no number, not 0.
+  const offset = rule.offset as number | null | undefined;
+  return { direction, sources: Array.isArray(raw) ? [...raw] : [raw], offset: offset === null ? Number.NaN : (offset ?? 0) };
 }
 
 /** The rule its parts make: one source written bare, several as a list. */

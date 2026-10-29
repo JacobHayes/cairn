@@ -211,3 +211,34 @@ test("C14: on a desktop and then a phone the layer opens the graph on its first 
   await firstChangeFramed(page, layered, { width: 1440, height: 768 });
   await firstChangeFramed(page, layered, { width: 390, height: 844 });
 });
+
+test("C14, A1a: a node a reviewer adds to a proposal is checked as it is typed, and its editor keeps an edit until the engine has passed it", async ({ page }) => {
+  await draftUpgrade(page);
+  const changes = page.getByTestId("all-changes");
+  if ((await whenSettled(page, () => changes.getAttribute("open"))) === null) {
+    await changes.locator("summary").first().click();
+  }
+  const adder = page.getByTestId("proposal-add-node");
+  const add = adder.getByRole("button", { name: "Add a node" });
+  // Labels are visible, and a title past the limit says so at the box and holds the button.
+  for (const label of ["Kind", "Title", "Inside"]) {
+    await expect(adder.locator(".label", { hasText: new RegExp(`^${label}$`, "i") })).toBeVisible();
+  }
+  await adder.getByLabel("New node title").fill("t".repeat(300));
+  await expect(adder.getByTestId("problem")).toContainText("256");
+  await expect(adder.getByLabel("New node title")).toHaveAttribute("aria-invalid", "true");
+  await expect(add).toBeDisabled();
+  await adder.getByLabel("New node title").fill("Extra step");
+  await expect(adder.getByTestId("problem")).toHaveCount(0);
+  await add.click();
+  // Its editor: Done waits while the title is refused, and keeps the title once it is fine.
+  const added = page.locator('[data-testid="change"][data-op="add_node"]').first();
+  await expect(added).toContainText("Extra step");
+  await added.getByRole("button", { name: "Edit" }).click();
+  const title = added.getByTestId("added-node-form").getByLabel("Title", { exact: true });
+  await title.fill("x".repeat(300));
+  await expect(added.getByRole("button", { name: "Done" })).toBeDisabled();
+  await title.fill("Renamed step");
+  await added.getByRole("button", { name: "Done" }).click();
+  await expect(page.locator('[data-testid="change"][data-op="add_node"]', { hasText: "Renamed step" })).toBeVisible();
+});

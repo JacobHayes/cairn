@@ -9,6 +9,7 @@
 // every view, Fade moves nothing, and the walk through at Decisions is the decision walkthrough.
 import { type Locator, type Page } from "@playwright/test";
 
+import { allowHoldingChecks, holdChecks, releaseChecks } from "./held-checks.ts";
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
 
@@ -633,4 +634,29 @@ test("C13: a pan does not come back when the range is chosen away and back", asy
   await page.getByTestId("timeline-range").getByText("Month", { exact: true }).click();
   await page.getByTestId("timeline-range").getByText("Fit", { exact: true }).click();
   await expect(page.getByTestId("timeline-reset")).toHaveCount(0);
+});
+
+test("C9: a search the engine refuses is said at the box and not applied; one it reads is applied", async ({ page }) => {
+  await openJourney(page, "browser", "j_launch", "?view=graph");
+  const box = page.getByTestId("toolbar-search");
+  await box.fill("s".repeat(300));
+  await box.press("Enter");
+  await expect.poll(() => box.evaluate((input: HTMLInputElement) => input.validationMessage)).toContain("256");
+  expect(new URL(page.url()).searchParams.has("q")).toBe(false);
+  await search(page, "kickoff");
+  expect(new URL(page.url()).searchParams.get("q")).toBe("kickoff");
+});
+
+test("C9: a search the engine is still reading is dropped when the box is cleared meanwhile", async ({ page }) => {
+  await allowHoldingChecks(page);
+  await openJourney(page, "browser", "j_launch", "?view=graph");
+  await holdChecks(page);
+  const box = page.getByTestId("toolbar-search");
+  await box.fill("kickoff");
+  await box.press("Enter");
+  await box.fill("");
+  await releaseChecks(page);
+  await settled(page);
+  expect(new URL(page.url()).searchParams.has("q")).toBe(false);
+  await expect(box).toHaveValue("");
 });

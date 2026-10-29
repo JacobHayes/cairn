@@ -11,7 +11,8 @@ import { removalMutations, useRemovalPlan } from "../authoring/removal.ts";
 import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
 import { draftOf, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
 import { useDraftProblems } from "../authoring/form-problems.ts";
-import { canHoldChildren, kindOption, moveTargets, newNode, nodesByPath, nodesFor, pathOf, rolesForFill, type GraphNode, type Mutation, type NodeField, type NodeKind, type ReferenceField, type Role, type Tree } from "../authoring/graph.ts";
+import { NewNodeFields, useNewNodeCheck } from "../authoring/NewNodeFields.tsx";
+import { moveTargets, newNode, nodesByPath, nodesFor, pathOf, rolesForFill, type GraphNode, type Mutation, type NodeField, type NodeKind, type ReferenceField, type Role, type Tree } from "../authoring/graph.ts";
 import { BasicsFields, ChecklistEditor, type NewItem, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
 import { CheckFailed, FieldBox, Picker } from "../authoring/parts.tsx";
 import type { Deployment } from "../data/host.ts";
@@ -24,7 +25,6 @@ import { NODE_FIELDS } from "@cairn/client";
 import { Button, Input, PickBox } from "../ui/kit.tsx";
 import { carryIds, withFieldValue, withMutation, withMutationsAdded, withoutMutation, type ProposalDraft } from "./model.ts";
 import { mutationWords, type Names } from "./words.ts";
-import { KINDS } from "../detail/model.ts";
 
 /** What the change editors read and change. */
 export interface ChangesContext {
@@ -43,6 +43,8 @@ export interface ChangesContext {
   hasGraph: boolean;
   /** Where a new node goes unless another is picked (a breakdown's placeholder). */
   defaultParent: string | undefined;
+  /** The editors holding a value with a problem, or one the engine has not passed yet. */
+  invalid: ReadonlySet<string>;
   /** Tells the review an editor holds a value with a problem (or no longer does), so nothing is saved or applied meanwhile. */
   setInvalid: (editor: string, invalid: boolean) => void;
 }
@@ -268,13 +270,15 @@ function editable(mutation: Mutation, context: ChangesContext): boolean {
 
 function MutationRow({ index, editor, mutation, context }: { index: number; editor: string; mutation: Mutation; context: ChangesContext }) {
   const [open, setOpen] = useState(false);
+  // The editor holds an edit the engine has not passed yet (or a value it refused): closing would drop it, so Done waits.
+  const holding = context.invalid.has(editor);
   const node = subjectOf(mutation);
   return (
     <li className="stack proposal-change" data-testid="change" data-op={mutation.op} data-node={node}>
       <span className="row">
         <span data-testid="change-words">{mutationWords(mutation, context.names)}</span>
         {context.editable && editable(mutation, context) ? (
-          <Button onClick={() => { setOpen(!open); }} aria-expanded={open}>
+          <Button disabled={open && holding} onClick={() => { setOpen(!open); }} aria-expanded={open}>
             {open ? "Done" : "Edit"}
           </Button>
         ) : null}
@@ -292,20 +296,26 @@ function AddNode({ context }: { context: ChangesContext }) {
   const [kind, setKind] = useState<NodeKind>("action");
   const [title, setTitle] = useState("");
   const [parent, setParent] = useState(context.defaultParent ?? lastParent ?? "");
-  const containers = nodesByPath(context.tree).filter((node) => canHoldChildren(node.kind));
+  const check = useNewNodeCheck(title, context.tree.byKey.size);
+  const unsendable = !check.ready;
+  // A node typed here and not yet added is left out of the proposal: Apply waits for it to be added or cleared.
+  useInvalid(context, "add-node", title.trim() !== "");
   const add = () => {
+    if (unsendable) {
+      return;
+    }
     const node = newNode(context.tree, kind, title, parent === "" ? undefined : parent, pending);
     context.edit(withMutationsAdded(context.draft, [{ op: "add_node", node }]));
     setTitle("");
   };
   return (
-    <form className="row" data-testid="proposal-add-node" onSubmit={(event) => { event.preventDefault(); add(); }}>
-      <Picker aria-label="Kind" value={kind} options={KINDS.map(kindOption)} onChange={(event) => { setKind(event.target.value as NodeKind); }} />
-      <Input aria-label="New node title" placeholder="Title" value={title} onChange={(event) => { setTitle(event.target.value); }} />
-      <Picker aria-label="Inside" value={parent} none="At the top level" options={containers.map((node) => ({ value: node.key, label: `${node.title} (${pathOf(context.tree, node.key)})` }))} onChange={(event) => { setParent(event.target.value); }} />
-      <Button type="submit" disabled={title.trim() === ""}>
-        Add a node
-      </Button>
+    <form className="stack" data-testid="proposal-add-node" onSubmit={(event) => { event.preventDefault(); add(); }}>
+      <NewNodeFields values={{ kind, title, parent }} onChange={(next) => { setKind(next.kind); setTitle(next.title); setParent(next.parent); }} tree={context.tree} check={check} />
+      <span>
+        <Button type="submit" disabled={unsendable}>
+          Add a node
+        </Button>
+      </span>
     </form>
   );
 }

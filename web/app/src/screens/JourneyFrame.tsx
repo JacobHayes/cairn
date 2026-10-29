@@ -16,7 +16,7 @@ import { domainOf, journeyAuthored } from "../authoring/target.ts";
 import { stepsFor } from "../canvas/ladder.ts";
 import { useSelection, type Selection } from "../canvas/selection.ts";
 import { graphViewFrom, type GraphView } from "../canvas/settings.ts";
-import { useJourney } from "../data/react.ts";
+import { useIsJourneyId, useJourney } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { SelectionPanel } from "../detail/SelectionPanel.tsx";
@@ -68,7 +68,7 @@ export function JourneyGate({ id, children }: { id: string; children: (ready: Re
     case "loading":
       return <p className="muted small">Deriving the journey...</p>;
     case "missing":
-      return <p className="callout" data-testid="journey-missing">This journey does not exist. <Link to={indexPath()}>All journeys</Link></p>;
+      return <JourneyMissing />;
     case "failed":
       return <p className="callout callout-bad"><Failed what="The journey" error={journey.message} /></p>;
     case "skew":
@@ -76,6 +76,10 @@ export function JourneyGate({ id, children }: { id: string; children: (ready: Re
     case "ready":
       return children(journey);
   }
+}
+
+function JourneyMissing() {
+  return <p className="callout" data-testid="journey-missing">This journey does not exist. <Link to={indexPath()}>All journeys</Link></p>;
 }
 
 /** Back from a node opened off the pass to the pass rail, which the cards put in the inspector's place. */
@@ -258,6 +262,11 @@ function NothingToDraw({ selected }: { selected: string | undefined }) {
 
 /** A journey's page, and its open proposals in the inspector's Proposals tab (C14), also while it is read or before a proposal creates it. */
 export function JourneyFrame({ id, screen, selected, edge, proposal }: FrameProps) {
+  // An address that is not a journey id names nothing to read or to watch: no part of the page asks for it.
+  const shaped = useIsJourneyId(id);
+  if (shaped !== true) {
+    return shaped === false ? <JourneyMissing /> : null;
+  }
   return (
     <>
       {proposal === undefined ? (

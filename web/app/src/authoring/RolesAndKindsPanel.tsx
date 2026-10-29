@@ -4,7 +4,8 @@
 // a kind shows its cascade first (A18): every participation, filling decision, default owner,
 // and message draft placeholder naming it is rewritten in the same patch. Limits are checked
 // before sending.
-import { KIND_COUNT_MAX, OWNER_KIND, ROLE_COUNT_MAX } from "@cairn/client";
+import { OWNER_KIND } from "@cairn/client";
+import type { CountLimit } from "@cairn/wasm";
 import { useId, useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
@@ -12,9 +13,9 @@ import { Button, Input } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { useRemovalPlan } from "./removal.ts";
 import { rolesForSlot, type Kind, type Mutation, type Role } from "./graph.ts";
-import { useValueProblems } from "./form-problems.ts";
+import { countCheck, useValueProblems } from "./form-problems.ts";
 import { mintKey, slugOf, uniqueId } from "./keys.ts";
-import { CheckFailed, invalidAttrs, Picker, Problem } from "./parts.tsx";
+import { CheckFailed, invalidAttrs, Labelled, Picker, Problem } from "./parts.tsx";
 import { Refusal } from "./StructureEditors.tsx";
 import { domainOf, named, type Authored } from "./target.ts";
 import { useAuthorWrite, type AuthorWrite } from "./write.ts";
@@ -26,7 +27,9 @@ interface SlotKind {
   /** "role" or "kind", for test ids and words. */
   name: "role" | "kind";
   words: string;
-  max: number;
+  /** The limit on how many a graph holds, and what they are called in its message. */
+  limit: CountLimit;
+  plural: string;
   add: (slot: Slot) => Mutation;
   edit: (slot: Slot) => Mutation;
   remove: (key: string) => Mutation;
@@ -36,7 +39,8 @@ interface SlotKind {
 const ROLES: SlotKind = {
   name: "role",
   words: "role",
-  max: ROLE_COUNT_MAX,
+  limit: "role_count_max",
+  plural: "roles",
   add: (role) => ({ op: "add_role", role }),
   edit: (role) => ({ op: "edit_role", role }),
   remove: (role) => ({ op: "remove_role", role }),
@@ -46,34 +50,31 @@ const ROLES: SlotKind = {
 const KINDS: SlotKind = {
   name: "kind",
   words: "participation kind",
-  max: KIND_COUNT_MAX,
+  limit: "kind_count_max",
+  plural: "participation kinds",
   add: (kind) => ({ op: "add_participation_kind", kind: kind }),
   edit: (kind) => ({ op: "edit_participation_kind", kind: kind }),
   remove: (kind) => ({ op: "remove_participation_kind", kind }),
   prefix: "k_",
 };
 
-/** Why a slot cannot be sent that the graph decides, not the value: its id is another's, or (new) the count limit. The engine reads the id and the label themselves. */
-function slotProblem(slot: Slot, taken: ReadonlySet<string>, kind: SlotKind, count: number): string | undefined {
-  if (taken.has(slot.id)) {
-    return `Another ${kind.words} has this id.`;
-  }
-  if (count > kind.max) {
-    return `At most ${String(kind.max)} of these.`;
-  }
-  return undefined;
-}
-
 /** A role or kind being edited, kept across reloads, with the revision its author opened it at (H5). */
-interface Editing {
+export interface Editing {
   slot: Slot;
   base: number;
+  /** The slot as it opened: what is unsent is what differs from it. */
+  opened: Slot;
+}
+
+/** Whether an open role or kind form holds input that Publish would leave out: it differs from how it opened. */
+export function slotUnsent(editing: Editing): boolean {
+  return JSON.stringify(editing.slot) !== JSON.stringify(editing.opened);
 }
 
 function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editing: Editing; setEditing: (next: Editing | undefined) => void; kind: SlotKind; slots: readonly Slot[]; write: AuthorWrite; revision: number }) {
-  const { slot, base } = editing;
+  const { slot, base, opened } = editing;
   const setSlot = (next: Slot) => {
-    setEditing({ slot: next, base });
+    setEditing({ slot: next, base, opened });
   };
   const onClose = () => {
     setEditing(undefined);
@@ -81,16 +82,17 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
   const isNew = !slots.some((each) => each.key === slot.key);
   const taken = new Set(slots.filter((each) => each.key !== slot.key).map((each) => each.id));
   const checks = useValueProblems([
-    { field: "id", kind: "id", what: "An id", value: slot.id },
+    { field: "id", kind: "id", what: "An id", value: slot.id, taken: [...taken] },
     { field: "label", kind: "title", what: "The label", value: slot.title ?? "", optional: true },
+    ...(isNew ? [countCheck("count", kind.limit, kind.plural, slots.length + 1)] : []),
   ]);
-  const idProblem = checks.problems.id ?? slotProblem(slot, taken, kind, slots.length + (isNew ? 1 : 0));
+  const idProblem = checks.problems.id ?? checks.problems.count;
   const labelProblem = checks.problems.label;
   const [idMessage, labelMessage] = [useId(), useId()];
   const sendable = checks.checked && idProblem === undefined && labelProblem === undefined;
   const save = (from = base) => {
     if (from !== base) {
-      setEditing({ slot, base: from });
+      setEditing({ slot, base: from, opened });
     }
     // A label left blank is none: the engine reads a label as a title, which is never blank.
     const { title, ...unlabelled } = slot;
@@ -104,8 +106,8 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
   return (
     <span className="stack" data-testid={`${kind.name}-form`}>
       <span className="row">
-        <Input aria-label={`${kind.words} label`} placeholder="Label" {...invalidAttrs(labelMessage, labelProblem)} value={slot.title ?? ""} onChange={(event) => { setSlot({ ...slot, title: event.target.value, ...(isNew ? { id: uniqueId(slugOf(event.target.value, kind.name), taken) } : {}) }); }} />
-        <Input aria-label={`${kind.words} id`} {...invalidAttrs(idMessage, idProblem)} value={slot.id} onChange={(event) => { setSlot({ ...slot, id: event.target.value }); }} />
+        <Labelled label="Label (optional)"><Input aria-label={`${kind.words} label`} placeholder="Label" {...invalidAttrs(labelMessage, labelProblem)} value={slot.title ?? ""} onChange={(event) => { setSlot({ ...slot, title: event.target.value, ...(isNew ? { id: uniqueId(slugOf(event.target.value, kind.name), taken) } : {}) }); }} /></Labelled>
+        <Labelled label="Id"><Input aria-label={`${kind.words} id`} {...invalidAttrs(idMessage, idProblem)} value={slot.id} onChange={(event) => { setSlot({ ...slot, id: event.target.value }); }} /></Labelled>
         <label className="row">
           <input type="checkbox" checked={slot.multi ?? false} onChange={(event) => { setSlot({ ...slot, multi: event.target.checked }); }} />
           Several at once
@@ -127,6 +129,7 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
 
 function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKind; slots: readonly Slot[] }) {
   const write = useAuthorWrite(authored, `slots:${kind.name}`);
+  const room = useValueProblems([countCheck("count", kind.limit, kind.plural, slots.length + 1)]);
   const [editing, setEditing] = useDraft<Editing>(`slot-form:${domainOf(authored)}:${kind.name}`);
   const [removing, setRemoving] = useState<Slot | undefined>(undefined);
   const plan = useRemovalPlan(authored.graph, authored.tree, removing === undefined ? undefined : kind.name === "role" ? { role: removing.key } : { kind: removing.key });
@@ -137,7 +140,7 @@ function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKin
           <li key={slot.key} className="row" data-testid={kind.name} data-key={slot.key}>
             <strong>{named(slot)}</strong> <span className="muted mono">{slot.id}</span>
             {slot.multi === true ? <span className="badge">several</span> : <span className="badge">one</span>}
-            <Button onClick={() => { setEditing({ slot, base: authored.revision }); }}>Edit</Button>
+            <Button onClick={() => { setEditing({ slot, base: authored.revision, opened: slot }); }}>Edit</Button>
             <Button aria-label={`Remove the ${kind.words} ${named(slot)}`} onClick={() => { setRemoving(slot); }}>Remove</Button>
           </li>
         ))}
@@ -156,9 +159,12 @@ function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKin
         />
       )}
       {editing === undefined ? (
-        <Button disabled={slots.length >= kind.max} onClick={() => { setEditing({ slot: { key: mintKey(kind.prefix), id: "", title: "", multi: false }, base: authored.revision }); }}>
-          Add a {kind.words}
-        </Button>
+        <span className="row">
+          <Button disabled={room.problems.count !== undefined} onClick={() => { const blank: Slot = { key: mintKey(kind.prefix), id: "", title: "", multi: false }; setEditing({ slot: blank, base: authored.revision, opened: blank }); }}>
+            Add a {kind.words}
+          </Button>
+          {room.problems.count === undefined ? null : <span className="muted small">{room.problems.count}</span>}
+        </span>
       ) : (
         <SlotForm editing={editing} setEditing={setEditing} kind={kind} slots={slots} write={write} revision={authored.revision} />
       )}

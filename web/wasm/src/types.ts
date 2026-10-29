@@ -211,7 +211,10 @@ export interface DateRuleValue {
 }
 
 /** `crates/schema` `ValueKind`: what a loose value of a form is read as. */
-export type ValueKind = "id" | "route_id" | "title" | "markdown" | "url";
+export type ValueKind = "id" | "route_id" | "journey_id" | "title" | "markdown" | "url" | "email" | { count: { limit: CountLimit } };
+
+/** The `crates/schema` limits a form counts against, by name. */
+export type CountLimit = "node_count_max" | "edge_count_per_node_max" | "role_count_max" | "kind_count_max" | "resource_count_per_node_max" | "email_count_per_identity_max";
 
 /** `crates/schema` `ValueCheck`: one value of a form that is not a node's, as typed. */
 export interface ValueCheck {
@@ -222,6 +225,8 @@ export interface ValueCheck {
   value: string;
   /** A blank value is left out rather than refused. */
   optional?: boolean;
+  /** Its siblings' values, which it must not equal. */
+  taken?: string[];
 }
 
 /** `crates/schema` `ValueProblem`: why one value cannot be sent, in words for the author. */

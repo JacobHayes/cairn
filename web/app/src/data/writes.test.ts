@@ -3,7 +3,6 @@
 import { KEY_PREFIX } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
-import { isKey } from "../authoring/keys.ts";
 
 import { consequenceLines, warningOf } from "./activity.ts";
 import type { Command } from "./edit-record.ts";
@@ -24,7 +23,7 @@ describe("patchOf", () => {
     const patch = patchOf(intent);
     expect(patch).toMatchObject({ target: { journey: "j_one" }, base_revision: 3, mutations: intent.mutations });
     expect(patch).not.toHaveProperty("deployment_revision");
-    expect(isKey(KEY_PREFIX.PatchId, patch.id)).toBe(true);
+    expect(patch.id.startsWith(KEY_PREFIX.PatchId)).toBe(true);
     expect(newPatchId()).not.toBe(newPatchId());
     expect(patchOf({ ...intent, deploymentRevision: 2 })).toMatchObject({ deployment_revision: 2 });
   });

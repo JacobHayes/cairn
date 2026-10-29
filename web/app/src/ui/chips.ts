@@ -12,11 +12,8 @@ export function hasSeparator(text: string): boolean {
 /** How one value is taken: its normal form, and why it may not be added (or undefined). */
 export interface ChipRules {
   normalize: (value: string) => string;
-  /** Why `value` (normalized) is not acceptable by itself, or undefined. */
-  problem: (value: string) => string | undefined;
-  /** Most values the list may hold, and the words for the refusal past it. */
-  max: number;
-  maxProblem: string;
+  /** Why `value` (normalized) may not join `held`, or undefined; the engine's answer, so it is asynchronous. */
+  problem: (value: string, held: readonly string[]) => Promise<string | undefined>;
 }
 
 /** What taking the text left: the list, the values refused (as typed, joined for the input), and the first reason. */
@@ -26,8 +23,8 @@ export interface Taken {
   problem: string | undefined;
 }
 
-/** Adds each value of `text` to `values` in order; a duplicate, a value past the maximum, or one failing `rules.problem` stays in `text`. */
-export function takeChips(values: readonly string[], text: string, rules: ChipRules): Taken {
+/** Adds each value of `text` to `values` in order; a value `rules.problem` refuses stays in `text` with its reason. */
+export async function takeChips(values: readonly string[], text: string, rules: ChipRules): Promise<Taken> {
   const held = [...values];
   const refused: string[] = [];
   let problem: string | undefined;
@@ -36,7 +33,7 @@ export function takeChips(values: readonly string[], text: string, rules: ChipRu
       continue;
     }
     const value = rules.normalize(raw);
-    const reason = held.includes(value) ? `${value} is already in the list.` : held.length >= rules.max ? rules.maxProblem : rules.problem(value);
+    const reason = await rules.problem(value, held);
     if (reason === undefined) {
       held.push(value);
     } else {

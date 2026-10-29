@@ -8,7 +8,7 @@ import { Failed } from "../ui/Failed.tsx";
 import { Button } from "../ui/kit.tsx";
 
 import type { Violation } from "../data/writes.ts";
-import { ViolationLines } from "../screens/RejectionView.tsx";
+import { ViolationLines, violationId } from "../screens/RejectionView.tsx";
 import type { Place } from "./violations.ts";
 
 /** What a field shows beside its control. */
@@ -66,10 +66,12 @@ export function FieldBox({ label, place, notes = {}, children }: { label: string
       } else {
         control.removeAttribute("aria-invalid");
       }
-      if (notes.problem === undefined) {
+      // Every message about the field: its problem, then each violation the engine reported.
+      const described = [...(notes.problem === undefined ? [] : [message]), ...violations.map((_, at) => violationId(message, at) ?? "")];
+      if (described.length === 0) {
         control.removeAttribute("aria-describedby");
       } else {
-        control.setAttribute("aria-describedby", message);
+        control.setAttribute("aria-describedby", described.join(" "));
       }
     }
   });
@@ -85,8 +87,18 @@ export function FieldBox({ label, place, notes = {}, children }: { label: string
       </span>
       {children}
       {notes.problem === undefined ? null : <Problem id={message}>{notes.problem}</Problem>}
-      <ViolationLines violations={violations} />
+      <ViolationLines violations={violations} idPrefix={message} />
     </div>
+  );
+}
+
+/** A control under a visible label, which also names it. */
+export function Labelled({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="field">
+      <span className="label">{label}</span>
+      {children}
+    </label>
   );
 }
 
