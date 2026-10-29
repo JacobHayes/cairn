@@ -306,15 +306,11 @@ impl From<ProposalWritten> for ProposalOutput {
 }
 
 /// `create_proposal`: exactly one content, a draft of your own (`destination` with `draft`)
-/// or one Cairn drafts (`upgrade`, `save_as_route`, or `relink`).
+/// or one Cairn drafts (`upgrade`, `save_as_route`, or `relink`). The listed schema is a
+/// plain object, as every provider requires of a tool's arguments; `content`
+/// refuses a call that names none or more than one.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-#[schemars(extend("oneOf" = [
-    { "required": ["destination", "draft"] },
-    { "required": ["upgrade"] },
-    { "required": ["save_as_route"] },
-    { "required": ["relink"] },
-]), extend("dependentRequired" = { "destination": ["draft"], "draft": ["destination"] }))]
 pub struct CreateProposal {
     /// A new id for the proposal.
     pub proposal: ProposalId,

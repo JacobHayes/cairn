@@ -87,17 +87,15 @@ pub(crate) fn schema<T: JsonSchema>() -> Map<String, Value> {
 }
 
 /// The schema of `T`, a tool's arguments that carry mutations, with each mutation described
-/// as an object whose `op` names it rather than spelled out: `apply_patch` spells the
-/// vocabulary out once, so the tool list an agent loads carries it once
-/// (decisions/2026-10-06-the-tool-list-carries-the-mutation-vocabulary-once-and-no.md).
+/// as an object whose `op` names it rather than spelled out (see ARCHITECTURE, MCP endpoint).
 /// Parsing is as strict either way.
 pub(crate) fn schema_citing_mutations<T: JsonSchema>() -> Map<String, Value> {
     citing::<T>(&[MUTATION, REVIEW_ITEM])
 }
 
-/// The schema of `T`, `apply_patch`'s arguments: the one place the mutation vocabulary is
-/// spelled out, as a type sketch generated from the mutation schema
-/// ([`crate::sketch`]), of the ops `listed` keeps: exactly those the tool takes. The
+/// The schema of `T`, the arguments of a tool that spells the mutation vocabulary out: a type
+/// sketch generated from the mutation schema ([`crate::sketch`]), of the ops `listed` keeps:
+/// exactly those the tool takes. The
 /// `mutations` items are objects whose `op` is one of those op names, described by the
 /// sketch; parsing is by the typed schema, as strict as ever.
 pub(crate) fn schema_with_mutation_sketch<T: JsonSchema>(
@@ -112,19 +110,31 @@ pub(crate) fn schema_with_mutation_sketch<T: JsonSchema>(
     };
     // The schemas are fixed by the types at build time: a construct the sketch cannot
     // render is a bug the listing's tests reach, not a condition to answer.
-    let crate::sketch::MutationSketch { text: sketch, ops } = crate::sketch::mutation_sketch(
+    let crate::sketch::MutationSketch {
+        text: sketch,
+        ops,
+        fields,
+    } = crate::sketch::mutation_sketch(
         definitions,
         MUTATION.0,
         &mutation,
         (crate::sketch::GROUPS, listed),
     )
     .unwrap_or_else(|error| unreachable!("{error}"));
+    // A mutation is an object with an `op` and only the fields some listed op takes: a
+    // call with no `op`, or a field no op has, is wrong by the schema alone.
+    let mut properties = Map::new();
+    for name in fields {
+        properties.insert(name, serde_json::json!({}));
+    }
+    properties.insert("op".to_owned(), serde_json::json!({ "enum": ops }));
     definitions.insert(
         MUTATION.0.to_owned(),
         serde_json::json!({
             "type": "object",
             "required": ["op"],
-            "properties": { "op": { "enum": ops } },
+            "properties": properties,
+            "additionalProperties": false,
             "description": format!(
                 "One mutation: an object with `op` and that op's fields, as typed here (`?` \
                  may be left out, `| null` takes null, `one of` takes exactly one):\n{sketch}"
@@ -164,7 +174,10 @@ fn cited<T: JsonSchema>(citations: &[Citation]) -> Map<String, Value> {
     let mut schema = schema::<T>();
     if let Some(Value::Object(definitions)) = schema.get_mut("$defs") {
         for (name, description) in citations {
-            let cited = serde_json::json!({ "type": "object", "description": description });
+            let mut cited = serde_json::json!({ "type": "object", "description": description });
+            if *name == MUTATION.0 {
+                cited["required"] = serde_json::json!(["op"]);
+            }
             if definitions.contains_key(*name) {
                 definitions.insert((*name).to_owned(), cited);
             }

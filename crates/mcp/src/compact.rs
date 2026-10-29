@@ -183,6 +183,11 @@ fn walk(schema: Value, place: Place) -> Value {
         compacted.insert(keyword, value);
     }
     constants_to_enum(&mut compacted);
+    // Providers accept `anyOf` and several refuse `oneOf`; the variants are disjoint, and
+    // the server parses strictly either way.
+    if let Some(variants) = compacted.remove("oneOf") {
+        compacted.entry("anyOf").or_insert(variants);
+    }
     Value::Object(compacted)
 }
 
@@ -453,7 +458,7 @@ mod tests {
                 },
                 "$defs": {
                     "Kind": { "type": "string", "enum": ["a", "b"] },
-                    "Change": { "oneOf": [
+                    "Change": { "anyOf": [
                         { "type": "object", "description": "Adds it.",
                           "properties": { "add": { "type": "string" } } },
                     ] },

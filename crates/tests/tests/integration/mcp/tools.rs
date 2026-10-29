@@ -38,7 +38,7 @@ fn every_tool_has_a_name_a_description_and_object_schemas() {
 /// patch: `apply_patch` and `update_journey_state`, each of the ops it takes, so a client that
 /// loaded one of them alone can write with it; every other tool that takes mutations cites it.
 #[test]
-fn the_mutation_vocabulary_is_spelled_out_once() {
+fn the_mutation_vocabulary_is_spelled_out_by_the_tools_that_take_a_patch() {
     let definitions = ToolSet::definitions();
     let mut spelled = Vec::new();
     let mut cited = Vec::new();
@@ -57,6 +57,173 @@ fn the_mutation_vocabulary_is_spelled_out_once() {
     }
     assert_eq!(spelled, ["update_journey_state", "apply_patch"]);
     assert!(cited.contains(&"create_proposal"), "{cited:?}");
+}
+
+/// What the providers refuse in a tool's arguments, from their documentation: Anthropic
+/// refuses a root that is not a plain object (no union at the top level), `OpenAI` documents
+/// `allOf`, `not`, `if` and the dependent keywords unsupported and wants its unions written
+/// `anyOf`, both fix the characters of tool and property names, and every provider needs a
+/// reference to resolve and caps the counts of tools, properties and enum values.
+mod providers {
+    use std::collections::BTreeSet;
+
+    use serde_json::Value;
+
+    pub const TOOLS_MAX: usize = 128;
+    pub const ENUM_VALUES_MAX: usize = 1000;
+    pub const PROPERTIES_MAX: usize = 5000;
+    pub const NAME_LENGTH_MAX: usize = 64;
+    pub const ROOT_COMBINATORS: [&str; 6] = ["oneOf", "anyOf", "allOf", "not", "enum", "const"];
+    pub const UNSUPPORTED: [&str; 8] = [
+        "oneOf",
+        "allOf",
+        "not",
+        "if",
+        "then",
+        "else",
+        "dependentRequired",
+        "dependentSchemas",
+    ];
+
+    /// Whether `name` is made of ASCII letters, digits, `_` and `-` (and `.` when `dots`).
+    pub fn name_ok(name: &str, dots: bool) -> bool {
+        (1..=NAME_LENGTH_MAX).contains(&name.len())
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-') || (dots && c == '.'))
+    }
+
+    /// What one tool's schema holds, counted over every schema in it.
+    pub struct Walk<'a> {
+        tool: &'a str,
+        definitions: BTreeSet<String>,
+        pub properties: usize,
+        pub enum_values: usize,
+    }
+
+    impl<'a> Walk<'a> {
+        pub fn over(tool: &'a str, root: &Value) -> Self {
+            let definitions = root["$defs"]
+                .as_object()
+                .map(|defined| defined.keys().cloned().collect())
+                .unwrap_or_default();
+            let mut walk = Self {
+                tool,
+                definitions,
+                properties: 0,
+                enum_values: 0,
+            };
+            walk.schema(root);
+            walk
+        }
+
+        fn schema(&mut self, schema: &Value) {
+            let Value::Object(object) = schema else {
+                return;
+            };
+            for (keyword, value) in object {
+                let tool = self.tool;
+                assert!(
+                    !UNSUPPORTED.contains(&keyword.as_str()),
+                    "{tool} uses `{keyword}`, which a provider refuses"
+                );
+                match (keyword.as_str(), value) {
+                    ("properties", Value::Object(named)) => {
+                        self.properties += named.len();
+                        for (name, member) in named {
+                            assert!(name_ok(name, true), "{tool} has the property name {name:?}");
+                            self.schema(member);
+                        }
+                    }
+                    ("$defs", Value::Object(named)) => named.values().for_each(|m| self.schema(m)),
+                    ("enum", Value::Array(values)) => self.enum_values += values.len(),
+                    ("$ref", Value::String(target)) => {
+                        let name = target.strip_prefix("#/$defs/");
+                        assert!(
+                            name.is_some_and(|name| self.definitions.contains(name)),
+                            "{tool} refers to {target}, which its schema does not define"
+                        );
+                    }
+                    (_, value) => {
+                        for member in value.as_array().into_iter().flatten().chain(Some(value)) {
+                            self.schema(member);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Every tool is one the model providers accept as a function.
+#[test]
+fn every_tool_schema_is_one_every_provider_accepts() {
+    let definitions = ToolSet::definitions();
+    assert!(definitions.len() <= providers::TOOLS_MAX);
+    for tool in &definitions {
+        let name = tool.name;
+        assert!(providers::name_ok(name, false), "tool name {name:?}");
+        let schema = Value::Object(tool.input_schema.clone());
+        assert_eq!(
+            schema["type"], "object",
+            "{name}'s arguments are not an object"
+        );
+        for keyword in providers::ROOT_COMBINATORS {
+            assert!(
+                schema.get(keyword).is_none(),
+                "{name} has `{keyword}` at the root"
+            );
+        }
+        let walk = providers::Walk::over(name, &schema);
+        assert!(
+            walk.properties <= providers::PROPERTIES_MAX,
+            "{name}: {} properties",
+            walk.properties
+        );
+        assert!(
+            walk.enum_values <= providers::ENUM_VALUES_MAX,
+            "{name}: {} enum values",
+            walk.enum_values
+        );
+    }
+}
+
+/// The mutation a tool takes is an object with an `op` from the listed ops and fields the
+/// schema names, so a call with no `op` or an invented field is wrong by the schema itself,
+/// not only by the prose beside it.
+#[test]
+fn a_mutation_is_an_object_with_an_op_and_named_fields() {
+    let written = [
+        json!({ "op": "transition", "node": "n_kickoff", "transition": "complete" }),
+        json!({ "op": "answer", "decision": "n_purpose", "value": { "boolean": true } }),
+        json!({ "op": "set_pin", "node": "n_findings", "date": "2026-11-03" }),
+        json!({ "op": "add_annotation", "annotation": { "key": "a_x", "note": "x" } }),
+    ];
+    for tool in ToolSet::definitions() {
+        let schema = Value::Object(tool.input_schema.clone());
+        let Some(mutation) = schema.pointer("/$defs/Mutation") else {
+            continue;
+        };
+        let name = tool.name;
+        assert_eq!(mutation["required"], json!(["op"]), "{name}");
+        let Some(fields) = mutation.get("properties").and_then(Value::as_object) else {
+            continue;
+        };
+        assert_eq!(mutation["additionalProperties"], false, "{name}");
+        let ops = mutation["properties"]["op"]["enum"].as_array().unwrap();
+        for write in &written {
+            assert!(ops.contains(&write["op"]), "{name} lists {}", write["op"]);
+            for field in write.as_object().unwrap().keys() {
+                assert!(fields.contains_key(field), "{name} names {field}");
+            }
+        }
+        // A relink or upgrade has a `to`; a state change has none.
+        assert_eq!(
+            fields.contains_key("to"),
+            name != "update_journey_state",
+            "{name}"
+        );
+    }
 }
 
 /// A mutation the sketch describes is parsed as strictly as before: a value of the wrong

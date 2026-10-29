@@ -9,7 +9,7 @@
 //! that clears something). An optional field's `null` means the same as leaving it out, so
 //! it is not written.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Write as _};
 
 use serde_json::{Map, Value};
@@ -27,11 +27,13 @@ impl fmt::Display for Unsupported {
 /// The groups of a vocabulary, by first op and header, and which of its ops are listed.
 pub(crate) type Listing<'a> = (&'a [(&'a str, &'a str)], &'a dyn Fn(&str) -> bool);
 
-/// The sketch, and the op names it covers in the schema's order.
+/// The sketch, the op names it covers in the schema's order, and every field name any of
+/// those ops takes.
 #[derive(Debug)]
 pub(crate) struct MutationSketch {
     pub text: String,
     pub ops: Vec<String>,
+    pub fields: BTreeSet<String>,
 }
 
 /// A rendering, or the construct that stopped it.
@@ -132,6 +134,7 @@ pub(crate) fn mutation_sketch(
     };
     let mut lines = Vec::new();
     let mut ops = Vec::new();
+    let mut fields = BTreeSet::new();
     let mut group: Option<(&str, bool)> = None;
     for variant in array(mutation, "oneOf")? {
         let op = variant
@@ -155,6 +158,9 @@ pub(crate) fn mutation_sketch(
             *written = true;
         }
         let (op, line) = sketch.variant(variant)?;
+        if let Some(Value::Object(properties)) = variant.get("properties") {
+            fields.extend(properties.keys().cloned());
+        }
         ops.push(op);
         lines.push(line);
     }
@@ -174,6 +180,7 @@ pub(crate) fn mutation_sketch(
     Ok(MutationSketch {
         text: lines.join("\n"),
         ops,
+        fields,
     })
 }
 

@@ -116,7 +116,7 @@ async fn a_draft_that_cannot_be_made_is_answered_by_its_kind() {
     }
 }
 
-/// I6: `create_proposal` holds exactly one content, as its listing says: naming none is
+/// I6: `create_proposal` holds exactly one content: naming none is
 /// refused, and naming two kinds, or half of your own draft, is refused at the argument that
 /// makes it wrong; a content named as null is refused there too, not read as absent.
 #[tokio::test]
@@ -159,11 +159,10 @@ async fn a_proposal_names_exactly_one_content() {
         .find(|tool| tool.name == "create_proposal")
         .unwrap();
     let listed = jsonschema::draft202012::new(&Value::Object(listed.input_schema)).unwrap();
+    // The listing is a plain object, as every provider requires: it refuses a content named
+    // as null, and the server refuses the rest.
+    assert!(!listed.is_valid(&with(json!({ "relink": relink, "upgrade": null }))));
     for (arguments, at) in cases {
-        assert!(
-            !listed.is_valid(&arguments),
-            "the listing refuses {arguments}"
-        );
         let answered = world.call(&ann, "create_proposal", arguments.clone()).await;
         let Err(cairn_mcp::ToolError::Arguments { path, .. }) = &answered else {
             panic!("{arguments}: {answered:?}");
