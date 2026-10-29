@@ -1,6 +1,6 @@
 // One conversation held for the tab (I5): a turn's answer carries what it added and is shown
 // at once, a read begun before an answer never replaces it, an answer after the conversation
-// stopped changes nothing, and the proposals of the last turn are held for review.
+// stopped changes nothing.
 import { createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
@@ -33,18 +33,19 @@ describe("a conversation held for the tab", () => {
     expect(host.reads).toHaveLength(1);
   });
 
-  it("holds the proposals of the last turn for review, and none once another turn is sent", async () => {
+  it("holds a proposal drafted under another destination than the target's, until another turn is sent", async () => {
     const { host, ref } = started();
     const proposals = [
-      { proposal: "pr_one", destination: { journey: "j_one" } },
-      { proposal: "pr_two", destination: { journey: "j_one" }, discarded: true },
+      { proposal: "pr_own", destination: target },
+      { proposal: "pr_route", destination: { route: "saved" } },
+      { proposal: "pr_gone", destination: { route: "other" }, discarded: true },
     ];
-    const sent = sendTurn(ref, "Draft it.");
+    const sent = sendTurn(ref, "Save it as a route.");
     host.turns[0]?.answer({ outcome: "answered", reply: { conversation: "cv_one", reply: "Drafted.", proposals, ended: { status: "replied" }, messages: [] } });
     await sent;
-    expect(conversationView(ref.getSnapshot()).proposals.map((each) => each.proposal)).toEqual(["pr_one"]);
+    expect(conversationView(ref.getSnapshot()).elsewhere.map((each) => each.proposal)).toEqual(["pr_route"]);
     void sendTurn(ref, "Again.");
-    expect(conversationView(ref.getSnapshot()).proposals).toEqual([]);
+    expect(conversationView(ref.getSnapshot()).elsewhere).toEqual([]);
   });
 
   it("shows the turn in flight until it is answered", async () => {

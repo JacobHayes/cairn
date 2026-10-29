@@ -31,7 +31,7 @@ const FIRST: u32 = 13;
 /// Every migration, numbered from [`FIRST`], in order. A migration is never edited once
 /// released; a change is a new one. It is a list of steps run in one transaction with its
 /// number.
-pub(crate) const MIGRATIONS: [(u32, &[Step]); 11] = [
+pub(crate) const MIGRATIONS: [(u32, &[Step]); 12] = [
     (
         FIRST,
         &[Step::Sql(include_str!("migrations/0013_schema.sql"))],
@@ -90,6 +90,10 @@ pub(crate) const MIGRATIONS: [(u32, &[Step]); 11] = [
         ],
     ),
     (23, &[Step::CompleteAnyway]),
+    (
+        24,
+        &[Step::Sql(include_str!("migrations/0024_receipts.sql"))],
+    ),
 ];
 
 /// Puts the database in WAL mode and applies the migrations it lacks.

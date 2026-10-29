@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 use cairn_schema::{
     Actor, ChangeClass, ChangeSet, Event, EventType, Limit, Mutation, Patch, PatchReceipt,
-    PatchTarget, from_json, from_yaml, to_json, to_yaml,
+    from_json, from_yaml, to_json, to_yaml,
 };
 use serde_json::Value;
 
@@ -116,7 +116,6 @@ fn mutations(yaml: &str) -> Vec<Mutation> {
 
 #[test]
 fn change_class_follows_the_glossary() {
-    let journey = PatchTarget::Journey("j_sample".parse().unwrap());
     let cases = [
         (
             "- {op: set_node_field, node: n_a, value: {weight: 3}}",
@@ -131,7 +130,7 @@ fn change_class_follows_the_glossary() {
             ChangeClass::State,
         ),
         (
-            "- {op: transition, node: n_a, transition: complete}\n- {op: add_edge, edge: {node: n_a, requires: n_b}}",
+            "- {op: add_edge, edge: {node: n_a, requires: n_b}}",
             ChangeClass::Structural,
         ),
         (
@@ -140,24 +139,7 @@ fn change_class_follows_the_glossary() {
         ),
     ];
     for (yaml, expected) in cases {
-        let patch = Patch {
-            id: "p_case".parse().unwrap(),
-            target: journey.clone(),
-            base_revision: cairn_schema::Revision::NONE,
-            deployment_revision: None,
-            mutations: cairn_schema::Mutations::new(mutations(yaml)).unwrap(),
-        };
-        assert_eq!(patch.change_class(), expected, "{yaml}");
-        // A route has no state, so the same mutations are structural there.
-        let route_patch = Patch {
-            target: PatchTarget::Route("sample".parse().unwrap()),
-            ..patch
-        };
-        assert_eq!(
-            route_patch.change_class(),
-            ChangeClass::Structural,
-            "{yaml}"
-        );
+        assert_eq!(mutations(yaml)[0].change_class(), expected, "{yaml}");
     }
 }
 

@@ -12,11 +12,13 @@ import { Link } from "react-router";
 
 import { proposalAddress } from "../address.ts";
 import { targetKey, type AssistantTarget, type ConversationEntry, type Proposed } from "../data/assistant.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { useDraft } from "../data/drafts.ts";
-import { useSession } from "../data/react.ts";
+import { useLive, useSession } from "../data/react.ts";
 import { AssistantSlot, useAssistantDock } from "../shell/frame.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { Button } from "../ui/kit.tsx";
+import { listKey, proposalsUnder } from "../proposals/read.ts";
 import { aboutWords } from "./model.ts";
 import { conversationView, sendTurn, type ConversationRef } from "./conversation.ts";
 import "./assistant.css";
@@ -58,11 +60,25 @@ export function Transcript({ entries }: { entries: readonly ConversationEntry[] 
   );
 }
 
-/** I5, C14: a proposal the last turn drafted or changed, to review where the user applies it. */
-function ProposedLink({ proposed }: { proposed: Proposed }) {
+/** I5, C14: the open proposals under the conversation's destination, by name, each linking to its review where applying it is the user's click. Read from the destination's list, so they are there after a reload and drop out once applied or discarded. */
+function OpenProposals({ target }: { target: AssistantTarget }) {
+  const destination = target;
+  const { view } = useLive(listKey(destination), proposalsUnder(destination));
+  const items = valueOf(view)?.items ?? [];
+  return items.map((proposal) => (
+    <p key={proposal.id} data-testid="assistant-proposed" data-proposal={proposal.id}>
+      <Link className="button" to={proposalAddress(proposal.destination, proposal.id)} data-testid="review-proposal">
+        Review: {proposal.title}
+      </Link>
+    </p>
+  ));
+}
+
+/** I5, C14: a proposal the last turn drafted under another destination (a journey saved as a route), to review where the user applies it. */
+function ElsewhereLink({ proposed }: { proposed: Proposed }) {
   return (
     <p data-testid="assistant-proposed" data-proposal={proposed.proposal}>
-      <Link className="button primary" to={proposalAddress(proposed.destination, proposed.proposal)} data-testid="review-proposal">
+      <Link className="button" to={proposalAddress(proposed.destination, proposed.proposal)} data-testid="review-proposal">
         Review proposal
       </Link>
     </p>
@@ -132,11 +148,11 @@ function Composer({ target, ready, sending, send }: { target: AssistantTarget; r
   );
 }
 
-/** What the panel says before the first message: how a change is made (I5, I7); the composer's label says what to ask. */
-function Empty() {
+/** What the panel offers before the first message: one request to start from. */
+function Empty({ target }: { target: AssistantTarget }) {
   return (
     <p className="muted" data-testid="assistant-empty">
-      Changes are made directly and reported here. A change to structure, a large or unclear one, or one you ask to see first comes back as a proposal for you to review.
+      {"journey" in target ? "Try: \u201CWhat should I do next?\u201D" : "Try: \u201CWhat does this draft still need?\u201D"}
     </p>
   );
 }
@@ -150,7 +166,7 @@ function AssistantPanel({ target }: { target: AssistantTarget }) {
 function Conversing({ conversation, target }: { conversation: ConversationRef; target: AssistantTarget }) {
   const key = targetKey(target);
   const snapshot = useSelector(conversation, (each) => each);
-  const { read, proposals, sending, failure } = useMemo(() => conversationView(snapshot), [snapshot]);
+  const { read, elsewhere, sending, failure } = useMemo(() => conversationView(snapshot), [snapshot]);
   const entries = useMemo(() => (read.status === "ready" ? read.conversation.messages : []), [read]);
   const send = (text: string) => sendTurn(conversation, text);
   const scroller = useRef<HTMLDivElement>(null);
@@ -170,10 +186,11 @@ function Conversing({ conversation, target }: { conversation: ConversationRef; t
             </Button>
           </p>
         ) : null}
-        {read.status === "ready" && entries.length === 0 && sending === undefined ? <Empty /> : null}
+        {read.status === "ready" && entries.length === 0 && sending === undefined ? <Empty target={target} /> : null}
         <Transcript entries={entries} />
-        {proposals.map((proposed) => (
-          <ProposedLink key={proposed.proposal} proposed={proposed} />
+        <OpenProposals target={target} />
+        {elsewhere.map((proposed) => (
+          <ElsewhereLink key={proposed.proposal} proposed={proposed} />
         ))}
         {sending === undefined ? null : (
           <>

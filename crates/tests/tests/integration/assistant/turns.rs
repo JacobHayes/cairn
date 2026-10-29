@@ -126,7 +126,24 @@ async fn the_model_is_offered_the_mcp_tools_and_the_guide() {
     let sent = roles(request);
     assert_eq!(sent[0].0, "system");
     assert!(sent[0].1.contains(instructions::guide()));
-    assert_eq!(sent[1..], [("user".to_owned(), "What is next?".to_owned())]);
+    assert_eq!(sent.last().unwrap().1, "What is next?");
+}
+
+/// What a provider can serve from its cache: the system text and the tool list are the same
+/// for every user and every target, so the first message that differs comes after them.
+#[tokio::test]
+async fn the_system_text_and_the_tools_do_not_depend_on_who_asks_or_where() {
+    let world = World::new().await;
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    world.empty_bakeoff().await;
+    world.script([Step::say("One."), Step::say("Two.")]);
+    world.turn(&lead, &vendor_target(), "Hello?").await;
+    world.turn(&user("u_owner"), &bakeoff(), "Hello?").await;
+    let requests = world.provider.requests();
+    assert_eq!(requests[0]["tools"], requests[1]["tools"]);
+    assert_eq!(requests[0]["messages"][0], requests[1]["messages"][0]);
+    assert_ne!(requests[0]["messages"][1], requests[1]["messages"][1]);
 }
 
 /// I7: applying a proposal and importing a file are the user's alone: named anyway, they are
@@ -461,7 +478,7 @@ async fn a_conversation_carries_on_for_its_user_alone() {
     assert_eq!(first.conversation, second.conversation);
     assert_ne!(first.conversation, other.conversation);
     let sent = world.provider.requests();
-    let history: Vec<(String, String)> = roles(&sent[2])[1..].to_vec();
+    let history: Vec<(String, String)> = roles(&sent[2])[2..].to_vec();
     assert_eq!(history.len(), 3, "{history:?}");
     assert_eq!(
         history[0],
@@ -475,7 +492,7 @@ async fn a_conversation_carries_on_for_its_user_alone() {
         ("user".to_owned(), "Second question.".to_owned())
     );
     assert_eq!(
-        roles(&sent[3])[1..],
+        roles(&sent[3])[2..],
         [("user".to_owned(), "Mine.".to_owned())]
     );
 }

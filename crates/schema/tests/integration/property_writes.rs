@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod property {
     use cairn_schema::testing::*;
-    use cairn_schema::{ChangeClass, Domain, from_json, from_yaml, to_json, to_yaml};
+    use cairn_schema::{from_json, from_yaml, to_json, to_yaml};
     use patina_dst_proptest::prelude::*;
     use serde::Serialize;
     use serde::de::DeserializeOwned;
@@ -43,13 +43,6 @@ mod property {
         #[test]
         fn proposals_round_trip(proposal in arb_proposal()) {
             round_trip(&proposal)?;
-        }
-
-        #[test]
-        fn route_patches_are_structural(patch in arb_patch()) {
-            if matches!(patch.target.domain(), Domain::Route(_)) {
-                prop_assert_eq!(patch.change_class(), ChangeClass::Structural);
-            }
         }
     }
 }

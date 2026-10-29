@@ -981,7 +981,7 @@ impl Mutation {
     }
 
     /// PRD glossary, Structural change: what this mutation is in a journey or the
-    /// deployment. Every change to a route is structural ([`Patch::change_class`]).
+    /// deployment. Every change to a route is structural.
     #[must_use]
     pub fn change_class(&self) -> ChangeClass {
         match self {
@@ -1078,27 +1078,6 @@ impl Mutation {
                 | Mutation::ApplyProposal { .. }
                 | Mutation::DiscardProposal {}
         )
-    }
-}
-
-impl Patch {
-    /// PRD glossary, Structural change: a patch is structural when any of its mutations is,
-    /// and every patch to a route is structural (a route has no state).
-    #[must_use]
-    pub fn change_class(&self) -> ChangeClass {
-        if matches!(self.target.domain(), Domain::Route(_)) {
-            return ChangeClass::Structural;
-        }
-        let structural = self
-            .mutations
-            .as_slice()
-            .iter()
-            .any(|mutation| mutation.change_class() == ChangeClass::Structural);
-        if structural {
-            ChangeClass::Structural
-        } else {
-            ChangeClass::State
-        }
     }
 }
 

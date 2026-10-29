@@ -1,6 +1,7 @@
 // One conversation as the panel shows it (I5), held per target for the tab by the session's
 // conversation manager rather than by a mounted panel: what the host keeps, a turn in flight,
-// and the proposals the last turn drafted. A panel closed while a turn runs shows its answer
+// and the proposals the last turn drafted elsewhere than the conversation's own target (the
+// target's own are read from its proposal list). A panel closed while a turn runs shows its answer
 // when opened again, and a read begun before an answer arrived never replaces the answer.
 //
 // The read and the turn are invoked actors, and the guarantee holds by construction rather
@@ -9,7 +10,7 @@
 // shown as it arrives and replaced by the host's own on the next read. An answer that arrives
 // after the conversation stopped (the session closed) changes nothing, because a stopped
 // actor hears nothing.
-import { networkFailure, type HttpFailure } from "@cairn/client";
+import { networkFailure, sameDomain, type HttpFailure } from "@cairn/client";
 import { assign, fromPromise, setup, waitFor, type ActorRefFrom, type SnapshotFrom } from "xstate";
 
 import type { AssistantHost, AssistantTarget, Conversation, Proposed, TurnOutcome } from "../data/assistant.ts";
@@ -19,8 +20,8 @@ export type Read = { status: "loading" } | { status: "failed"; message: string }
 /** What the panel shows of one conversation. */
 export interface ConversationView {
   read: Read;
-  /** The proposals the last turn left for review. */
-  proposals: readonly Proposed[];
+  /** The proposals the last turn drafted under another destination than the target's. */
+  elsewhere: readonly Proposed[];
   /** The words of the turn in flight, if one is. */
   sending: string | undefined;
   /** Why the last turn was not answered, or its conversation not read again. */
@@ -34,7 +35,7 @@ export interface ConversationInput {
 
 interface ConversationContext extends ConversationInput {
   read: Read;
-  proposals: readonly Proposed[];
+  elsewhere: readonly Proposed[];
   /** The words of the turn sent last. */
   text: string;
   failure: HttpFailure | undefined;
@@ -63,12 +64,12 @@ export const conversationMachine = setup({
     turn: fromPromise<TurnOutcome, ConversationInput & { text: string }>(({ input }) => input.assistant.turn(input.target, input.text)),
   },
   actions: {
-    begin: assign({ text: ({ event }) => (event as Extract<ConversationEvent, { type: "send" }>).text, failure: undefined, proposals: [] }),
+    begin: assign({ text: ({ event }) => (event as Extract<ConversationEvent, { type: "send" }>).text, failure: undefined, elsewhere: [] }),
     ready: assign({ read: ({ event }) => ({ status: "ready" as const, conversation: (event as unknown as { output: Conversation }).output }) }),
   },
 }).createMachine({
   id: "conversation",
-  context: ({ input }) => ({ ...input, read: { status: "loading" }, proposals: [], text: "", failure: undefined }),
+  context: ({ input }) => ({ ...input, read: { status: "loading" }, elsewhere: [], text: "", failure: undefined }),
   initial: "reading",
   states: {
     idle: { on: { refresh: "reading", send: { target: "sending", actions: "begin" } } },
@@ -96,8 +97,8 @@ export const conversationMachine = setup({
               const reply = answered(event.output) ? event.output.reply : undefined;
               const held = context.read.status === "ready" ? context.read.conversation.messages : [];
               return {
-                read: reply === undefined ? context.read : { status: "ready" as const, conversation: { conversation: reply.conversation, messages: [...held, ...(reply.messages)] } },
-                proposals: (reply?.proposals ?? []).filter((each) => each.discarded !== true),
+                read: reply === undefined ? context.read : { status: "ready" as const, conversation: { conversation: reply.conversation, messages: [...held, ...reply.messages] } },
+                elsewhere: (reply?.proposals ?? []).filter((each) => each.discarded !== true && !sameDomain(each.destination, context.target)),
               };
             }),
           },
@@ -114,8 +115,8 @@ export type ConversationSnapshot = SnapshotFrom<typeof conversationMachine>;
 
 /** What the panel shows of the conversation: the turn in flight is the state, not a field beside it. */
 export function conversationView(snapshot: ConversationSnapshot): ConversationView {
-  const { read, proposals, text, failure } = snapshot.context;
-  return { read, proposals, sending: snapshot.hasTag("busy") ? text : undefined, failure };
+  const { read, elsewhere, text, failure } = snapshot.context;
+  return { read, elsewhere, sending: snapshot.hasTag("busy") ? text : undefined, failure };
 }
 
 /**

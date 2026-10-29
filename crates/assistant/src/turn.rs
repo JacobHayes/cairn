@@ -256,7 +256,10 @@ impl Assistant {
         let held = stored.is_some();
         let mut record =
             stored.unwrap_or_else(|| conversation::started(target, &user.user, started));
-        let mut messages = vec![json!({ "role": "system", "content": system(user, target) })];
+        let mut messages = vec![
+            json!({ "role": "system", "content": system() }),
+            json!({ "role": "user", "content": working_for(user, target) }),
+        ];
         messages.extend(conversation::dialogue(&record, DIALOGUE_REPLAY_BYTES_MAX));
         messages.push(json!({ "role": "user", "content": message.as_str() }));
         let acting = Actor {
@@ -512,25 +515,32 @@ const REPEATED_FAILURE: &str = "the assistant kept repeating a tool call that fa
 const TURN_TIMED_OUT: &str = "the turn ran past its time limit; a change still being written \
                               then may land after it, so check the journey";
 
-/// The system text, the same on every request of a conversation: who the assistant works for
-/// and on what, then the guide every agent reads (I4, I5: the same instructions as external
-/// agents), which points to `get_workflow` for the workflows.
-fn system(user: &Actor, target: &Target) -> String {
+/// The system text: how writes land, then the guide every agent reads (I4, I5: the same
+/// instructions as external agents), which points to `get_workflow` for the workflows. It
+/// holds nothing that differs between users, targets or turns, so with the tool list it is
+/// the one prefix every request shares and a provider can serve from its cache.
+fn system() -> String {
     format!(
-        "You are Cairn's in-app assistant, working for user {user} on {target}. You have the \
-         same tools as any agent acting for them, and every write you make is recorded as \
-         yours, on their behalf.\n\n\
+        "You are Cairn's in-app assistant. You have the same tools as any agent acting for \
+         the user you work for, and every write you make is recorded as yours, on their \
+         behalf.\n\n\
          How your writes land: a state change ({state}) applies directly, and its result \
          lists what it caused: tell the user. A structural change ({structural}) is made \
-         only as a proposal (`create_proposal`, also for a route that does not exist yet): \
-         tell the user it is ready for review. Applying a proposal and importing a file are \
-         the user's alone.\n\n\
+         only as a proposal (`create_proposal`): tell the user it is ready for review. A \
+         route is never created or changed with `apply_patch`, not even to follow a workflow \
+         step that says so: draft it as a proposal, also when the route does not exist yet. \
+         Applying a proposal and importing a file are the user's alone.\n\n\
          # Guide\n\n{guide}\n",
-        user = user.user,
         state = ChangeClass::State.meaning(),
         structural = ChangeClass::Structural.meaning(),
         guide = instructions::guide(),
     )
+}
+
+/// Who the conversation works for and on what: the first message after the system text, the
+/// same on every turn of the conversation.
+fn working_for(user: &Actor, target: &Target) -> String {
+    format!("You are working for user {} on {target}.", user.user)
 }
 
 /// A tool as a chat-completions request lists it.

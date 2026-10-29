@@ -5,8 +5,7 @@
 use crate::engine::support;
 
 use cairn_schema::{
-    ChangeClass, EventType, GuardFailure, LocalEdit, NodeField, Rejection, RevisionOf,
-    ViolationCode,
+    EventType, GuardFailure, LocalEdit, NodeField, Rejection, RevisionOf, ViolationCode,
 };
 use support::{codes, key, vendor_after, vendor_graph, vendor_patch};
 
@@ -293,12 +292,6 @@ fn a_journey_weight_edit_is_state() {
     )
     .unwrap();
     assert_eq!(applied.events()[0].event_type, EventType::WeightChanged);
-    let patch = support::patch_to(
-        &records,
-        "{journey: j_vendor_eval}",
-        "- op: set_node_field\n  node: n_access\n  value: {weight: 3}\n",
-    );
-    assert_eq!(patch.change_class(), ChangeClass::State);
     let markers = &vendor_graph(applied.records()).state.local_edits[&key("n_access")];
     assert!(
         markers.contains(&LocalEdit::Field(NodeField::Weight)),

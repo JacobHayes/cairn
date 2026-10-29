@@ -56,6 +56,7 @@ test("I5, I7: a direct change reported as a receipt, and a breakdown proposed, r
   await ask(page, "Break the test workload down into an ingest and a query workload.");
   const proposed = panel.getByTestId("assistant-proposed");
   await expect(proposed).toHaveCount(1);
+  await expect(proposed.getByTestId("review-proposal")).toContainText("Break down the workload");
   await expect(page.locator('[data-testid="node-card"][data-parent="n_workload"]')).toHaveCount(0);
 
   await proposed.getByTestId("review-proposal").click();

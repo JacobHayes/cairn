@@ -49,7 +49,7 @@ describe("the conversation manager", () => {
     const words = (view: ReturnType<typeof conversationView>) => (view.read.status === "ready" ? view.read.conversation.messages.map((entry) => entry.content) : []);
     expect(words(conversationView(first.getSnapshot()))).toEqual(["Hello?", "Hi."]);
     // The other target's conversation heard nothing of it.
-    expect(second && conversationView(second.getSnapshot())).toMatchObject({ read: { status: "loading" }, sending: undefined, proposals: [] });
+    expect(second && conversationView(second.getSnapshot())).toMatchObject({ read: { status: "loading" }, sending: undefined });
     // Opening the first again shows the answer, which the host kept.
     ref.send({ type: "open", target });
     expect(words(conversationView(first.getSnapshot()))).toEqual(["Hello?", "Hi."]);

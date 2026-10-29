@@ -11,4 +11,5 @@ mod milestone_done_migration;
 mod open;
 mod property_round_trip;
 mod reason_migration;
+mod receipts_migration;
 mod tour_migration;
