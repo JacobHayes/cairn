@@ -1,4 +1,4 @@
-// What segments' browser test uses (brief 7.7): the security-review segment imported
+// What segments' browser test uses: the security-review segment imported
 // from its file and published, and a container's Insert segment here walked to proposal review,
 // each the way a person does it.
 import { fileURLToPath } from "node:url";

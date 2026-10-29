@@ -1,6 +1,6 @@
 //! Change sets built by hand, for the conformance suite and backend tests. The suite tests
 //! persistence, not validation, so it builds the change sets an engine would produce
-//! directly (brief 3.1): records as after-state, one event per mutation.
+//! directly: records as after-state, one event per mutation.
 //!
 //! Test code: a value that does not parse is a broken test, so these helpers unwrap.
 #![allow(

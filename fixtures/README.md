@@ -48,7 +48,7 @@ is done, snoozes the baseline on a node, pins the report earlier than its derive
 finishes the workload and the baseline (which completes testing and opens reporting), and
 answers the reviewer with a person created in the same patch.
 
-Derived at each decision point (brief 2.2): the relevance and participations `derive` gives
+Derived at each decision point: the relevance and participations `derive` gives
 after steps 1, 2, 6, and 8. `fixture_readme.rs` reads this table and checks it against what the engine derives.
 
 | Node | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |
@@ -89,7 +89,7 @@ on a gate is blocked. The scenario's `fixture_readme.rs` checks these values.
 | `reporting/review-opens`, `informed` | none (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) |
 | `reporting/final-review/final-report`, `reviewer` | none (role `findings_reviewer`) | none (role `findings_reviewer`) | none (role `findings_reviewer`) | `Farid Haddad` (role `findings_reviewer`) |
 
-Due dates once the decision meeting is pinned (brief 2.3): answering the meeting date in step 2
+Due dates once the decision meeting is pinned: answering the meeting date in step 2
 pins `decision-meeting` to 2026-11-20 (E3), and every unfinished node a bound reaches gets
 these latest starts and due dates. The final review closes at the meeting and opens 14 days
 before it; everything upstream is due by what it feeds. Latest bounds read backward from pins
@@ -112,7 +112,7 @@ values.
 | `reporting/review-opens` | 2026-11-06 | 2026-11-06 |
 | `testing` | 2026-11-06 | 2026-11-06 |
 
-What can be acted on after each step (brief 2.4): the frontier (every actionable node: relevant,
+What can be acted on after each step: the frontier (every actionable node: relevant,
 open, not blocked, not a group) and, where it differs, the acting frontier (without snoozed
 nodes and nodes a date ahead holds). Once the meeting date is answered, the decision meeting is
 pinned to it and waits for that day, scheduled, off the acting frontier; the steps are read
@@ -133,7 +133,7 @@ Setup is not actionable until kickoff (steps 1 and 2: its contents wait on the s
 the plan reaches the frontier only after its two actions, and the comparison set only after the
 plan.
 
-The frontier in rank order after the first three steps (brief 2.5), read on 2026-10-06 (the
+The frontier in rank order after the first three steps, read on 2026-10-06 (the
 scenario tests' clock), with each node's gravity, unlocks, and slack (null is "no deadline")
 and its rank under the default constants, to four places. Rank is global: every owner is the evaluation's owner (or, at creation, no one), so the
 owner factor is 1 throughout. Kickoff leads while it gates Setup (its gravity holds Setup, the
@@ -157,7 +157,7 @@ the 14-day horizon, so urgency is 0. `fixture_readme.rs` checks the ranks.
 | 3 | `n_decision_meeting` | 10 | 0 | 45 | 0.1852 |
 | 3 | `n_workload` | 1 | 0 | none | 0.0185 |
 
-Notices (brief 7.5): the route file's own graph, with the decision meeting as its final
+Notices: the route file's own graph, with the decision meeting as its final
 milestone, lists two nodes, each checked by hand to have no chain to or from the meeting. Work
 inside the final-review stage is not listed (the stage closes at the meeting), nor are the
 decisions that fill roles, nor the partner-led subset (it sits inside Testing, which Reporting
@@ -169,7 +169,7 @@ checks the table.
 | `purpose` | Nothing requires it, no condition reads it, and no date rule names it. |
 | `setup/workload` | Setup waits on it, but nothing waits on Setup: the test plan alone feeds Testing. |
 
-Projected after kickoff (brief 2.6), read at 2026-10-06: the canvas level with actions hidden
+Projected after kickoff, read at 2026-10-06: the canvas level with actions hidden
 (each visible node, and the nearest visible ancestor it is drawn in; C2), the actions that roll
 up into a visible node as its checklist (C4), and the first three items of the next list (C10).
 `crates/tests/tests/integration/engine/fixture_readme.rs` checks these lines.
@@ -178,7 +178,7 @@ up into a visible node as its checklist (C4), and the first three items of the n
 - `vendor-evaluation`, after step 3, actions rolled up: `n_plan` holds `n_plan_draft`, `n_plan_review`; `n_partner_led` holds `n_criteria`, `n_partner_results`.
 - `vendor-evaluation`, after step 3, next: `n_access`, `n_workload`.
 
-Version 2 (brief 2.7), `route-v2.yaml`, extends version 1: the access deliverable is renamed
+Version 2, `route-v2.yaml`, extends version 1: the access deliverable is renamed
 ("Environment and data access"), the workload placeholder is removed, a sign-off action is added
 under reporting (`n_signoff`, requiring the final review), and the baseline is relevant only when
 the comparison set is the prior tool. Upgrading the finished scenario journey, which has no local
@@ -200,7 +200,7 @@ the panel, skips the screen with a reason (a skip is not guarded), has the assis
 interviews into one interview per panelist with explicit participations, completes the onsite,
 and makes the offer with a rationale, which the journey keeps with that answer.
 
-Projected at the end of the scenario (brief 2.6), read at 2026-10-06: the level with actions
+Projected at the end of the scenario, read at 2026-10-06: the level with actions
 hidden, what rolls up, and the next list, which holds only the offer letter's decision.
 
 - `hiring-loop`, after step 6, visible with actions hidden: `n_choose_panel`, `n_loop`, `n_onsite` (in `n_loop`), `n_interviews` (in `n_onsite`), `n_make_offer`, `n_offer`.
@@ -219,7 +219,7 @@ role through a multi-valued `contributor` kind (owner, being single-valued, cann
 multi-valued role, A7). The scenario pins the launch date, completes kickoff,
 shifts the launch pin a week when feature work slips, and records a code-freeze actual
 date later than the plan's chain allows: a fact, accepted and never a warning.
-Derived (brief 2.3): with the launch pinned to 2026-11-23, the freeze is due 21 days before it,
+Derived: with the launch pinned to 2026-11-23, the freeze is due 21 days before it,
 on 2026-11-02; done on 2026-11-04, two days late, it is not short, and nor is the launch: the
 work still ahead can meet it. At the end
 three nodes wait for a date, scheduled and off the next list: the launch for its pinned day,
@@ -227,7 +227,7 @@ the beta's start, which marks itself done on its date, and the announcement for 
 not-before date, the beta's end. The retrospective, a milestone with no pin, is not held by
 its rule: an unpinned milestone is confirmed on the day.
 
-Projected at the end of the scenario (brief 2.6), read at 2026-10-06: the level with actions
+Projected at the end of the scenario, read at 2026-10-06: the level with actions
 hidden, what rolls up, and the first three items of the next list.
 
 - `product-launch`, after step 4, visible with actions hidden: `n_beta`, `n_beta_end`, `n_beta_start`, `n_build`, `n_features` (in `n_build`), `n_code_freeze`, `n_kickoff`, `n_launch`, `n_materials`, `n_announcement` (in `n_materials`), `n_docs` (in `n_materials`), `n_retro`.
@@ -241,7 +241,7 @@ two-week bake-off between two options as a proposal (three decisions, four deliv
 milestone, two identities, and a `judges` role declared on the journey); the owner applies it; the
 criteria and judges are decided and both trials start.
 
-Projected at the end of the scenario (brief 2.6), read at 2026-10-06: the level with actions
+Projected at the end of the scenario, read at 2026-10-06: the level with actions
 hidden (the bake-off has no actions, so nothing rolls up), and the first three items of the
 next list.
 
@@ -275,7 +275,7 @@ browser tests import it into a route and start a journey from it.
 
 ## Status summaries
 
-Each scenario's journey at its end, summarized for observers (brief 5.4, C18), read on
+Each scenario's journey at its end, summarized for observers (C18), read on
 2026-10-06: the in-scope nodes by display state (D8; `by_state` counts the same nodes by
 stored state), how many are left to finish, the overdue, short, and stale nodes, the milestones not yet
 done with their effective dates, and the open decisions in rank order. Nothing is

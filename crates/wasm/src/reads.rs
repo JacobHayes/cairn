@@ -1,4 +1,4 @@
-//! The in-browser root's reads for the screens around a journey (brief 5.5): the journey
+//! The in-browser root's reads for the screens around a journey: the journey
 //! index filtered as `GET /api/journeys` filters it (C16), the route index and route detail (C17),
 //! route files exported and imported through the service (A13), and the caller with their
 //! logins and identities (H3). Each answers the API's JSON for the same request, so the

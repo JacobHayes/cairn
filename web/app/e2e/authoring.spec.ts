@@ -1,4 +1,4 @@
-// Brief 5.6 on the in-browser host, seeded from the fixtures on each load: a small route
+// Authoring on the in-browser host, seeded from the fixtures on each load: a small route
 // authored by hand from an empty draft, with an edge drawn on the canvas and a refusal (A3), a notice cleared by a requirement (A20),
 // published, exported, and imported back to the same graph (A12, A1a, A13); and, on a fixture
 // journey, a local node added and a route-copied title edited and reset (B4). The forms'

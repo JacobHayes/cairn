@@ -46,7 +46,3 @@
   others' changes where people then report surprise, or the multiplayer testbed finding an
   applied-over write that overwrote a record, which would make every stale write go to a
   person.
-- Supersedes the client-side parts of
-  decisions/2026-10-06-what-the-clients-safe-retry-resubmits-and-how-often.md and the
-  rebase half of
-  decisions/2026-10-21-the-page-asks-the-derive-worker-for-every-engine-call.md.

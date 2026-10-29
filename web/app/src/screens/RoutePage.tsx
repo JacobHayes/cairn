@@ -1,4 +1,4 @@
-// A route's page (design 4.9): one page per route, the same shape as a journey's. The header
+// A route's page: one page per route, the same shape as a journey's. The header
 // names the route and the version its views show (the draft, or a published version, picked in
 // the header: routes/VersionSelect.tsx), with the View picker, the primary and the `⋯`. The
 // views are the Graph, the List and the Timeline (the View picker), which share the journey's
@@ -7,10 +7,10 @@
 // The inspector holds the route's card while no node is open (the draft card, or a version's
 // card) and the open node once one is: a draft node's form, a version node's read-only panel.
 // Selecting a node traces it on the canvas, as on a journey. A draft is authored by hand here
-// (5.6: the palette above the views, edges drawn between cards); a version is read only. The
+// (the palette above the views, edges drawn between cards); a version is read only. The
 // address says which (routes/address.ts) and the page follows the route live (H6). The shown graph
 // is derived once (route-reads.ts) and every view draws from that derivation. The assistant panel
-// (5.8) talks about the route's draft.
+// talks about the route's draft.
 import type { RouteSchedule } from "@cairn/wasm";
 import "./screens.css";
 

@@ -1,4 +1,4 @@
-// B4, A18: Remove in the selection bar while a journey's structure is edited. Each selected node
+// B4, A18: Remove in the inspector's selection panel while a journey's structure is edited. Each selected node
 // (the outermost of any that contain others) is removed with its cascade shown first, one
 // confirmation at a time: a removal's rewrites are computed from the graph as it is, so each
 // is previewed and sent on the graph the one before left, never merged into one patch.

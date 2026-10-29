@@ -1,6 +1,6 @@
 // What each view draws on the journey's page: the graph, the list, the timeline and the walk
 // through, each from the journey's one view state (journeys/view.ts) and its own settings.
-// The graph's stalled surface and, in edit mode, the structure's tools (5.6) are the head's
+// The graph's stalled surface and, in edit mode, the structure's tools are the head's
 // (CanvasBars).
 import { lazy, Suspense, useMemo } from "react";
 import { useLocation } from "react-router";
@@ -33,7 +33,7 @@ export interface ProjectionProps {
   selected: string | undefined;
   /** The line whose card is open, as `<from>~<to>`; the canvas draws it in the inspector. */
   edge: string | undefined;
-  /** In edit mode, the journey's structure as authored, and the edge being drawn (5.6). */
+  /** In edit mode, the journey's structure as authored, and the edge being drawn. */
   authored: Authored | undefined;
   drawing: EdgeDrawing;
   /** The walk reports the card it is on (none when it has none), so the frame can leave the node it names to the card. */

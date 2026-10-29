@@ -3,8 +3,7 @@
 // a journey's notes and links), and each reference elsewhere that would dangle with what the
 // same patch does about it. The patch is previewed with the engine first, so the author sees
 // whether it is accepted and what it would newly cause in the journey (D7) before confirming.
-// Removing a role or a kind shows its cascade the same way. Exported for proposal review
-// (5.7), which shows cascaded items the same way.
+// Removing a role or a kind shows its cascade the same way. Exported for proposal review, which shows cascaded items the same way.
 
 import { Failed } from "../ui/Failed.tsx";
 import { Button } from "../ui/kit.tsx";

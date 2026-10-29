@@ -1,4 +1,4 @@
-// The app frame every screen renders inside (design 3.1): a chrome rail with the screens,
+// The app frame every screen renders inside: a chrome rail with the screens,
 // the workspace (the screen the router shows, its one scroller `.ws-body`), the inspector
 // column on the right (INSPECTOR | ASSISTANT; a bottom sheet below 1100px; a rail when hidden). The sync dot sits
 // beside the brand at the top of the rail. The frame is one `100dvh` grid with one scroller per

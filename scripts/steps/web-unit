@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Step web-unit: the web unit tests (Vitest, one suite per web package with a vitest.config.ts:
 # the browser host's agreement tests run in Node).
-# PRACTICES, The validation ladder. The browser host's tests (brief 4.5) run in Node and need
+# PRACTICES, The validation ladder. The browser host's tests run in Node and need
 # the module (mise run build:wasm) and the server's answers to compare with (the
 # cairn-wasm-cases binary, which walks the fixtures through the service natively:
 # scripts/agreement-cases); both are build outputs under web/wasm/dist/. The authoring tests
-# (5.6) check the editors against the module's engine. A suite that runs no test, or any test
+# check the editors against the module's engine. A suite that runs no test, or any test
 # that fails or is skipped, fails the step.
 set -euo pipefail
 cd "$(dirname "$0")/../.."

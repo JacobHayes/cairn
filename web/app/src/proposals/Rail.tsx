@@ -108,7 +108,7 @@ function MarkWord({ mark }: { mark: DiffMark }) {
   return <span className={`layer-word layer-word-${mark.kind}`}>{DIFF_LABELS[mark.kind]}</span>;
 }
 
-/** A15, F5: the candidate's violations; a contradictory chain offers 5.1's resolution moves, each added to the proposal. */
+/** A15, F5: the candidate's violations; a contradictory chain offers the inspector's resolution moves, each added to the proposal. */
 function Violations({ layer, model }: { layer: Layer; model: LayerModel }) {
   const violations = model.preview.violations ?? [];
   if (violations.length === 0) {

@@ -1,4 +1,4 @@
-// Node detail's writes: each action one patch through the edit manager (4.6: the safe retry,
+// Node detail's writes: each action one patch through the edit manager (the safe retry,
 // D7's consequences notice, nothing sent under version skew), drafted against the revision its
 // author saw. The write is the manager's, found again by the section's edit key: a rejection
 // waits there across a screen left and a reload, and the section shows it inline when it is on

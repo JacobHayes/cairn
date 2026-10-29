@@ -1,4 +1,4 @@
-// What a save leaves under the control that made it (design 9.4) as a lifecycle: shown when a
+// What a save leaves under the control that made it as a lifecycle: shown when a
 // write lands, gone after `RECEIPT_MS` (a delayed transition), shown afresh by the next save
 // and cleared when a new write starts. The control that shows it owns it (`useReceipt`).
 import { assign, setup, type SnapshotFrom } from "xstate";

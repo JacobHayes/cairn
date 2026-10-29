@@ -400,8 +400,7 @@ async fn history_pages_a_journeys_events_grouped_by_patch(store: Arc<dyn Store>)
     );
 }
 
-/// The derived reads' futures are `Send` over either store, as the write path's are
-/// (2026-10-18-the-store-trait-returns-boxed-futures-and-the-stack-holds-a-trait-object.md).
+/// The derived reads' futures are `Send` over either store, as the write path's are.
 #[test]
 fn every_derived_read_can_be_awaited_on_another_thread() {
     fn send<T: Send>(_: &T) {}

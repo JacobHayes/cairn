@@ -1,7 +1,7 @@
 // A button that opens a small menu of actions: the View picker and the journey's `⋯` in its
 // header, and the toolbar's filter. It closes on Escape, on a click outside it, and when an item
 // is chosen. Its popover is marked `data-popover`, which the keyboard map reads: an Escape that
-// finds one open leaves the selection alone (3.4).
+// finds one open leaves the selection alone.
 //
 // A menu of actions (`role="menu"`) is a keyboard menu: opened from the keyboard it puts the
 // focus on its current item (`aria-current="page"`) or its first; the arrow keys move over the

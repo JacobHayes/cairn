@@ -1,6 +1,6 @@
 //! The OIDC provider against a stub issuer on loopback (H1: OAuth/OIDC against a
 //! registered provider): a sign-in ends in a session for the login the ID token names,
-//! and every way an ID token or a callback can be wrong is refused (3.2, Security).
+//! and every way an ID token or a callback can be wrong is refused.
 
 #[cfg(test)]
 mod oidc {

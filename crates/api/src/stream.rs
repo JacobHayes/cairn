@@ -10,7 +10,7 @@
 //! disconnected: its subscription is dropped, freeing its place under the subscriber limit,
 //! and its body ends in an error, so it reconnects and starts again from current revisions.
 //! A peer that stops reading is caught here only once the socket's buffers fill; the
-//! listener's `TCP_USER_TIMEOUT` (4.7) closes it at the stall, and the pump then drops it
+//! listener's `TCP_USER_TIMEOUT` closes it at the stall, and the pump then drops it
 //! as gone (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md). A client that
 //! goes away is noticed at once and dropped the same way.
 

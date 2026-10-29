@@ -1,4 +1,4 @@
-// A journey's page in a real browser (2.2 to 2.4), on the in-browser host: what only focus,
+// A journey's page in a real browser, on the in-browser host: what only focus,
 // layout and the window show. The view state set on one view follows every other, and each
 // draws the same node from it; the keys act on the view the pointer left them on (j, Enter,
 // Esc, v); Frontier highlights without hiding; the search narrows every view; and no view

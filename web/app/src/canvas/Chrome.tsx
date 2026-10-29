@@ -1,4 +1,4 @@
-// What sits over the graph (5.8): the Signal button at the top right (the lens, Key; a route's canvas has no signals, so its Key button takes the slot) and Reveal at
+// What sits over the graph: the Signal button at the top right (the lens, Key; a route's canvas has no signals, so its Key button takes the slot) and Reveal at
 // the bottom right. The rest of the controls are the view's own (screens/ViewControls.tsx) and the
 // zoom buttons (GraphCanvas). Quiet by rule: one control each.
 import { Panel } from "@xyflow/react";

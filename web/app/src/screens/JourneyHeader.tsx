@@ -1,4 +1,4 @@
-// The journey header (4.1): one line with the name, the status when the journey is not active (a
+// The journey header: one line with the name, the status when the journey is not active (a
 // read-only chip), the View picker and the journey's `⋯` (Edit, insert a segment, save it as a
 // route, re-link it, copy its link, and its Status: the moves the status allows, B11, and
 // deletion once archived, A19). What the journey is (progress, next milestone, route) is on the

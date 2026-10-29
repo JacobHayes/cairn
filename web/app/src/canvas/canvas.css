@@ -1,4 +1,4 @@
-/* The canvas (5.4 to 5.8): cards, lines, and what sits over them, drawn with Graticule's tokens in light
+/* The canvas: cards, lines, and what sits over them, drawn with Graticule's tokens in light
    and dark. Quiet by rule (C6): nothing animates or flashes. A card's row heights match cards.ts, which
    sized the layout, so sizes here are px. A card is always drawn whole; only an open container's head is
    simplified below the near zoom, by `data-lod` on the canvas root, so the boxes never change size. The canvas fills its region (`.ws-canvas`,
@@ -43,7 +43,7 @@
   background: transparent;
 }
 
-/* The controls as square hairline buttons (5.8), a vertical stack at the bottom left; a fit keeps its left padding clear of the stack and the keys hint beside Fit. */
+/* The controls as square hairline buttons, a vertical stack at the bottom left; a fit keeps its left padding clear of the stack and the keys hint beside Fit. */
 .canvas .react-flow__controls {
   z-index: 6;
   box-shadow: none;
@@ -217,7 +217,7 @@
   font-size: var(--type-text-size);
 }
 
-/* ---- cards (5.5) ------------------------------------------------------------------------------ */
+/* ---- cards ------------------------------------------------------------------------------ */
 
 /* Paper, a hairline, and DESIGN's four corner ticks (L-shaped, 8px, inset 3px). */
 .node {
@@ -611,7 +611,7 @@
   outline: 1px solid var(--color-text);
 }
 
-/* Hanging tags (5.5): the rank tag at the top left, the trace's tag at the top right, the Signals chip at the bottom right. */
+/* Hanging tags: the rank tag at the top left, the trace's tag at the top right, the Signals chip at the bottom right. */
 .node .hang-tag {
   font-size: var(--type-label-size);
   line-height: 20px;
@@ -905,7 +905,7 @@
   margin-left: 0;
 }
 
-/* ---- zoomed out (5.4): an open container's head ---------------------------------------------- */
+/* ---- zoomed out: an open container's head ---------------------------------------------- */
 
 /* Below the near zoom a container's head is its title, left aligned and centred in the head's box, and a stage's state chip at the far right. The kind, progress, date, owner, the marker and the fold control go (a double-click still folds); the marker's row keeps its height, the rule stays. The title is 13px on screen (the zoom is `--z` on the root), never below the reading size 15px unless the room needs it, or the largest size at which the whole title fits the room (`--title-fit`, cards.ts), whichever is less. */
 .react-flow[data-lod="out"] .node-container .node-inner {
@@ -978,7 +978,7 @@
   height: 0.55em;
 }
 
-/* ---- lines (5.6) ------------------------------------------------------------------------------ */
+/* ---- lines ------------------------------------------------------------------------------ */
 
 .line .react-flow__edge-path {
   fill: none;

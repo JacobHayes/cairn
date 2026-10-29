@@ -45,7 +45,7 @@ mod property {
         (Some(key.clone()), true)
     }
 
-    /// The plain expansion of 2.2's reference test, in the pruned set: a node depends on its
+    /// The plain expansion of the dependency pass's reference test, in the pruned set: a node depends on its
     /// in-scope children and on every requirement, opening, and (unless force-included)
     /// condition decision of itself and its ancestors that is in scope; each with whether
     /// every way it reaches the node is a stage opening that does not gate.

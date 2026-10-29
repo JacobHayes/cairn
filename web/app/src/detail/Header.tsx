@@ -1,4 +1,4 @@
-// C8, D8: the inspector's header (design 6.2): the kind and where the node sits (each crumb a
+// C8, D8: the inspector's header: the kind and where the node sits (each crumb a
 // link) with its display state at the top right, its title (renamed in place from the menu),
 // one meta line (the owner; the date and rank are the Dates section's and the sentence's), the flags that are set, and, for an orphaned node, the choice it needs. Where the
 // node came from is not here: it is the Origin section.

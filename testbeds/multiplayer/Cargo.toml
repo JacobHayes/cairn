@@ -1,4 +1,4 @@
-# Brief 6.1, the multiplayer testbed: Cairn's real HTTP server over the SQLite store and N
+# The multiplayer testbed: Cairn's real HTTP server over the SQLite store and N
 # virtual clients using the real Rust client (H5's safe retry, H6's subscription tracking),
 # run under the patina native shim (PRACTICES, Simulation with patina). Its own Cargo
 # workspace (the empty [workspace] table), so `cargo patina build` resolves only this tree.

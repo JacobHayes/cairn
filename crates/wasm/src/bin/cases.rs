@@ -1,4 +1,4 @@
-//! Writes the agreement cases for the browser tests (brief 4.5): every group the server walk
+//! Writes the agreement cases for the browser tests: every group the server walk
 //! gives, a generated 2,000-node journey, and the document at the limits, one JSON file each,
 //! with an index, into the directory named first. `scripts/agreement-cases` runs it.
 

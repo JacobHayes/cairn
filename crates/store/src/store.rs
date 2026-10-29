@@ -29,8 +29,7 @@ use crate::target::{Document, LoadTarget};
 /// Nothing is answered from a write that may not have reached the store's storage: not a
 /// read, not a receipt, not a commit. A backend that cannot tell whether a failed commit
 /// reached it settles that before it answers anything, or errs on every call until it is
-/// reopened
-/// (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
+/// reopened.
 #[async_trait]
 pub trait Store: AuthStore + ConversationStore + Send + Sync {
     /// One read of one graph by typed target: a journey, a route with its draft, a published
@@ -63,8 +62,7 @@ pub trait Store: AuthStore + ConversationStore + Send + Sync {
     async fn commit(&self, commit: Commit) -> Result<Committed, CommitError>;
 
     /// Whether the store still answers: an error once it has failed closed, when it answers
-    /// nothing until it is reopened
-    /// (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
+    /// nothing until it is reopened.
     /// It reads the store's own state and touches no storage, so a health check costs
     /// nothing.
     ///
@@ -126,7 +124,7 @@ pub trait Store: AuthStore + ConversationStore + Send + Sync {
 }
 
 /// Auth state outside every domain (ARCHITECTURE, Auth; Schema outline): plain record
-/// operations the auth crate builds on (3.2). A login, session, or agent token names a
+/// operations the auth crate builds on. A login, session, or agent token names a
 /// user that exists; a record that does not is a malformed write.
 #[async_trait]
 pub trait AuthStore: Send + Sync {

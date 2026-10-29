@@ -1,4 +1,4 @@
-// What a card says in plain words (5.5, the density call): the one date in its foot, a
+// What a card says in plain words (the density call): the one date in its foot, a
 // condition's "if" sentence, a snooze's target, a container's progress. Pure and apart from the
 // components, so the unit tests read the same sentences the canvas draws.
 import { conditionWords, decisionOf, decisionsIn, type ConditionNames } from "../authoring/condition.ts";

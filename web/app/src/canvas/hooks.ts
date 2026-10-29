@@ -147,7 +147,7 @@ export function useLaidOut(domain: string, view: string, model: CanvasModel | un
 const NO_FLIPS: ReadonlySet<string> = new Set();
 
 /**
- * C2, 5.1: the containers the viewer has flipped (opened against the ladder, or folded) since
+ * C2: the containers the viewer has flipped (opened against the ladder, or folded) since
  * `step` was chosen, for a view that folds for display. A pick (`picks` counts them, a repeated
  * pick of the same step and Reset included) drops them, so a flip made before never comes back.
  * `set` makes one container's flip what it is told, rather than toggling it.
@@ -173,7 +173,7 @@ export function useFlips(step: Step | undefined, picks: number): { flipped: Read
 }
 
 /**
- * C2, C7, 5.1: the folds of a view that folds for display (the list, the timeline) over the graph's
+ * C2, C7: the folds of a view that folds for display (the list, the timeline) over the graph's
  * `nodes`, `current` being its current stages (none for a route): the containers the drawn step opens and the viewer's flips since the depth was chosen, and a container above
  * the selected node is open whatever either says. Folding such a container moves the selection to
  * it (`take`) and closes it: the node is no longer hidden inside a fold, and the address says

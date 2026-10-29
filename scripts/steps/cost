@@ -3,9 +3,8 @@
 # (in check:fast when the integration step runs: the same inputs).
 # PRACTICES, The validation ladder. Cost tests are the tests in
 # `tests/integration/cost_*.rs`, each inside `mod cost`: a pass over a graph at the schema's
-# limits, which is structurally slow, so they are a step of their own, not part of unit
-# (decisions/2026-10-09-cost-tests-run-in-the-full-check-only.md,
-# decisions/2026-10-22-check-fast-runs-the-cost-tests-with-the-integration-tests.md). Like the property tests
+# limits, which is structurally slow, so they are a step of their own, not part of unit.
+# Like the property tests
 # they are modules of their crate's one integration test binary, selected by module path, one
 # suite per file, counted from the test names (`<file>::cost::<test>`).
 set -euo pipefail

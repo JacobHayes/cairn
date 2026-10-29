@@ -2,11 +2,11 @@
 # Step browser: the binary with its web build served, and in-browser end-to-end of the app
 # against the wasm host and the binary (Playwright in Chromium, one suite per web package with
 # a playwright.config.ts).
-# PRACTICES, The validation ladder. The binary (brief 4.7) serves the app's build
+# PRACTICES, The validation ladder. The binary serves the app's build
 # (web/app/dist/build/): its own tests that start it (`mod binary` in
 # crates/cairn/tests/integration/binary.rs, so `binary::binary::`) are a suite here, and the
 # app's server-host tests run against `cairn demo`, the same binary over the fixtures in
-# memory (the `server` project of web/app/playwright.config.ts). The app's tests (brief 4.6)
+# memory (the `server` project of web/app/playwright.config.ts). The app's tests
 # need the module and the binary. A suite that runs no test, or any test that fails or is
 # skipped, fails the step. The browsers are Playwright's own, pinned with @playwright/test:
 # `npx playwright install chromium` once per machine.

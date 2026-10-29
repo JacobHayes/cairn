@@ -1647,8 +1647,7 @@ fn a_patch_to_a_proposal_is_not_a_domain_patch() {
     assert!(DomainPatch::new(proposal, None).is_err());
 }
 
-/// The futures a multi-threaded host awaits are `Send` over either store
-/// (2026-10-18-the-store-trait-returns-boxed-futures-and-the-stack-holds-a-trait-object.md).
+/// The futures a multi-threaded host awaits are `Send` over either store.
 #[test]
 fn every_operation_can_be_awaited_on_another_thread() {
     fn send<T: Send>(_: &T) {}

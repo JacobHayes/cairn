@@ -101,7 +101,7 @@ export function litOf(screen: Screen, state: ViewState, ready: Ready): ReadonlyS
   return frontierOn(screen, state) ? new Set(ready.derived.acting_frontier) : undefined;
 }
 
-/** C2, 5.1: the stages that are current in `ready`, as the engine derived them: those holding an acting-frontier or active node. */
+/** C2: the stages that are current in `ready`, as the engine derived them: those holding an acting-frontier or active node. */
 export function currentStagesOf(ready: Ready): Set<string> {
   return new Set(ready.derived.current_stages ?? []);
 }

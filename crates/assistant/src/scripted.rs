@@ -1,6 +1,6 @@
 //! A scripted provider: it answers each call with the next step of a script and records what
-//! it was sent, so the turn loop, the write wrapper, and the endpoints are tested, and the
-//! proof is generated, with no network and no credential.
+//! it was sent, so the turn loop, the write wrapper, and the endpoints are tested with no network and
+//! no credential.
 
 use std::collections::VecDeque;
 use std::sync::Mutex;

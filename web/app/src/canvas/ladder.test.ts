@@ -1,4 +1,4 @@
-// Depth's ladder (C2, 5.1): the step and the viewer's own clicks decide what is open.
+// Depth's ladder (C2): the step and the viewer's own clicks decide what is open.
 import { expect, test } from "vitest";
 
 import type { GraphNode } from "../detail/model.ts";

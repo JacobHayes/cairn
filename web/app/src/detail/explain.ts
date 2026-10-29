@@ -1,7 +1,7 @@
 // The words behind node detail's explanations (C8, F7): each derived value's explanation
 // inputs from the local derive, said in terms of the journey's nodes, and, for a date bound,
 // the pin or rule to edit to change it. Pure functions of the derived document, so every
-// screen that explains a value (5.2's trace, 5.4's timeline) says it the same way.
+// screen that explains a value (the trace, the timeline) says it the same way.
 import type { Schema } from "@cairn/client";
 
 import { isLeaf } from "../authoring/graph.ts";

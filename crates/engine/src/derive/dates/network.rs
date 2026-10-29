@@ -1,5 +1,5 @@
-//! The network itself: instant slots and the constraints between them, built from 2.2's
-//! pruned effective dependency graph and the graph's date rules, estimates, and stage closes,
+//! The network itself: instant slots and the constraints between them, built from the
+//! dependency pass's pruned effective dependency graph and the graph's date rules, estimates, and stage closes,
 //! as the translation table in [`super`] lays out. Pins, answers, actuals, and today are not
 //! constraints; the layers seed them onto slots.
 
@@ -19,10 +19,10 @@ use crate::derive::skip::Skips;
 use crate::derive::stored_state;
 use crate::graph::Document;
 
-/// Slots per node: 2.2's instants, [`Point::ALL`].
+/// Slots per node: the four instants, [`Point::ALL`].
 const POINTS: usize = Point::ALL.len();
 
-/// One instant of the network, by position: node `i`'s instants at `4i..4i + 4` (2.2's
+/// One instant of the network, by position: node `i`'s instants at `4i..4i + 4` (see
 /// [`Instant::slot`]), `created_at` after them, then each node's answer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct Slot(u32);

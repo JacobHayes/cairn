@@ -34,7 +34,7 @@ export interface Side {
 }
 
 /**
- * What Reveal shows beside the view (5.7): the level with every kind and class and no filter or
+ * What Reveal shows beside the view: the level with every kind and class and no filter or
  * search, less what the view does not draw (`drawn`, the view's own level under the same
  * collapse) and the trace does not touch. The traced nodes the view hides are drawn, ghosted
  * where not relevant.
@@ -146,7 +146,7 @@ export function useCanvasGraph({ view, side, was, wait = false, layer, ready, se
   const { trace, learn } = useSelectionTrace(side.held, layer === undefined ? selected : undefined);
   // A node the proposal removes has no card in the graph after; its address is drawn from the level before, so the level after is asked for no node.
   const asked = layer !== undefined && address !== undefined && !nodes.some((node) => node.key === address) ? undefined : address;
-  // Reveal (5.7) is a moment, not an address: it ends when something else is selected.
+  // Reveal is a moment, not an address: it ends when something else is selected.
   const [revealedFor, setRevealedFor] = useState<{ node: string | undefined; linked: number } | undefined>(undefined);
   const traced = useMemo(() => (trace === undefined ? undefined : new Set([trace.node, ...trace.upstream, ...trace.downstream])), [trace]);
   const revealed = revealedFor !== undefined && revealedFor.node === selected ? revealedFor : undefined;

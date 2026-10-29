@@ -1,4 +1,4 @@
-//! The in-browser root's proposals (I6, C14; brief 5.7): created against a domain with a
+//! The in-browser root's proposals (I6, C14): created against a domain with a
 //! client-generated id, fetched, edited, previewed, applied, discarded, and refreshed by id
 //! alone, and the upgrade, save-as-route, and re-link drafts (B7, B8, B9), each through the
 //! same service calls as the server's `/api/{domain}/proposals`, `/api/proposals/{id}...`, and

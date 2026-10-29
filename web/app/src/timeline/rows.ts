@@ -317,7 +317,7 @@ export function chartOf(view: Ready, timeline: Timeline, options: ChartOptions):
   const rows = rowsOf(view, dated, options);
   const { row: selected, dependencies } = options.selected === undefined ? { row: undefined, dependencies: [] } : selectionOf(view, rows, options.selected);
 
-  // Out of focus (2.3) is outside the selection's trace or outside the highlight: the lowest opacity wins.
+  // Out of focus is outside the selection's trace or outside the highlight: the lowest opacity wins.
   const traced = new Set(dependencies.flatMap((each) => [each.from, each.to]));
   if (selected !== undefined) {
     traced.add(selected);

@@ -1,5 +1,4 @@
-// C11, B2, B5, B6, D4: what the inspector offers for a node by its kind and state (design 6.4,
-// 6.5): one primary action, at most one visible secondary, and an overflow menu listing only what
+// C11, B2, B5, B6, D4: what the inspector offers for a node by its kind and state: one primary action, at most one visible secondary, and an overflow menu listing only what
 // applies, grouped by how often it is wanted. Pure, so the unit tests check each kind and state
 // without a page.
 import { accepts, isTerminal, isWork, nodeOf, storedSnooze, titleOf, type NodeDetail, type NodeMove, type Ready } from "./model.ts";

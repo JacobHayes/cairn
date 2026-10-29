@@ -1,6 +1,6 @@
-//! The auth layer on a bare axum router (readiness ruling: 4.2's API does not exist yet),
+//! The auth layer on a bare axum router (no API behind it),
 //! with the dev provider and browser sessions: H1 (a simple local mode), and the security
-//! rules a request meets whatever provider it reaches (3.2, Security).
+//! rules a request meets whatever provider it reaches.
 
 #[cfg(test)]
 mod layer {

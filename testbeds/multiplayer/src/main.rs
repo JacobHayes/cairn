@@ -1,10 +1,10 @@
-//! Brief 6.1, the multiplayer testbed (PRACTICES, Simulation with patina: Testbeds).
+//! The multiplayer testbed (PRACTICES, Simulation with patina: Testbeds).
 //!
-//! One process runs Cairn's real HTTP server (4.2's router over a service on the SQLite
+//! One process runs Cairn's real HTTP server (the API's router over a service on the SQLite
 //! store) and N virtual clients, all as tasks on a multi-thread tokio runtime
 //! (`WORKER_THREADS` workers; decisions/2026-10-18-the-multiplayer-testbed-runs-a-multi-thread-runtime.md). Each client patches one
-//! shared journey through the real Rust client: H5's safe retry resubmits a stale patch
-//! when what intervened cannot overlap it and surfaces it when it can, and a transport
+//! shared journey through the real Rust client: a patch is submitted once and the server applies a stale
+//! one when what intervened cannot overlap it and rejects it when it can, and a transport
 //! retry resends a patch whose answer was lost, which the server answers from its receipt.
 //! Each client also keeps a view current through its SSE subscription and H6's tracking.
 //! One more client is an agent calling the service in process, with the same transport

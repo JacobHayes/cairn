@@ -1,4 +1,4 @@
-// The CSS check of the lint step (design 3.2, guard rails): the app's styles keep one
+// The CSS check of the lint step: the app's styles keep one
 // scroller per region and use the design's tokens. A rule outside its allowlist is a violation:
 //   - `overflow` or `overflow-y` of auto or scroll, except on the frame's scrollers;
 //   - `max-height` in `vh`, and `100vh` anywhere (the frame is `100dvh`);
@@ -22,7 +22,7 @@ export interface Source {
   text: string;
 }
 
-/** The only elements that scroll (design 3.2): the rail, the workspace body, and the inspector's, sheet's, popover's, modal's and tour callout's bodies. */
+/** The only elements that scroll: the rail, the workspace body, and the inspector's, sheet's, popover's, modal's and tour callout's bodies. */
 const SCROLLERS = [".rail", ".ws-body", ".inspector-body", ".sheet-body", ".popover-body", ".modal-body", ".tour-body"];
 /** Elements that may stick: table headers, the Plan list's pinned columns, the timeline's axis, the inspector's way back to the pass. */
 const STICKY = ["th", ".list-pinned", ".timeline-axis", ".back-to-pass"];

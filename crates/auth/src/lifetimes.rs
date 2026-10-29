@@ -1,5 +1,4 @@
-//! How long what the auth crate issues lasts (3.2, Decisions left to the implementer:
-//! session and token lifetimes). Agent tokens last until revoked: a token is a login
+//! How long what the auth crate issues lasts. Agent tokens last until revoked: a token is a login
 //! (ARCHITECTURE, Auth), and a script holding one should not stop on a timer.
 
 use std::time::Duration;

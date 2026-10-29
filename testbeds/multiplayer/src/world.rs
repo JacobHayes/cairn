@@ -1,4 +1,4 @@
-//! The world the clients share: a composition root like the binary's (4.7) - the SQLite
+//! The world the clients share: a composition root like the binary's - the SQLite
 //! store, the in-process notifier, the dev sign-in provider, and the API's router - served
 //! on the simulated loopback network, and the journey every client patches.
 

@@ -1,4 +1,4 @@
-//! Brief 6.2, the durability testbed (PRACTICES, Simulation with patina: Testbeds,
+//! The durability testbed (PRACTICES, Simulation with patina: Testbeds,
 //! `durability`; PRD J2, J3, A17). The service runs on the real SQLite store in one data
 //! directory and one client submits a seeded plan of domain patches, recording in a durable
 //! ledger what it submitted and what was acknowledged. Under the patina native shim the

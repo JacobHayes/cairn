@@ -1,4 +1,4 @@
-// What a list of journeys says of each one, as data (4.8, C16): progress from the status summary,
+// What a list of journeys says of each one, as data (C16): progress from the status summary,
 // what needs a look (worst first), what is the viewer's, the next milestone, and the one fact a
 // phone row leads with. Words come from the functions here, so the index, Home and the journey
 // card say a thing one way. Pure, so the unit tests check them without a page.
@@ -16,7 +16,7 @@ export function progressOf(model: SummaryModel): { done: number; inScope: number
   return { done: model.inScope - model.remaining, inScope: model.inScope };
 }
 
-/** What is still the viewer's to do (2.4): of their nodes, those the engine reads as open for them, and how many of those are on the acting frontier. */
+/** What is still the viewer's to do: of their nodes, those the engine reads as open for them, and how many of those are on the acting frontier. */
 export function yoursOf(entries: readonly MineEntry[]): { open: number; actionable: number } {
   const open = entries.filter((entry) => entry.open === true);
   return { open: open.length, actionable: open.filter((entry) => entry.acting === true).length };

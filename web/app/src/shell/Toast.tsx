@@ -1,5 +1,5 @@
 // The Graticule toast, kept only for confirmations that are not about syncing ("Route file
-// exported", design 9.7): it takes itself down after a few seconds, waits while the pointer is
+// exported"): it takes itself down after a few seconds, waits while the pointer is
 // on it, has no close button, and the next one replaces it. It rises at the workspace's
 // bottom right (app.css). The timing is the toast machine's (data/toasts.ts).
 import { useSelector } from "@xstate/react";

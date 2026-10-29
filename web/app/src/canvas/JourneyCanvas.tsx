@@ -1,11 +1,11 @@
 // The journey canvas (C1 to C7, C15): the journey's level for the view state (Depth's step
-// and the containers collapsed, the ladder, 5.1; the relevance classes, the Filter and the
+// and the containers collapsed, the ladder; the relevance classes, the Filter and the
 // search, journeys/requests.ts), read from its local derivation with the next list (rank) and
 // "mine", turned into cards and lines, laid out in the layout worker, and drawn; the trace of the
 // selected node as an overlay (selecting a node traces it; several selected trace nothing), and
 // what Frontier lights at full strength with the rest faded, as is what Depth's Fade dims (the
 // level is then the Actions one, so nothing moves). A card opens the
-// node's detail (5.1) beside the canvas, or joins the selection; a line opens its card (LineCard.tsx).
+// node's detail beside the canvas, or joins the selection; a line opens its card (LineCard.tsx).
 import { OWNER_KIND } from "@cairn/client";
 import { Panel } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
@@ -81,13 +81,13 @@ export interface JourneyCanvasProps {
   selected: string | undefined;
   /** The line whose card is open, as `<from>~<to>`. */
   edge: string | undefined;
-  /** In edit mode, a card picked while an edge is drawn ends the edge instead of opening (5.6); true when it took the pick. */
+  /** In edit mode, a card picked while an edge is drawn ends the edge instead of opening; true when it took the pick. */
   onPick?: ((key: string) => boolean) | undefined;
   /** The selection: who is selected, and what adds to it. */
   selection: Selection;
 }
 
-/** What a card asks of the canvas: open its node, expand or collapse it (and refit to it, 5.1), trace it. */
+/** What a card asks of the canvas: open its node, expand or collapse it (and refit to it), trace it. */
 function useActions(ready: Ready, view: GraphView, selected: string | undefined, onPick: JourneyCanvasProps["onPick"], selection: Selection): CardActions {
   const navigate = useNavigate();
   const frame = useFrameActions();

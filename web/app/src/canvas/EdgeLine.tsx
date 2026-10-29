@@ -1,4 +1,4 @@
-// `EdgeLine`: one edge on the canvas (C1), drawn along the route ELK left room for (5.6): an
+// `EdgeLine`: one edge on the canvas (C1), drawn along the route ELK left room for: an
 // orthogonal polyline with 4px corners, and at its target end the marker that says what it is: a
 // closed arrowhead for a requirement, a hollow diamond for a condition gate, a bar for a stage
 // opening. No words on the line; hovering or focusing one gives the

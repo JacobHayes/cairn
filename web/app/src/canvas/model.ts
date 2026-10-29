@@ -27,11 +27,11 @@ export type Trace = Schema<"Trace">;
 /** C5: how many of the acting frontier's top-ranked items carry a rank tag on the canvas (the Signals lens shows the rest). */
 export const RANK_TAG_COUNT = 3;
 
-/** C2: Depth's steps, coarsest first, each named after the deepest kind it draws (5.1). */
+/** C2: Depth's steps, coarsest first, each named after the deepest kind it draws. */
 export const STEPS = ["stages", "decisions", "deliverables", "actions"] as const;
 export type Step = (typeof STEPS)[number];
 
-/** C6: what the Signals lens puts on each card (8.2). */
+/** C6: what the Signals lens puts on each card. */
 export const LENSES = ["rank", "gravity", "unlocks", "slack"] as const;
 export type Lens = (typeof LENSES)[number];
 
@@ -63,7 +63,7 @@ export interface Here {
   mine: boolean;
 }
 
-/** What a route's card says instead of a state (8.11): its date rule in words, and an advisory notice (A20). */
+/** What a route's card says instead of a state: its date rule in words, and an advisory notice (A20). */
 export interface RouteMarks {
   /** The one foot line: "Due 14 days before Decision meeting". */
   foot: string | undefined;
@@ -81,7 +81,7 @@ export interface Card {
   /** A top-level group: a stage. */
   stage: boolean;
   /** It has children (it can be expanded and collapsed, C4). */
-  /** Its subtree is rolled up into it: the level collapsed it (5.3). */
+  /** Its subtree is rolled up into it: the level collapsed it. */
   collapsed: boolean;
   /** Every hidden node that rolled up into it, whatever hid it (C2); the trace marks the card for each. */
   rolledUp: string[];
@@ -94,7 +94,7 @@ export interface Card {
   route?: RouteMarks | undefined;
 }
 
-/** The one secondary line a card may carry (5.5): a decided decision's answer, a container's progress, a childless piece of work's checklist count, or what a conditional node depends on. */
+/** The one secondary line a card may carry: a decided decision's answer, a container's progress, a childless piece of work's checklist count, or what a conditional node depends on. */
 export type CardBody =
   | { kind: "answer"; text: string; rationale: string | undefined }
   | { kind: "progress"; done: number; total: number; badge: CardBadge | undefined }
@@ -104,7 +104,7 @@ export type CardBody =
   | { kind: "marked_done"; skipped: number; keptPending: boolean }
   | { kind: "depends"; text: string };
 
-/** What the Signals lens can put on a card (8.2): each is a number, or none when the card has no value. */
+/** What the Signals lens can put on a card: each is a number, or none when the card has no value. */
 export interface Signals {
   rank: number | undefined;
   gravity: number | undefined;
@@ -131,11 +131,11 @@ export interface CardState {
   /** C5: its place in the acting frontier's rank order. */
   rank: number | undefined;
   signals: Signals;
-  /** C5: a stage holding the acting frontier or active work, which the Stages step opens (5.1). */
+  /** C5: a stage holding the acting frontier or active work, which the Stages step opens. */
   current: boolean;
 }
 
-/** How an edge is drawn (5.6), strongest first: a requirement, a condition gate, or a stage opening. Every one holds its dependent back; date relationships are not edges (`DateLine`). */
+/** How an edge is drawn, strongest first: a requirement, a condition gate, or a stage opening. Every one holds its dependent back; date relationships are not edges (`DateLine`). */
 export type LineKind = "requires" | "condition" | "stage_opening";
 
 /** The kinds of line, strongest first. */

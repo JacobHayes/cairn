@@ -1,4 +1,4 @@
-// What authoring's browser tests share (brief 5.6): starting a route with an empty
+// What authoring's browser tests share: starting a route with an empty
 // draft, adding a node from the palette and reaching its structure, a node form's fields,
 // roles, and a journey's edit mode, each the way a person does it.
 import { expect, type Locator, type Page } from "@playwright/test";
@@ -58,7 +58,7 @@ export function formField(page: Page, field: string): Locator {
   return nodeForm(page).locator(`[data-testid="author-field"][data-field="${field}"]`);
 }
 
-/** Opens a folded section of the open node's form (design 4.9): relevance, dates, completion, or weight. */
+/** Opens a folded section of the open node's form: relevance, dates, completion, or weight. */
 export async function openForm(page: Page, name: "relevance" | "dates" | "completion" | "weight"): Promise<Locator> {
   const found = nodeForm(page).getByTestId(`form-${name}`);
   if ((await whenSettled(page, () => found.getAttribute("open"))) === null) {

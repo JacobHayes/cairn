@@ -1,4 +1,4 @@
-// B6: what a snooze can set aside and until when (design 6.5): the node itself or an ancestor
+// B6: what a snooze can set aside and until when: the node itself or an ancestor
 // container holding unfinished work, each with its open count, nearest first; and the quick
 // dates. Pure, so the unit tests check them without a page.
 import type { Schema } from "@cairn/client";

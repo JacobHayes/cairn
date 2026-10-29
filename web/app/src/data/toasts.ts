@@ -1,4 +1,4 @@
-// The toast (design 9.7): a confirmation that is not about syncing ("Route file exported"),
+// The toast: a confirmation that is not about syncing ("Route file exported"),
 // shown briefly at the workspace's bottom right and replaced by the next. Its lifetime is a
 // machine: it counts down while shown (a delayed transition), the count pauses while the
 // pointer is on it and restarts in full when the pointer leaves, and a new toast replaces the

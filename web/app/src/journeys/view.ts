@@ -155,7 +155,7 @@ export function listPath(journey: string, filter: Partial<ViewFilter>): string {
 
 /**
  * C11: the decision walkthrough a new journey opens on: the walk through at Decisions depth
- * (the creation flow, 5.5, navigates here once the journey exists; it can be launched any time).
+ * (the creation flow navigates here once the journey exists; it can be launched any time).
  */
 export function walkthroughPath(journey: string): string {
   return journeyPath({ journey }, "walk", viewStateParams({ ...DEFAULT_VIEW_STATE, depth: "decisions" }).toString());
@@ -168,7 +168,7 @@ function searchOf(params: URLSearchParams): string {
 
 /**
  * `search` with its view state replaced by `next`, every other parameter kept in its order. The
- * viewer's expands and collapses (`open=`, `shut=`) hold until a depth is picked (5.1): they are
+ * viewer's expands and collapses (`open=`, `shut=`) hold until a depth is picked: they are
  * dropped when `picked` says one was picked, or when the depth changes with Fade off (with Fade
  * on every depth draws the one layout, which a step only dims, so the folds stay).
  */

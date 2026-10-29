@@ -1,4 +1,4 @@
-// C11, D1, D4, B2, B5, B6: what a person does to the node (design 6.4, 6.5): its one primary
+// C11, D1, D4, B2, B5, B6: what a person does to the node: its one primary
 // action (a decision's is its answer form), at most one secondary beside it, and a `⋯` menu
 // listing only what applies. Skip, Snooze, Keep, Include anyway and the guard bypass open a
 // small form in place of the row, never a modal; each is one patch whose rejection shows here.

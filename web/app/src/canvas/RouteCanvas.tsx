@@ -41,7 +41,7 @@ export interface RouteCanvasProps {
   edge: string | undefined;
   /** The nodes with no path to the final milestone (A20): their cards say so. */
   unanchored: ReadonlySet<string>;
-  /** A card picked while an edge is drawn ends the edge instead of opening (5.6); true when it took the pick. */
+  /** A card picked while an edge is drawn ends the edge instead of opening; true when it took the pick. */
   onPick: ((key: string) => boolean) | undefined;
 }
 
@@ -78,7 +78,7 @@ function useGraph(shown: Derived<Shown>, view: GraphView, selected: string | und
   return { ...graph, tree };
 }
 
-/** What a card asks of the canvas: select its node (and bring the inspector back), expand or collapse it in place (and refit to it, 5.1), trace it. */
+/** What a card asks of the canvas: select its node (and bring the inspector back), expand or collapse it in place (and refit to it), trace it. */
 function useActions(shown: Derived<Shown>, view: GraphView, selected: string | undefined, onPick: RouteCanvasProps["onPick"], tree: Tree, proposal: string | undefined): CardActions {
   const navigate = useNavigate();
   const frame = useFrameActions();

@@ -7,7 +7,7 @@
 // to what it needs and unblocks (a shortfall's chain in error ink) and fades the rest; Frontier
 // fades what it does not light, and Depth's Fade what is below the depth. Two-finger horizontal scroll pans time, a pinch
 // zooms it, vertical scroll moves the rows (the workspace's own). Nodes with no date gather in
-// a folded list. A row's title opens the node's detail (5.1) beside the timeline, which
+// a folded list. A row's title opens the node's detail beside the timeline, which
 // explains its dates (F7).
 import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";

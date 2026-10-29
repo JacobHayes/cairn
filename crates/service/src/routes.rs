@@ -228,7 +228,7 @@ fn invalid(found: cairn_schema::Violation) -> WriteError {
 /// patch ids mint different keys with overwhelming likelihood, and the engine draws again for
 /// a body a graph already holds or retired.
 ///
-/// Public so the browser host mints the same keys when it imports a file locally (brief 4.5).
+/// Public so the browser host mints the same keys when it imports a file locally.
 #[derive(Clone, Debug)]
 pub struct PatchKeys {
     seed: String,

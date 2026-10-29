@@ -24,7 +24,7 @@
 //! Undecided nodes stay in both. Gate edges block (D1); a stage opening with `gates: false`
 //! is date-only: dates read it, blocking and the acyclicity invariant do not.
 //!
-//! Consuming it (2.3, 2.4): [`Dependencies::waits`] and [`Dependencies::waited_by`] give an
+//! Consuming it: [`Dependencies::waits`] and [`Dependencies::waited_by`] give an
 //! instant's edges in a set, for whole-graph passes in topological order;
 //! [`Dependencies::of`] lists one node's effective dependencies with the source of each,
 //! walking the entry chains on demand rather than materializing inherited edges per node.

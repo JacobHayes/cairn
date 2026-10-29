@@ -1,7 +1,7 @@
 //! Records outside every domain, with no events (ARCHITECTURE, Store trait; Schema
 //! outline): auth state (users, their logins, login sessions, transient OAuth state,
 //! agent tokens, and the auth log) and assistant conversations. Plain records the auth and
-//! assistant crates build their own types over (3.2, 4.4). Secrets are never stored: a
+//! assistant crates build their own types over. Secrets are never stored: a
 //! session or agent token, or an OAuth code, is held only as its SHA-256 digest, so a
 //! leaked database does not leak a usable secret.
 

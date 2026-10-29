@@ -1,4 +1,4 @@
-// 2.4, C16: what a list of journeys says of each one: the journey card tells a participant who
+// C16: what a list of journeys says of each one: the journey card tells a participant who
 // arrives cold how much is still theirs to do, and the index says what needs a look, what is
 // theirs, and the one fact a phone row leads with.
 import { describe, expect, it } from "vitest";
@@ -10,7 +10,7 @@ import { forYouOf, forYouWords, milestoneOf, troubleOf, troubleWords, yoursOf, t
 
 const entry = (node: string, flags: { open?: boolean; acting?: boolean }) => ({ node, kinds: ["k_owner"], ...flags });
 
-describe("what is still the viewer's to do (2.4)", () => {
+describe("what is still the viewer's to do", () => {
   it("counts the work the engine reads as open for them, and how much of it is on the acting frontier", () => {
     expect(yoursOf([entry("n_report", { open: true }), entry("n_findings", { open: true, acting: true }), entry("n_stage", {}), entry("n_done", {})])).toEqual({ open: 2, actionable: 1 });
     expect(yoursOf([])).toEqual({ open: 0, actionable: 0 });

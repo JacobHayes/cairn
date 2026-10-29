@@ -1,4 +1,4 @@
-// The assistant panel (I5, I7; brief 5.8): the caller's conversation with the in-app
+// The assistant panel (I5, I7): the caller's conversation with the in-app
 // assistant about a journey or a route's draft, in the inspector column's ASSISTANT tab. A
 // message is one turn on the host; the reply shows with each write the assistant made: a
 // direct change with the nodes it wrote and what it newly caused (D7), linked to those nodes,

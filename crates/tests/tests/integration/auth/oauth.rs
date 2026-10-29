@@ -1,7 +1,7 @@
 //! The built-in OAuth server (I2: MCP is an OAuth resource server on the shared auth): an
 //! MCP client discovers the resource and server metadata, registers, has a user sign in
 //! through OIDC and allow it, and exchanges the code for an agent token (H2); every check
-//! on the way refuses what it should (3.2, Security).
+//! on the way refuses what it should.
 
 #[cfg(test)]
 mod oauth {

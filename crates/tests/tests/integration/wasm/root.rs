@@ -1,4 +1,4 @@
-//! Brief 4.5, Acceptance (native half): the in-browser root loads each fixture, applies a
+//! Native half: the in-browser root loads each fixture, applies a
 //! patch, rejects a stale one with what intervened, and notifies its subscribers (A17, H5,
 //! H6); its answers are the API's JSON for the same values, so one data layer reads either
 //! host. The browser tests run the same through the wasm build.
@@ -293,7 +293,7 @@ fn a_message_draft_renders_with_the_journey_context_in_the_derivation() {
     assert!(matches!(thrown(&refused), HostError::Missing { .. }));
 }
 
-/// Brief 5.5: the reads the screens around a journey make are the API's JSON: the index with
+/// The reads the screens around a journey make are the API's JSON: the index with
 /// its filters (C16), the route index and detail (C17), the caller (H3), and a route file
 /// exported, imported as a new route, and exported again unchanged (A13).
 #[test]

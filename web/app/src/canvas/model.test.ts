@@ -114,7 +114,7 @@ describe("C1: what a card says", () => {
 
 });
 
-describe("a route's canvas (8.11)", () => {
+describe("a route's canvas", () => {
   test("draws cards with no journey state, by the same level", () => {
     expect(cardsOf(wholeLevel(), graph).map((each) => each.journey)).toEqual(whole.cards.map(() => undefined));
   });

@@ -3,8 +3,7 @@
 //! names its user on any listener and from any peer; every spoiled one is refused, one
 //! lasting longer than IAP's do included; a rotated key is fetched, a withdrawn one stops
 //! verifying once the kept set ages out, and neither forged key ids nor failed fetches
-//! fetch on every request, nor does a slow fetch hold up requests whose key is kept
-//! (3.2, Security).
+//! fetch on every request, nor does a slow fetch hold up requests whose key is kept.
 //! With the relay on, a Google ID token as the bearer counts only beside a valid assertion
 //! (I2); without it, the provider is as it was. Only a Google account's email counts as
 //! verified, so an external identity is refused, and so is a request with several

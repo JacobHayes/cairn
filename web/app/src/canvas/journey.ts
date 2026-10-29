@@ -99,7 +99,7 @@ function bodyOf(context: Context, node: GraphNode, derived: NodeDerived, at: Lev
   return undefined;
 }
 
-/** The foot's date, or where a snooze ends, or the container a snooze holds through (7.4). */
+/** The foot's date, or where a snooze ends, or the container a snooze holds through. */
 function footOf(context: Context, node: GraphNode, derived: NodeDerived, state: DisplayState): CardState["foot"] {
   const { view } = context;
   const snoozed = snoozeWords(view, derived);

@@ -1,8 +1,8 @@
-// C2, C4: Depth's ladder (5.1). Two rules decide what is open and nothing else does: the
+// C2, C4: Depth's ladder. Two rules decide what is open and nothing else does: the
 // step, and the viewer's own expands and collapses since picking it. At Stages, the current
 // stages open to the Deliverables step and every other top-level stage is collapsed; at the other steps
 // every container is open to that step. The level request carries the result (the kinds shown,
-// the containers collapsed), so the engine does the roll-up (5.3). Pure, so a unit test reads
+// the containers collapsed), so the engine does the roll-up. Pure, so a unit test reads
 // the rules without a canvas.
 import type { GraphNode, NodeKind } from "../detail/model.ts";
 import { STEPS, type CanvasSettings, type Step } from "./model.ts";
@@ -27,7 +27,7 @@ export function kindsAt(step: Step): NodeKind[] {
 }
 
 /**
- * The nodes `step` leaves out (5.1): at Stages, each top-level node that is neither a stage nor a
+ * The nodes `step` leaves out: at Stages, each top-level node that is neither a stage nor a
  * milestone, with everything beneath it. Stages draws the Deliverables set only inside the stages.
  */
 export function leftOutAt(step: Step, nodes: readonly GraphNode[]): Set<string> {
@@ -98,7 +98,7 @@ export function collapsedAt(step: Step, nodes: readonly GraphNode[], current: Re
 }
 
 /**
- * C4, 5.1: whether the step opens container `key` before the viewer flips it: at Stages only the
+ * C4: whether the step opens container `key` before the viewer flips it: at Stages only the
  * current stages (`current`, the engine's `current_stages`) of the top-level ones, every other
  * container at every step. The list and the timeline fold by it as the graph collapses by
  * `collapsedAt`.
@@ -114,7 +114,7 @@ export function withExpanded<T extends Pick<CanvasSettings, "open" | "shut">>(vi
   return expanded ? { ...view, open: [...without(view.open), key], shut: without(view.shut) } : { ...view, shut: [...without(view.shut), key], open: without(view.open) };
 }
 
-/** `view` with `step` picked: it clears the viewer's expands and collapses (5.1). */
+/** `view` with `step` picked: it clears the viewer's expands and collapses. */
 export function withStep<T extends Pick<CanvasSettings, "step" | "open" | "shut">>(view: T, step: Step): T {
   return { ...view, step, open: [], shut: [] };
 }

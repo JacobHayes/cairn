@@ -235,7 +235,7 @@ impl Assistant {
     ) -> Result<TurnReply, TurnError> {
         let started = self.clock.now();
         // The turn's work ends a reserve before its limit, so its conversation is saved
-        // within it; every wait is held to one or the other (review 4.4 r2).
+        // within it; every wait is held to one or the other.
         let end = Instant::now() + TURN_DURATION_MAX;
         let deadline = end - TURN_SAVE_RESERVE;
         let read = tokio::time::timeout_at(deadline, self.context(user, target)).await;

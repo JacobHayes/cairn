@@ -1,4 +1,4 @@
-// C8, Gating, D4 (design 6.9): what the node waits on, what finishing it would unblock, and why
+// C8, Gating, D4: what the node waits on, what finishing it would unblock, and why
 // it applies or not. Every row is a link that opens that node's detail. Folded, and open when
 // the node is blocked, stale, or conditional, which is when there is something to read.
 import { useCaller } from "../data/react.ts";

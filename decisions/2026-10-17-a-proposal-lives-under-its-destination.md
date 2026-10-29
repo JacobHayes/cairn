@@ -1,6 +1,6 @@
 # A proposal lives under its destination, and `/proposals/<id>` is no page
 
-Question (from the unit that made open proposals findable): neither the API nor the app could list proposals, and a drafted one was reachable only by its own link at `/proposals/<id>`, a path with no destination in it, so nothing on a journey, a route, Entities or Home could say one was waiting. Where does a proposal live? This supersedes `2026-10-06-a-proposal-is-created-under-its-domain-and-addressed.md` (a proposal addressed by its id alone after creation) and the clause "`/proposals/...` is unchanged" in `2026-10-17-one-address-per-journey-and-node.md`.
+Question (from the unit that made open proposals findable): neither the API nor the app could list proposals, and a drafted one was reachable only by its own link at `/proposals/<id>`, a path with no destination in it, so nothing on a journey, a route, Entities or Home could say one was waiting. Where does a proposal live?
 
 Call: a proposal has one destination (a journey, a route or its draft, or the deployment; it may be one that does not exist yet, including the route a save-as-route creates), and every address of it is under that destination.
 

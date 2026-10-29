@@ -807,7 +807,7 @@ async fn a_commit_landing_just_past_the_deadline_is_reported() {
     );
 }
 
-/// PRACTICES, Explicit limits (review 4.4 r2): a tool call whose commit stalls is held to the
+/// PRACTICES, Explicit limits: a tool call whose commit stalls is held to the
 /// turn's limit; the turn ends, releases its conversation and its slot, and is saved.
 #[tokio::test(start_paused = true)]
 async fn a_stalled_commit_cannot_hold_a_turn_past_its_limit() {

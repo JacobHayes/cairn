@@ -708,8 +708,7 @@ async fn writes_under(
     ]
 }
 
-/// The proposal operations' futures are `Send` over either store
-/// (2026-10-18-the-store-trait-returns-boxed-futures-and-the-stack-holds-a-trait-object.md).
+/// The proposal operations' futures are `Send` over either store.
 #[test]
 fn every_proposal_operation_can_be_awaited_on_another_thread() {
     fn send<T: Send>(_: &T) {}

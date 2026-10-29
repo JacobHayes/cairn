@@ -1,4 +1,4 @@
-// `?`: the key sheet, a modal <dialog> with a table of the bindings (3.4): the browser draws
+// `?`: the key sheet, a modal <dialog> with a table of the bindings: the browser draws
 // its backdrop and makes the page behind it inert. Escape or Close shuts it. It takes the focus
 // while it is open (Tab stays on its Close button, which is all it holds), so Enter or Space
 // cannot reach the control that had the focus behind it, and gives the focus back on close.

@@ -1,16 +1,15 @@
 # Multiplayer testbed: many clients, one journey, under patina
 
-Brief 6.1, on the simulation track (PRACTICES, Simulation with patina): exploratory, run by
+On the simulation track (PRACTICES, Simulation with patina): exploratory, run by
 `mise run sim`, never by `mise run check`. Cairn's real HTTP server, store, and Rust client
 under the patina native shim, with clients patching one journey through network faults and
 fault sites in the store, and the multiplayer invariants checked at the end of every run.
-Proof: `briefs/proof/6.1/README.md`.
 
 ## The program
 
 `src/main.rs` assembles a composition root as the binary's will (`src/world.rs`): the SQLite
 store on a file in the run's virtual filesystem, the in-process notifier, the dev sign-in
-provider (no token: every request is the dev user), and 4.2's `cairn_api::router`, served by
+provider (no token: every request is the dev user), and `cairn_api::router`, served by
 axum on `127.0.0.1:7878`. Everything runs as tasks on a multi-thread tokio runtime with four workers, so requests
 run on several threads and PCT reorders them
 (`decisions/2026-10-18-the-multiplayer-testbed-runs-a-multi-thread-runtime.md`).
@@ -30,10 +29,10 @@ Setup creates journey `j_shared` with three nodes and one pair of identities. Th
 - **The agent** (one more client, numbered after the others): the same drafts and the same
   transport retry, calling the service in process as an agent host (MCP, the assistant) does.
   Each attempt runs on its own task, so an attempt the agent stops waiting for keeps going.
-  An HTTP client cannot do this: the server drops a request whose connection closes, so a
-  resubmission over HTTP never meets its original in the server (DECISIONS.md, 6.1).
+  The server runs each write on its own task too, so a write whose connection closes keeps
+  going, and an HTTP resubmission can meet its original.
 - **Views** (one per HTTP client; `src/view.rs`): fetch the journey and the deployment, then
-  follow an SSE subscription to both through 4.2's `client::Tracker` (H6), refetching on
+  follow an SSE subscription to both through the client's `Tracker` (H6), refetching on
   each newer tick and reopening the stream whenever it ends.
 - **Fault sites** (`src/faults.rs`), on the store's commit points, all `buggify!` and so
   inert without `--buggify`, none during setup: a commit waits before it begins (short, or a
@@ -94,59 +93,25 @@ recorded twice is byte-identical, its replay reports the same verdict); the smok
 passing); the
 faulted sweep (8 seeds of dropped, delayed, refused, and reset
 connections, every run passing and resending, some patch answered from its receipt, no inert
-knob). The patina gaps below are not checked: they exercise the pinned patina, not Cairn
+knob).
+The open patina limitation below is not checked: it exercises the pinned patina, not Cairn
 (`decisions/2026-10-17-simulation-runs-no-known-gap-checks.md`).
-
-## The product finding (fixed)
-
-H5, found by the smoke campaign in about one generation in eight and recorded in
-DECISIONS.md (brief 6.1): a patch resubmitted while its original was still committing was
-answered stale, naming the revision the original was producing with nothing intervening. The
-retry logic rebased it onto that revision; the engine answered that it named a revision that
-did not exist yet; the client rebased back, and so on until its 32-resubmission bound ran
-out in no time at all, and the caller was told the patch conflicted. Then the original
-landed. The same stale answer, given to any other patch beside a commit in flight, named
-that revision with nothing intervening even when the commit in flight touched what the patch
-did. Fixed (DECISIONS.md, the same entry): a commit beside one in flight waits for it and then
-meets its receipt or what it really touched (the store has one writer, so a commit waits
-for the writer, `decisions/2026-10-21-the-store-is-sqlite-with-one-writer.md`); and
-the client never rebases a patch backward. `crates/tests/tests/integration/service/in_flight.rs` holds both cases over both stores, and
-the campaign tolerates no finding.
 
 When a smoke generation fails, read its observed verdict and replay the saved trace before
 blaming determinism: Patina currently classes a finding found under PCT whose run hit a
 change point as `NONDETERMINISM`, because a replay always reports a bug depth of 0 (a Patina
 bug, reported).
 
-## Patina gap history
+## Open patina limitation
 
-The gaps this testbed found in Patina, each with a `DECISIONS.md` entry tagged patina. Gaps
-1 to 3 are the spike's. Gaps 4, 5 and 6 are fixed at the pinned revision, and no leg checks
-them:
-
-- Gap 4, Turso links symbols the shim refuses to run beside (`dlopen`, `dlclose` and
-  simsimd's AVX-512 FP16 kernels): the audit decodes those instructions and traps `dlopen`
-  (`6bca33af`), so the audit is clean and no run names an allowance.
-- Gap 5, a site label holding a space breaks a campaign: labels are escaped in the report
-  (the label rule in `scripts/steps/lint` stays for the reasons in
-  `decisions/2026-10-18-patina-main-retires-four-testbed-workarounds.md`).
-- Gap 6, an `always!` violation leaves no trace to replay: the trace is finalized and
-  replays (`2d1c8d3f`). The invariants stay `violation` verdicts for another reason
-  (`decisions/2026-10-18-testbed-invariants-stay-verdicts.md`).
-
-Also fixed, and removed from the testbed: a delayed TCP segment waking no reactor (the 1 ms
-ticker; `0115ebf0`) and tokio TCP I/O on a multi-thread runtime aborting the shim (the
-single-thread runtime; `0115ebf0`).
-
-Still open and worked around: `campaign --faults` draws every plane with no way to leave
+`campaign --faults` draws every plane with no way to leave
 one out, so the network sweep is explicit (`decisions/2026-10-18-patina-campaign-faults-still-cannot-sweep-the-multiplayer-testbed.md`).
 
 ## Limits and choices
 
 - One agent, four HTTP clients, eight patches each, three nodes: enough contention for every
-  oracle within 16 generations, and short enough to stay under patina's trace event limit,
-  which one early version (32 client resubmissions per patch during every long stall, since replaced by the server's own loop) exceeded.
+  oracle within 16 generations, and short enough to stay under patina's trace event limit.
 - The long faults are rationed per run (four waits, one stall): each long stall surfaces
-  nearly every patch drafted during it (the finding above), so more add nothing.
+  nearly every patch drafted during it, so more add nothing.
 - The catch-up deadline covers the network as well as coalescing; under the sweep's faults
   the slowest view took about 280 ms of its 450.

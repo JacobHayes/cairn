@@ -47,8 +47,7 @@ Yes brings in three steps and frees one to start.
 
 ### The graph: what a step needs, and what it unlocks
 
-A journey opens on its graph, which draws the whole journey as a map you can pan and zoom. It opens fitted to
-the whole graph. Click a step to trace it: Cairn marks what it needs and what it unblocks,
+A journey's graph draws the whole journey as a map you can pan and zoom. Click a step to trace it: Cairn marks what it needs and what it unblocks,
 and fades the rest.
 
 ![The graph traced from one step, with what it needs and what it unblocks marked](docs/images/graph.png)
@@ -82,7 +81,6 @@ saved, so stopping it ends the demo.
 
 ```sh
 mise run demo   # then open http://127.0.0.1:8080/
-mise run workspace name   # a jj workspace in ../cairn-ws/name with this checkout's build outputs copied in
 ```
 
 **The real thing, on your machine.** This builds Cairn and runs it with a local database,
@@ -146,8 +144,8 @@ More reading:
 - [`PRACTICES.md`](PRACTICES.md): how code is written and checked.
 - [`DESIGN.md`](DESIGN.md): the look and feel.
 - [`AGENTS.md`](AGENTS.md): where an agent changing Cairn starts.
-- [`briefs/`](briefs/README.md): the milestones that built Cairn.
-- [`decisions/`](decisions/README.md): judgment calls awaiting review, one file each.
+- [`briefs/`](briefs/README.md): planned units of work.
+- [`decisions/`](decisions/README.md): judgment calls, one file each.
 
 ## Built with
 

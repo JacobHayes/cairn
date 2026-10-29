@@ -1,4 +1,4 @@
-// Brief 5.8 in the browser: the assistant panel on the server host against the demo's
+// The assistant in the browser: the assistant panel on the server host against the demo's
 // scripted model. A direct change is applied and reported with links to the node it wrote, and a
 // breakdown asked for comes back as a proposal that opens in proposal review and applies
 // (I5's two paths, I7: applying is the user's click); the conversation is the user's per

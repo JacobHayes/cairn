@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The durability testbed's legs of `mise run sim` (brief 6.2; PRACTICES, Simulation with
+# The durability testbed's legs of `mise run sim` (PRACTICES, Simulation with
 # patina). Not part of `mise run check`. Each leg fails loudly; none skips.
 #
 #   1. code: the unit tests (rustfmt and clippy are the check ladder's lint step);

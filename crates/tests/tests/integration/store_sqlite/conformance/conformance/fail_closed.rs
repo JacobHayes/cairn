@@ -1,5 +1,4 @@
-//! A commit the store cannot settle fails it closed
-//! (decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md): a `COMMIT`
+//! A commit the store cannot settle fails it closed: a `COMMIT`
 //! that fails other than by a constraint is injected in place of the `COMMIT` itself, since
 //! a failed log sync has no seam to inject it at.
 

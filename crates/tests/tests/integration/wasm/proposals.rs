@@ -1,4 +1,4 @@
-//! Brief 5.7 (native half): the in-browser root drafts, previews, refreshes, and applies
+//! The in-browser root (native half) drafts, previews, refreshes, and applies
 //! proposals as the server's API does (B7, B8, B9, C14, I6), answering the API's JSON for
 //! each, so proposal review runs on either host. The browser tests drive the same calls
 //! through the wasm build.

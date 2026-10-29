@@ -17,7 +17,7 @@ import { HeaderEditor } from "../journeys/HeaderEditor.tsx";
 import type { Ready } from "../detail/model.ts";
 import type { Authored } from "./target.ts";
 
-/** Edit mode's band under the header (design 4.9): what the edits are, the palette and the roles, Done; then tombstones and the edge being drawn. */
+/** Edit mode's band under the header: what the edits are, the palette and the roles, Done; then tombstones and the edge being drawn. */
 export function JourneyAuthoringBar({
   ready,
   authored,

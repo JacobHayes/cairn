@@ -6,7 +6,7 @@ use std::fmt;
 use cairn_store::StoreError;
 
 /// Why a request's credentials were refused. A refusal decides the request: no other
-/// provider is asked to accept it instead (3.2, Security).
+/// provider is asked to accept it instead.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Refusal {
     /// A presented credential is not valid: unknown, expired, revoked, or wrong.

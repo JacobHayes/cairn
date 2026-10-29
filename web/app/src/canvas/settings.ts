@@ -2,7 +2,7 @@
 // follows the back button. A graph, a journey's or a route's, reads the page's view state
 // (journeys/view.ts: the depth, the Filter and the search, shared with every view) and its own
 // settings: the containers the viewer expanded and collapsed since picking the depth (`open=`,
-// `shut=`, C4), the Signals lens (`lens=`, C6) and whether its structure is being edited (5.6). Every setting at its default leaves the
+// `shut=`, C4), the Signals lens (`lens=`, C6) and whether its structure is being edited. Every setting at its default leaves the
 // address bare.
 import { LENSES, type Lens } from "./model.ts";
 import { journeyPath } from "../journeys/address.ts";

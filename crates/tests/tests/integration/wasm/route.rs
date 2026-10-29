@@ -1,4 +1,4 @@
-//! Brief 5.2 (native half): the in-browser root reads a route and its published versions as
+//! Native half: the in-browser root reads a route and its published versions as
 //! the API answers them, and a route's graph, which has no state, has a canvas level by the
 //! journey level's rules (C2): every node of the graph when every kind is shown, its implicit
 //! gates among the edges, and hidden actions rolled up into their deliverable.
@@ -256,7 +256,7 @@ fn route_apply(route: Option<Route>, patch: &str) -> Result<Route, HostError> {
     })
 }
 
-/// Brief 5.6: a route authored by hand (A12) is previewed locally: a new route with an empty
+/// A route authored by hand (A12) is previewed locally: a new route with an empty
 /// draft, a node added to the draft, and a node whose id a sibling holds refused with the
 /// engine's violation (A15), each without committing anything.
 #[test]

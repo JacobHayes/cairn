@@ -37,7 +37,7 @@ export type SyncState =
   | "in-sync";
 
 /**
- * The colour rule (9.2): good is nothing to do, working is steel, wait is amber (it will sort
+ * The colour rule: good is nothing to do, working is steel, wait is amber (it will sort
  * itself out, or it is safe to wait), act is red (your change is not landing until you act).
  */
 export type SyncTone = "good" | "working" | "wait" | "act" | "hollow";
@@ -102,7 +102,7 @@ export interface SyncSummary {
   announce: "polite" | "assertive" | undefined;
 }
 
-/** The state the chip is in, by the precedence of 9.1: the first that holds. */
+/** The state the chip is in, by precedence: the first that holds. */
 export function summarize(input: SyncInput): SyncCase {
   const { now, lag, problems } = input;
   const lagFor = lag === undefined ? undefined : now - lag.since;
@@ -145,7 +145,7 @@ export function summarize(input: SyncInput): SyncCase {
 
 const reason = (problem: Problem) => `${problem.label === undefined ? "" : `${problem.label}: `}${problem.message}`;
 
-/** The words and colour of a case (9.2). */
+/** The words and colour of a case. */
 export function syncWords(shown: SyncCase): SyncSummary {
   switch (shown.state) {
     case "conflict":

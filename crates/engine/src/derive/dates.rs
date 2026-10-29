@@ -7,7 +7,7 @@
 //!
 //! # Translation table
 //!
-//! Instants (F2). Each node has 2.2's four instants ([`super::dependencies::Point`]): a start
+//! Instants (F2). Each node has the dependency pass's four instants ([`super::dependencies::Point`]): a start
 //! and a finish, and for a container its two entries, which are internal (never shown) and
 //! collapsed out of every chain. A decision or milestone has one instant: its start is its
 //! finish. The journey has `created_at`, and each date decision its answer, an instant apart
@@ -41,7 +41,7 @@
 //!
 //! A node's anchor is its requirement entry if it is a container, else its start; its
 //! condition anchor is its condition entry, or its start. Constraints touching a not-relevant
-//! node are dropped (2.2's pruned set, and rules and closes whose node or source is not
+//! node are dropped (the dependency pass's pruned set, and rules and closes whose node or source is not
 //! relevant); those through an undecided node are kept and marked conditional (F2).
 //! Effectively skipped work, and work skipped itself, has zero duration and seeds nothing.
 //!
@@ -49,7 +49,7 @@
 //!
 //! At `node_count_max` (2,000 nodes, 64 explicit edges each in plus out, 16 condition clauses
 //! each, two rules of 64 sources each): 5 x 2,000 + 1 = 10,001 instant slots (four per node,
-//! `created_at`, one answer per node). Constraints: 2.2's edges, about 110,000 (6 per node of
+//! `created_at`, one answer per node). Constraints: the dependency pass's edges, about 110,000 (6 per node of
 //! work, entries, and containment; 64,000 explicit; 32,000 condition gates; 2,000 openings),
 //! plus 256,000 rule constraints and 2,000 stage closes, about 370,000 of 20 bytes each and
 //! two `u32` adjacency slots each: about 10 MiB. Building is O(constraints log constraints)

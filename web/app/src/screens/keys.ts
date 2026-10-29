@@ -1,4 +1,4 @@
-// The keyboard map (3.4): keys never fire while a field has focus, and `?` opens the sheet.
+// The keyboard map: keys never fire while a field has focus, and `?` opens the sheet.
 // The bindings that ship with the journey pages (and the route's, for what a route offers) move you or change the view: `j` and `k`
 // (next and previous row), `Enter` (the open node's primary action), `Esc` (close a popover,
 // then the sheet, then clear the selection),

@@ -1,6 +1,6 @@
 // What the acting surfaces' browser tests share: opening the list, the list with Frontier
 // on, and the walk through the way a person does, reading their rows and cards, and starting a fresh journey
-// from the vendor evaluation's route on the server host (the creation screen is 5.5's).
+// from the vendor evaluation's route on the server host.
 import { readFileSync } from "node:fs";
 
 import { expect, type Locator, type Page } from "@playwright/test";

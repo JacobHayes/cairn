@@ -1,6 +1,6 @@
 /* The journey's page: the head (the header line, the active filters) over the projection, with the inspector column beside it. The
    workspace (.ws-body) and the inspector are the only scrollers, so the window itself never
-   scrolls and nothing sits below the fold (2.1); the graph fills what the head leaves and the
+   scrolls and nothing sits below the fold; the graph fills what the head leaves and the
    other projections scroll with the head. Below 720px the frame is one column the document
    scrolls (ui/app.css), and the page flows: head, projection, then the inspector's content. */
 .journey-frame > .journey-head {
@@ -342,7 +342,7 @@
   background: color-mix(in srgb, var(--color-ground) 60%, transparent);
 }
 
-/* A route in the frame (8.11): one line of header, the Graph and List switch, and the list's rows. */
+/* A route in the frame: one line of header, the Graph and List switch, and the list's rows. */
 .route-header {
   gap: var(--space-2);
 }

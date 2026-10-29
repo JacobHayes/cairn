@@ -3,7 +3,7 @@
 //! operation, shares the schema types for its arguments, bounds its output (a list that can
 //! grow is paged), and answers a refused write with the engine's rejection unchanged (A15).
 //!
-//! [`ToolSet::call`] runs a tool in process as an actor: the assistant (4.4) uses it
+//! [`ToolSet::call`] runs a tool in process as an actor: the assistant uses it
 //! directly, and [`router`] serves the same set over Streamable HTTP at [`MCP_PATH`], with
 //! the shipped instructions (I4) as its instructions and prompts.
 

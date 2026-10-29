@@ -2,7 +2,7 @@
 //! type is `route-file`, `scenario`, `patch`, or `graph`. Reads YAML (`.yaml`, `.yml`) or
 //! JSON; on success prints the canonical YAML and exits 0, on failure prints the error with
 //! the path to the failing value and exits 1. For route authors checking a file before
-//! import, and for the brief proofs.
+//! import.
 
 use std::process::ExitCode;
 

@@ -88,7 +88,7 @@ const ROOT_OPTIONS: LayoutOptions = {
   "elk.hierarchyHandling": "INCLUDE_CHILDREN",
   ...INNER_SPACING,
   "elk.spacing.componentComponent": String(LAYER_GAP_PX),
-  // Edges are routed in the gaps INNER_SPACING leaves, so an arrowhead is never under a card (5.6).
+  // Edges are routed in the gaps INNER_SPACING leaves, so an arrowhead is never under a card.
   "elk.edgeRouting": "ORTHOGONAL",
   // Brandes-Koepf balanced, not network simplex: on the vendor evaluation, one added requirement
   // moved up to 12 of its 27 nodes with network simplex, past C15's bound; balanced keeps every
@@ -163,7 +163,7 @@ export function placement(graph: ElkNode): Placement {
   return placed;
 }
 
-/** Each laid-out edge's route (5.6): ELK's orthogonal sections, start to bends to end, in root coordinates. */
+/** Each laid-out edge's route: ELK's orthogonal sections, start to bends to end, in root coordinates. */
 export function routes(graph: ElkNode): Routes {
   const routed: Routes = {};
   for (const edge of graph.edges ?? []) {

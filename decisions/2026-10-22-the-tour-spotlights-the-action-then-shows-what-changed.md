@@ -2,7 +2,7 @@
 
 Question: the tour of Cairn teaches by having a person act on a practice journey. How does it point at the action without hiding what the action changes? This comes from the comparison of an overlay with the band after the band shipped.
 
-Call: steps that ask for an action have two states. While the action waits, the screen dims and the complete action area is cut out, with the guidance in a callout beside it; nothing outside can be clicked and the app's keys are quiet. When the derived state shows the action done, the dimming lifts, or widens to take in the change when it grows out of the action area as one box, and the callout moves beside the change and says what Cairn worked out. The person moves on with Next, never a timer. The callout is placed by the shared tooltip placement, so the tour adds no second floating mechanism. Escape never skips the tour. This changes the call in `2026-10-22-the-tour-is-the-one-guided-first-run.md`, which chose a band above the screen and no dimming.
+Call: steps that ask for an action have two states. While the action waits, the screen dims and the complete action area is cut out, with the guidance in a callout beside it; nothing outside can be clicked and the app's keys are quiet. When the derived state shows the action done, the dimming lifts, or widens to take in the change when it grows out of the action area as one box, and the callout moves beside the change and says what Cairn worked out. The person moves on with Next, never a timer. The callout is placed by the shared tooltip placement, so the tour adds no second floating mechanism. Escape never skips the tour.
 
 Calls made while building it:
 

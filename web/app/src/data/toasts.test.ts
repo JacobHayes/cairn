@@ -1,4 +1,4 @@
-// The toast's lifetime (design 9.7): it goes after its time, the time waits while the pointer
+// The toast's lifetime: it goes after its time, the time waits while the pointer
 // is on it and starts again in full when the pointer leaves, and a new toast takes the place of
 // the one on screen with a full time of its own.
 import { createActor } from "xstate";

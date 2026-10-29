@@ -1,7 +1,7 @@
 // A card's size, worked out from what it shows before anything is drawn, so the layout (C15)
 // reads the same sizes the cards render at and lays out the same graph identically: a head, a
 // title of up to two lines, and at most a body line, a foot line and the hidden-prerequisites
-// line (5.5). NodeCard draws each row at exactly these heights. A title's lines are counted from
+// line. NodeCard draws each row at exactly these heights. A title's lines are counted from
 // its width as the browser measures it (measure.ts), so the count is what the drawing wraps to. What an overlay or the Signals
 // lens adds hangs outside the card, so neither moves a node.
 import type { LayoutRequest } from "./layout.ts";

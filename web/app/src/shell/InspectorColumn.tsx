@@ -1,4 +1,4 @@
-// The inspector column of the frame (design 3.1, 3.3): a chrome column on the right at
+// The inspector column of the frame: a chrome column on the right at
 // 1100px and wider, and below that, tablet and phone alike, a bottom sheet over the workspace. The
 // sheet has a handle that drags (touch or pointer), taps and answers the arrow keys between three
 // heights, peek (the head and the top of the pane), half and full; letting go below the peek

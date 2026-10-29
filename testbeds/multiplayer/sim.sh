@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The multiplayer testbed's legs of `mise run sim` (brief 6.1; PRACTICES, Simulation with
+# The multiplayer testbed's legs of `mise run sim` (PRACTICES, Simulation with
 # patina). Not part of `mise run check`. Each leg fails loudly; none skips.
 #
 #   1. code: the unit tests (rustfmt and clippy are the check ladder's lint step);
@@ -13,7 +13,7 @@
 #      run passes, every run resent a request, some patch was answered from its receipt,
 #      and no fault knob was inert;
 #
-# The known patina gaps (README, Patina gap report) are not checked here: they exercise the
+# The open patina limitation (README) is not checked here: it exercises the
 # pinned patina, not Cairn, and are recorded in decisions/
 # (decisions/2026-10-17-simulation-runs-no-known-gap-checks.md).
 #
@@ -28,13 +28,12 @@ fail() {
 }
 command -v cargo-patina >/dev/null || fail "cargo-patina is missing: run mise install"
 
-# Coverage oracles in the binary that this testbed cannot reach, by label (DECISIONS.md,
-# 6.1 integration). The campaign's own gate is waived for these alone: any other oracle that
+# Coverage oracles in the binary that this testbed cannot reach, by label. The campaign's own gate is waived for these alone: any other oracle that
 # never fires fails leg 4, and one of these firing is reported so it can leave the list.
 out_of_reach=(
-  # 4.8's derived-read memo: the views refetch the journey document, never a derived read.
+  # The derived-read memo: the views refetch the journey document, never a derived read.
   service-derived-read-answered-from-memo
-  # 4.8's and 4.9's proposal and route-import paths: the testbed drafts no proposal and
+  # The proposal and route-import paths: the testbed drafts no proposal and
   # imports no route file.
   service-import-resubmission-rebuilt-from-receipt
   service-proposal-apply-answered-from-receipt
@@ -43,7 +42,7 @@ out_of_reach=(
   service-proposal-draft-resubmitted
   service-proposal-patch-answered-from-receipt
   service-proposal-refreshed-against-destination
-  # 4.4's assistant: its tool loop, turn limits, and write wrapper. The testbed never drives
+  # The assistant: its tool loop, turn limits, and write wrapper. The testbed never drives
   # the assistant, so no turn runs.
   assistant-structural-write-proposed
   assistant-direct-write-applied

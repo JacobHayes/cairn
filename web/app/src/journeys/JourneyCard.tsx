@@ -44,7 +44,7 @@ function LineageFold({ ready }: { ready: Ready }) {
   );
 }
 
-/** `You have 3 open items here, 2 ready`, for a participant who arrives cold (2.4); nothing when none is open, or the journey holds no current work (B11). */
+/** `You have 3 open items here, 2 ready`, for a participant who arrives cold; nothing when none is open, or the journey holds no current work (B11). */
 function Yours({ ready }: { ready: Ready }) {
   const mine = useMineOf(ready.journey.header.id);
   if (mine.status !== "ready" || !STATUS_HOLDS_CURRENT_WORK[ready.journey.header.status]) {

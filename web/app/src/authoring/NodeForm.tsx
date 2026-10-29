@@ -105,7 +105,7 @@ function holds(props: FieldsProps, fields: readonly FormField[]): boolean {
 }
 
 /**
- * A9, A8, F4, A16: the form's fields in sections that open by kind (design 4.9): Basics always,
+ * A9, A8, F4, A16: the form's fields in sections that open by kind: Basics always,
  * Question for a decision, and the rest folded under their names, each opening itself when one
  * of its fields has a violation so it shows at its field (A15).
  */

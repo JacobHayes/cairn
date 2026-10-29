@@ -1,7 +1,7 @@
 //! The composition root types (ARCHITECTURE, Service layer and composition; Terms:
 //! Composition root, Capabilities document): what each host's root fills in to assemble a
-//! [`Service`](crate::Service). The server binary's root (4.7) reads them from its
-//! configuration; the browser host's (4.5) fixes them.
+//! [`Service`](crate::Service). The server binary's root reads them from its
+//! configuration; the browser host's fixes them.
 
 use std::collections::BTreeSet;
 use std::sync::Arc;

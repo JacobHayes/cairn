@@ -1,4 +1,4 @@
-// Priority, C8: why the node ranks where it does (design 6.9, 8.3 to 8.5): the sentence, the four
+// Priority, C8: why the node ranks where it does the sentence, the four
 // terms of the blend as a bar with words, the gravity broken down with what only counts at the
 // configured discount split out by the decision it waits on, what finishing it would unblock now
 // and what it would not yet free, and the formulas behind it. A container shows one number for its

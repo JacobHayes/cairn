@@ -88,7 +88,7 @@ pub async fn patch_deployment(
 }
 
 /// A17: one domain patch as `actor`, whose target must be `domain`. A proposal is edited
-/// through its own endpoints (4.9), never as a domain.
+/// through its own endpoints, never as a domain.
 async fn submit(
     api: &Api,
     actor: Actor,

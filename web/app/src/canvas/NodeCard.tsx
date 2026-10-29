@@ -1,4 +1,4 @@
-// `NodeCard`: one node on the canvas (C1), drawn at the size cards.ts gave the layout (5.5): a
+// `NodeCard`: one node on the canvas (C1), drawn at the size cards.ts gave the layout: a
 // head with the kind at the left and the display-state chip at the right, the title, at most one
 // body line (a decided decision's answer, a container's progress, what a conditional node depends
 // on), and at most one foot line (the one date in words, and the owner when it is the viewer or
@@ -291,7 +291,7 @@ function Marker({ card }: { card: Card }) {
 /** What a contributor's dot on its tag says on hover. */
 const CONTRIBUTOR_WORDS = "Adds to the selected node's gravity";
 
-/** What hangs outside a card: its rank tag (C5), the trace's tag (C7), and the Signals chip (8.2). */
+/** What hangs outside a card: its rank tag (C5), the trace's tag (C7), and the Signals chip. */
 function Hanging({ data }: { data: CardData }) {
   const { card, overlay, lens } = data;
   const mark = overlay?.marks[card.key];

@@ -10,7 +10,7 @@ import { standsFor, type CanvasOverlay } from "./overlay.ts";
 export const DOTTED = "2 3";
 export const DATED = "6 4";
 
-/** The marker at a line's target end, by what it stands for (5.6): only the end tells a condition from a stage opening. */
+/** The marker at a line's target end, by what it stands for: only the end tells a condition from a stage opening. */
 export const MARKERS: Record<LineKind, "arrow" | "diamond" | "bar"> = {
   requires: "arrow",
   condition: "diamond",

@@ -1,11 +1,11 @@
-// A journey's page (2.2): the header (title, status, the View picker, `⋯`), the active
+// A journey's page: the header (title, status, the View picker, `⋯`), the active
 // filters, and the view the address names (the graph first), with the inspector column beside
 // it: the open node's detail, or the journey card when nothing is selected. The Summary is the
 // journey's front page. The head stays put and the projection and the inspector scroll on
 // their own (screens.css; the frame's slots are shell/frame.tsx). The journey is read and derived in the tab and kept current (H6); what it
 // shows is in the address (journeys/address.ts, canvas/settings.ts), so every link keeps it: the
 // view state every view shares is parsed here once (journeys/view.ts) and handed to the views.
-// Edit mode (5.6) adds the structure's editors: the node's structure in its detail, and
+// Edit mode adds the structure's editors: the node's structure in its detail, and
 // drawing a requirement between two cards.
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";

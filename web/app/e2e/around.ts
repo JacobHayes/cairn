@@ -1,4 +1,4 @@
-// What the browser tests of the screens around a journey share (brief 5.5): starting a
+// What the browser tests of the screens around a journey share: starting a
 // journey from the form, the journey's status under its `⋯`, route detail's versions and actions,
 // a file exported from it as the browser saves it, and the identities screen's merge.
 import { readFile } from "node:fs/promises";

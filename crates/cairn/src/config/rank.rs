@@ -1,4 +1,4 @@
-//! The rank constants' checks (PRD Priority; brief 4.7: validated at startup): every
+//! The rank constants' checks (PRD Priority; validated at startup): every
 //! coefficient finite and non-negative, the four blend weights summing to one, the undecided
 //! discount from 0 to 1, the other-owner factor from 1 to the weight limit, and the urgency
 //! horizon a whole number of days from 1 to the date offset limit. Each breach is its own

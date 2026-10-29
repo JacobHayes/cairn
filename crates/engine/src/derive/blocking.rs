@@ -186,7 +186,7 @@ impl Blocking {
         blocking
     }
 
-    /// The frontier and the acting frontier, in key order (2.5 ranks them).
+    /// The frontier and the acting frontier, in key order (the ranking orders them).
     fn fronts(&mut self) {
         for (key, flags) in self.keys.iter().zip(&self.flags) {
             if !flags.actionable {
@@ -204,8 +204,8 @@ impl Blocking {
     /// actionable ancestor, at most `containment_depth_max` steps each. A closed or
     /// not-relevant container ends the walk: a terminal container satisfies its dependents
     /// whatever was reopened beneath it (D1; it is stale instead), and nothing above a
-    /// not-relevant container waits on what a force include keeps in scope beneath it (2.2's
-    /// pruned set).
+    /// not-relevant container waits on what a force include keeps in scope beneath it (the
+    /// dependency pass's pruned set).
     fn assert_frontier(&self, sweep: &Sweep<'_>) {
         assert!(self.acting_frontier.len() <= self.frontier.len());
         let tree = sweep.graph.tree();

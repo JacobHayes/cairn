@@ -5,7 +5,7 @@
 // every revision, so a live edit never jumps the viewport. It opens fitted to the whole drawn
 // graph, as `f` and the Fit button do, unless it is given nodes to open on (`firstFit`).
 //
-// Input (5.10), 720px and wider: two-finger scroll pans freely, the wheel alone never zooms, a
+// Input, 720px and wider: two-finger scroll pans freely, the wheel alone never zooms, a
 // pinch or Ctrl/Cmd+wheel zooms at the pointer, a double-click zooms into a container. Zoom only
 // simplifies a container's head below a zoom (`data-lod` on the root, CSS only); a card never changes size.
 // Below the reading zoom a container is drawn as a tile (tiles.ts) and what it holds is hidden;
@@ -42,7 +42,7 @@ import { useWork } from "../data/react.ts";
 const nodeTypes = { card: NodeCard };
 const edgeTypes = { line: EdgeLine, dates: DateEdgeLine };
 
-/** C3: the most the canvas zooms in; the most it zooms out is computed from the graph (5.6). */
+/** C3: the most the canvas zooms in; the most it zooms out is computed from the graph. */
 const ZOOM_MAX = 1.5;
 /** Room kept free round a fitted view (px), under the floating controls: the controls row and Signal above, the zoom stack at the left, Reveal below. */
 const PAD = { top: 56, left: 72, right: 24, bottom: 56 };
@@ -51,7 +51,7 @@ const FIT_PADDING = { top: px(PAD.top), left: px(PAD.left), right: px(PAD.right)
 /** A small graph fits at 100% rather than blown up to fill the region. */
 const FIT = { maxZoom: 1, padding: FIT_PADDING };
 
-/** What a navigation asks the view to do once the card is there: centre on it (a find), or fit to the container just expanded or collapsed (5.1). */
+/** What a navigation asks the view to do once the card is there: centre on it (a find), or fit to the container just expanded or collapsed. */
 export interface Reveal {
   key: string;
   /** The navigation that asked, so each is done once. */
@@ -201,7 +201,7 @@ function nodesOf(props: GraphCanvasProps, edgeEnds: ReadonlySet<string>, tiling:
   });
 }
 
-/** What a line says (5.7): its sentence, and where the journey's state is known, whether it still holds anything back. */
+/** What a line says: its sentence, and where the journey's state is known, whether it still holds anything back. */
 function lineWords(line: Line): string {
   const state = lineWaitWords(line);
   return state === undefined ? line.sentence : `${line.sentence} \u00b7 ${state}`;
@@ -415,7 +415,7 @@ function useCenterAboveSheet(selected: string | undefined, layered: boolean, tab
   }, [selected]);
 }
 
-/** A find centres its result, and an expand or collapse fits the container (5.1): once the card is drawn as asked. */
+/** A find centres its result, and an expand or collapse fits the container: once the card is drawn as asked. */
 function useReveal(reveal: Reveal | undefined, model: CanvasModel, table: TileTable): void {
   const flow = useReactFlow();
   const fitTo = useFit(table);
@@ -526,8 +526,8 @@ function useEdgeFocus(model: CanvasModel, tip: PointTip) {
 }
 
 /**
- * How far the canvas zooms out, computed from the graph (5.6) so fit-all always fits, and the
- * pinch Safari may send instead of a ctrl-key wheel (5.10).
+ * How far the canvas zooms out, computed from the graph so fit-all always fits, and the
+ * pinch Safari may send instead of a ctrl-key wheel.
  */
 function useZoomRange(props: GraphCanvasProps, root: RefObject<HTMLDivElement | null>): { minZoom: number; fit: number } {
   const flow = useReactFlow();
@@ -730,7 +730,7 @@ function useZoomInto(props: GraphCanvasProps, table: TileTable): (key: string) =
   return zoomIntoOf(props, fitTo, work);
 }
 
-/** Input (5.10): two-finger scroll pans; pinch (and ctrl+wheel) zooms; the wheel alone never does. */
+/** Input: two-finger scroll pans; pinch (and ctrl+wheel) zooms; the wheel alone never does. */
 const INPUT = {
   panOnDrag: true,
   panOnScroll: true,

@@ -1,4 +1,4 @@
-// The canvas's Safari pinch listener (5.10): a pinch zooms once, and not twice when a ctrl-key
+// The canvas's Safari pinch listener: a pinch zooms once, and not twice when a ctrl-key
 // wheel arrives too (xyflow already zoomed that one).
 import { expect, test } from "vitest";
 

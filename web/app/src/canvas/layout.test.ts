@@ -1,6 +1,6 @@
 // C15: the layout is deterministic, reads left to right, holds each container's children
 // inside it, and with the previous positions as hints a small edit moves few nodes. Every edge
-// is routed in the gap the layout left for it, so its marker is never under a card (5.6), and
+// is routed in the gap the layout left for it, so its marker is never under a card, and
 // the whole graph fits the viewport at the PRD limit (C3). ELK runs in-thread here, as the
 // worker runs it.
 import ELK from "elkjs/lib/elk.bundled.js";
@@ -148,7 +148,7 @@ describe("the layout (C15)", () => {
 });
 
 describe("edges and the whole graph", () => {
-  test("every edge is routed with room for its marker: the stretch before its tip is long enough and clear of every card (5.6)", async () => {
+  test("every edge is routed with room for its marker: the stretch before its tip is long enough and clear of every card", async () => {
     const laid = await layOut(elk(), fixture);
     const where = absolute(fixture, laid.nodes);
     const parents = new Set(TREE.flatMap(([, parent]) => (parent === undefined ? [] : [parent])));

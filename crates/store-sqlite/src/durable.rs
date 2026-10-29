@@ -1,5 +1,4 @@
-//! A commit the store cannot settle fails it closed
-//! (decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md). A `COMMIT`
+//! A commit the store cannot settle fails it closed. A `COMMIT`
 //! that fails other than by a constraint (an I/O error, a full disk) may have written its
 //! record to the write-ahead log without syncing it, so the store cannot say whether the
 //! commit holds, and it answers nothing more: every call errs, and the host exits so a

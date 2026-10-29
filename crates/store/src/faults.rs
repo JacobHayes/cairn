@@ -3,7 +3,7 @@
 //! with `Faults::default()` never fails or waits because of it. The conformance suite arms
 //! a failure between a commit's state rows and its events to show nothing is left behind,
 //! a backend's own tests pause a commit midway to show what it does and does not block, and
-//! the service's tests and the multiplayer testbed (6.1) hold commits to make them overlap.
+//! the service's tests and the multiplayer testbed hold commits to make them overlap.
 
 use std::collections::BTreeSet;
 use std::future::Future;

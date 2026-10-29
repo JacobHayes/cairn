@@ -1,5 +1,5 @@
 //! The Tailscale provider (H1), offline: `Tailscale-User-*` headers from the proxies it lists,
-//! and the refusals that keep forged headers from naming anyone (3.2, Security).
+//! and the refusals that keep forged headers from naming anyone.
 
 #[cfg(test)]
 mod tailscale {

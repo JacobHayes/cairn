@@ -22,7 +22,7 @@ use cairn_schema::{Date, Deployment, IdentityKey, Journey, JourneyHeader, Journe
 
 /// How many derivations the memo keeps. A derivation at the limits holds a 2,000-node graph
 /// and its derive, tens of MiB, so the bound keeps the worst case within a few hundred MiB
-/// while a small team's open journeys, viewer by viewer, still hit (brief 4.8, Decision log).
+/// while a small team's open journeys, viewer by viewer, still hit.
 pub(crate) const MEMO_ENTRY_COUNT_MAX: usize = 8;
 
 /// What a derive reads, as the memo keys it (D6).

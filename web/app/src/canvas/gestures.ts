@@ -1,9 +1,9 @@
-// The canvas's gestures that xyflow does not handle (5.10). Chromium and Firefox report a
+// The canvas's gestures that xyflow does not handle. Chromium and Firefox report a
 // trackpad pinch as a ctrl-key wheel, which xyflow zooms at the pointer. Safari may instead send
 // only WebKit's `gesturestart`, `gesturechange` and `gestureend`: this listener zooms on those,
 // unless a ctrl-key wheel arrived since the gesture began (xyflow already handled it, so zooming
 // again would double it). It also stops Safari's own page zoom. Whether Safari sends wheels or
-// gestures cannot be shown by a synthetic event; the proof records the real pinch as unchecked.
+// gestures cannot be shown by a synthetic event, so no test covers the real pinch.
 
 /** A viewport: the canvas's offset and zoom. */
 export interface Viewport {
@@ -82,12 +82,12 @@ export function fitZoom(bounds: { width: number; height: number }, size: { width
   return Math.min(Math.max(1, size.width - pad.left - pad.right) / bounds.width, Math.max(1, size.height - pad.top - pad.bottom) / bounds.height);
 }
 
-/** The most the canvas zooms out (5.6): 0.1, or less when the whole graph needs it, so fit-all always fits. */
+/** The most the canvas zooms out: 0.1, or less when the whole graph needs it, so fit-all always fits. */
 export function minZoomOf(fit: number): number {
   return Math.min(0.1, fit * 0.9);
 }
 
-/** Below this zoom a container's head is simplified (5.4): its title, and a stage's state chip. */
+/** Below this zoom a container's head is simplified: its title, and a stage's state chip. */
 export const NEAR_ZOOM = 0.6;
 
 /** The zoom a card's title stays readable at (about 10px of its 14px): a first fit never goes below it. */

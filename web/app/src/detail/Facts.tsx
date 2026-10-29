@@ -1,4 +1,4 @@
-// C8, E2, B4 (design 6.9): who takes part in the node, and where it came from (held by the
+// C8, E2, B4: who takes part in the node, and where it came from (held by the
 // Details section): they explain rather than ask for anything. The origin says whether the
 // node is the route's, edited here, or the journey's own.
 import { treeOf } from "../authoring/graph.ts";

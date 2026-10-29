@@ -1,331 +1,232 @@
 # Cairn: Engineering practices
 
-Companion to `ARCHITECTURE.md`; read that first. This document says how code is written and verified, not what it does.
+How code is written and verified. Companion to `ARCHITECTURE.md`.
 
 ## Summary
 
-Three ideas carry the rest:
-
-1. **Assert everything you believe, bound everything you allocate.** Types check structure; assertions check logic; explicit limits turn "should never happen" into "cannot happen past this number". Assertions stay on in release. The engine is where most of both live.
-2. **Programmer error panics, user error returns.** A patch that violates an invariant is a `Rejection` value with every violation listed (A15). A derive pass that produces a node with two parents is a bug and fails the request; a panic outside the engine stops the process. The two are never confused.
-3. **A check either fails loudly or proves it ran.** No silent skips, no vacuous green: a simulation with no fired fault sites, a property test with no generated cases, and a missing tool in CI are all failures.
+1. **Assert everything you believe, bound everything you allocate.** Assertions stay on in release; every count, size, depth, and duration has a named limit.
+2. **Programmer error panics, user error returns.** An invalid patch is a `Rejection` listing every violation (A15); a broken code invariant is a bug.
+3. **A check either fails loudly or proves it ran.** A simulation with no fired fault sites, a test suite that ran nothing, or a missing tool is a failure.
 
 ## Terms
 
 | Term | Definition |
 |---|---|
-| **Invariant** | A property that holds between every pair of operations. Graph invariants are in the PRD; code invariants are the assertions below. |
-| **Limit** | A named, hard-coded maximum on a count, size, depth, or duration. Every loop, buffer, and collection has one. Limits are not configuration. |
-| **Rejection** | The engine's value-typed answer to an invalid patch: every violation, by path. Expected, tested, never a panic. |
-| **Assertion** | A runtime check of a code invariant (`assert!`). Failure is a bug and aborts the operation or process. On in every build. |
-| **Oracle** | A check that decides whether a simulated run passed: an `always!` invariant, a `sometimes!` coverage site, a `verdict`, or a replay comparison. |
-| **Fault site** | A `buggify!` point where simulation may take a rare path on a seed-chosen run. Inert outside simulation. |
-| **Seed** | The single input a deterministic run is a function of. A failure is a seed; a seed is a reproduction. |
-| **Testbed** | A small program that assembles Cairn crates into a world with actors and invariants, run under simulation. |
-| **Step** | One named check of the validation ladder (lint, unit, web-unit, generated, embed, property, integration, cost, browser, advisories), run by `mise run check` or `mise run check:fast`. |
+| **Invariant** | A property that holds between every pair of operations. Graph invariants are in the PRD; code invariants are assertions. |
+| **Limit** | A named, hard-coded maximum. Not configuration. |
+| **Rejection** | The engine's value-typed answer to an invalid patch: every violation, by path. |
+| **Assertion** | A runtime check of a code invariant (`assert!`), on in every build. |
+| **Oracle** | What decides whether a simulated run passed: `always!`, `sometimes!`, a `verdict`, or a replay comparison. |
+| **Fault site** | A `buggify!` point where simulation may take a rare path. Inert outside simulation. |
+| **Seed** | The single input a deterministic run is a function of. |
+| **Testbed** | A small program assembling Cairn crates into a simulated world with actors and invariants. |
+| **Step** | One named check of the validation ladder. |
 
 ## Rules
 
 ### Bounds and assertions
 
-- **Explicit limits.** Put a limit on everything because everything has a limit. Limits are named constants in one module per crate (`limits.rs`), used by validation, by loops, and by tests, and hard-coded: a limit that is hit in practice is a design signal to revisit in `ARCHITECTURE.md`, not a knob. Design for the worst case within them: a pass is costed and tested at the limits, not at typical size. See the table below.
-- **Assertions, positive and negative space, on in release.** Assert what you expect and what you do not: arguments, returns, and invariants. Engine functions carry at least two assertions on average; the applier and derive carry more. Assert the breach as well as the contract: after `apply`, assert the revision advanced by exactly one and the event count equals the mutation count (J2 as an assertion, not only a test). Whole-graph re-verification after `apply` (running the full invariant check on the committed graph) is also on in release; at the node limit it is milliseconds per write and it is the check most worth paying for. Relationships between constants are checked at compile time with `const` assertions (mutations per patch from the node limit).
-- **Bounded load.** Bound concurrency and queues, and run background work on fixed intervals rather than per event: SSE ticks coalesce per domain. Requests are handled as they arrive, bounded by the in-flight limit.
-- **No recursion.** Containment is a tree of arbitrary depth (A2) and wasm stacks are small; every traversal is iterative with an explicit stack bounded by `containment_depth_max`. No lint catches recursion in general, so review enforces it, and engine tests run at the depth limit in the wasm build.
-- **Fixed-width integers.** Counts, offsets, weights, and revisions are `u32` or `i32` (`i64` where day arithmetic multiplies). `usize` appears only at the boundary with slices. Serialized types never carry `usize`.
+- **Explicit limits.** Named constants in one `limits.rs` per crate, used by validation, loops, and tests. A limit hit in practice is a design signal, not a knob. Cost and test at the limits, not typical size.
+- **Assertions, positive and negative space, on in release.** Assert arguments, returns, and invariants; engine functions average at least two. After `apply`, assert the revision advanced by exactly one and events equal mutations (J2), and re-verify the whole graph's invariants (on in release). Relationships between constants are `const` assertions.
+- **Bounded load.** Bound concurrency and queues; background work runs on fixed intervals, not per event (SSE ticks coalesce per domain).
+- **No recursion.** Every traversal is iterative with an explicit stack bounded by `containment_depth_max` (wasm stacks are small). Engine tests run at the depth limit in the wasm build.
+- **Fixed-width integers.** Counts, offsets, weights, revisions are `u32`/`i32` (`i64` where day arithmetic multiplies). `usize` only at slice boundaries, never serialized.
 
 ### Code shape
 
-- **Functions of at most 70 lines.** A hard limit, enforced by `clippy::too_many_lines` at 70. Long functions are split by phase, and the phase names become the function names.
-- **Big-endian names, no abbreviations, units in the name.** `node_count_max`, `offset_days`, `commit_duration_ms`, `revision_base`. Paired names share length where practical (`source` and `target`). Abbreviations are limited to those the PRD already uses (`id`, `key`, `api`, `mcp`).
-- **Declare near use.** Variables are declared where they are first needed and scoped as tightly as the borrow checker allows; no "declare everything at the top" blocks.
-- **Dimensionality.** Keep signatures narrow so callers branch less; a branch at a call site spreads to every caller above it. Return the fewest outcomes that are true: `()` over `bool` over a value over `Option` over `Result`, and handle a case inside the function when it has what it needs rather than handing it back. Take the narrowest input: a resolved key is a `Key`, not an `Option<Key>` or a path. The PRD's closed sets (kinds, states, relevance, provenance) are enums, and every engine `match` is exhaustive with no wildcard arm.
-- **Logical interfaces.** Minimize surface area. Hide physical, non-deterministic interfaces behind logical, deterministic ones: the clock, timezone, and viewer are derive inputs, never read by the engine. Each seam declares its fault model (the fault sites simulation exercises). Push control flow up and data flow down: decisions about I/O, retries, and time live in the shell, which is what makes the engine simulable.
+- **Functions of at most 70 lines**, split by phase.
+- **Big-endian names, no abbreviations, units in the name**: `node_count_max`, `offset_days`, `commit_duration_ms`. Only the PRD's abbreviations (`id`, `key`, `api`, `mcp`).
+- **Declare near use.**
+- **Dimensionality.** Narrow signatures so callers branch less. Return the fewest true outcomes (`()` over `bool` over a value over `Option` over `Result`); take the narrowest input (a `Key`, not `Option<Key>`). The PRD's closed sets are enums; engine `match`es are exhaustive with no wildcard.
+- **Logical interfaces.** Clock, timezone, and viewer are derive inputs, never read by the engine. I/O, retries, and time live in the shell; each seam declares its fault model.
 
 ### Scope and dependencies
 
-- **No configuration by default.** A knob exists only when two real deployments need different values. database file path, listen address, public base URL, auth providers (each with its own security settings: the Tailscale trusted proxies, the dev provider's off-loopback override and its verified emails), assistant provider and its credential, deployment timezone, and the rank constants (which the PRD makes configurable) are the configuration surface; limits and behavior switches are not.
-- **Do it right while it is hot.** No `TODO` without an owner and a reason in the same line; no "later" that is not in `ARCHITECTURE.md`'s open questions or the PRD's `Later`.
-- **Back-of-the-envelope first.** Every change that adds a pass over the graph states its cost at `node_count_max` before code, in compute and memory, and storage or network where the pass touches them (solving the whole date network once per read, not a lookup per node, is the PRD's own example).
-- **Dependencies are deliberate, not zero.** The engine crate depends on `serde` and a date type and nothing that touches the OS, so it compiles to wasm and runs under any simulator. Shell crates take what they need (axum, rusqlite, rmcp, openidconnect), and the commit that adds a dependency says why in one line. The test for a new dependency is whether it would take longer to maintain our own version than to audit upgrades of theirs; for a small service the answer is usually to take it. A dependency that pulls a runtime or the OS into the engine is rejected regardless. Tools are dependencies too: each tool in `mise.toml` is pinned and earns its place the same way.
+- **No configuration by default.** A knob exists only when two real deployments need different values. The surface: database path, listen address, public base URL, auth providers and their security settings (the Tailscale trusted proxies, the dev provider's off-loopback override and verified emails), assistant provider and credential, deployment timezone, rank constants. Limits and behavior switches are not configuration.
+- **Do it right while it is hot.** No `TODO` without an owner and reason on the same line; deferred work lives only in the PRD's Later.
+- **Back-of-the-envelope first.** A new pass over the graph states its cost at `node_count_max` (compute, memory, storage or network) before code, and comes with a property test.
+- **Dependencies are deliberate, not zero.** The engine takes only `serde` and a date type, nothing touching the OS or a runtime, so it compiles to wasm and simulates. Shell crates take what they need when maintaining our own would cost more than auditing upgrades; the adding commit says why. Tools in `mise.toml` are pinned and earn their place the same way.
 
 ### Simplicity
 
-Do as much as necessary and as little as possible. The rules above say how to be careful; this says when to stop. Every layer, process, script, flag, branch, and rule pays for itself or goes, and a constraint pays by naming the real situation it protects against; two in tension are weighed by those situations.
+Do as much as necessary and as little as possible; every layer, script, flag, branch, and rule pays for itself or goes.
 
-- **A fast loop is a feature; question a layer before optimizing it.** A claim about where time, disk, or cost goes cites a measurement, and a comparison runs on a few cases and ends by picking a default. When a step is slow, first ask whether it should exist. A cache in front of a cheap read, a background process that mirrors a file another process already owns, or a wrapper script around one command is usually cheaper to delete than to tune.
-- **Fail closed, recover from durable state.** When an error leaves in-memory state in doubt, stop: refuse to serve what it covers, or crash, and recover by reopening from what was committed. A write that fails halfway does not record which cached rows are now suspect and keep serving the rest; it drops the cache and reloads. One failure mode with one recovery path beats hidden error modes plus the bookkeeping to limp through them.
-- **Migrate old data once.** When existing data breaks a new rule, a one-off migration brings the data into line and the code keeps one rule. A loader that accepts the old shape and the new one forever is a permanent branch every later change has to reason about: rewrite the stored documents to the new field name, then read only that name.
-- **No compatibility cruft before anyone depends on it.** Cairn has no outside consumers whose upgrades it must stage. Rename and cut over in one change, callers, documents, and stored data together, rather than keeping a deprecated alias, a fallback field, or a shim. One exists only for a named consumer that cannot move in the same change.
-- **Judge what exists by what it is for, and cull what no longer earns its place.** Work in an area deletes the code and tests there that no longer pay for themselves, as a matter of course. Keeping something takes the same case as adding it fresh: what it is for, what it catches or does that nothing else does, and what it costs. That it exists, that work went into it, or that a check now runs it is no reason (sunk cost), and neither is that later work was built around it (path dependency): weigh what that work would cost to move, then decide. Before crediting a test with catching a break, check the break was not an intended change.
-- **Build the end state, removing first.** Shape a change as if the code had always been meant for its intent, not as a patch on what was there: delete what the intent makes redundant in code, interfaces, tests and documents, then add only what is still missing.
-- **Fix the class, not the instance.** When a bug or finding is one case of a pattern, remove its cause and sweep for the other cases in the same change; deleting the duplication behind a pattern beats a test per case.
-- **Fix it where it lives.** Use a tool or dependency as it is designed. When it is at fault, record the gap for its maintainers with a small reproduction rather than bend Cairn around it; a workaround that stays names what it waits on.
-- **Plain and portable over clever.** Take the plain, portable way until a measurement shows it is too slow; then the clever version lands with that measurement. Clever saves seconds when it works and costs an afternoon when it silently does not, often on a machine its author never tried.
+- **A fast loop is a feature; question a layer before optimizing it.** Claims about time or cost cite a measurement. A slow step first asks whether it should exist.
+- **Fail closed, recover from durable state.** When in-memory state is in doubt, refuse or crash, and reload from what was committed; never track suspect rows.
+- **Migrate old data once.** A one-off migration, then one code path; no loader accepting both shapes.
+- **No compatibility cruft before anyone depends on it.** Rename and cut over in one change; no alias, fallback field, or shim without a named consumer that cannot move.
+- **Judge what exists by what it is for, and cull what no longer earns its place.** Work in an area deletes the code and tests there that no longer pay. Keeping something takes the case adding it would: what it is for, what it catches or does that nothing else does, what it costs. Existing, effort spent, or a check running it are not reasons; for later work built on it, weigh the cost of moving that work. Before crediting a test with catching a break, check the break was not intended.
+- **Build the end state, removing first.** Delete what the change makes redundant, then add what is missing.
+- **Fix the class, not the instance**, in the same change.
+- **Fix it where it lives.** Report a tool's bug upstream with a reproduction; a workaround that stays names what it waits on.
+- **Plain and portable over clever**, until a measurement says otherwise.
 
 ### Frontend state
 
-How `web/app` and `web/client` hold state ([`decisions/2026-10-16-frontend-state-is-machines-for-lifecycles-and-functions-for-the-rest.md`](decisions/2026-10-16-frontend-state-is-machines-for-lifecycles-and-functions-for-the-rest.md)).
+How `web/app` and `web/client` hold state.
 
-- **Machines for lifecycles.** An owned, mutually exclusive workflow mode is an XState v5 machine, a small one too. A workflow mode is a state that decides which async work exists, when it expires, or which events may proceed while work is outstanding: a write, a read, the subscription, a form that is open, a toast, a receipt, the sync chip's popover, a conversation with the assistant.
-- **Pure functions for derived values.** Anything derivable is computed by a pure function and never stored beside its source. The sync chip's display state is `summarize`, a projection, not a machine.
-- **Plain data for payloads.** What a machine carries, and what is kept in storage, is data a person could read, never a snapshot.
-- **One owner per fact.** Others read a fact from its owner and are never pushed a copy. A component reads state through a tagged selector (`writeView` and the like), never by piecing it together from optional context fields, and never copies a snapshot into React state.
-- **Effects belong to the machine.** A timer is a delayed transition, a request an invoked actor, and a busy state does not accept a new start. Cancelling stops the UI waiting for the answer; it never undoes a commit.
-- **Owners.** The shared actors are the session root's children; a component owns its transient actors (`useActorRef`: a keyed read, a receipt, the chip's popover, an open form, a workflow) and reads shared ones through `useSelector`. A manager keeps an explicit keyed map, stops what it spawns, and finds nothing through XState's system registry. Apart from preferences and browser sources (`useMedia`, the network, the theme), there is no hand-written store with listeners, and no flag, attempt count or generation counter standing in for a state; one that stays says why in a line where it is.
-- **Preferences are not machines.** `useAxis` and `useFrame` keep their independent preferences and keyed overrides, with presentation derived from them.
-- **Actors are tested with controlled promises and a `SimulatedClock`**, with wall time injected separately; a bounded workflow (the edge drawing) also has every reachable state and transition walked with `@xstate/graph`; Playwright covers focus, navigation, reload recovery, multiple tabs and worker wiring.
+- **Machines for lifecycles.** An owned, mutually exclusive workflow mode (deciding which async work exists, when it expires, or which events proceed meanwhile) is an XState v5 machine, however small: a write, a read, the subscription, an open form, a toast, a receipt, the sync chip's popover, an assistant conversation.
+- **Pure functions for derived values**, never stored beside the source (the sync chip's state is `summarize`, not a machine).
+- **Plain data for payloads and anything stored**, never snapshots.
+- **One owner per fact.** Components read through tagged selectors (`writeView`), never copy a snapshot into React state.
+- **Effects belong to the machine.** Timers are delayed transitions, requests invoked actors; a busy state refuses a new start. Cancelling stops waiting, never undoes a commit.
+- **Owners.** Shared actors are the session root's children; components own transient actors (`useActorRef`) and read shared ones with `useSelector`. Managers keep explicit keyed maps, stop what they spawn, and never use XState's system registry. Besides preferences (`useAxis`, `useFrame`) and browser sources (`useMedia`, network, theme): no hand-written stores with listeners, no flag or counter standing in for a state (one that stays says why where it is).
+- **Testing actors**: controlled promises and a `SimulatedClock`; bounded workflows also walk every state with `@xstate/graph`; Playwright covers focus, navigation, reload recovery, multiple tabs, worker wiring.
 
 ### Not adopted
 
-Rules from Tiger Style and the Power of Ten that Cairn does not follow, and why. Work that finds a reason to adopt one raises it.
-
-- **Static memory allocation.** Cairn loads a domain, works on it, and drops it; allocation per request is the natural shape and the limits bound it. Static allocation would buy predictability the workload does not need at the cost of every collection becoming a fixed array.
-- **Zero-copy data plane.** There is no data plane. A journey is a few megabytes handled a few times per second.
-- **Line length 100.** rustfmt's default.
-- **No `else if` chains, split compound conditions.** Rust's `match` covers most of the motivation; a rule on `if` shape is noise.
-- **No dynamic dispatch.** The store, notifier, and auth provider are trait objects by design; the cost is irrelevant at this scale and the seams are the point. The store, auth provider and model provider traits use `async-trait` (boxed `Send` futures, plain `async fn` in implementations) for this reason, so there is one idiom for an object-safe async trait, and holding it as `Arc<dyn Store>` keeps the server stack compiled once instead of once per backend.
+From Tiger Style and the Power of Ten: static memory allocation, zero-copy data plane, line length 100 (rustfmt's default instead), `else if`/compound-condition rules. **No dynamic dispatch** is not adopted either: the store, notifier, and auth provider are trait objects, because the seams are the point; async traits use `async-trait` as the one object-safe idiom.
 
 ## Errors, panics, and rejections
 
-- **User and agent errors are values.** Invalid patches, stale revisions, guard failures, contradictory chains, and unknown keys are `Rejection` or typed error enums (`thiserror`), returned, serialized unchanged through the API and MCP, and tested. They never panic.
-- **Programmer errors panic.** A violated code invariant (two parents, a derived field about to be stored, an event without a patch id) is `assert!` or `unreachable!`. In the server, the service layer catches a panic from an engine call inside a request: the engine works on a private candidate and nothing commits, so the request fails with a 500 carrying the request id, the panic is logged with the domain and request id, and the engine panic count metric is incremented. A panic anywhere else (shared shell state, background tasks, startup) aborts the process, because shared state may be left inconsistent. In the browser any panic aborts the wasm module. Under test or simulation, a panic is the finding.
-- **No `unwrap` or `expect` outside tests** (`clippy::unwrap_used`, `clippy::expect_used` denied). Where a value is known present, the reason is an assertion with a message, not an `unwrap`.
-- **`#[must_use]` on every result-bearing engine function.** Ignoring a `Rejection` is a compile error in practice.
-- **Rejections are complete.** Validation collects every violation before returning (A15). A test asserts that a patch with three independent violations reports three.
+- **User and agent errors are values**: `Rejection` or `thiserror` enums, serialized unchanged through the API and MCP. Never panics.
+- **Programmer errors panic** (`assert!`, `unreachable!`). The server's service layer catches an engine panic inside a request: nothing commits, the request fails 500 with its request id, the panic is logged with domain and request id, and the engine panic metric increments. A panic anywhere else in the server aborts the process, since shared state may be inconsistent. In the browser any panic aborts the wasm module.
+- **No `unwrap` or `expect` outside tests**; use an assertion with a message.
+- **`#[must_use]`** on every result-bearing engine function.
+- **Rejections are complete**: validation collects every violation (A15).
 
 ### `assert!` versus `always!`
 
-They answer different questions and are not interchangeable.
-
-- `assert!` is the correctness check. It is on in every build, including release and wasm, and a failure is a panic with a message.
-- `patina_dst::always!(cond, "label")` is a simulation oracle. Under `patina` a violation is a labeled, structured verdict that the campaign classifier, deduplicator, and minimizer read; outside `patina` it compiles to a `debug_assert!`, which is off in release. So it never replaces an `assert!`.
-
-Rule: production crates use `assert!` for invariants, plus `sometimes!` coverage oracles and `buggify!` fault sites where simulation needs them. Testbeds use `sometimes!`, `buggify!`, and `verdict` (a violation verdict per broken invariant, so a run reports every broken invariant rather than aborting at the first: [`decisions/2026-10-18-testbed-invariants-stay-verdicts.md`](decisions/2026-10-18-testbed-invariants-stay-verdicts.md)) because a labeled verdict is what makes a campaign's output triageable. A production crate may add an `always!` next to an `assert!` at a seam where the label helps triage (the commit path, the retry path); the `assert!` stays. Every site's label is a kebab-case string literal, which the lint step checks: a campaign gates the literal labels declared at link time, and the testbeds' `sim.sh` scripts word-split and grep labels, so a spaced label would break them ([`decisions/2026-10-18-patina-main-retires-four-testbed-workarounds.md`](decisions/2026-10-18-patina-main-retires-four-testbed-workarounds.md)).
+`assert!` is the correctness check, on everywhere. `patina_dst::always!` is a simulation oracle that compiles to `debug_assert!` outside `patina`, so it never replaces an `assert!`; add it beside one only where a labeled verdict helps triage. Testbeds report broken invariants with `verdict` (one per invariant, not aborting at the first). Every site label is a kebab-case string literal (lint checks; campaigns and `sim.sh` grep them).
 
 ## Explicit limits
 
-Hard-coded named constants; validation rejects a patch that would exceed one, and loops use the same constant as their bound. Sized for human-authored processes, not for what the machine could hold. Every list a person or agent writes has a count limit and every string a byte limit; the few values that take another row's limit, and why it fits them, are in [`decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md`](decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
+Validation rejects a patch exceeding a limit; loops use the same constant. Every list a person or agent writes has a count limit and every string a byte limit; a value without its own row takes the nearest row that fits. Changing one needs the user's sign-off, then this table and `limits.rs` change together.
 
 | Limit | Value | Why this value |
 |---|---|---|
-| nodes per graph | 2,000 | The PRD sizes a deployment at thousands of nodes across hundreds of journeys; a route is typically tens to low hundreds. 2,000 leaves 10x headroom over a large journey. |
-| containment depth | 16 | Convention is group > deliverable > action, occasionally deeper; 16 is far past anything readable on a canvas. |
-| explicit edges per node, in plus out | 64 | A milestone that gates a whole stage does so through one implicit edge, not 64 explicit ones. Past this the canvas is unreadable and the author should restructure. |
-| mutations per patch | 8,000 | An import of a full graph is roughly four mutations per node (node, edges, participations, resources); 4 x the node limit, enforced by a `const` assertion. |
-| roles, participation kinds per graph | 32 each | A process with more than a couple dozen distinct roles is several processes. A node has at most one participation per kind, so this bounds a node's participations too. |
-| choices per decision | 32 | A single-choice question with more options is a text or identity answer in disguise. |
-| checklist items per node | 50 | A list someone ticks through in one sitting; past 50 the items are pieces of work of their own, which belong in child actions. |
-| identities per role fill, identity-list answer, explicit participation, or journey's owners; values per `in` clause | 100 | A stakeholder list; past 100 it is a team, which the PRD does not model. An `in` clause compares against such a list. |
-| emails per identity | 16 | Work, personal, and a few former addresses, with room for a merge to join two people's lists. |
-| aliases per identity | 32 | Each merge of a duplicate adds one; a person imported from several sources gathers a handful. |
-| identities per deployment | 5,000 | Hundreds of journeys naming tens of people each, mostly shared; past this the deployment is a staff directory, which the PRD does not model. |
-| journeys named by one identity merge | 1,000 | A merge names every journey referencing either identity, and the PRD sizes a deployment at hundreds of journeys. |
-| resources per node | 16 | A tip, a template, an example or two; past 16 it is a reading list, which belongs in one linked document. |
-| notes per node, or on the journey | 100 | A running log of status notes over a long piece of work; past 100 the discussion belongs in a linked conversation. |
-| links per node, or on the journey | 32 | The artifacts, references, and conversations of one piece of work; past 32 they belong in a folder behind one link. |
-| condition tree depth, clauses | 8, 16 | Conditions are meant to be one or two clauses; this allows a complicated one and still fits in a form editor. |
-| id slug or key, title or label | 64, 256 bytes | Ids and keys are paths and short references; titles, names, and choice labels are card labels. |
-| description, prompt, help, note, tip, message draft, text answer | 64 KiB | A long tip or template; larger content lives in a linked document. |
-| link (URL) | 4 KiB | Practical URLs stay under about 2 KiB; twice that admits long signed links and stays under the 8 KiB request line common servers accept. |
-| email address | 254 bytes | RFC 5321 caps an address path at 256 octets, angle brackets included. |
-| reason for a skip, override, or bypass | 4 KiB | A sentence or a short paragraph; a longer account belongs in a note. |
-| date offset, estimate | 365 days | A year. "Two weeks before the meeting" is the typical case; a multi-year offset is a modeling error. |
-| weight | 1,000 | The PRD's examples are 1, 5, and 10. Gravity sums weights over up to 2,000 nodes, so the sum fits comfortably in a `u32`. |
-| history page | 200 per request | A bounded agent view; the remainder is counts and keys. Callers page. |
-| tool list, one tool's definition apart from the mutation sketch, the mutation sketch | 48 KiB, 4 KiB, 14 KiB | What an agent loads on connecting (and the assistant sends on every provider exchange), as compact JSON bytes, about four to a token: the list near 12,000 tokens, a tool near 1,000, the sketch near 3,500. A tool that outgrows its share is split or described less, not given more room ([`decisions/2026-10-24-tools-and-their-answers-are-shaped-for-an-agents-context.md`](decisions/2026-10-24-tools-and-their-answers-are-shaped-for-an-agents-context.md)). |
-| served guide | 4,096 bytes | What a client shows of the server's instructions (Claude Code shows the first 4 KB), as UTF-8 bytes of `instructions::guide()`. The guide keeps what spans tools; a rule that governs one tool goes in that tool's description ([`decisions/2026-10-29-the-guide-keeps-the-core-and-tools-carry-their-rules.md`](decisions/2026-10-29-the-guide-keeps-the-core-and-tools-carry-their-rules.md)). |
-| bytes per listed node row, on each fixture journey | 320 | A row is what an agent acts on: about 80 tokens, so a page of 200 stays near 16,000. |
-| graph, serialized with its state | 16 MiB | One journey, one route draft or published version, or the deployment record, at the limits above, with room. A route's versions are separate graphs, each under its own cap, so publishing never fills a route up. Events and history are excluded and read by page, so an old journey never outgrows its cap by being used. |
-| request body | 24 MiB | The domain cap plus envelope, so a domain at its cap still fits one request. |
-| contradictory chains per rejection | 16 | Enough to see every distinct conflict a person would fix in one sitting; the rejection says when there were more. |
-| explanation entries per value in a server response | 50 | The calculation uses everything and the browser, which derives locally, sees everything; a server response carries the largest entries and a total and pages the rest. |
-| SSE subscribers per process | 256 | Tens of users with a few tabs each. |
-| assistant tool-loop iterations per turn | 32 | A runaway stop, not a budget. Structuring a journey is a few reads, one proposal, and a report; 32 is several times that. If a turn hits it, the tool set is wrong, not the number. |
-| request duration, API and MCP (not SSE or the assistant) | 5 s | Typical requests take tens of milliseconds; the heaviest, an import at the mutation limit, about a second. Past five seconds something is stuck. |
-| assistant provider call | 120 s | One non-streamed model response, including a long proposal; past this the provider is down and the turn reports it. |
-| assistant turn | 10 min | The iteration limit at typical provider latency, with room. |
-| assistant tool-result bytes kept per turn | 256 KiB | Every loop iteration resends the whole exchange, so results kept whole make a turn's cost grow with the square of its reads. Past this the oldest results are replaced by a note that they were dropped; about 64 thousand tokens. |
-| identical failing tool calls per turn | 3 | The same tool with the same arguments failing again is a stuck model, and every repeat is billed; the third failure ends the turn. |
-| assistant provider call retries | 2 | A rate limit (429) or a server error (5xx, 529 included) is retried with jittered backoff, inside the turn's limits. A timeout is never retried: the tokens may already be billed. |
-| longest `Retry-After` honoured | 30 s | A provider asking for a longer wait fails the call at once rather than holding the turn. |
-| store connection acquire | 5 s | Commits take milliseconds; five seconds of waiting is contention, which at this scale is a bug. |
-| outbound sign-in provider call (OIDC, IAP key set, Google token exchange), and a whole request to the IAP relay's endpoints | 10 s | A sign-in provider that slow is down; the login fails. |
-| requests in flight at the IAP relay's endpoints, per process | 16 | Each sign-in or refresh is one short request; the token endpoint, registration and the metadata are reachable without IAP, so a flood of them holds at most this many of the 128 and signed-in requests keep the rest. |
-| IAP key set fetch tries, failed or not | once per 60 s | Google rotates IAP's keys rarely; neither a stream of forged key ids nor an outage at Google may fetch on every request. |
-| IAP key set age | 1 h | A key Google withdraws stops verifying within the hour, at one fetch an hour; past it the set is fetched again, and refused as unavailable if that fails. |
-| IAP assertion clock skew | 30 s | IAP's assertions last ten minutes and NTP keeps clocks well inside this. |
-| IAP assertion lifetime, issue to expiry | 10 min, plus the skew at either end | IAP's own last ten minutes; a longer one was not issued as IAP issues them. |
-| SSE coalescing interval | 250 ms | Feels live; at most four ticks a second per domain. |
-| SSE write stall | 15 s | A subscriber holds the latest revision per domain, not a queue, so a slow one never accumulates ticks; one that cannot take a write this long is disconnected and reconnects with current revisions (H6). |
-| requests in flight per process | 128 | Tens of users with a few tabs and agents; past this a client is looping. Overflow is a 503 with `Retry-After`. |
-| store connections per process | 16 readers, plus the one writer | Each in-flight read borrows a reader; every write takes the writer in turn. |
-| assistant turns in flight per process | 32 | Each turn is an open request waiting on the provider; the provider's rate limit binds well before this. |
-| attempts to commit one stale patch at moved revisions, per request | 8 | A runaway stop, not a budget: each attempt needs another commit to land between the service's load and its commit ([`decisions/2026-10-22-the-server-applies-a-stale-write-that-overlaps-nothing.md`](decisions/2026-10-22-the-server-applies-a-stale-write-that-overlaps-nothing.md)). |
-| automatic resends of a write with no answer | 5, waiting 250 ms, doubling, at most 15 s | Five resends cover about eight seconds of a server that answers nothing; time offline uses none, since each waits for the connection. Past five the person retries by hand ([`decisions/2026-10-16-a-write-is-an-operation-the-edit-manager-owns.md`](decisions/2026-10-16-a-write-is-an-operation-the-edit-manager-owns.md)). |
-| journeys a tab keeps derived after their view closes | 8 | Going back to a recent journey shows it at once; each one holds its derivation in the tab's worker, so the least recently shown beyond this are released. |
-| canvas layouts a tab keeps | 32 views, 4 per view | Toggling a setting back and forth lays out nothing; the least recently laid out beyond this are forgotten and laid out again when shown. |
-| saves the sync chip lists as Recent | 10 | What this tab did lately, newest first; past ten the popover is a log, which the journey's history already is. |
-| assistant turns a tab keeps per conversation | 50 | The newest turns; a long conversation never grows the tab without bound. |
-| CI check part duration | 45 min | The slowest cold part measured 23 minutes; on main a run in flight is never cancelled, so a hung part would hold the next run (`timeout-minutes` in `check.yml`). |
+| nodes per graph | 2,000 | 10x a large journey. |
+| containment depth | 16 | Far past readable. |
+| explicit edges per node, in plus out | 64 | Past this, restructure. |
+| mutations per patch | 8,000 | A full import, about four per node; `const`-asserted as 4 x the node limit. |
+| roles, participation kinds per graph | 32 each | One participation per kind per node, so this bounds those too. |
+| choices per decision | 32 | More is a text or identity answer. |
+| checklist items per node | 50 | More are child actions. |
+| identities per role fill, identity-list answer, explicit participation, or journey's owners; values per `in` clause | 100 | A stakeholder list, not a team. |
+| emails per identity | 16 | Room for a merge. |
+| aliases per identity | 32 | One per merged duplicate. |
+| identities per deployment | 5,000 | Not a staff directory. |
+| journeys named by one identity merge | 1,000 | Every journey referencing either identity. |
+| resources per node | 16 | More belongs in one linked document. |
+| notes per node, or on the journey | 100 | More belongs in a linked conversation. |
+| links per node, or on the journey | 32 | More belongs in a folder behind one link. |
+| condition tree depth, clauses | 8, 16 | Fits a form editor. |
+| id slug or key, title or label | 64, 256 bytes | Short references; card labels. |
+| description, prompt, help, note, tip, message draft, text answer | 64 KiB | More lives in a linked document. |
+| link (URL) | 4 KiB | Long signed links, under the 8 KiB request line. |
+| email address | 254 bytes | RFC 5321. |
+| reason for a skip, override, or bypass | 4 KiB | Longer belongs in a note. |
+| date offset, estimate | 365 days | Longer is a modeling error. |
+| weight | 1,000 | Sums over every node fit a `u32`. |
+| history page | 200 per request | Callers page. |
+| tool list, one tool's definition apart from the mutation sketch, the mutation sketch | 48 KiB, 4 KiB, 14 KiB | Compact JSON an agent loads on connecting. A tool that outgrows its share is split or described less. |
+| served guide | 4,096 bytes | UTF-8 bytes of `instructions::guide()`; clients show about 4 KB. It keeps what spans tools; a one-tool rule goes in that tool's description. |
+| bytes per listed node row, on each fixture journey | 320 | A page of 200 stays near 16,000 tokens. |
+| graph, serialized with its state | 16 MiB | One journey, route version or draft, or the deployment record. Events and history are excluded and paged. |
+| request body | 24 MiB | The graph cap plus envelope. |
+| contradictory chains per rejection | 16 | The rejection says when there were more. |
+| explanation entries per value in a server response | 50 | Largest entries plus a total; the rest pages. |
+| SSE subscribers per process | 256 | Tens of users, a few tabs each. |
+| assistant tool-loop iterations per turn | 32 | A runaway stop, not a budget. |
+| request duration, API and MCP (not SSE or the assistant) | 5 s | Past this it is stuck. |
+| assistant provider call | 120 s | Past this the provider is down; the turn reports it. |
+| assistant turn | 10 min | The iteration limit at typical latency. |
+| assistant tool-result bytes kept per turn | 256 KiB | Past this the oldest results are replaced by a note that they were dropped. |
+| identical failing tool calls per turn | 3 | The third failure ends the turn. |
+| assistant provider call retries | 2 | Only 429 and 5xx (529 included), with jittered backoff inside the turn's limits. Never a timeout: tokens may be billed. |
+| longest `Retry-After` honoured | 30 s | A longer wait fails the call at once. |
+| store connection acquire | 5 s | Longer is contention, a bug. |
+| outbound sign-in provider call (OIDC, IAP key set, Google token exchange), and a whole request to the IAP relay's endpoints | 10 s | The login fails. |
+| requests in flight at the IAP relay's endpoints, per process | 16 | Unauthenticated relay floods leave the rest of the 128 for signed-in requests. |
+| IAP key set fetch tries, failed or not | once per 60 s | Forged key ids or an outage never fetch per request. |
+| IAP key set age | 1 h | Then refetched, and refused as unavailable if that fails. |
+| IAP assertion clock skew | 30 s | |
+| IAP assertion lifetime, issue to expiry | 10 min, plus the skew at either end | Longer was not issued by IAP. |
+| SSE coalescing interval | 250 ms | At most four ticks a second per domain. |
+| SSE write stall | 15 s | A subscriber holds the latest revision per domain, not a queue; a stalled one is disconnected and reconnects with current revisions (H6). |
+| requests in flight per process | 128 | Overflow is a 503 with `Retry-After`. |
+| store connections per process | 16 readers, plus the one writer | Reads borrow a reader; writes take the writer in turn. |
+| assistant turns in flight per process | 32 | |
+| attempts to commit one stale patch at moved revisions, per request | 8 | A runaway stop. |
+| automatic resends of a write with no answer | 5, waiting 250 ms, doubling, at most 15 s | Each waits for the connection; then the person retries by hand. |
+| journeys a tab keeps derived after their view closes | 8 | Least recently shown beyond this are released. |
+| canvas layouts a tab keeps | 32 views, 4 per view | Least recently laid out beyond this are forgotten. |
+| saves the sync chip lists as Recent | 10 | Newest first. |
+| assistant turns a tab keeps per conversation | 50 | The newest. |
+| CI check part duration | 45 min | Main never cancels a run in flight, so a hung part would hold the next (`timeout-minutes` in `check.yml`). |
 
 ## Code conventions
 
-- **Rust**: stable toolchain pinned by mise; `rustfmt` default; `clippy` with `pedantic` as warnings and a denied set (`unwrap_used`, `expect_used`, `panic` in shell handlers, `indexing_slicing` in the engine, `too_many_lines` at 70, `missing_docs` on public engine items); `#![forbid(unsafe_code)]` in every crate. Warnings are errors in CI.
-- **Deterministic by construction.** The engine uses `BTreeMap`, `IndexMap`, or sorted `Vec`s wherever iteration order reaches an output; `HashMap` is denied in the engine crate. A property test asserts that two derives of the same input serialize identically, and it runs both under `patina` (where hashing is seeded and would hide the bug) and plain.
-- **Errors carry context.** Every error type implements `Display` with the path or key involved; shell errors wrap engine errors without flattening them.
-- **Comments say why.** What the code does is the code; the comment is for the invariant it protects, the PRD id it implements, or the reason a limit has its value.
-- **PRD ids in code.** A function that implements a numbered requirement names it in its doc comment (`/// D1a skip cascade.`). Scenario tests name the ids they cover. This is how a reviewer checks coverage.
-- **TypeScript**: strict mode, `eslint` with the type-aware rules and `max-lines-per-function` at 70, no `any` outside generated code. Generated files live only in the generated paths (ARCHITECTURE, Generated artifacts), are never edited by hand, and are marked as such.
+- **Rust**: stable toolchain pinned by mise; default `rustfmt`; `clippy` `pedantic` as warnings plus denied `unwrap_used`, `expect_used`, `panic` in shell handlers, `indexing_slicing` in the engine, `too_many_lines` at 70, `missing_docs` on public engine items; `#![forbid(unsafe_code)]` everywhere; warnings are errors in CI.
+- **Deterministic by construction.** The engine iterates only ordered collections (`BTreeMap`, `IndexMap`, sorted `Vec`); `HashMap` is denied there. A property test checks two derives serialize identically, under `patina` and plain.
+- **Errors carry context**: `Display` names the path or key; shell errors wrap engine errors without flattening.
+- **Comments say why.**
+- **PRD ids in code**: in the doc comment of the function implementing a requirement (`/// D1a skip cascade.`) and in scenario tests.
+- **TypeScript**: strict, type-aware `eslint`, `max-lines-per-function` at 70, no `any` outside generated code. Generated files live only in the generated paths (ARCHITECTURE, Generated artifacts) and are never hand-edited.
 
 ## Testing
 
-- **One structural check beats a test per case.** A property that must hold everywhere (no id in served text, nothing outside its box, a page that fits its window, a tool list within its budget) is one check that every case runs through, so a new case is covered without anyone remembering to add its test; a test written again by hand for each screen, message or component tests our diligence, not the code, and is cut for the check.
+**One structural check beats a test per case.** A property that must hold everywhere (no id in served text, nothing outside its box, a tool list within budget) is one check every case runs through, not a test per screen or message.
+
 ### Engine: examples, properties, replay
 
-- **Scenario tests** (J3): every scenario the PRD lists, as example-based tests at a fixed clock over the shared fixtures, each in the file of the area it exercises and citing the PRD ids it covers, asserting derived bounds, blocking, shortfalls, and ranking, not only replay equality. A scenario another test already covers is not repeated.
-- **Replay harness** (J3): the engine tests apply every patch through one shared helper (`support::apply`), which rebuilds the records from the patch's events and compares them to what apply produced, so every accepted step of every scenario replays. Drift fails the build. A separate test asserts that every mutation type emits an event (J2).
-- **Property tests** with `proptest` through `patina-dst-proptest`: generated graphs within the limits and generated operation sequences, with properties such as: apply then replay equals apply; a rejected patch leaves the graph unchanged; derive is a pure function of (graph, inputs); gravity never decreases upstream along a dependency between in-scope nodes; no accepted graph contains a contradictory chain; every implicit edge names its source.
-- **Round trips**: file import and export, JSON and YAML, proposal edit and apply.
+- **Scenario tests** (J3): every PRD scenario, at a fixed clock over the shared fixtures, citing its ids, asserting derived bounds, blocking, shortfalls, and ranking. Each scenario once.
+- **Replay** (J3): engine tests apply patches through `support::apply`, which replays the patch's events and compares; every mutation type emits an event (J2).
+- **Property tests** over generated graphs and operation sequences within the limits: apply then replay equals apply; a rejected patch changes nothing; derive is pure; gravity never decreases upstream along a dependency between in-scope nodes; no accepted contradictory chain; every implicit edge names its source.
+- **Round trips**: import and export, JSON and YAML, proposal edit and apply.
 
 #### Property tests
 
-`patina-dst-proptest` is a drop-in for `proptest`'s prelude that seeds cases from `patina_dst::rng()`. Under plain `cargo test` it runs from a fixed seed, in the core ladder; under a campaign the run seed sweeps the cases and a failure replays byte for byte. If plain `proptest` does something better, use it there and record the gap in a new file in `decisions/`, tagged `[patina]` in its title, so patina can be improved.
-
-The shape of an engine property test, in Cairn's terms:
-
-```rust
-use patina_dst_proptest::prelude::*;
-use cairn_engine::{apply, derive, replay, DeriveInputs, Graph, Patch};
-use cairn_engine::testing::{arb_graph, arb_ops, Op};
-
-proptest! {
-    #[test]
-    fn apply_then_replay_matches(initial in arb_graph(), ops in prop::collection::vec(arb_ops(), 1..64)) {
-        let inputs = DeriveInputs::fixed_clock();
-        let mut graph = initial.clone();
-        let mut events = Vec::new();
-        for op in ops {
-            // Ops carry indices, resolved against the graph as it is now, so a
-            // generated sequence stays meaningful as the graph changes.
-            let patch: Patch = op.resolve(&graph);
-            match apply(&graph, &patch, &inputs) {
-                Ok(applied) => {
-                    prop_assert_eq!(applied.events.len(), patch.mutations.len());
-                    prop_assert_eq!(applied.graph.revision, graph.revision + 1);
-                    events.extend(applied.events);
-                    graph = applied.graph;
-                }
-                Err(rejection) => prop_assert!(!rejection.violations.is_empty()),
-            }
-        }
-        prop_assert_eq!(replay(&initial, &events), graph);
-        prop_assert_eq!(derive(&graph, &inputs), derive(&graph, &inputs));
-    }
-}
-```
-
-`arb_graph` and `arb_ops` are the engine's own test strategies (generic content only), generating within the limits table. `Op` is a small enum (add child under node i, add edge i to j, answer decision i with choice k, transition node i, pin milestone i, remove node i) whose `resolve` maps indices modulo the current node count.
+Use `patina-dst-proptest`, a drop-in for `proptest`'s prelude seeded from `patina_dst::rng()`: a fixed seed under `cargo test`, swept and byte-for-byte replayable under a campaign. Where plain `proptest` is better, use it and record the gap in a `decisions/` file tagged `[patina]`. A failing case becomes an example-based scenario test, then a fix.
 
 ### Shell: conformance and integration
 
-- **Store conformance suite** in `crates/store`, run against memory and SQLite. It covers revision checks, atomic commit (a failure after state rows and before events leaves nothing), alias resolution, and index queries.
-- **Persisted types are mapped exhaustively, in every backend.** A codec that splits a persisted schema value into columns destructures it with no `..` and builds the value it loads as a struct literal with no `..` or `Default`; a match over a persisted enum names every variant, with no catch-all arm and no guessing from its serde shape. A field or variant added to the schema then does not compile until each backend maps it. What the compiler cannot see, a column written wrong or a name read back to no variant, the suite's every-field and every-variant cases catch (`cairn_store::build::every`, `cairn_store::conformance::every`): each persisted type with every optional field filled and every variant held, a cleared value put over it, and every record removed, compared with what each backend loads. Their builders follow the same rule, so the cases grow with the type. A schema change and its store mapping land in one change; the randomized round trip (rung 3) covers combinations, never alone.
-- **API and MCP tests** run in-process against the memory store: every endpoint and every tool at least once, every rejection shape once, capability gating (a root without the assistant serves no assistant endpoints).
-- **In-browser end-to-end** with Playwright against the wasm host, the fixtures, and `cairn demo`: the success criteria as scripts (open a journey, answer decisions in the walkthrough, resolve a date conflict, upgrade). A browser test is for what only a browser catches: real layout, scroll, focus and gestures; wiring across modules the unit tests mock (screen, data hook, host, worker, router); the server host's live updates, conflicts and sign-in; and the shipped binary. It covers one write path (the inspector, the bulk bar, the triage pass, route authoring, a journey's edit mode, proposal review, the segment stepper, the assistant), not each feature's rules: those are an engine scenario, an API test, or a Vitest of a pure function, and a React-state rule (a draft keyed by node, a button's enabling) is pulled out as a pure function and tested there. The browser host's agreement with the server runs in Node over the same wasm32 binary (`web/wasm`), not in a browser. Every browser spec takes `test` from `web/app/e2e/test.ts` (eslint forbids Playwright's), which checks the containment invariant (DESIGN, Nothing spills out of its box) and that the page does not scroll sideways on every page after every test, and every picture goes through `capture` in `e2e/invariants.ts`, which runs those checks (the no-internal-keys one, and on a touch screen the touch-target one) before it shoots; the stress journey (`e2e/stress.ts`, `stress.spec.ts`) walks worst-case content, at the lengths the limits allow, through every screen, width and theme. The stress walk and `mise run screenshots` share the functions that reach a state (`e2e/screenshots.ts`: a journey or route view, a popover, a card's menu, the Controls menu, an index), so the navigation runs in every browser check; the stress walk runs once more as a touch screen at phone width, and `mise run screenshots` takes its phone pictures as one, so the touch-target check covers every state either reaches. The same table feeds two more runs the browser step makes, each a plain script of rules over what Chrome drew, never a model: the screenshot walk's checks (every state in light and dark, each fold opened, one Tab walk per screen for the 2px focus ring, axe-core's structural rules), and `mise run sweep`, which visits every state at each width the stylesheets' media queries switch at, a pixel either side, and a spread between.
-- **Browser tests wait on events, never on time.** A test waits on what the page shows: a web-first assertion, or `settled(page)` in `web/app/e2e/shell.ts`, which waits for the sync dot's `data-settled` (no read, screen or canvas move at work, no write in flight, the stream open) to hold. A read that does not retry (`count`, `getAttribute`, `boundingBox`, `evaluate`...) runs on a settled page (`whenSettled`) or inside `expect.poll` or `toPass`; opening a screen and every write helper end settled. A display only the clock changes (a toast, SAVED fading, the popover's leave delay) is driven with `page.clock`. The tests run with reduced motion. eslint forbids fixed waits (`waitForTimeout`, `setTimeout`, `requestAnimationFrame`, `networkidle`, a `timeout` option) and an unsettled read in `web/app/e2e` (`decisions/2026-10-22-browser-tests-wait-on-a-settled-page.md`).
+- **Store conformance suite** (`crates/store`) on memory and SQLite: revision checks, atomic commit, alias resolution, index queries.
+- **Persisted types are mapped exhaustively, in every backend.** Codecs destructure with no `..`, build loaded values as struct literals with no `..` or `Default`, and match every persisted enum variant with no catch-all, so a new field or variant does not compile until every backend maps it. The every-field and every-variant cases (`cairn_store::build::every`, `cairn_store::conformance::every`) catch what the compiler cannot. A schema change and its mapping land together.
+- **API and MCP tests** in process on the memory store: every endpoint and tool once, every rejection shape once, capability gating.
+- **Browser tests** (Playwright, wasm host, fixtures, `cairn demo`) are only for what a browser catches: real layout, scroll, focus, gestures; wiring across modules unit tests mock; the server host's live updates, conflicts, and sign-in; the shipped binary. One test per write path, not per feature rule: rules are engine scenarios, API tests, or Vitests of pure functions (extract React-state rules into one). The browser host's agreement with the server runs in Node over the wasm32 build.
+  - Specs import `test` from `web/app/e2e/test.ts` (checks containment, DESIGN's Nothing spills out of its box, and no sideways scroll after every test). Pictures go through `capture` (`e2e/invariants.ts`), which runs those checks, no internal keys, and on touch screens touch targets.
+  - New screen states go in `e2e/screenshots.ts`; the stress walk (`stress.spec.ts`, worst-case content at the limits, every width and theme, plus touch at phone width), `mise run screenshots`, the screenshot walk's checks (light and dark, folds opened, focus ring, axe-core), and `mise run sweep` (every media-query breakpoint, a pixel either side) all reach states through it. None uses a model.
+- **Browser tests wait on events, never on time**: web-first assertions or `settled(page)` (`web/app/e2e/shell.ts`); non-retrying reads run on a settled page (`whenSettled`) or in `expect.poll`/`toPass`; clock-only displays use `page.clock`; reduced motion. eslint forbids fixed waits and unsettled reads. Screen-opening and write helpers return settled.
 
 ### Simulation with `patina` (exploratory, not a gate)
 
-`patina` runs ordinary `std` programs under a seeded virtual OS: clock, entropy, filesystem, network, and thread scheduling are pure functions of the seed, faults are injected from outside, and a run can be recorded and replayed byte for byte. Only the campaigns are kept off the critical path: no brief depends on the testbed briefs (1.3, 6.1, 6.2), and `cargo patina campaign` runs as `mise run sim`, locally and nightly in CI, never inside `mise run check`. What the check does cover, because it is cheap and is what broke the nightly most nights, is each testbed's formatting, clippy and unit tests (the lint and unit steps; `check:fast` runs them whenever a testbed or a crate it builds on changed); only the shim-linked build, the campaigns and the coverage gate stay nightly (`decisions/2026-10-22-the-check-covers-the-testbeds-but-not-their-campaigns.md`). Everything else patina offers is used where it applies: the SDK's `sometimes!` and `reachable!` oracles and `buggify!` fault sites in shell crates, and seeded property tests under plain `cargo test`. Point tests are left out for their value (see 3 below). What a campaign finds becomes an ordinary deterministic test in the core ladder, then a fix. It works in three ways.
+[`patina`](https://github.com/JacobHayes/patina) runs `std` programs under a seeded virtual OS with injected faults and byte-for-byte replay. Campaigns run as `mise run sim` (locally and nightly), never in `mise run check`; the check covers only each testbed's lint and unit tests. A finding becomes an ordinary deterministic test, then a fix.
 
-1. **SDK instrumentation in shell crates** (`patina_dst`, inert outside simulation), added with the code they instrument: `sometimes!` coverage oracles so a green campaign proves the interesting paths ran (a revision conflict was retried, a contradictory chain was rejected, an SSE tick was coalesced, a midnight rollover happened during a request), and `buggify!` fault sites for what the runtime cannot inject from outside (an assistant provider timeout, a notifier delay, a clock read straddling the deployment's midnight). `always!` next to an `assert!` only at seams where a labeled verdict helps triage.
-2. **Testbeds**: small programs under `testbeds/` that assemble real Cairn crates into a world with virtual actors and invariants, built and swept with `cargo patina campaign`. They are ordinary Rust, each its own Cargo workspace: a `main` that builds the world from the composition root, depends on `patina-dst` for `sometimes!`, `buggify!` and `verdict`, and is driven by its `sim.sh`. The multiplayer testbed serves the real router (axum on tokio) on a multi-thread runtime with the clients as tasks ([`decisions/2026-10-18-the-multiplayer-testbed-runs-a-multi-thread-runtime.md`](decisions/2026-10-18-the-multiplayer-testbed-runs-a-multi-thread-runtime.md)); the durability testbed drives the service in process. The patina gaps they found are the `[patina]` files in `decisions/`.
-   - `multiplayer`: one server on the simulated network, N clients issuing patches to the same journey with drops, latency, and jitter, against the server's handling of stale patches (H5). Invariants: every acknowledged patch is visible in the next snapshot; no patch is applied twice; revisions are gap-free; replay equals state at the end; a stale patch the server applies lands only over commits that do not touch what it touches; every view catches up after writes stop (the full list: `testbeds/multiplayer/README.md`).
-   - `durability`: the server on SQLite under filesystem faults (EIO, short writes, crash-restart with torn writes). Invariants: after restart, state equals the replayed log and no acknowledged commit is missing. SQLite is compiled into the binary and does its file I/O through the C library calls the shim interposes, so the testbed targets the real store.
-3. **Point tests** with `#[patina_dst::test]` for a single timing-sensitive test (SSE coalescing, retry backoff) would be swept over seeds, but they are left out because they add little for their cost: timing-sensitive code takes its time as an argument, so each interleaving that matters is an ordinary deterministic test, while each point test rebuilds its target under the shim (about 18 s for a trivial test) and every `cargo test` would need the `cargo-patina` binary ([`decisions/2026-10-06-notifier-point-tests-are-plain-tests-with-the-clock-passed.md`](decisions/2026-10-06-notifier-point-tests-are-plain-tests-with-the-clock-passed.md), [`decisions/2026-10-18-point-tests-stay-out-for-their-value.md`](decisions/2026-10-18-point-tests-stay-out-for-their-value.md)).
+- **Shell-crate instrumentation** (`patina_dst`, inert outside simulation), added with the code and allowed before any campaign uses it: `sometimes!`/`reachable!` oracles proving interesting paths ran, and `buggify!` sites for faults the runtime cannot inject (provider timeout, notifier delay, a clock read straddling midnight).
+- **Testbeds** (`testbeds/`, each its own Cargo workspace driven by `sim.sh`): `multiplayer` (the real router, N clients on a lossy network, against stale-patch handling, H5; invariants in `testbeds/multiplayer/README.md`) and `durability` (SQLite under filesystem faults and torn-write crashes: after restart state equals the replayed log and no acknowledged commit is lost).
+- **No point tests** (`#[patina_dst::test]`): timing-sensitive code takes time as an argument and is tested deterministically.
 
-Rules that keep simulation honest: a campaign fails when a declared `sometimes!` site never fired; a campaign reruns every new finding and classes one that does not reproduce `NONDETERMINISM`, which `sim.sh` fails on like any class it does not expect; fault knobs are recorded so a failure replays flag-free; a failing seed is minimized to the one or two faults that matter, then rewritten as an ordinary deterministic test that sets up that situation explicitly (the faults, the interleaving, the inputs). A seed only reproduces against the exact code it ran on, so it is never the regression test itself. Nor does any simulation check depend on one seed's outcome (a pinned seed, or a threshold tuned so a seed range fires): a check names the event it injects (`--fs-crash-at sync:40`, an I/O seam in a test) or states a property over every run plus a `sometimes!` oracle the campaign requires to fire (`decisions/2026-10-16-simulation-checks-pin-no-seed.md`).
+Keeping it honest: a declared `sometimes!` that never fired fails the campaign; a finding that does not reproduce is `NONDETERMINISM` and fails `sim.sh`; fault knobs are recorded; a failing seed is minimized and rewritten as a deterministic test, never kept as the regression test. No check depends on a seed's outcome: it names the event it injects (`--fs-crash-at sync:40`) or states a property over every run plus a required `sometimes!`.
 
-Tooling: `cargo-patina` is not on crates.io. mise installs it through its cargo backend from the git repository at a pinned revision (`"cargo:https://github.com/JacobHayes/patina" = { version = "rev:...", crate = "cargo-patina" }`), which is a normal tool entry in `mise.toml`; cargo builds it from source under the hood, once. The SDK crates (`patina-dst`, `patina-dst-proptest`) are git dependencies in `Cargo.toml` at the same revision. `mise run sim` fails, and never skips, when it is missing; the core ladder never needs it.
+Tooling: mise installs `cargo-patina` from git at a pinned revision; `patina-dst` and `patina-dst-proptest` are git dependencies at the same revision. `mise run sim` fails, never skips, without it; the core ladder never needs it.
 
 ## The validation ladder
 
-Two commands cover it: `mise run check:fast [filter...]` for the inner loop and `mise run check`, the whole thing. Each runs named steps (`scripts/steps/`), and the output names them, so nobody needs a step number, a cargo, vitest, or playwright incantation. The fail-early steps run first, one at a time and in order: lint (format, lint, typecheck), then the unit tests. Only then do the slow steps that do not depend on one another run side by side. Nothing is skipped silently.
+`mise run check:fast [filter...]` is the inner loop; `mise run check` runs every step, never skipping. Steps live in `scripts/steps/`. Lint, unit, web-unit, generated and embed run first, one at a time and in order (generated rewrites files the others read); the rest run side by side. Nothing is skipped silently.
 
-```mermaid
-flowchart TB
-    lint["lint: format, lint, typecheck<br/>seconds"] --> unit["unit: Rust unit tests, scenario tests, replay<br/>seconds"] --> webunit["web-unit: Vitest, browser host agreement<br/>seconds"]
-    webunit --> gate{"check or check:fast?"}
-    gate -- "check" --> generated["generated: regenerate and diff<br/>seconds"]
-    generated --> embed["embed: the binary builds with the web build embedded<br/>seconds"] --> all
-    subgraph all["side by side"]
-        property["property tests"]
-        integration["integration: store conformance, API and MCP in process"]
-        cost["cost tests at the limits"]
-        browser["browser: binary tests, in-browser end-to-end"]
-        advisories["advisories: RustSec over every lock file"]
-    end
-    gate -- "check:fast" --> some
-    subgraph some["side by side, if the change touches their inputs"]
-        property2["property tests"]
-        integration2["integration, and cost with it"]
-        browser2["browser: in-browser host only, unless the server side changed"]
-    end
-    sim["sim (not part of check): simulation campaigns<br/>minutes locally, longer nightly"]
-```
+| Step | Check |
+|---|---|
+| lint | `rustfmt`, `clippy` (each testbed too), kebab-case patina labels, TypeScript typecheck, `eslint`, CSS lint (`mise run lint:css`), `cargo-machete`, `knip`, the `wasm32-unknown-unknown` build of the runtime-free crates |
+| unit | Rust unit tests (every crate and testbed), engine scenarios, replay |
+| web-unit | Vitest, including the browser host's agreement with the server |
+| generated | regenerate the generated paths; fail on any change |
+| embed | `cargo check` of `cairn` with default features (web build embedded) |
+| property | property tests, fewer cases locally than in CI |
+| integration | store conformance, API and MCP in process, doc tests |
+| cost | cost tests at the limits, budgeted in operations, not wall time |
+| browser | the binary's tests; end-to-end on the wasm host and the binary; screenshot walk; breakpoint sweep |
+| advisories | `cargo deny check advisories` over every lock file; an open RustSec advisory fails unless `deny.toml` accepts it with why |
 
-| Step | Check | Typical time |
-|---|---|---|
-| lint | `rustfmt`, `clippy` (deny; the testbeds too, each a separate workspace), kebab-case patina site labels, TypeScript typecheck, `eslint`, the CSS lint (`mise run lint:css`: one scroller per region, tokens for colour and radius), `cargo-machete` (a dependency a crate declares and never uses) and `knip` (a TypeScript file or export nothing imports), the `wasm32-unknown-unknown` build of the runtime-free crates (the service and what it stands on) | seconds |
-| unit | unit tests for every Rust crate and each testbed, engine scenario tests, replay harness (memory store) | seconds |
-| web-unit | web unit tests (Vitest), including the browser host's agreement with the server's answers | seconds |
-| generated | regenerate the generated paths and fail if any file in them changed, appeared, or disappeared | seconds |
-| embed | `cargo check` of the `cairn` crate with its default features, which embeds the web build rather than reading it from disk as every other build of the ladder does (`web-dir`); it writes metadata only, so the binary the tests run and every other step's artifacts are untouched | seconds |
-| property | property tests, bounded case count locally (more in CI) | seconds |
-| integration | store conformance on memory and SQLite; API and MCP tests in-process; doc tests | tens of seconds |
-| cost | cost tests at the limits, budgeted in operations, not wall-clock time (`decisions/2026-10-22-check-fast-runs-the-cost-tests-with-the-integration-tests.md`) | seconds |
-| browser | the binary's tests with the web build read from disk; in-browser end-to-end against the wasm host and the binary; the structural checks over every screen state (the screenshot walk) and the breakpoint sweep | about two minutes |
-| advisories | every lock file in the repository, found rather than listed (the workspace's and each testbed's), against the RustSec advisory database with `cargo deny check advisories`; an open advisory (a vulnerability, or a crate unsound or unmaintained) fails it unless `deny.toml` lists it as accepted, with why. It fetches the database, so it needs the network, and it runs in the full check only, where the nightly run catches advisories published on quiet days (`decisions/2026-10-21-the-full-check-fails-on-an-open-rustsec-advisory.md`) | seconds |
-
-`mise run check` runs every step, never skipping. CI runs it on every push, and CI's run on main is the gate: a release is cut only from a commit whose run passed, and `mise run land` refuses to land while the newest finished run on main failed, except the fix (`--fix`; `decisions/2026-10-21-ci-on-main-is-the-gate.md`). Run it locally when a change needs what `check:fast` leaves out. `mise run check:fast` on the rebased result is the gate before landing; CI adds a nightly run with a larger property case count, and runs `mise run sim` nightly, outside the gate; a release is a manual dispatch of the release workflow, which refuses unless CI passed on main's head, then builds the binaries and publishes the release. `mise run check:fast` is the inner loop: lint, then only the steps whose inputs the change touches (`scripts/changed`: the files of `jj diff -r @ --name-only`, or of `@-` when the working copy is empty; any failure to diff runs everything), and a line says what it left out. The Rust inputs select unit and property, and the Rust half of lint (`rustfmt`, `clippy`, the same two over each testbed as a separate workspace, which also checks its lock file against the workspace crates it depends on, the wasm32 build, the patina site labels); without a Rust input the TypeScript typecheck, `eslint`, and the CSS lint still run. The web inputs and the Rust inputs select web-unit (it compares the browser host's module with the server's answers); the web inputs select browser. In `check:fast` the browser step runs only the in-browser host's specs, on the demo site built once for the run: it relinks no binary, and runs neither the binary's tests nor the `@server` specs, unless the change touches the server side of the web app (a Rust input, `web/client`, the server host `web/app/src/data/server-host.ts`, the assistant, the proposals module, the boot code and Vite config that choose the host, or the `@server` specs and Playwright config), when it runs both hosts as the full check does. So fast mode alone does not cover the binary's tests, the `@server` specs, or the production bundle for a web-only change that leaves the server side alone; `mise run check` does, and it skips nothing. `check:fast` runs integration, and cost with it (the cost tests are modules of the integration tests' binary, so the same inputs select both), when a crate those tests build or a file they read changed (`scripts/changed`'s fourth flag); it never runs generated, embed, or advisories, which are the full check's (`decisions/2026-10-09-the-check-has-two-commands.md`).
-
-CI runs the same steps in parts, each on its own runner and side by side: lint (lint, advisories); rust (unit, property, integration, cost); web (web-unit, generated, embed); browser. A part is the steps that share one build, and each runner runs `mise run check --part NAME`, which builds only what its steps need. `scripts/ladder --parts` lists the parts and the workflow builds its matrix from that list, so CI runs every step; the ladder fails, on every run, when a step of the full check belongs to no part or to two (`decisions/2026-10-16-ci-runs-the-ladder-in-parts-on-separate-runners.md`). Each part restores its own Rust dependency cache, saved from main even when a later step fails. On main a run in flight is never cancelled: a newer push waits for it (replacing any run still waiting), so its caches are saved and the newest run covers every commit before it; any other ref cancels a run a newer push supersedes (`decisions/2026-10-16-ci-caches-survive-failed-runs-and-main-runs-finish.md`).
-
-Two tasks run the review and landing steps around the ladder. `mise run review [--base REV] [--target REV] [--plan FILE [--plan-base REV]] [--out DIR] [--round N] [--intent TEXT] [SCREENSHOT...]` reviews one change, resolving its base and target once so every job reads the same pair, with up to four jobs side by side: codex's code review, the `cull` skill over the change, the `screen-critique` skill when screenshots are given, and the `acceptance-audit` skill when a plan is given (it always judges the whole change against the whole plan, where a later round narrows the others to the fixes). Each job's findings and session log go under `dist/review/`. One model and one effort run every job, set in `mise.toml` (`CAIRN_REVIEW_MODEL`, `CAIRN_REVIEW_EFFORT`); each job is told only where its work is and finds the diff itself. `mise run land [--fix]` refuses while the newest finished CI run on main failed, unless `--fix` says this change is the fix; takes a lock in the jj repository's directory, so workspaces land one at a time; rebases the change onto `main`; runs `check:fast` on the result; and moves the `main` bookmark to it only when that passes. It lands one commit (a stack is squashed first) and never pushes.
-
-One heavy check at a time on the machine: the two mise tasks (`mise-tasks/check/_default` and `fast`, filtered or not) run through `scripts/locked`, which takes a machine-wide kernel lock before building or testing, so checks in several workspaces do not each compile and test at once. It opens `$TMPDIR/cairn-check.lock` on descriptor 9, locks it with `flock` (perl's `flock(2)` on macOS, which has no `flock` command and whose `lockf` busy-waits), and execs the check; the scripts it starts inherit the descriptor, which `scripts/ladder-lib.sh` leaves alone, and the kernel drops the lock when the last of them exits, however it ended, so there is no stale lock to take over. A second run blocks until the first ends. Ctrl-C reaches the foreground process group and stops the run.
-
-A step that runs zero tests fails. Every step reports how many tests each of its suites ran, and fails if any suite it lists ran none, so one suite vanishing cannot hide behind another's count. Lint runs tools, not tests: it fails if any tool is missing or reports nothing checked. Outside CI it first applies what its tools can fix themselves (`cargo fmt`, `cargo clippy --fix` for machine-applicable suggestions, `eslint --fix`) and prints `lint: fixed N files (commit them)`, so only what needs a person fails; with `CI` set it only verifies (`decisions/2026-10-09-local-checks-fix-and-ci-verifies.md`). The generated step regenerates files the other steps read, so it runs alone, before the side-by-side steps.
-
-The integration tests of the library crates are one test binary, `crates/tests/tests/integration/main.rs` (the package `cairn-tests`), with a module per crate (`engine`, `service`, ...) and a module per file inside it, so the workspace's dependencies are linked, and the executable scanned by endpoint security on its first run, once rather than once per crate. The two crates whose tests run a binary of their own (`cairn`, `cairn-schema`) keep a `tests/integration/main.rs` of their own, since Cargo only names a binary to the tests of its package. A new test file goes in its crate's directory of `crates/tests/tests/integration/` and is declared in that `mod.rs` as `mod <file>;`; `scripts/ladder-tests` counts each test for its crate, so the suites keep their counts, and a property or cost file is labelled `<crate> <file>` (`decisions/2026-10-09-the-library-crates-integration-tests-are-one-test-binary.md`). Steps pick tests by module path, not by file: `mod property` in `property_*.rs` for property, `mod conformance` and `mod in_process` for integration, `mod binary` in the binary's `binary.rs` for browser, `mod cost` in `cost_*.rs` for cost, and the rest in unit.
-
-With filters, `mise run check:fast <filter>` runs only what matches, built as the ladder builds it so nothing is compiled twice: the Rust tests whose names contain a filter (any step's), the Vitest files whose path contains one (or, where none does, the tests whose name does), and the Playwright spec in Chromium that a filter names (`canvas`) or whose test titles contain one (only those tests; its `@server` tests too), with the module, the web build, and the binary built only if stale. The Rust tests run only when a Rust input changed or the filters matched no Vitest file or test and no Playwright spec, so a filter for a web spec builds no Rust test binary. It runs no lint, and it fails when nothing matches.
-
-Both commands are quiet (`scripts/ladder-lib.sh`). Everything a step runs goes to its own log, `dist/ladder/<step>.log`. A passing step prints one line (`web-unit: passed, 1430 tests, 38s tests, 90s build, 140s in all`) and the run one summary line; the side-by-side steps' lines come in order once all have finished. The line separates the wall time the step spent compiling (`build`) from the time its tests ran (`tests`), so a time is judged against like work. Each is timed where it executes, by `scripts/timed` around the compile or the test run, never by subtracting one from the other; builds that overlap count once, and a build beside a test run (the demo site's build inside Playwright's run) is reported on its own line as well as inside the run. Every compile site is wrapped, so a new one is wrapped when it is added: the prepare phase, the testbeds' test builds, the agreement cases, the generators, the web and wasm builds, clippy and the wasm32 check, and the servers the browser tests start. In CI the `build:` line also says what the dependency cache gave: exact (rust-cache's `cache-hit`), partial (restored from an older key: `cache-hit` false with the dependencies' artifacts in `target/`) or none (a part that builds nothing ahead of its steps, lint, says it on its summary line); the cache holds dependencies only, so our own crates compile in every case, and the note does not say the build was warm (`decisions/2026-10-24-step-lines-time-building-apart-from-testing.md`). A failure prints only what a person acts on: the compiler errors or lint lines, a failing test's name and output (each tool's own terse reporter; the passing tests are left out), the log's path, and the command that reruns it (`mise run check:fast <test name>`). `mise run gen` runs its generators side by side and rebinds the wasm module only when cargo rebuilt it.
-
-The ladder's Rust tests run in one pass: `scripts/ladder-tests` builds every test binary once (after lint, and after the web build the binary serves) and runs them in parallel, and each step counts its suites by test name from that run, so a suite keeps its name and count whichever step owns it. Every crate builds at opt-level 1 without LTO in the `dev` profile the tests inherit, `cairn-tests` alone at 0 (debug assertions on; `wasm-dev` keeps its own level so the module's bindings do not change), so the tests, the checks and `serve` share one set of artifacts; web-unit runs `cairn-wasm-cases` in it. In lint eslint caches per file, and in web-unit `cairn-wasm-cases` (run by `scripts/agreement-cases`, which web/wasm's Node tests read) is reused while the crates it links and the fixtures are unchanged (`web/wasm/dist/cases.hash`). The Playwright servers of web/app, `cairn demo` and the in-browser host's Vite server, start side by side (`scripts/e2e-servers`). The calls are in `decisions/2026-10-09-the-ladder-runs-its-tests-in-parallel-from-an-optimized-test-profile.md` (the one parallel run) and `decisions/2026-10-17-the-dev-profile-builds-at-opt-level-1-without-lto.md` (the profile).
+- **CI** runs `mise run check` on every push, in parts on separate runners: lint (lint, advisories); rust (unit, property, integration, cost); web (web-unit, generated, embed); browser. `scripts/ladder --parts` feeds the matrix; a step in no part or two fails the ladder. CI's run on main is the gate; on main a run in flight is never cancelled. Nightly adds more property cases and `mise run sim`. A release is a manual dispatch that refuses unless CI passed on main's head.
+- **`mise run check:fast`** on the rebased result gates landing. It runs lint, then only the steps whose inputs changed (`scripts/changed`, from `jj diff` of `@`, or `@-` when empty), and says what it skipped. Rust inputs select unit and property; web or Rust inputs select web-unit; web inputs select browser, which runs only the in-browser host's specs unless the server side of the web app changed. Integration and cost run when what they build or read changed. Never generated, embed, or advisories. So it does not cover the binary's tests, `@server` specs, or the production bundle for a web-only change.
+- **`mise run check:fast <filter>`** runs only matching Rust tests (by name), Vitest files or tests, and Playwright specs or tests (Chromium); no lint; fails when nothing matches.
+- **`mise run review`** runs the review jobs (code review, `cull`, `screen-critique` with screenshots, `acceptance-audit` with `--plan`) into `dist/review/`; **`mise run land [--fix]`** squashes, rebases onto `main`, runs `check:fast`, and moves `main` only if it passes, refusing while main's newest CI run is red unless `--fix`. It never pushes.
+- Checks take a machine-wide lock (`scripts/locked`), so one runs at a time.
+- **A step that runs zero tests fails**, per suite; lint fails on a missing tool. Outside CI lint applies auto-fixes first and says to commit them; in CI it only verifies.
+- **Integration tests are one binary**: `crates/tests/tests/integration/main.rs`, a module per crate. A new file goes in its crate's directory there, declared in `mod.rs`. Steps pick tests by module: `mod property` (`property_*.rs`), `mod conformance` and `mod in_process` (integration), `mod binary` (browser), `mod cost` (`cost_*.rs`), the rest unit.
+- Output is quiet: each step logs to `dist/ladder/<step>.log`, prints one line on success, and on failure only what a person acts on plus the rerun command. New compile sites are wrapped in `scripts/timed`.
 
 ### Growing the ladder
 
-A step is a file in `scripts/steps/`; `scripts/ladder` lists it in the position it belongs to and names the part CI runs it in (the ladder refuses a step with none). The first brief to have tests for a kind of check adds its step in the same change as those tests, so `check` never depends on a tool or service nothing uses yet, and once a step exists a suite that silently stops running fails it.
-
-## For implementers and agents
-
-- Run `check:fast <filter>` while coding, and plain `check:fast` before review and when landing; CI runs the full `mise run check` on main. A step that fails is the next thing to fix, not a note in the handoff.
-- A new pass over the graph comes with its cost at `node_count_max` and a property test.
-- A bug found by simulation or a property test becomes an example-based scenario test, then is fixed.
-- Adding or changing a limit needs the user's sign-off first. Then it goes in the table above and in the crate's `limits.rs` in the same commit, with its "why".
-- A fault site or oracle may land before any campaign exercises it; under `mise run sim`, a declared oracle that never fires fails the campaign.
-
-## Open questions
-
-- Property case counts and campaign seed counts for CI and nightly; start small and raise until run time is the constraint.
-- Whether to run the engine's property tests in the browser too (the wasm build under a fixed seed) or trust that the same crate compiled twice behaves the same. Cheap to add later.
-
-## Related
-
-- `ARCHITECTURE.md` - what the system is
-- `PRD.md` - what it must do
-- Tiger Style: https://tigerstyle.dev - TigerBeetle's coding discipline, descended from NASA's Power of Ten; the source of most of the Rules
-- `patina`: https://github.com/JacobHayes/patina (`README.md`, `USAGE-MODES.md`, `docs/skills/patina-dst.md`, `testbeds/workq`)
+A step is a file in `scripts/steps/`, listed in `scripts/ladder` with its CI part. Add it in the same change as the first tests of its kind.

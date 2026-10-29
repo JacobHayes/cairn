@@ -1,4 +1,4 @@
-//! Shared helpers for the service's tests and its proof: services over each store, the
+//! Shared helpers for the service's tests: services over each store, the
 //! deployment's settings, and an executor.
 #![allow(dead_code)]
 

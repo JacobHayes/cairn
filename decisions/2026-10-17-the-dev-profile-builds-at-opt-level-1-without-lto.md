@@ -1,6 +1,6 @@
 # The dev profile builds at opt-level 1 without LTO, and the test crate at 0
 
-Question (build speed): the library crates' integration tests (`cairn-tests`, 118 s), `cairn`'s and `cairn-schema`'s took minutes to build. A probe found linking is about 1% of that (lld, 0.3-0.8 s; mold is no faster); the time is LLVM re-instantiating generics (serde for every schema type, the server stack generic over `Store`) in each final binary. rustc stops sharing generics between crates at opt-level 2, and Cargo's default local thin LTO adds about a third of the CPU. Which dev profile is fastest end to end? This revisits the 2026-10-09 choice of opt-level 2 and supersedes `2026-10-08-the-engine-stays-at-opt-level-0-in-dev-builds.md`.
+Question (build speed): the library crates' integration tests (`cairn-tests`, 118 s), `cairn`'s and `cairn-schema`'s took minutes to build. A probe found linking is about 1% of that (lld, 0.3-0.8 s; mold is no faster); the time is LLVM re-instantiating generics (serde for every schema type, the server stack generic over `Store`) in each final binary. rustc stops sharing generics between crates at opt-level 2, and Cargo's default local thin LTO adds about a third of the CPU. Which dev profile is fastest end to end?
 
 Measured (plain cargo, non-incremental like mbx, fresh target directory each, the 12-core box shared with other agents at load 10-22; wall seconds. "tests edit" is one line in cairn-tests, "engine edit" one line in cairn-engine, both rebuilding all test binaries; "suite" is the cairn-tests binary run alone, 696 tests):
 

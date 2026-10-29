@@ -1,4 +1,4 @@
-// A receipt's lifetime (design 9.4): shown when a write lands, gone after its time, shown
+// A receipt's lifetime: shown when a write lands, gone after its time, shown
 // afresh and for a full time by the next save, and gone at once when cleared.
 import { createActor } from "xstate";
 import { describe, expect, it } from "vitest";

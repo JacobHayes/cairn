@@ -295,8 +295,7 @@ pub async fn serve(
     );
     listener::warn_unsupported();
     // A store that has failed closed answers nothing more: the server stops, and exits
-    // non-zero, so a supervisor restarts the process and the open recovers from disk
-    // (decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md).
+    // non-zero, so a supervisor restarts the process and the open recovers from disk.
     let closing = Arc::clone(&store);
     let stop = async move {
         tokio::select! {

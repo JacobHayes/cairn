@@ -18,10 +18,10 @@ import type { SheetSnap } from "./InspectorColumn.tsx";
 
 export type InspectorTab = "inspector" | "assistant" | "proposals";
 
-/** The window widths that make the inspector a bottom sheet, tablet and phone alike (design 3.3). */
+/** The window widths that make the inspector a bottom sheet, tablet and phone alike. */
 export const SHEET = "(max-width: 1099px)";
 
-/** The widths that give the inspector a column of its own (design 3.3); narrower, it is a sheet. */
+/** The widths that give the inspector a column of its own; narrower, it is a sheet. */
 export const COLUMN = "(min-width: 1100px)";
 /** A phone's width: the top bar replaces the rail and the sheet opens at its peek. */
 export const PHONE_WIDTH = `(max-width: ${String(DESKTOP_MIN - 1)}px)`;

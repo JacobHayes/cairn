@@ -174,7 +174,7 @@ impl Service {
 
     /// D3: the journey's whole derive in the schema's shape (every node's derived values with
     /// their explanation inputs, the frontiers, the stalled diagnostic): what the browser's
-    /// wasm derive of the journey's domain document gives byte for byte (brief 4.5).
+    /// wasm derive of the journey's domain document gives byte for byte.
     ///
     /// # Errors
     ///

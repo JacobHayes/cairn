@@ -53,8 +53,7 @@ use cairn_store::{Notifier, Store, StoreError};
 
 /// The service over one store (ARCHITECTURE, Service layer and composition). The store and
 /// the notifier are trait objects, so the service and every layer above it are compiled once
-/// whatever backend a host picks
-/// (decisions/2026-10-18-the-store-trait-returns-boxed-futures-and-the-stack-holds-a-trait-object.md). Cloning shares the store and notifier.
+/// whatever backend a host picks. Cloning shares the store and notifier.
 #[derive(Clone)]
 pub struct Service {
     store: Arc<dyn Store>,

@@ -1,4 +1,4 @@
-//! The binary itself, as a deployment runs it (brief 4.7, Acceptance): a config file and a
+//! The binary itself, as a deployment runs it: a config file and a
 //! database file, one port for the UI and the API, startup failures that name what is
 //! missing, a clean stop, and a patch it acknowledged still in the file after it. `mod
 //! commands` needs only the binary; `mod binary` needs it built with the web build

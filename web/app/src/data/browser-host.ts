@@ -1,5 +1,5 @@
 // The in-browser host (ARCHITECTURE, Web UI: in-browser host): the same service over the
-// memory store seeded with the fixtures, in this page (4.5's InBrowserHost), answering the
+// memory store seeded with the fixtures, in this page (`InBrowserHost`), answering the
 // API's JSON. Nothing persists and each tab is its own; its ticks come from the in-process
 // notifier, so its stream never drops.
 import type { Answered, HttpFailure, OpenTicks } from "@cairn/client";

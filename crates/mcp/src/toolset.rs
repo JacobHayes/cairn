@@ -1,7 +1,7 @@
 //! The tool set (ARCHITECTURE, MCP endpoint; Assistant): every tool's definition, and one
 //! entry point that parses a call's arguments against the tool's schema, runs it as the
 //! caller, and answers its output as JSON. The MCP server serves it over Streamable HTTP;
-//! the assistant (4.4) calls it in process, so an external agent and the assistant are the
+//! the assistant calls it in process, so an external agent and the assistant are the
 //! same thing with a different transport (I7).
 
 use cairn_auth::Clock;

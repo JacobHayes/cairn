@@ -3,7 +3,7 @@
 //!
 //! A request is authenticated by its session cookie and by every configured provider. Any
 //! provider's refusal refuses the request, so a credential that fails never falls through
-//! to another provider (3.2, Security); otherwise the session, then the first provider in
+//! to another provider; otherwise the session, then the first provider in
 //! configured order with a credential, names the actor. A session cookie that is no live
 //! session is no credential: it names no one, and the answer clears it. Handlers behind the layer read it as an
 //! `Extension<Actor>`.

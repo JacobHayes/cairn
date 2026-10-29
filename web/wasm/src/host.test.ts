@@ -1,4 +1,4 @@
-// Brief 4.5, Acceptance, in Node over the wasm32 module: the in-browser root loads
+// The in-browser host, in Node over the wasm32 module: the in-browser root loads
 // each fixture, applies a patch, refuses stale ones, and notifies its subscriber; a trap
 // stops the module; the worker keeps a journey's newest document and fails loudly.
 import { readFileSync } from "node:fs";

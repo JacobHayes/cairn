@@ -1,4 +1,4 @@
-// What the assistant panel's browser tests share (brief 5.8): the demo server's
+// What the assistant panel's browser tests share: the demo server's
 // scripted model, set to answer the next turn with given tool calls and words
 // (crates/cairn/src/demo.rs), and the panel opened and a message sent the way a person does.
 import { expect, type Locator, type Page } from "@playwright/test";

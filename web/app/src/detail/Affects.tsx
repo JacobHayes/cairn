@@ -1,4 +1,4 @@
-// C12, C8 (design 6.7): what each answer of a decision would do, node by node: for each choice,
+// C12, C8: what each answer of a decision would do, node by node: for each choice,
 // the nodes it brings in, drops, and leaves to be decided later, each a link with its state, and
 // the role it fills and the milestone it pins. It replaces the decision view's table, one click
 // from the form that shows the same effects as counts.

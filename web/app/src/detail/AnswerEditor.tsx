@@ -1,4 +1,4 @@
-// B2: answering or revising a decision, the form being the display (design 6.6): the context,
+// B2: answering or revising a decision, the form being the display: the context,
 // the question, the input itself with what each choice would do beside it, a reason, and one
 // Save. Nothing is preselected; what is picked is a draft that survives a reload and is sent
 // only by Save, which is enabled only when the draft differs from what is stored. A decision

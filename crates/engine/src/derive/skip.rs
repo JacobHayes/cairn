@@ -11,7 +11,7 @@
 //! nested keeps included, since a kept node's own state need not cover what it holds (it may
 //! be done while a kept child is reopened, or not relevant while a kept child is
 //! force-included). Whether the
-//! work satisfies dependencies is blocking's to decide (2.4: `deps_done` reads it).
+//! work satisfies dependencies is blocking's to decide (`deps_done` reads it).
 //!
 //! Cost at `node_count_max`: the inherited skips are one walk down the tree, O(nodes); kept
 //! work and the covered counts are each a walk up from a node, at most `containment_depth_max`

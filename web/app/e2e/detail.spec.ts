@@ -1,4 +1,4 @@
-// Brief 8.7, Acceptance: the inspector's one write path that no unit test reaches, over the
+// The inspector's one write path that no unit test reaches, over the
 // in-browser host (each page load seeds the fixtures afresh): a date pin the chain rejects
 // (F5), with the rejection and an unsent bypass reason surviving a reload (D4), counted by the
 // sync chip wherever you go, and resolved with a listed move. A node's actions hold one open

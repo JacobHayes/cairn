@@ -1,6 +1,6 @@
 // C14: a proposal's changes, editable one by one: each mutation in words with its own editor
-// where it has one (a node it adds with 5.6's field editors, a field it sets with the
-// condition or date-rule editor, a pin's date, an answer with 5.1's answer input) and a way to
+// where it has one (a node it adds with the authoring field editors, a field it sets with the
+// condition or date-rule editor, a pin's date, an answer with the answer input) and a way to
 // drop it; and what a reviewer adds: a node (B10: a breakdown's pieces), a node removed with
 // its cascade (A18), and an edge (A3). Nothing is sent from here: the edits change the draft,
 // previewed at once, and are saved with the proposal.

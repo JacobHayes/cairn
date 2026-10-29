@@ -1,4 +1,4 @@
-// A route draft in the frame (design 4.9): the one-line header with Publish as the primary and
+// A route draft in the frame: the one-line header with Publish as the primary and
 // the draft's `⋯`, the draft card the inspector shows while no node is open (what blocks
 // publishing, what is only advisory, Publish and Discard), what an import or a publish leaves
 // under the header, and the List projection. A route has no state or dates, so its cards say

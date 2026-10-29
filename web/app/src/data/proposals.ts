@@ -1,4 +1,4 @@
-// Proposals over either host (I6, C14; brief 5.7): fetched, created, edited, previewed,
+// Proposals over either host (I6, C14): fetched, created, edited, previewed,
 // applied, discarded, and refreshed by id, and the upgrade, save-as-route, and re-link drafts
 // (B7, B8, B9). The server answers over HTTP (`/api/{domain}/proposals`, `/api/proposals/{id}...`,
 // `/api/journeys/{id}/{upgrade,save-as-route,relink}`); the in-browser host answers the same JSON

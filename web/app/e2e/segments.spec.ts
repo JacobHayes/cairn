@@ -1,4 +1,4 @@
-// Brief 7.7 on the in-browser host: the security-review segment imported and published, then
+// Segments on the in-browser host: the security-review segment imported and published, then
 // inserted into the vendor evaluation's Testing group (C19, B13, C14). The insertion starts
 // after a host node and maps the segment's reviewer onto the journey's existing findings
 // reviewer, so the segment's own filling decision is left out; review shows the incoming nodes

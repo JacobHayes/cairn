@@ -117,7 +117,7 @@ enum Channel {
     /// In process, as an agent host (MCP, the assistant) calls the service. Each attempt
     /// runs on a task of its own, and an attempt the agent stops waiting for keeps running,
     /// as a server-side call does once its caller has gone: so a resubmission can meet its
-    /// original in flight. The API runs each patch on a task of its own too (4.2), so an
+    /// original in flight. The API runs each patch on a task of its own too, so an
     /// HTTP resubmission can meet its original once the original reached the service.
     InProcess {
         service: Service,

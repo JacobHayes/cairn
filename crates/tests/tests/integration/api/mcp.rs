@@ -334,7 +334,7 @@ mod mcp_in_process {
     /// The PRD's success criterion, as an agent session through the endpoint: over the
     /// vendor evaluation, the agent reads the snapshot first, lists the open decisions,
     /// answers each, is refused a patch with every violation, proposes a breakdown for the
-    /// placeholder, and applies it; its acting frontier is then 2.6's next list (I3, I6,
+    /// placeholder, and applies it; its acting frontier is then the next list (I3, I6,
     /// A15, B10, C10).
     #[tokio::test]
     async fn an_agent_answers_the_decisions_and_breaks_down_the_placeholder() {

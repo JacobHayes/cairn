@@ -77,7 +77,7 @@ describe("the host's query for the filters", () => {
   });
 });
 
-describe("the journey's views (2.2, 2.3)", () => {
+describe("the journey's views", () => {
   it("cycles forward with v through the projections", () => {
     expect(nextProjection("graph")).toBe("list");
     expect(nextProjection("timeline")).toBe("graph");

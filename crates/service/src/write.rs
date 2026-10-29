@@ -20,8 +20,8 @@ use crate::limits::STALE_ATTEMPT_COUNT_MAX;
 use crate::{Call, Service, ServiceError, consequence, load, notices};
 
 /// A patch to a journey, a route with its draft, or the deployment (A17), with the note its
-/// events carry (J1). A patch to a proposal goes through the proposal's own operations
-/// (4.8), so it is not a domain patch.
+/// events carry (J1). A patch to a proposal goes through the proposal's own operations,
+/// so it is not a domain patch.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DomainPatch {
     patch: Patch,
@@ -381,7 +381,7 @@ impl Service {
     /// merge that id committed. A merge names the journeys referencing its identities at
     /// their revisions when it was drafted, which a client reads from the index, so a
     /// resubmission after any of them moved carries other content for the same merge; it is
-    /// matched by what it merges (briefs/4.3-mcp.md, Decision log): the committed patch's
+    /// matched by what it merges: the committed patch's
     /// one event merged the same identities into the same survivor.
     async fn merged_as(&self, patch: &Patch) -> Result<bool, WriteError> {
         let [

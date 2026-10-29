@@ -1,4 +1,4 @@
-//! The server's side of the agreement (brief 4.5, Acceptance): each fixture's journey walked
+//! The server's side of the agreement: each fixture's journey walked
 //! through the service natively, as the server runs it, and what it answered recorded as the
 //! exact JSON the API sends, beside the call the browser host makes for the same value. The
 //! native agreement tests run every call through this crate natively; the browser tests run

@@ -105,7 +105,7 @@ describe("summarize", () => {
 });
 
 describe("syncWords", () => {
-  it("colours each state by what it asks of the person (9.2)", () => {
+  it("colours each state by what it asks of the person", () => {
     const first = problem("rejected");
     const cases: [Parameters<typeof syncWords>[0], SyncTone][] = [
       [{ state: "conflict", count: 1, first }, "act"],

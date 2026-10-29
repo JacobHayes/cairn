@@ -2,7 +2,7 @@
 //! journey of `node_count_max` nodes (`generated::date_limits`, with its state) follows a
 //! route of the same structure; the target retitles every node. Drafting the upgrade (the
 //! merge, the orphan removals, and the trial apply that validates and derives the candidate
-//! once) and applying it are timed and printed for the proof, reported rather than gated.
+//! once) and applying it are timed and printed, reported rather than gated.
 
 #[cfg(test)]
 mod cost {

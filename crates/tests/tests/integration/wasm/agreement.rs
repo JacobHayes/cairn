@@ -1,4 +1,4 @@
-//! Brief 4.5, Acceptance (native half): every call the browser host makes over each
+//! Native half of the agreement: every call the browser host makes over each
 //! fixture's domain document (the derive, every projection, two proposal previews, a local
 //! apply, a touched set, the route files, and the vendor evaluation after an identity merge)
 //! answers what the server's service answers, byte for byte, when this crate runs natively.

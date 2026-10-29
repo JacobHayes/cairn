@@ -1,5 +1,5 @@
 //! The Rust client of the API (ARCHITECTURE, HTTP API: the Rust client for integration
-//! tests): what this crate's tests and the multiplayer testbed (6.1) talk to a server with.
+//! tests): what this crate's tests and the multiplayer testbed talk to a server with.
 //! H6's subscription tracking ([`tracker`]) knows no transport: the HTTP [`Client`] drives
 //! it. A stale patch is decided by the server (H5), so the client sends each patch once.
 

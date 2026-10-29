@@ -65,7 +65,7 @@ function Sentence({ view, detail, rank }: { view: Ready; detail: NodeDetail; ran
 }
 
 /**
- * `extra` sits under the actions: the node's structure, in a journey's edit mode (5.6), or on a
+ * `extra` sits under the actions: the node's structure, in a journey's edit mode, or on a
  * card its way past breaking down. `folded` starts every section closed, as a card shows them.
  */
 export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view: Ready; nodeKey: string; extra?: ReactNode; folded?: boolean }) {
@@ -73,7 +73,7 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
   const detail = nodeDetail(view, nodeKey);
   const rename = useRename(view, nodeKey, detail?.node.title ?? nodeKey);
   const row = useRankRow(view, nodeKey);
-  // Closing keeps the screen it is open on and what that screen shows (5.2).
+  // Closing keeps the screen it is open on and what that screen shows.
   const { search } = useLocation();
   const addresses = useNodeAddresses();
   const close = addresses.close();

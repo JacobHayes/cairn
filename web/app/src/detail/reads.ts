@@ -1,7 +1,7 @@
 // What the inspector reads from the tab's derive beyond the node's own values (ARCHITECTURE,
 // Web UI: the browser derives locally): the node's rank terms, from the next list it ranks in,
 // and the dependents it would not yet free, from the explanations projection. Each is read on
-// demand for the open node only, never for every node (design 6.11).
+// demand for the open node only, never for every node.
 import type { Schema } from "@cairn/client";
 
 import type { NodeRow } from "../acting/why.ts";

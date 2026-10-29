@@ -1,4 +1,4 @@
-// The Signals lens (8.2): one labelled chip in each card's bottom-right slot, tinted on the
+// The Signals lens: one labelled chip in each card's bottom-right slot, tinted on the
 // neutral ramp by quartile of the range shown. It never re-lays out: the chip hangs outside the
 // card. Pure, so the unit tests read the same chips the canvas draws.
 import type { Card, Lens } from "./model.ts";

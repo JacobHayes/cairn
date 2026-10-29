@@ -1,4 +1,4 @@
-// C8: which of the inspector's sections are folded, remembered per viewer (design 6.8) in
+// C8: which of the inspector's sections are folded, remembered per viewer in
 // localStorage, keyed by the kind of node and the section. It can be missing or throw (a private
 // window, blocked site data, a preview), so every read and write is guarded and the sections
 // then take their defaults. A section can be opened from outside it (the `⋯` menu's "Pin a
