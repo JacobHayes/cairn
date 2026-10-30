@@ -21,10 +21,10 @@
 // asks before one while a write is busy. Version skew stops it, as it stops all new work. A patch
 // is sent as it is: the server answers a stale one stale, as it does a proposal or an import
 // that goes stale, for a person to read again and decide again.
-import { backoffDelayMs, networkFailure, sameDomain, targetDomain, type HttpFailure, type Patch, type Rejection } from "@cairn/client";
+import { backoffDelayMs, networkFailure, sameDomain, targetDomain, type HttpFailure, type Patch, type PatchExtras, type Rejection } from "@cairn/client";
 import { and, assign, fromPromise, setup, type ActorRefFrom, type SnapshotFrom } from "xstate";
 
-import type { About, Answer, Command, OperationId, ProposalCall, Removed } from "./edit-command.ts";
+import type { About, Answer, Command, OperationId, PatchCommand, ProposalCall, Removed } from "./edit-command.ts";
 import type { Host } from "./host.ts";
 import type { ProposalHost, ProposalWritten } from "./proposals.ts";
 import { subjectOf } from "./writes.ts";
@@ -100,11 +100,14 @@ interface DeliverInput {
   env: WriteEnv;
 }
 
+/** What goes with a patch: its note, and the proposal it is written to (I6). */
+function extrasOf(command: PatchCommand): PatchExtras {
+  return { ...(command.note === undefined ? {} : { note: command.note }), ...(command.proposal === undefined ? {} : { proposal: command.proposal }) };
+}
+
 /** A proposal write, sent as its call says: one request. */
 function callOf(proposals: ProposalHost, call: ProposalCall): Promise<ProposalWritten<Answer>> {
   switch (call.op) {
-    case "create":
-      return proposals.create(call.destination, call.request);
     case "edit":
       return proposals.edit(call.destination, call.proposal, call.request);
     case "discard":
@@ -113,8 +116,6 @@ function callOf(proposals: ProposalHost, call: ProposalCall): Promise<ProposalWr
       return proposals.refresh(call.destination, call.proposal, call.request);
     case "apply":
       return proposals.apply(call.destination, call.proposal, call.request);
-    case "save_as_route":
-      return proposals.saveAsRoute(call.journey, call.request);
   }
 }
 
@@ -126,7 +127,7 @@ const deliver = fromPromise<Outcome, DeliverInput>(async ({ input }) => {
   const { command, env } = input;
   switch (command.kind) {
     case "patch":
-      return answered(await env.host.send(command.patch, command.note));
+      return answered(await env.host.send(command.patch, extrasOf(command)));
     case "import":
       return answered(await env.host.importRoute(command.request));
     case "proposal":

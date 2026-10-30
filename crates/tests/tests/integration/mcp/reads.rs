@@ -154,11 +154,10 @@ async fn history_attributes_each_event_in_a_mixed_patch_to_its_own_maker() {
     let child = json!({ "op": "add_node", "node": {
         "key": "n_workload_ingest", "id": "ingest", "parent": "n_workload",
         "kind": "deliverable", "title": "The ingest workload" }});
-    let draft = json!({ "title": "Break the workload down", "destination_revision": 1,
-        "mutations": [child] });
-    let create = json!({ "proposal": "pr_workload", "destination": { "journey": "j_vendor_eval" },
-        "draft": draft, "patch_id": "p_propose" });
-    world.ok(&helper, "create_proposal", create).await;
+    let create = json!({ "proposal": "pr_workload", "target": { "journey": "j_vendor_eval" },
+        "base_revision": 1, "note": "Break the workload down", "mutations": [child],
+        "patch_id": "p_propose" });
+    world.ok(&helper, "apply_patch", create).await;
     let direct = json!({ "op": "add_node", "node": {
         "key": "n_extra", "id": "extra", "kind": "action", "title": "Extra work" }});
     let apply =

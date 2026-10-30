@@ -174,3 +174,96 @@ pub fn sqlite_store(root: &Path) -> Arc<SqliteStore> {
 }
 
 pub use crate::fixtures::{fixtures_root, publish_fixture_route, scenario};
+
+/// A proposal drafted the way a test states it: a draft (title, base revision, mutations) or
+/// a save as route, written through the one entry a patch with `proposal` takes.
+pub trait Drafts {
+    /// Creates proposal `id` for `destination` from `draft`, which holds no items.
+    fn create_proposal<'a>(
+        &'a self,
+        call: &'a Call,
+        patch_id: cairn_schema::PatchId,
+        destination: &'a cairn_schema::Domain,
+        id: &'a cairn_schema::ProposalId,
+        draft: cairn_schema::ProposalDraft,
+    ) -> impl Future<Output = Result<cairn_service::ProposalWritten, WriteError>> + Send + 'a;
+
+    /// Proposes saving `journey` as a draft of `route`, named `name` when it is created.
+    fn propose_save_as_route<'a>(
+        &'a self,
+        call: &'a Call,
+        patch_id: cairn_schema::PatchId,
+        id: &'a cairn_schema::ProposalId,
+        journey: &'a cairn_schema::JourneyId,
+        route: &'a cairn_schema::RouteId,
+        name: &'a cairn_schema::Title,
+    ) -> impl Future<Output = Result<cairn_service::ProposalWritten, cairn_service::ProposeError>>
+    + Send
+    + 'a;
+}
+
+impl Drafts for Service {
+    async fn create_proposal(
+        &self,
+        call: &Call,
+        patch_id: cairn_schema::PatchId,
+        destination: &cairn_schema::Domain,
+        id: &cairn_schema::ProposalId,
+        draft: cairn_schema::ProposalDraft,
+    ) -> Result<cairn_service::ProposalWritten, WriteError> {
+        assert!(draft.items.is_empty(), "a patch drafts no review items");
+        let patch = Patch {
+            id: patch_id,
+            target: destination.clone().into(),
+            base_revision: draft.destination_revision,
+            deployment_revision: None,
+            mutations: cairn_schema::Mutations::new(draft.mutations.into_vec()).unwrap(),
+        };
+        let title: cairn_schema::Markdown = draft.title.as_str().parse().unwrap();
+        let submitted = DomainPatch::new(patch, Some(title)).unwrap();
+        let proposing = cairn_service::Proposing::named(Some(id.clone()), None)
+            .unwrap()
+            .unwrap();
+        match self.propose(call, &submitted, &proposing).await {
+            Ok(written) => Ok(written),
+            Err(cairn_service::ProposeError::Write(error)) => Err(error),
+            Err(other) => panic!("a proposal that should draft: {other}"),
+        }
+    }
+
+    async fn propose_save_as_route(
+        &self,
+        call: &Call,
+        patch_id: cairn_schema::PatchId,
+        id: &cairn_schema::ProposalId,
+        journey: &cairn_schema::JourneyId,
+        route: &cairn_schema::RouteId,
+        name: &cairn_schema::Title,
+    ) -> Result<cairn_service::ProposalWritten, cairn_service::ProposeError> {
+        let held = self.route(route).await?;
+        let mut mutations = Vec::new();
+        if held.is_none() {
+            mutations.push(cairn_schema::Mutation::CreateRoute {
+                name: name.clone(),
+                description: None,
+            });
+        }
+        mutations.push(cairn_schema::Mutation::OpenDraft {
+            source: cairn_schema::DraftSource::SaveAsRoute {
+                journey: journey.clone(),
+            },
+        });
+        let patch = Patch {
+            id: patch_id,
+            target: cairn_schema::PatchTarget::Route(route.clone()),
+            base_revision: held.map_or(cairn_schema::Revision::NONE, |found| found.revision),
+            deployment_revision: None,
+            mutations: cairn_schema::Mutations::new(mutations).unwrap(),
+        };
+        let submitted = DomainPatch::new(patch, None).unwrap();
+        let proposing = cairn_service::Proposing::named(Some(id.clone()), None)
+            .unwrap()
+            .unwrap();
+        self.propose(call, &submitted, &proposing).await
+    }
+}

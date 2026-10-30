@@ -16,7 +16,7 @@ mod in_process {
     };
     use serde_json::{Value, json};
 
-    use crate::api::support::{World, get, ok, post};
+    use crate::api::support::{World, get, ok, post, proposing};
 
     const JOURNEY: &str = "/api/journeys/j_vendor_eval";
     const PR_NOTE: &str = "/api/journeys/j_vendor_eval/proposals/pr_note";
@@ -58,7 +58,12 @@ mod in_process {
     }
 
     fn create_body(patch_id: &str) -> Value {
-        json!({"patch_id": patch_id, "id": "pr_note", "draft": note_draft("Note", "a_note", 3)})
+        proposing(
+            &json!({"journey": "j_vendor_eval"}),
+            patch_id,
+            "pr_note",
+            &note_draft("Note", "a_note", 3),
+        )
     }
 
     fn edit_body(patch_id: &str, base: u32) -> Value {
@@ -74,8 +79,8 @@ mod in_process {
     async fn drafted_by_agent(world: &World) -> Transport {
         world.vendor_after(3).await;
         let agent = agent_of(world, "ann").await;
-        let proposals = format!("{JOURNEY}/proposals");
-        ok::<ProposalAnswer>(&post(&agent, &proposals, &create_body("p_pr")).await);
+        let patches = format!("{JOURNEY}/patches");
+        ok::<ProposalAnswer>(&post(&agent, &patches, &create_body("p_pr")).await);
         let edited = patch(&agent, PR_NOTE, &edit_body("p_edit", 1)).await;
         ok::<ProposalAnswer>(&edited);
         agent
@@ -95,10 +100,10 @@ mod in_process {
         );
         assert!(held.proposing_agent.is_some(), "the agent is recorded (I6)");
 
-        let proposals = format!("{JOURNEY}/proposals");
-        let lost: ProposalAnswer = ok(&post(&agent, &proposals, &create_body("p_pr_lost")).await);
+        let patches = format!("{JOURNEY}/patches");
+        let lost: ProposalAnswer = ok(&post(&agent, &patches, &create_body("p_pr_lost")).await);
         assert_eq!(lost, ProposalAnswer::Existing { proposal: held });
-        let repeated: ProposalAnswer = ok(&post(&agent, &proposals, &create_body("p_pr")).await);
+        let repeated: ProposalAnswer = ok(&post(&agent, &patches, &create_body("p_pr")).await);
         assert!(
             matches!(repeated, ProposalAnswer::AlreadySaved { .. }),
             "{repeated:?}"
@@ -173,11 +178,13 @@ mod in_process {
     async fn proposals_for_every_domain_are_created_and_previewed() {
         let world = World::start().await;
         let ann = world.vendor_after(3).await;
-        for (_, target, id, draft) in crate::api::support::proposals_of_every_domain(&ann).await {
-            let create = json!({"patch_id": format!("p_{id}"), "id": id, "draft": draft});
-            let created = saved(ok(&post(&ann, &target, &create).await));
+        for (destination, base, id, draft) in
+            crate::api::support::proposals_of_every_domain(&ann).await
+        {
+            let create = proposing(&destination, &format!("p_{id}"), id, &draft);
+            let created = saved(ok(&post(&ann, &format!("{base}/patches"), &create).await));
             let review: ProposalReview =
-                ok(&post(&ann, &format!("{target}/{id}/preview"), &json!({})).await);
+                ok(&post(&ann, &format!("{base}/proposals/{id}/preview"), &json!({})).await);
             assert_eq!(review.proposal, created, "{id}");
             let left = (
                 review.preview.unresolved.len(),
@@ -208,7 +215,7 @@ mod in_process {
         let world = World::start().await;
         let ann = world.vendor_after(3).await;
         let create = create_body("p_pr");
-        ok::<ProposalAnswer>(&post(&ann, &format!("{JOURNEY}/proposals"), &create).await);
+        ok::<ProposalAnswer>(&post(&ann, &format!("{JOURNEY}/patches"), &create).await);
         let discard = json!({"patch_id": "p_discard", "base_revision": 1});
         let discarded: ProposalAnswer =
             ok(&post(&ann, &format!("{PR_NOTE}/discard"), &discard).await);
@@ -226,7 +233,7 @@ mod in_process {
         let world = World::start().await;
         let ann = world.vendor_after(3).await;
         let create = create_body("p_pr");
-        ok::<ProposalAnswer>(&post(&ann, &format!("{JOURNEY}/proposals"), &create).await);
+        ok::<ProposalAnswer>(&post(&ann, &format!("{JOURNEY}/patches"), &create).await);
         let other = crate::api::support::patch(
             "p_other",
             "{journey: j_vendor_eval}",
@@ -350,14 +357,14 @@ mod in_process {
             "mutations": [{"op": "create_journey", "name": "New journey"}],
         });
         created.push((
-            &cairn_api::endpoints::PROPOSE_JOURNEY,
-            "/api/journeys/j_new_one/proposals".to_owned(),
+            json!({"journey": "j_new_one"}),
+            "/api/journeys/j_new_one".to_owned(),
             "pr_journey",
             journey,
         ));
-        for (_, target, id, draft) in created {
-            let create = json!({"patch_id": format!("p_{id}"), "id": id, "draft": draft});
-            ok::<ProposalAnswer>(&post(&ann, &target, &create).await);
+        for (destination, base, id, draft) in created {
+            let create = proposing(&destination, &format!("p_{id}"), id, &draft);
+            ok::<ProposalAnswer>(&post(&ann, &format!("{base}/patches"), &create).await);
         }
         for (scope, expected) in [("new_journeys", "pr_journey"), ("new_routes", "pr_route")] {
             let listed: ProposalList = get(&ann, &format!("/api/proposals?scope={scope}")).await;
@@ -381,11 +388,12 @@ mod in_process {
         let world = World::start().await;
         let ann = world.vendor_after(2).await;
         let step = json!({"patch_id": "p_step", "base_revision": 1});
-        let nested = json!({
-            "patch_id": "p_nested",
-            "id": "pr_nested",
-            "draft": {"title": "Nested", "destination_revision": 2, "mutations": [{"op": "discard_proposal"}]},
-        });
+        let nested = proposing(
+            &json!({"journey": "j_vendor_eval"}),
+            "p_nested",
+            "pr_nested",
+            &json!({"title": "Nested", "destination_revision": 2, "mutations": [{"op": "discard_proposal"}]}),
+        );
         let cases = [
             (
                 Method::GET,
@@ -419,7 +427,7 @@ mod in_process {
             ),
             (
                 Method::POST,
-                "/api/journeys/j_vendor_eval/proposals",
+                "/api/journeys/j_vendor_eval/patches",
                 Some(&nested),
                 ProblemCode::BadRequest,
             ),
@@ -465,9 +473,10 @@ mod in_process {
             ),
         ];
         for (id, mutation, violations) in proposals {
-            let body = json!({"patch_id": format!("p_{id}"), "id": id, "draft": {
-                "title": id, "destination_revision": revision, "mutations": [mutation]}});
-            ok::<ProposalAnswer>(&post(&ann, "/api/deployment/proposals", &body).await);
+            let draft =
+                json!({"title": id, "destination_revision": revision, "mutations": [mutation]});
+            let body = proposing(&json!("deployment"), &format!("p_{id}"), id, &draft);
+            ok::<ProposalAnswer>(&post(&ann, "/api/deployment/patches", &body).await);
             let held: Proposal = get(&ann, &format!("/api/deployment/proposals/{id}")).await;
             assert_eq!(held.status, ProposalStatus::Open);
             let review: ProposalReview = ok(&post(

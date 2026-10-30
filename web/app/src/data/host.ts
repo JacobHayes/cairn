@@ -1,6 +1,6 @@
 // What the shell's one data layer reads and writes through (ARCHITECTURE, Web UI): a host, the
 // server over HTTP (server-host.ts).
-import type { Answered, HttpFailure, OpenTicks, Schema, operations } from "@cairn/client";
+import type { Answered, HttpFailure, OpenTicks, PatchExtras, PatchSubmitted, Schema, operations } from "@cairn/client";
 import type {
   AppliedLocally,
   ApplyRequest,
@@ -132,7 +132,7 @@ export interface Host {
   /** J4: a page of a journey's history, or of `node`'s, after the log position `after`. */
   history(journey: string, node?: string, after?: number): Promise<HistoryPage>;
   /** Sends one patch, its events carrying `note` (J1). */
-  send(patch: Patch, note?: Markdown): Promise<Answered<HttpFailure>>;
+  send(patch: Patch, extras?: PatchExtras): Promise<Answered<HttpFailure, PatchSubmitted>>;
   /** I6, C14: proposals, and the save-as-route draft (B8). */
   readonly proposals: ProposalHost;
   /** I5: the assistant's calls; the capabilities say whether the server has one. */

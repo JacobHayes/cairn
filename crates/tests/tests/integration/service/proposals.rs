@@ -15,7 +15,7 @@ use cairn_schema::{
 use cairn_service::{ProposalWritten, Service, Written};
 use cairn_store::{EventQuery, Store, Take, Tick, Watch};
 
-use support::{agent_call, applied, call, domain, patch, rejected, service_over};
+use support::{Drafts, agent_call, applied, call, domain, patch, rejected, service_over};
 
 /// Runs each case once over a fresh memory store and once over a fresh SQLite store.
 macro_rules! on_both_stores {

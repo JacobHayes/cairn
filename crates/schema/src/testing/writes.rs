@@ -424,6 +424,7 @@ pub fn arb_mutation() -> BoxedStrategy<Mutation> {
         1 => prop_oneof![
             arb_proposal_draft().prop_map(|proposal| Mutation::CreateProposal { proposal }),
             arb_proposal_draft().prop_map(|proposal| Mutation::EditProposal { proposal }),
+            (arb_revision(), prop::collection::vec(arb_domain_mutation(), 0..3)).prop_map(|(destination_revision, mutations)| Mutation::ExtendProposal { destination_revision, mutations: bounded_vec(mutations) }),
             (arb_proposal_id(), arb_revision()).prop_map(|(proposal, reviewed_revision)| Mutation::ApplyProposal { proposal, reviewed_revision }),
             Just(Mutation::DiscardProposal {}),
         ],

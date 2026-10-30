@@ -155,6 +155,7 @@ fn scope(mutation: &Mutation) -> Scope {
         Mutation::ApplyProposal { .. } => Scope::Apply,
         Mutation::CreateProposal { .. }
         | Mutation::EditProposal { .. }
+        | Mutation::ExtendProposal { .. }
         | Mutation::DiscardProposal {} => Scope::Proposal,
     }
 }

@@ -3,11 +3,11 @@
 // for a refusal or an answer that never came; and the save a landed write records, with the
 // warnings it caused. Committed state always comes from the host: the tick that follows
 // refetches it.
-import type { Schema, Tick } from "@cairn/client";
+import { targetDomain, type Schema, type Tick } from "@cairn/client";
 
 import type { Markdown, Patch } from "./host.ts";
 import { consequenceLines, warningOf, type ConsequenceLine, type SaveEvent, type TitleOf, type Unlocked } from "./activity.ts";
-import { destinationOf, proposalIdOf, type Answer, type Command } from "./edit-command.ts";
+import { type Answer, type Command } from "./edit-command.ts";
 import { proposalAddress } from "../address.ts";
 import { moveOf } from "../detail/model.ts";
 
@@ -173,8 +173,9 @@ export interface Save {
  * proposal changes nothing yet, so it records nothing.
  */
 export function saveOf(command: Command, answer: Answer, began: number, titleOf: TitleOf): Save | undefined {
-  if (command.kind === "proposal" && !isPatchAnswer(answer)) {
-    return DRAFTING.has(command.call.op) ? { text: "Drafted a proposal", lines: [], unlocked: undefined, address: proposalAddress(destinationOf(command.call), proposalIdOf(command.call)) } : undefined;
+  if (command.kind === "patch" && command.proposal !== undefined) {
+    const destination = targetDomain(command.patch.target);
+    return destination === undefined ? undefined : { text: "Drafted a proposal", lines: [], unlocked: undefined, address: proposalAddress(destination, command.proposal) };
   }
   if (!isPatchAnswer(answer)) {
     return undefined;
@@ -188,9 +189,6 @@ export function saveOf(command: Command, answer: Answer, began: number, titleOf:
       return command.call.op === "apply" ? { text: "Applied a proposal", lines: consequenceLines(answer), unlocked: undefined, address: undefined } : undefined;
   }
 }
-
-/** The proposal writes that make a proposal. */
-const DRAFTING: ReadonlySet<string> = new Set(["create", "save_as_route"]);
 
 /**
  * A save as the event Recent lists (D7), made at `at`: its words, and the warning sentence its

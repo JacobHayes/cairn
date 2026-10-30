@@ -23,9 +23,9 @@ use cairn_schema::{
 };
 use cairn_service::wire::{
     Caller, Capabilities, EventPage, Health, History, IdentityReferences, JourneyPage, Mine,
-    NodeDetail, PatchAnswer, PatchRequest, Problem, Projected, ProposalAnswer, ProposalApply,
-    ProposalCreate, ProposalEdit, ProposalList, ProposalReview, ProposalStep, RouteDetail,
-    RouteImport, RoutePage, SaveAsRouteRequest, SearchPage, Tick, Tour, TourWrite, UserName,
+    NodeDetail, PatchAnswer, PatchRequest, PatchSubmitted, Problem, Projected, ProposalAnswer,
+    ProposalApply, ProposalEdit, ProposalList, ProposalReview, ProposalStep, RouteDetail,
+    RouteImport, RoutePage, SearchPage, Tick, Tour, TourWrite, UserName,
 };
 
 type SchemaFn = fn(&mut SchemaGenerator) -> Schema;
@@ -87,8 +87,9 @@ fn json<T: JsonSchema>() -> Success {
 fn patch(endpoint: &'static Endpoint, summary: &'static str) -> Operation {
     Operation {
         body: Some(schema_of::<PatchRequest>),
-        success: json::<PatchAnswer>(),
+        success: json::<PatchSubmitted>(),
         patch: true,
+        drafts: true,
         ..operation(endpoint, summary)
     }
 }
@@ -281,19 +282,7 @@ fn proposal_write<T: JsonSchema>(endpoint: &'static Endpoint, summary: &'static 
 /// Proposals: created against a domain, then listed and addressed under it (I6, C14).
 fn proposals() -> Vec<Operation> {
     use crate::endpoints as at;
-    let create = "Creates a proposal for this domain, which may not exist yet, under a \
-                  client-generated id; a create resubmitted under that id answers the proposal.";
-    let mut all = vec![
-        Operation {
-            path: &[JOURNEY_ID],
-            ..proposal_write::<ProposalCreate>(&at::PROPOSE_JOURNEY, create)
-        },
-        Operation {
-            path: &[ROUTE_ID],
-            ..proposal_write::<ProposalCreate>(&at::PROPOSE_ROUTE, create)
-        },
-        proposal_write::<ProposalCreate>(&at::PROPOSE_DEPLOYMENT, create),
-    ];
+    let mut all = Vec::new();
     all.extend(proposals_under(
         &at::JOURNEY_PROPOSALS,
         &[JOURNEY_ID],
@@ -387,24 +376,10 @@ fn proposals_under(
     ]
 }
 
-/// A proposal the engine drafts for a journey: a body of `T`.
-fn drafted<T: JsonSchema>(endpoint: &'static Endpoint, summary: &'static str) -> Operation {
-    Operation {
-        path: &[JOURNEY_ID],
-        drafts: true,
-        ..proposal_write::<T>(endpoint, summary)
-    }
-}
-
-/// Bulk and import: save as route as a proposal; route files.
+/// Bulk and import: route files.
 fn bulk() -> Vec<Operation> {
     use crate::endpoints as at;
     vec![
-        drafted::<SaveAsRouteRequest>(
-            &at::SAVE_AS_ROUTE,
-            "Proposes saving the journey's structure as a route draft, with a participation \
-             mapping per explicit identity and an exclusion per node.",
-        ),
         Operation {
             path: &[ROUTE_ID],
             body: Some(schema_of::<RouteImport>),

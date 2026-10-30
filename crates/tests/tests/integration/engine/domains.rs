@@ -370,6 +370,19 @@ fn walk_proposals(records: &Records, ops: &mut BTreeSet<String>) -> Records {
         &draft("edit_proposal", "Add a short note", before),
         ops,
     );
+    let extend = format!(
+        "- op: extend_proposal\n  destination_revision: {before}\n  mutations:\n  - op: add_annotation\n    annotation: {{key: a_extended, note: Extended.}}\n"
+    );
+    let moved_base = extend.replace(&format!("revision: {before}"), "revision: 0");
+    let refused = support::patch_to(&records, proposal, &moved_base);
+    assert!(
+        matches!(
+            support::apply(&records, &refused, &support::fixed_inputs()),
+            Err(Rejection::Stale { .. })
+        ),
+        "an extension drafted against another destination revision is stale"
+    );
+    let records = accept(&records, proposal, &extend, ops);
     assert_eq!(
         journey_revision(&records),
         before,
@@ -380,7 +393,7 @@ fn walk_proposals(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     let result = support::apply(&records, &patch, &support::fixed_inputs());
     assert!(
         matches!(result, Err(Rejection::Stale { .. })),
-        "the reviewer saw revision 1; it is at 2"
+        "the reviewer saw revision 1; it is at 3"
     );
     let records = apply_note_proposal(&records, ops);
     let other = "{proposal: {id: pr_other, destination: {journey: j_vendor_eval}}}";
@@ -396,7 +409,7 @@ fn walk_proposals(records: &Records, ops: &mut BTreeSet<String>) -> Records {
 /// I6, H2: applying commits the proposal's mutations with its applied status, attributed to
 /// its author and confirmed by the user applying it; applying again finds it applied.
 fn apply_note_proposal(records: &Records, ops: &mut BTreeSet<String>) -> Records {
-    let apply_it = "- op: apply_proposal\n  proposal: pr_note\n  reviewed_revision: 2\n";
+    let apply_it = "- op: apply_proposal\n  proposal: pr_note\n  reviewed_revision: 3\n";
     let patch = support::patch_to(records, JOURNEY, apply_it);
     let applied = support::apply(records, &patch, &support::fixed_inputs()).unwrap();
     let event = &applied.events()[0];
@@ -420,7 +433,11 @@ fn apply_note_proposal(records: &Records, ops: &mut BTreeSet<String>) -> Records
         .state
         .annotations;
     assert!(annotations.get(&"a_proposed".parse().unwrap()).is_some());
-    let again = "- op: apply_proposal\n  proposal: pr_note\n  reviewed_revision: 3\n";
+    assert!(
+        annotations.get(&"a_extended".parse().unwrap()).is_some(),
+        "an extension is applied with the rest"
+    );
+    let again = "- op: apply_proposal\n  proposal: pr_note\n  reviewed_revision: 4\n";
     let twice = support::patch_to(&records, JOURNEY, again);
     let found = support::codes(support::apply(&records, &twice, &support::fixed_inputs()));
     assert_eq!(found, [ViolationCode::ProposalNotOpen]);

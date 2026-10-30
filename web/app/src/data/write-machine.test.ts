@@ -235,10 +235,7 @@ const applyCommand: Command = {
   kind: "proposal",
   call: { op: "apply", destination: { journey: "j_one" }, proposal: "pr_one", request: { patch_id: "p_one", reviewed_revision: 4 } },
 };
-const createCommand: Command = {
-  kind: "proposal",
-  call: { op: "create", destination: { journey: "j_one" }, request: { id: "pr_one", patch_id: "p_one", draft: { mutations: [], base_revision: 3 } as never } },
-};
+const draftCommand: Command = { kind: "patch", patch: { id: "p_one", target: { journey: "j_one" }, base_revision: 3, mutations: [] }, proposal: "pr_one" };
 const importCommand: Command = {
   kind: "import",
   request: { patch_id: "p_one", file: { format: 1, route: "r_one", name: "One", nodes: [] } as never },
@@ -260,13 +257,14 @@ describe("a proposal write or an import", () => {
   });
 
   it("is resent as the same request when its answer was lost, and settles on the answer it gets then", async () => {
-    const { host, actor, view, advance } = setup([], createCommand);
-    host.proposed = [lost, proposalLanded];
+    const { host, actor, view, advance } = setup([], draftCommand);
+    host.answers = [lost, proposalLanded];
     actor.send({ type: "submit" });
     await settled();
     expect(view()).toMatchObject({ state: "unconfirmed", retrying: true });
     await advance(backoffDelayMs(0));
-    expect(host.called).toEqual(["create", "create"]);
+    expect(host.sent.map((each) => each.id)).toEqual(["p_one", "p_one"]);
+    expect(host.extras).toEqual([{ proposal: "pr_one" }, { proposal: "pr_one" }]);
     expect(view()).toMatchObject({ state: "landed" });
   });
 

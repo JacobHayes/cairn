@@ -3,31 +3,32 @@
 import type { Schema } from "@cairn/client";
 
 import type { Markdown, Patch, RouteImport } from "./host.ts";
-import type { Domain, ProposalAnswer } from "./proposals.ts";
-import type { ProposalAsk } from "../proposals/write.ts";
+import type { Domain } from "./proposals.ts";
 
 /** What names one edit's delivery: its patch id (H5), the same on every resend. */
 export type OperationId = string;
 
-/** A patch for a journey, a route or the deployment, with the note its events carry (J1). */
+/**
+ * A patch for a journey, a route or the deployment, with the note its events carry (J1). With
+ * `proposal` it is written to that proposal instead of applied (I6): a new id creates the
+ * proposal, titled by the note.
+ */
 export interface PatchCommand {
   kind: "patch";
   patch: Patch;
   note?: Markdown;
+  proposal?: string;
 }
 
 /**
- * A write to a proposal, or one that drafts one (I6, B8, C14): plain data, tagged by
- * `op`, each `request` the API's body with its patch id (H5). The id of the proposal it is
- * about is in the call.
+ * A write to a proposal (I6, C14): plain data, tagged by `op`, each `request` the API's body
+ * with its patch id (H5). The proposal it is about is in the call.
  */
 export type ProposalCall =
-  | { op: "create"; destination: Domain; request: Schema<"ProposalCreate"> }
   | { op: "edit"; destination: Domain; proposal: string; request: Schema<"ProposalEdit"> }
   | { op: "discard"; destination: Domain; proposal: string; request: Schema<"ProposalStep"> }
   | { op: "refresh"; destination: Domain; proposal: string; request: Schema<"ProposalStep"> }
-  | { op: "apply"; destination: Domain; proposal: string; request: Schema<"ProposalApply"> }
-  | { op: "save_as_route"; journey: string; request: Schema<"SaveAsRouteRequest"> };
+  | { op: "apply"; destination: Domain; proposal: string; request: Schema<"ProposalApply"> };
 
 /** A proposal write. Never rebased: a stale proposal needs a person's renewed review. */
 export interface ProposalCommand {
@@ -45,7 +46,7 @@ export interface ImportCommand {
 export type Command = PatchCommand | ProposalCommand | ImportCommand;
 
 /** What a landed write was answered: a patch's answer, or a proposal's. */
-export type Answer = Schema<"PatchAnswer"> | ProposalAnswer;
+export type Answer = Schema<"PatchSubmitted">;
 
 /** The operation id of a command: its patch id, which the API is idempotent on (H5). */
 export function idOf(command: Command): OperationId {
@@ -56,31 +57,6 @@ export function idOf(command: Command): OperationId {
       return command.call.request.patch_id;
     case "import":
       return command.request.patch_id;
-  }
-}
-
-/** The id of the proposal a call is about: the one it creates, edits, applies or drafts. */
-export function proposalIdOf(call: ProposalCall): string {
-  switch (call.op) {
-    case "create":
-      return call.request.id;
-    case "save_as_route":
-      return call.request.proposal;
-    case "edit":
-    case "discard":
-    case "refresh":
-    case "apply":
-      return call.proposal;
-  }
-}
-
-/** The destination a proposal call is about: the one named, or the route it saves a journey as. */
-export function destinationOf(call: ProposalCall | ProposalAsk): Domain {
-  switch (call.op) {
-    case "save_as_route":
-      return { route: call.request.route };
-    default:
-      return call.destination;
   }
 }
 

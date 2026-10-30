@@ -14,11 +14,12 @@ import {
   sendOver,
   type CairnClient,
   type Patch,
+  type PatchExtras,
 } from "@cairn/client";
 import { serverAssistant } from "./assistant.ts";
 import type { AgentToken } from "./host.ts";
 import { serverProposals } from "./proposals.ts";
-import { Missing, ReadFailed, Skewed, type Host, type JourneyIndexQuery, type Markdown, type RouteImport, type TourWrite, type TourWriteRequest } from "./host.ts";
+import { Missing, ReadFailed, Skewed, type Host, type JourneyIndexQuery, type RouteImport, type TourWrite, type TourWriteRequest } from "./host.ts";
 
 interface Reply<T> {
   data?: T;
@@ -184,7 +185,7 @@ export function serverHost(origin: string, build: string | undefined): Host {
           },
         }),
       ),
-    send: (patch: Patch, note?: Markdown) => sendOver(client, note)(patch),
+    send: (patch: Patch, extras?: PatchExtras) => sendOver(client, extras)(patch),
     proposals: serverProposals(client),
     assistant: serverAssistant(client),
     agentTokens: serverAgentTokens(client),

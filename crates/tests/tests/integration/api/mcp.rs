@@ -199,9 +199,8 @@ mod mcp_in_process {
     /// I6: a breakdown drafted, reviewed, edited, and applied by id.
     async fn proposals(agent: &Agent, revision: u64) {
         let draft = breakdown(revision, "Break the workload down");
-        let created = json!({ "proposal": "pr_workload", "destination": { "journey": JOURNEY },
-            "draft": draft, "patch_id": "p_propose" });
-        let created = agent.ok("create_proposal", created).await;
+        let created = proposing(&draft, "p_propose");
+        let created = agent.ok("apply_patch", created).await;
         assert_eq!(created["revision"], 1);
         let scope = json!({ "scope": "destination", "destination": { "journey": JOURNEY } });
         let listed = agent.ok("list_proposals", scope).await;
@@ -260,12 +259,16 @@ mod mcp_in_process {
         // kind, a saved route at the new route; asked again under its patch id,
         // it is answered.
         let drafted = [(
-            json!({ "save_as_route": { "journey": JOURNEY, "route": "saved-evaluation", "name": "Saved evaluation" }, "proposal": "pr_save", "patch_id": "p_save" }),
+            json!({ "target": { "route": "saved-evaluation" }, "base_revision": 0, "patch_id": "p_save", "proposal": "pr_save",
+                "mutations": [
+                    { "op": "create_route", "name": "Saved evaluation" },
+                    { "op": "open_draft", "source": { "save_as_route": { "journey": JOURNEY } } },
+                ] }),
             json!({ "route": "saved-evaluation" }),
             json!({ "op": "open_draft", "source": { "save_as_route": { "journey": JOURNEY } } }),
         )];
         for (arguments, destination, drafts) in drafted {
-            let proposed = agent.ok("create_proposal", arguments.clone()).await;
+            let proposed = agent.ok("apply_patch", arguments.clone()).await;
             assert_eq!(proposed["status"], "saved", "{arguments}");
             assert_eq!(proposed["destination"], destination, "{arguments}");
             let id = &arguments["proposal"];
@@ -278,7 +281,7 @@ mod mcp_in_process {
                     .any(|mutation| fields.iter().all(|(key, value)| &mutation[key] == value)),
                 "{id} drafts {drafts}: {mutations:?}"
             );
-            let again = agent.ok("create_proposal", arguments.clone()).await;
+            let again = agent.ok("apply_patch", arguments.clone()).await;
             assert_eq!(again["status"], "already_saved", "{arguments}");
         }
     }
@@ -317,6 +320,13 @@ mod mcp_in_process {
             "destination_revision": revision,
             "mutations": [child("ingest", "Ingest workload"), child("query", "Query workload")],
         })
+    }
+
+    /// `apply_patch` arguments writing `draft`'s mutations into proposal `pr_workload`.
+    fn proposing(draft: &Value, patch_id: &str) -> Value {
+        json!({ "target": { "journey": JOURNEY }, "patch_id": patch_id,
+            "base_revision": draft["destination_revision"], "note": draft["title"],
+            "mutations": draft["mutations"], "proposal": "pr_workload" })
     }
 
     /// The PRD's success criterion, as an agent session through the endpoint: over the
@@ -434,10 +444,11 @@ mod mcp_in_process {
         let listed = json!({ "journey": JOURNEY, "filters": ["needs_breakdown"] });
         let listed = agent.ok("list_nodes", listed).await;
         assert_eq!(keys(&listed["items"]), ["n_workload"]);
-        let create = json!({ "proposal": "pr_workload", "destination": { "journey": JOURNEY },
-            "draft": breakdown(revision, "Break the workload down"),
-            "patch_id": "p_propose_workload" });
-        agent.ok("create_proposal", create).await;
+        let create = proposing(
+            &breakdown(revision, "Break the workload down"),
+            "p_propose_workload",
+        );
+        agent.ok("apply_patch", create).await;
         let review = json!({ "proposal": "pr_workload", "review": true });
         let review = agent.ok("get_proposal", review).await;
         assert_eq!(review["review"].get("violations"), None);
@@ -628,7 +639,6 @@ mod mcp_in_process {
         let cases = [
             ("get_snapshot", Some(true), None, None),
             ("import_route", None, Some(false), Some(true)),
-            ("create_proposal", None, Some(false), Some(true)),
             ("edit_proposal", None, None, Some(true)),
             ("manage_identity", None, None, Some(true)),
             ("apply_patch", None, None, Some(true)),

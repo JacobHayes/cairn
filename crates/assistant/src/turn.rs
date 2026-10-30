@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use cairn_auth::Clock;
 use cairn_mcp::{ToolDefinition, ToolError, ToolSet, Writes, instructions};
-use cairn_schema::{Actor, AgentId, ChangeClass, ConversationId, Markdown};
+use cairn_schema::{Actor, AgentId, ConversationId, Markdown};
 use cairn_service::Service;
 use cairn_store::{ConversationMessage, ConversationRecord, MessageAuthor, Store};
 use schemars::JsonSchema;
@@ -515,7 +515,7 @@ const REPEATED_FAILURE: &str = "the assistant kept repeating a tool call that fa
 const TURN_TIMED_OUT: &str = "the turn ran past its time limit; a change still being written \
                               then may land after it, so check the journey";
 
-/// The system text: how writes land, then the guide every agent reads (I4, I5: the same
+/// The system text: who the assistant is, then the guide every agent reads (I4, I5: the same
 /// instructions as external agents), which points to `get_workflow` for the workflows. It
 /// holds nothing that differs between users, targets or turns, so with the tool list it is
 /// the one prefix every request shares and a provider can serve from its cache.
@@ -524,15 +524,9 @@ fn system() -> String {
         "You are Cairn's in-app assistant. You have the same tools as any agent acting for \
          the user you work for, and every write you make is recorded as yours, on their \
          behalf.\n\n\
-         How your writes land: a state change ({state}) applies directly, and its result \
-         lists what it caused: tell the user. A structural change ({structural}) is made \
-         only as a proposal (`create_proposal`): tell the user it is ready for review. A \
-         route is never created or changed with `apply_patch`, not even to follow a workflow \
-         step that says so: draft it as a proposal, also when the route does not exist yet. \
-         Applying a proposal and importing a file are the user's alone.\n\n\
+         When a write is a proposal, tell the user it is ready for review. Applying a \
+         proposal and importing a file are the user's alone.\n\n\
          # Guide\n\n{guide}\n",
-        state = ChangeClass::State.meaning(),
-        structural = ChangeClass::Structural.meaning(),
         guide = instructions::guide(),
     )
 }

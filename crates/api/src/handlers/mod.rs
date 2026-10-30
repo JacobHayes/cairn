@@ -14,14 +14,14 @@ use axum::extract::{Extension, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use cairn_schema::{Actor, Domain, JourneyId, PatchTarget, Rejection, RouteId};
-use cairn_service::{DomainPatch, Written};
+use cairn_service::{DomainPatch, Proposing, Written};
 
 use crate::Api;
 use crate::error::ApiError;
 use crate::extract::{JsonBody, Path, segment};
 use crate::observe;
 use cairn_service::wire::{
-    Capabilities, Health, HealthStatus, PatchAnswer, PatchRequest, ProblemCode,
+    Capabilities, Health, HealthStatus, PatchRequest, PatchSubmitted, ProblemCode,
 };
 
 /// A handler's answer: its JSON body, or what went wrong.
@@ -62,7 +62,7 @@ pub async fn patch_journey(
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<PatchRequest>,
-) -> Answer<PatchAnswer> {
+) -> Answer<PatchSubmitted> {
     let id: JourneyId = segment(&id, "journey")?;
     submit(&api, actor, &Domain::Journey(id), request).await
 }
@@ -73,7 +73,7 @@ pub async fn patch_route(
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<PatchRequest>,
-) -> Answer<PatchAnswer> {
+) -> Answer<PatchSubmitted> {
     let id: RouteId = segment(&id, "route")?;
     submit(&api, actor, &Domain::Route(id), request).await
 }
@@ -83,35 +83,49 @@ pub async fn patch_deployment(
     State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     JsonBody(request): JsonBody<PatchRequest>,
-) -> Answer<PatchAnswer> {
+) -> Answer<PatchSubmitted> {
     submit(&api, actor, &Domain::Deployment, request).await
 }
 
-/// A17: one domain patch as `actor`, whose target must be `domain`. A proposal is edited
-/// through its own endpoints, never as a domain.
+/// A17: one domain patch as `actor`, whose target must be `domain`: applied, or with a
+/// `proposal` written to it (I6). A proposal is changed through its own endpoints, never as
+/// a domain.
 async fn submit(
     api: &Api,
     actor: Actor,
     domain: &Domain,
     request: PatchRequest,
-) -> Answer<PatchAnswer> {
-    let PatchRequest { patch, note } = request;
-    let proposal = matches!(patch.target, PatchTarget::Proposal { .. });
-    if proposal || patch.target.domain() != *domain {
+) -> Answer<PatchSubmitted> {
+    let PatchRequest {
+        patch,
+        note,
+        proposal,
+        proposal_revision,
+    } = request;
+    let targeted = matches!(patch.target, PatchTarget::Proposal { .. });
+    if targeted || patch.target.domain() != *domain {
         let message = format!("the patch targets {:?}, not {domain}", patch.target);
         return Err(ApiError::problem(ProblemCode::TargetMismatch, message));
     }
     let patch_id = patch.id.clone();
     let submitted = DomainPatch::new(patch, note)
         .map_err(|error| ApiError::problem(ProblemCode::TargetMismatch, error.to_string()))?;
+    let proposing = Proposing::named(proposal, proposal_revision)?;
     let (service, call) = (api.service.clone(), api.call(actor));
-    let answer = committed(async move { service.patch(&call, &submitted).await })
-        .await?
-        .map_err(ApiError::from);
-    let outcome = written_outcome(&answer);
-    tracing::info!(patch_id = %patch_id, %domain, outcome, "patch");
-    observe::patch_outcome(outcome);
-    Ok(Json(answer?.into()))
+    let Some(proposing) = proposing else {
+        let answer = committed(async move { service.patch(&call, &submitted).await })
+            .await?
+            .map_err(ApiError::from);
+        let outcome = written_outcome(&answer);
+        tracing::info!(patch_id = %patch_id, %domain, outcome, "patch");
+        observe::patch_outcome(outcome);
+        return Ok(Json(PatchSubmitted::Patch(answer?.into())));
+    };
+    let logged = proposing.id().clone();
+    let drafted =
+        committed(async move { service.propose(&call, &submitted, &proposing).await }).await?;
+    let answer = proposals::drafted_written(&patch_id, &logged, "propose", drafted)?;
+    Ok(Json(PatchSubmitted::Proposal(answer.0)))
 }
 
 /// Runs a write on its own task, so the request duration limit can answer the caller without

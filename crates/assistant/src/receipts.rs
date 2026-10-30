@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use cairn_mcp::{ProposalOutput, WriteOutput, Writes};
+use cairn_mcp::{WriteOutput, Writes};
 use cairn_schema::{Consequences, Domain, JourneyId, PatchId, ProposalId, Revision};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -59,17 +59,25 @@ impl Receipts {
     /// Notes the answer `output` of a successful call of `tool` with `arguments`, which
     /// writes `writes`.
     pub(crate) fn record(&mut self, writes: Writes, tool: &str, arguments: &Value, output: &Value) {
-        match writes {
-            Writes::Patch => self.write(tool, arguments, output),
-            Writes::Proposal => self.proposal(arguments, output),
-            Writes::Nothing | Writes::File | Writes::Confirmation => {}
+        if matches!(
+            writes,
+            Writes::Nothing | Writes::File | Writes::Confirmation
+        ) {
+            return;
+        }
+        let Ok(written) = serde_json::from_value::<WriteOutput>(output.clone()) else {
+            tracing::warn!(tool, "an assistant write could not be reported");
+            return;
+        };
+        if written.is_proposal() {
+            self.proposal(arguments, &written);
+        } else {
+            self.write(tool, arguments, written);
         }
     }
 
-    fn write(&mut self, tool: &str, arguments: &Value, output: &Value) {
-        let patch_id = id_in(arguments, "patch_id");
-        let written = serde_json::from_value::<WriteOutput>(output.clone());
-        let (Some(patch_id), Ok(written)) = (patch_id, written) else {
+    fn write(&mut self, tool: &str, arguments: &Value, written: WriteOutput) {
+        let Some(patch_id) = id_in(arguments, "patch_id") else {
             tracing::warn!(tool, "an assistant write could not be reported");
             return;
         };
@@ -87,10 +95,10 @@ impl Receipts {
 
     /// A later write to a proposal the turn already reported replaces that report, so each
     /// proposal is reported once, as it stands.
-    fn proposal(&mut self, arguments: &Value, output: &Value) {
-        let proposal = id_in(arguments, "proposal");
-        let output = serde_json::from_value::<ProposalOutput>(output.clone());
-        let (Some(proposal), Ok(output)) = (proposal, output) else {
+    fn proposal(&mut self, arguments: &Value, written: &WriteOutput) {
+        let (Some(proposal), Some(destination)) =
+            (id_in(arguments, "proposal"), written.destination().cloned())
+        else {
             tracing::warn!("an assistant proposal could not be reported");
             return;
         };
@@ -101,8 +109,8 @@ impl Receipts {
             .proposals
             .iter()
             .position(|each| each.proposal == proposal);
-        let discarded = if output.state_known() {
-            output.is_discarded()
+        let discarded = if written.state_known() {
+            written.is_discarded()
         } else if known.is_some() {
             return;
         } else {
@@ -110,7 +118,7 @@ impl Receipts {
         };
         let held = Proposed {
             proposal,
-            destination: output.destination().clone(),
+            destination,
             discarded,
         };
         match known {

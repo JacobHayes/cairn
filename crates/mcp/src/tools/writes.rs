@@ -8,9 +8,9 @@
 
 use cairn_schema::{
     Domain, Identity, IdentityKey, IdentitySet, JourneyId, Markdown, Mutation, Mutations, Patch,
-    PatchId, PatchTarget, Revision, RouteFile, from_yaml,
+    PatchId, PatchTarget, ProposalId, Revision, RouteFile, from_yaml,
 };
-use cairn_service::{Call, DomainPatch};
+use cairn_service::{Call, DomainPatch, Proposing};
 
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -26,7 +26,8 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "update_journey_state",
         description: "Record what happened in a journey, as one patch of ordered mutations: answers, \
             transitions, notes, ticks, who does a node, pins and dates, snoozes, overrides, \
-            status. It never changes the graph: that is apply_patch or a proposal.\n\n\
+            status. It never changes the graph: that is apply_patch.\n\n\
+            Add `proposal` to have the patch reviewed instead of applied. \
             Order is never a guard: start, finish or answer a node whatever it waits on or its \
             own date. Reopening what finished work relied on marks that work `stale`.",
         writes: Writes::Patch,
@@ -39,7 +40,13 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Apply ordered mutations to a journey, a route's draft, or the deployment, all or \
             nothing: structure and state alike, so a mix is one patch. Prefer `set_node_field` \
             for one field. Deleting is permanent, so only when the person asks; one patch to \
-            the `deployment` deletes any number.",
+            the `deployment` deletes any number.\n\n\
+            Add `proposal` (a new id) to draft the patch for review instead of applying it: it is \
+            created with `note` as its title, against `base_revision`; with the id of an open \
+            proposal and its `proposal_revision`, the mutations are added to it, drafted against \
+            the revision it names. A person applies a proposal. Saving a journey as a route is an \
+            `open_draft` from `save_as_route` (after `create_route` for a new route), alone, with \
+            `proposal`: Cairn drafts the route.",
         writes: Writes::Patch,
         destructive: true,
         schema: || schema_with_mutation_sketch::<ApplyPatch>(&written_directly),
@@ -76,30 +83,23 @@ impl ToolSet {
         if name == "import_route" {
             return output(self.import_route(call, parse(arguments)?).await);
         }
-        let Some(submitted) = self.drafted_patch_of(name, arguments).await? else {
-            return Err(ToolError::UnknownTool {
-                name: name.to_owned(),
-            });
+        let (submitted, proposing) = match name {
+            "update_journey_state" => parse::<UpdateJourneyState>(arguments)?.patch()?,
+            "apply_patch" => parse::<ApplyPatch>(arguments)?.patch()?,
+            "manage_identity" => (self.identity_patch(parse(arguments)?).await?, None),
+            _ => {
+                return Err(ToolError::UnknownTool {
+                    name: name.to_owned(),
+                });
+            }
         };
-        let written = self.service.patch(call, &submitted).await;
-        output(written.map(WriteOutput::from).map_err(ToolError::from))
-    }
-
-    /// The domain patch the direct-write tool `name` submits for `arguments`, worked out
-    /// without writing; `None` for `import_route`, whose patch the service builds from the
-    /// file, and for a name that is not a direct-write tool.
-    pub(crate) async fn drafted_patch_of(
-        &self,
-        name: &str,
-        arguments: Value,
-    ) -> Result<Option<DomainPatch>, ToolError> {
-        let drafted = match name {
-            "update_journey_state" => parse::<UpdateJourneyState>(arguments)?.patch(),
-            "apply_patch" => parse::<ApplyPatch>(arguments)?.patch(),
-            "manage_identity" => self.identity_patch(parse(arguments)?).await,
-            _ => return Ok(None),
-        }?;
-        Ok(Some(drafted))
+        if let Some(proposing) = proposing {
+            let proposed = self.service.propose(call, &submitted, &proposing).await;
+            output(proposed.map(WriteOutput::from).map_err(ToolError::from))
+        } else {
+            let written = self.service.patch(call, &submitted).await;
+            output(written.map(WriteOutput::from).map_err(ToolError::from))
+        }
     }
 
     // PRD: A13.
@@ -157,12 +157,13 @@ impl ToolSet {
 }
 
 // PRD: I6.
-/// The ops that change a proposal rather than a domain, which no direct write takes:
+/// The ops that change a proposal rather than a domain, which no patch carries:
 /// `apply_proposal` has its own tool, which records the caller as confirming the proposal,
-/// and the others are the proposal tools' to write.
-const PROPOSAL_OPS: [&str; 4] = [
+/// and a proposal is made and added to by the `proposal` argument.
+const PROPOSAL_OPS: [&str; 5] = [
     "create_proposal",
     "edit_proposal",
+    "extend_proposal",
     "apply_proposal",
     "discard_proposal",
 ];
@@ -215,13 +216,22 @@ pub(crate) struct UpdateJourneyState {
     /// `create_identity` earlier in the same patch.
     #[serde(default)]
     deployment_revision: Option<Revision>,
+    /// The title of a proposal this write creates; otherwise a note for its events.
     #[serde(default)]
     note: Option<Markdown>,
     mutations: Mutations,
+    /// Draft this patch into the proposal with this id (a new `pr_` id creates it) instead of
+    /// applying it.
+    #[serde(default)]
+    proposal: Option<ProposalId>,
+    /// With `proposal`, when it exists: its editing revision, from the answer that created or
+    /// last changed it.
+    #[serde(default)]
+    proposal_revision: Option<Revision>,
 }
 
 impl UpdateJourneyState {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
+    fn patch(self) -> Result<(DomainPatch, Option<Proposing>), ToolError> {
         refuse_proposal_ops("mutations", &self.mutations)?;
         let found = self
             .mutations
@@ -233,7 +243,7 @@ impl UpdateJourneyState {
                 path: format!("mutations[{index}].op"),
                 message: "update_journey_state records what happened in a journey; this op \
                           changes what the graph is, a route, or the deployment: send it \
-                          with apply_patch, or draft a proposal"
+                          with apply_patch"
                     .to_owned(),
             });
         }
@@ -244,7 +254,9 @@ impl UpdateJourneyState {
             deployment_revision: self.deployment_revision,
             mutations: self.mutations,
         };
-        DomainPatch::new(patch, self.note).map_err(ToolError::refused)
+        let proposing = Proposing::named(self.proposal, self.proposal_revision)?;
+        let submitted = DomainPatch::new(patch, self.note).map_err(ToolError::refused)?;
+        Ok((submitted, proposing))
     }
 }
 
@@ -260,13 +272,22 @@ pub(crate) struct ApplyPatch {
     /// Needed when a journey write names identities.
     #[serde(default)]
     deployment_revision: Option<Revision>,
+    /// The title of a proposal this write creates; otherwise a note for its events.
     #[serde(default)]
     note: Option<Markdown>,
     mutations: Mutations,
+    /// Draft this patch into the proposal with this id (a new `pr_` id creates it) instead of
+    /// applying it.
+    #[serde(default)]
+    proposal: Option<ProposalId>,
+    /// With `proposal`, when it exists: its editing revision, from the answer that created or
+    /// last changed it.
+    #[serde(default)]
+    proposal_revision: Option<Revision>,
 }
 
 impl ApplyPatch {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
+    fn patch(self) -> Result<(DomainPatch, Option<Proposing>), ToolError> {
         refuse_proposal_ops("mutations", &self.mutations)?;
         let patch = Patch {
             id: self.patch_id,
@@ -275,8 +296,10 @@ impl ApplyPatch {
             deployment_revision: self.deployment_revision,
             mutations: self.mutations,
         };
-        DomainPatch::new(patch, self.note)
-            .map_err(|_| unreachable!("a direct target is a domain, never a proposal"))
+        let proposing = Proposing::named(self.proposal, self.proposal_revision)?;
+        let submitted = DomainPatch::new(patch, self.note)
+            .unwrap_or_else(|_| unreachable!("a target is a domain, never a proposal"));
+        Ok((submitted, proposing))
     }
 }
 
@@ -293,7 +316,7 @@ fn refuse_proposal_ops(at: &str, mutations: &Mutations) -> Result<(), ToolError>
     let message = if matches!(mutation, Mutation::ApplyProposal { .. }) {
         "a proposal is applied with apply_proposal, which records you as confirming it"
     } else {
-        "a proposal is drafted and changed with create_proposal and edit_proposal"
+        "a proposal is made and added to by naming it in `proposal`, and changed with edit_proposal"
     };
     Err(ToolError::Arguments {
         path: format!("{at}[{index}].op"),

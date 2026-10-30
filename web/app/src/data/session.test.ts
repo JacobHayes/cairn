@@ -62,11 +62,11 @@ describe("a control waiting on its write", () => {
 
   it("leaves a drafted proposal's link in Recent even when nobody was waiting for the write", async () => {
     const { host, session } = await started();
-    host.proposed = [{ outcome: "answered", answer: { outcome: "already_saved" } as never }];
+    host.answers = [{ outcome: "answered", answer: { outcome: "already_saved" } as never }];
     session.edits.send({
       type: "submit",
       id: "p_one",
-      command: { kind: "proposal", call: { op: "save_as_route", journey: "j_one", request: { patch_id: "p_one", proposal: "pr_new", route: "r", name: "R" } } },
+      command: { kind: "patch", patch: { id: "p_one", target: { route: "r" }, base_revision: 0, mutations: [] }, proposal: "pr_new" },
       about: aboutNode(),
     });
     await settled();

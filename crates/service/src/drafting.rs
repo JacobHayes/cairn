@@ -1,26 +1,29 @@
-//! Save as route as a proposal (B8; ARCHITECTURE, Save as route): the engine drafts it from
-//! what the service loads, and the service stores the draft as an ordinary proposal, reviewed
-//! and applied like any other (C14, I6, I7). A proposal whose destination moved is refreshed
-//! (I6): a save is drafted again on the new base with the reviewer's choices carried over by
-//! what they are about (identity, node), anything else is re-based as it stands, and the edit gives it a new revision, so it must be reviewed again before it can be
-//! applied. A write resubmitted under its patch id is answered from its receipt before
-//! anything is drafted, since the destination may have moved since (H5), and a proposal
-//! resubmitted under a new patch id is the one its author already holds (I6).
+//! A proposal written as a patch (I6, B8; ARCHITECTURE, Save as route): a patch that names a
+//! proposal is added to it, or creates it, instead of being applied. A save as route is the
+//! one content Cairn drafts: the engine drafts it from what the service loads, and the service
+//! stores the draft as an ordinary proposal, reviewed and applied like any other (C14, I6,
+//! I7). A proposal whose destination moved is refreshed (I6): a save is drafted again on the
+//! new base with the reviewer's choices carried over by what they are about (identity, node),
+//! anything else is re-based as it stands, and the edit gives it a new revision, so it must be
+//! reviewed again before it can be applied. A write resubmitted under its patch id is answered
+//! from its receipt before anything is drafted, since the destination may have moved since
+//! (H5).
 //!
-//! Cost: one load of the journey, the deployment, and the route, then the engine's draft (a
-//! trial apply), and one proposal write.
+//! Cost: a create or extend loads the proposal; a save also loads the journey, the deployment
+//! and the route, then the engine's draft (a trial apply); one proposal write.
 
 use std::collections::BTreeMap;
 use std::fmt;
 
 use cairn_engine::{ApplyInputs, DraftError};
 use cairn_schema::{
-    Domain, DraftSource, JourneyId, Mutation, NodeKey, PatchId, ProposalDraft, ProposalId,
-    ReviewItem, Revision, RouteId, Title,
+    BoundedVec, Domain, DraftSource, JourneyId, Markdown, Mutation, NodeKey, PatchId, Proposal,
+    ProposalDraft, ProposalId, Rejection, ReviewItem, Revision, RouteId, Title,
 };
 
+use crate::proposals::proposal_patch;
 use crate::write::engine;
-use crate::{Call, ProposalWritten, Service, ServiceError, WriteError, load};
+use crate::{Call, DomainPatch, ProposalWritten, Service, ServiceError, WriteError, load};
 
 /// A proposal the service could not draft or store, classified once here so every host
 /// answers it the same way: something it names is missing, the caller asked for a draft that
@@ -32,6 +35,13 @@ pub enum ProposeError {
     /// The engine cannot draft it from what exists, which the caller can change: the draft is
     /// too large (B8).
     CannotDraft(DraftError),
+    /// The request is not one a proposal write takes; it names the argument at fault.
+    Refused {
+        /// The argument, by its name in the tool's and the API's request.
+        path: String,
+        /// What to change.
+        message: String,
+    },
     /// The proposal write was refused or failed.
     Write(WriteError),
 }
@@ -67,12 +77,57 @@ impl fmt::Display for ProposeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ProposeError::Missing(error) | ProposeError::CannotDraft(error) => error.fmt(formatter),
+            ProposeError::Refused { path, message } => write!(formatter, "{path}: {message}"),
             ProposeError::Write(error) => error.fmt(formatter),
         }
     }
 }
 
 impl std::error::Error for ProposeError {}
+
+impl ProposeError {
+    fn refused(path: &str, message: impl Into<String>) -> Self {
+        ProposeError::Refused {
+            path: path.to_owned(),
+            message: message.into(),
+        }
+    }
+}
+
+/// The proposal a patch is written to instead of being applied (I6): its id, and the editing
+/// revision the writer saw when it exists already.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Proposing {
+    id: ProposalId,
+    revision: Option<Revision>,
+}
+
+impl Proposing {
+    /// The proposal a request names, if it names one.
+    ///
+    /// # Errors
+    ///
+    /// [`ProposeError::Refused`] when it names a revision without a proposal.
+    pub fn named(
+        proposal: Option<ProposalId>,
+        revision: Option<Revision>,
+    ) -> Result<Option<Self>, ProposeError> {
+        match (proposal, revision) {
+            (Some(id), revision) => Ok(Some(Self { id, revision })),
+            (None, None) => Ok(None),
+            (None, Some(_)) => Err(ProposeError::refused(
+                "proposal_revision",
+                "a proposal revision belongs to a proposal: name it with proposal, or leave this out",
+            )),
+        }
+    }
+
+    /// The proposal's id.
+    #[must_use]
+    pub fn id(&self) -> &ProposalId {
+        &self.id
+    }
+}
 
 /// What a stored proposal was drafted as, read off its mutations.
 #[derive(Debug, PartialEq, Eq)]
@@ -86,44 +141,217 @@ enum Drafted {
 }
 
 impl Service {
-    /// B8: proposes saving `journey`'s structure as a draft of `route` (created with `name`
-    /// when it does not exist), as proposal `id`, with a participation item per explicit
-    /// identity and an exclusion item per node for the reviewer.
+    /// I6: writes `submitted` to proposal `proposing` instead of applying it, as `call`'s actor.
+    /// The proposal is created when it does not exist, open, against the patch's base
+    /// revision (0 creates the destination), titled by the patch's note; when it does, the
+    /// patch's mutations are added to it, against the proposal's editing revision and the
+    /// destination revision it was drafted against. A save as route (an `open_draft` from a
+    /// journey, after the `create_route` when the route does not exist) is the whole content
+    /// of a create, drafted by Cairn with a participation item per explicit identity and an
+    /// exclusion item per node for the reviewer (B8).
     ///
     /// # Errors
     ///
-    /// [`ProposeError::Missing`] when the journey does not exist, [`ProposeError::CannotDraft`]
-    /// when the draft is too large; [`ProposeError::Write`] when the proposal write is refused
-    /// or fails.
-    pub async fn propose_save_as_route(
+    /// [`ProposeError::Refused`] when the request is not one a proposal write takes;
+    /// [`ProposeError::Missing`] when a save's journey does not exist,
+    /// [`ProposeError::CannotDraft`] when its draft is too large; [`ProposeError::Write`]
+    /// when the proposal write is refused (stale, reused patch id, not open) or fails.
+    pub async fn propose(
         &self,
         call: &Call,
-        patch_id: PatchId,
-        id: &ProposalId,
-        journey: &JourneyId,
-        route: &RouteId,
-        name: &Title,
+        submitted: &DomainPatch,
+        proposing: &Proposing,
     ) -> Result<ProposalWritten, ProposeError> {
-        let destination = Domain::Route(route.clone());
-        if let Some(answer) = self
-            .drafted_before(call, &patch_id, (&destination, id), None, |held| {
-                asked(
-                    &Drafted::Save {
-                        journey: journey.clone(),
-                        route: route.clone(),
-                        name: Some(name.clone()),
-                    },
-                    &drafted(&held.destination, &held.draft),
+        let patch = submitted.patch();
+        let destination = patch.target.domain();
+        let id = &proposing.id;
+        if patch.deployment_revision.is_some() {
+            return Err(ProposeError::refused(
+                "deployment_revision",
+                "a proposal records one revision, its destination's: leave deployment_revision out",
+            ));
+        }
+        let mutations = patch.mutations.as_slice();
+        let save = save_of(&destination, mutations)?;
+        let held = self.store.proposal(id).await?;
+        let Some(revision) = proposing.revision else {
+            // A create, or its resubmission after a lost answer.
+            return self
+                .create_proposed(call, submitted, &destination, id, save)
+                .await;
+        };
+        let Some(held) = held else {
+            return Err(ProposeError::refused(
+                "proposal_revision",
+                format!(
+                    "there is no proposal {id} to add to: leave proposal_revision out to create it"
+                ),
+            ));
+        };
+        if save.is_some()
+            || matches!(
+                drafted(&held.destination, &held.draft),
+                Drafted::Save { .. }
+            )
+        {
+            return Err(ProposeError::refused(
+                "mutations",
+                "a save as route is a proposal of its own: it takes nothing added, and nothing is added to it",
+            ));
+        }
+        self.addressed(&destination, id).await?;
+        let extend = Mutation::ExtendProposal {
+            destination_revision: patch.base_revision,
+            mutations: BoundedVec::new(mutations.to_vec())
+                .map_err(|error| ProposeError::refused("mutations", error.to_string()))?,
+        };
+        let edit = proposal_patch(patch.id.clone(), &destination, id, revision, extend);
+        if let Some(answer) = self.saved_before(&edit).await? {
+            return Ok(answer?);
+        }
+        Ok(self
+            .write_proposal(call, &edit, id, submitted.note().cloned())
+            .await?)
+    }
+
+    /// A create of proposal `id`: the patch's own mutations, or Cairn's draft of the save.
+    async fn create_proposed(
+        &self,
+        call: &Call,
+        submitted: &DomainPatch,
+        destination: &Domain,
+        id: &ProposalId,
+        save: Option<(JourneyId, RouteId, Option<Title>)>,
+    ) -> Result<ProposalWritten, ProposeError> {
+        let patch = submitted.patch();
+        let is_save = save.is_some();
+        let draft = if let Some((journey, route, name)) = save {
+            if let Some(answer) = self
+                .drafted_before(call, &patch.id, (destination, id), None, |held| {
+                    asked(
+                        &Drafted::Save {
+                            journey: journey.clone(),
+                            route: route.clone(),
+                            name: name.clone(),
+                        },
+                        &drafted(&held.destination, &held.draft),
+                    ) && held.draft.destination_revision == patch.base_revision
+                })
+                .await?
+            {
+                return Ok(answer);
+            }
+            let name = match name {
+                Some(name) => name,
+                None => match self.route(&route).await? {
+                    Some(found) => found.header.name,
+                    None => {
+                        return Err(ProposeError::refused(
+                            "mutations",
+                            format!(
+                                "route {route} does not exist: create_route comes before the save"
+                            ),
+                        ));
+                    }
+                },
+            };
+            let draft = self.draft_save(call, &journey, &route, &name).await?;
+            if draft.destination_revision != patch.base_revision {
+                return Err(self
+                    .stale_save(destination, &draft, patch.base_revision)
+                    .await?);
+            }
+            draft
+        } else {
+            let title = submitted.note().map(title_of).transpose()?.ok_or_else(|| {
+                ProposeError::refused(
+                    "note",
+                    "a new proposal is titled by the note: say in a line what it proposes",
                 )
-            })
-            .await?
+            })?;
+            ProposalDraft::new(
+                title,
+                None,
+                patch.base_revision,
+                BoundedVec::new(patch.mutations.as_slice().to_vec())
+                    .map_err(|error| ProposeError::refused("mutations", error.to_string()))?,
+                BoundedVec::default(),
+            )
+            .map_err(|error| ProposeError::refused("mutations", error.to_string()))?
+        };
+        if !is_save
+            && let Some(answer) = self
+                .create_answered(submitted, destination, id, &draft)
+                .await?
         {
             return Ok(answer);
         }
-        let draft = self.draft_save(call, journey, route, name).await?;
         Ok(self
-            .create_proposal(call, patch_id, &destination, id, draft)
+            .put_new_proposal(call, patch.id.clone(), destination, id, draft)
             .await?)
+    }
+
+    /// What a create of `draft` as proposal `id` is already answered by: its receipt, whatever
+    /// the proposal has become since a lost answer; else a refusal when `id` holds other
+    /// content, since any other write to a held id is an addition and says so.
+    async fn create_answered(
+        &self,
+        submitted: &DomainPatch,
+        destination: &Domain,
+        id: &ProposalId,
+        draft: &ProposalDraft,
+    ) -> Result<Option<ProposalWritten>, ProposeError> {
+        let patch = submitted.patch();
+        let created = proposal_patch(
+            patch.id.clone(),
+            destination,
+            id,
+            Revision::NONE,
+            Mutation::CreateProposal {
+                proposal: draft.clone(),
+            },
+        );
+        if let Some(answer) = self.saved_before(&created).await? {
+            return Ok(Some(answer?));
+        }
+        match self.store.proposal(id).await? {
+            Some(held)
+                if !same_content(
+                    &held,
+                    destination,
+                    patch.base_revision,
+                    patch.mutations.as_slice(),
+                ) =>
+            {
+                Err(ProposeError::refused(
+                    "proposal_revision",
+                    format!("proposal {id} exists: name its editing revision to add to it"),
+                ))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    /// The stale rejection for a save drafted at the destination's current revision when the
+    /// request was drafted at `base`.
+    async fn stale_save(
+        &self,
+        destination: &Domain,
+        draft: &ProposalDraft,
+        base: Revision,
+    ) -> Result<ProposeError, ServiceError> {
+        let stale = self
+            .stale_base(destination, base, draft.destination_revision)
+            .await?;
+        let Some(stale) = stale else {
+            unreachable!("the revisions differ");
+        };
+        Ok(ProposeError::Write(WriteError::Rejected(
+            Rejection::Stale {
+                conflicts: vec![stale.conflict],
+                intervening: stale.intervening,
+            },
+        )))
     }
 
     /// I6: refreshes proposal `id` against its destination as it stands now, against
@@ -215,6 +443,77 @@ impl Service {
             note: None,
         }
     }
+}
+
+/// The journey, route and route name of a save as route a patch asks for: `open_draft` from a
+/// journey, after the `create_route` that names a route not yet there. None when the patch
+/// holds no save.
+fn save_of(
+    destination: &Domain,
+    mutations: &[Mutation],
+) -> Result<Option<(JourneyId, RouteId, Option<Title>)>, ProposeError> {
+    let Some(at) = mutations.iter().position(|mutation| {
+        matches!(
+            mutation,
+            Mutation::OpenDraft {
+                source: DraftSource::SaveAsRoute { .. }
+            }
+        )
+    }) else {
+        return Ok(None);
+    };
+    let Mutation::OpenDraft {
+        source: DraftSource::SaveAsRoute { journey },
+    } = &mutations[at]
+    else {
+        unreachable!("the position found a save");
+    };
+    let (Domain::Route(route), name) = (
+        destination,
+        match &mutations[..at] {
+            [] => None,
+            [Mutation::CreateRoute { name, .. }] => Some(name.clone()),
+            _ => {
+                return Err(ProposeError::refused(
+                    "mutations",
+                    "a save as route is an open_draft from a journey, after a create_route when the route does not exist yet, and nothing else",
+                ));
+            }
+        },
+    ) else {
+        return Err(ProposeError::refused(
+            "target",
+            "a save as route is written to a route",
+        ));
+    };
+    if at + 1 != mutations.len() {
+        return Err(ProposeError::refused(
+            "mutations",
+            "a save as route is an open_draft from a journey, after a create_route when the route does not exist yet, and nothing else",
+        ));
+    }
+    Ok(Some((journey.clone(), route.clone(), name)))
+}
+
+/// Whether proposal `held` is what a create under its id asks for: the same destination,
+/// base revision and mutations (a create resubmitted after a lost answer).
+fn same_content(
+    held: &Proposal,
+    destination: &Domain,
+    base: Revision,
+    mutations: &[Mutation],
+) -> bool {
+    held.destination == *destination
+        && held.draft.destination_revision == base
+        && held.draft.mutations.as_slice() == mutations
+}
+
+/// A note as a proposal's title: one line, a title's size.
+fn title_of(note: &Markdown) -> Result<Title, ProposeError> {
+    note.as_str()
+        .trim()
+        .parse()
+        .map_err(|error: cairn_schema::TextError| ProposeError::refused("note", error.to_string()))
 }
 
 /// What `draft`, a proposal for `destination`, was drafted as: a save of a journey into the

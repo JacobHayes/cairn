@@ -33,7 +33,7 @@ pub use caller::{Caller, UserName};
 pub use compose::{
     AgentSignIn, AuthKind, AuthMethod, Capabilities, DeploymentSettings, McpAccess, Parts,
 };
-pub use drafting::ProposeError;
+pub use drafting::{ProposeError, Proposing};
 pub use error::ServiceError;
 pub use observe::{DERIVE_DURATION, engine_call_active};
 pub use projections::{ChildEntry, History, NodeDetail, Projected, ReadError};

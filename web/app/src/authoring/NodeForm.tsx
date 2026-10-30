@@ -5,6 +5,7 @@
 // field before Save (A15); the engine's checks of its values stop one before it is sent (PRACTICES), and a check that cannot be made says so and can be asked again.
 import { useEffect } from "react";
 
+import { Check } from "../acting/Controls.tsx";
 import { useDraft } from "../data/drafts.ts";
 import { Failed } from "../ui/Failed.tsx";
 import { Button } from "../ui/kit.tsx";
@@ -178,10 +179,9 @@ export function NodeForm({ authored, node }: NodeFormProps) {
       write.dismiss();
     },
   };
+  const [proposing = false, setProposing] = useDraft<boolean>(`propose:${domainOf(authored)}:${node.key}`); // kept with the unsent form: a stale save sent again is still a proposal, never a live write
   const save = async (base = kept?.base) => {
-    if (await write.run(changes.map((each) => each.mutation), base)) {
-      setKept(undefined);
-    }
+    if (await write.run(changes.map((each) => each.mutation), base, proposing ? `Edit ${node.title}` : undefined)) { setKept(undefined); setProposing(undefined); }
   };
   /** Drops the unsent change and its rejection. */
   const discard = () => {
@@ -201,8 +201,9 @@ export function NodeForm({ authored, node }: NodeFormProps) {
       {kept === undefined && changes.length === 0 ? null : (
         <span className="row">
           <Button type="submit" primary disabled={write.disabled || !sendable} data-testid="node-form-save" onMouseDown={(event) => { event.preventDefault(); }}>
-            Save {changes.length === 0 ? "" : `(${plural(changes.length, "change")})`}
+            {proposing ? "Propose" : "Save"} {changes.length === 0 ? "" : `(${plural(changes.length, "change")})`}
           </Button>
+          <Check label="Propose instead" checked={proposing} onChange={(next) => { setProposing(next ? true : undefined); }} testId="propose-instead" />
           <Button disabled={kept === undefined} onClick={discard}>
             Discard changes
           </Button>

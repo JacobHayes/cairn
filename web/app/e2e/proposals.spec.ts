@@ -7,8 +7,9 @@ import { expect, test } from "./test.ts";
 
 import { DESKTOP_MIN } from "../src/shell/breakpoints.ts";
 import { openJourneyCard } from "./around.ts";
+import { formField, openEditing } from "./authoring.ts";
 import { apply, blockers, draftBreakdown, graphRoom, marginIn, pickNode, reviewOpen } from "./proposals.ts";
-import { expectAddress, goTo, nodeCard, open, setDepth, syncChip, whenSettled } from "./shell.ts";
+import { expectAddress, goTo, nodeCard, open, openFromCanvas, readable, setDepth, syncChip, whenSettled } from "./shell.ts";
 
 /** The drafted proposal is listed in its journey's Proposals tab and on Home, and opens under the journey. */
 async function proposalIsListed(page: Page, journey: string, reviewed: string): Promise<void> {
@@ -186,4 +187,17 @@ test("C14: a node typed in a proposal's additions survives switching to another 
   await page.getByRole("link", { name: /The proposal/ }).click();
   await expect(page.getByTestId("proposal-additions")).toHaveAttribute("open", "");
   await expect(page.getByTestId("proposal-add-node").getByLabel("New node title")).toHaveValue("Kept while away");
+});
+
+test("I6: a node form saved with Propose instead opens a proposal for review, and applying it makes the change", async ({ page }) => {
+  await readable(page);
+  await openEditing(page, "j_vendor_eval");
+  await openFromCanvas(page, "n_access");
+  await formField(page, "title").getByRole("textbox").fill("Sandbox access");
+  await page.getByTestId("propose-instead").getByRole("checkbox").check();
+  await page.getByTestId("node-form-save").click();
+  await reviewOpen(page);
+  expect(new URL(page.url()).pathname).toMatch(/^\/journeys\/j_vendor_eval\/proposals\/pr_[0-9a-f]+$/);
+  await apply(page);
+  await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Sandbox access");
 });

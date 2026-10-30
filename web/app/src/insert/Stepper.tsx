@@ -13,7 +13,9 @@ import { useEffect, useMemo, useState } from "react";
 import { canHoldChildren, type Graph, nodesByPath, pathOf, titleIn } from "../authoring/graph.ts";
 import { Picker } from "../authoring/parts.tsx";
 import { domainOf, type Authored } from "../authoring/target.ts";
+import { authorCommand } from "../authoring/write.ts";
 import { readDraft, writeDraft } from "../data/drafts.ts";
+import { newPatchId } from "../data/writes.ts";
 import { Problem, useDraftAndOpen } from "../proposals/Entries.tsx";
 import { Button, Input } from "../ui/kit.tsx";
 import { stepperDraftKey } from "./entry.ts";
@@ -213,9 +215,9 @@ export function InsertStepper({ authored, parent, onClose, onPreview }: InsertSt
   const { step, loaded, plan, settled, people, candidate, choices, next, back, change, choose } = useInsertion(authored, parent, onPreview);
   const { write, start } = useDraftAndOpen(`insert:${domainOf(authored)}`);
   const review = (copy: RouteCopy, mutation: Plan["mutation"]) => {
-    const draft = { title: `Insert ${copy.route.header.name}`, destination_revision: authored.revision, mutations: [mutation] };
+    const patch = newPatchId();
     // Drafted, the insertion is no longer unsent: the stepper and its choices go with it.
-    start((id) => ({ op: "create", destination: authored.target, request: { id, draft } }), onClose);
+    start(authored.target, (id) => authorCommand(authored, [mutation], authored.revision, patch, { id, title: `Insert ${copy.route.header.name}` }), onClose);
   };
   const last = step === 3 || (step === 2 && !people);
   return (
@@ -247,7 +249,7 @@ export function InsertStepper({ authored, parent, onClose, onPreview }: InsertSt
           </Button>
         )}
         <span className="spacer" />
-        <Button ghost disabled={write.pending} onClick={onClose}>
+        <Button ghost disabled={write.busy} onClick={onClose}>
           Cancel
         </Button>
         {step === 1 ? null : last ? (

@@ -1,7 +1,7 @@
-//! Proposals (I6, C14; ARCHITECTURE, HTTP API: Resources): created against a domain with a
-//! client-generated id at `POST /api/{domain}/proposals`, then addressed by that id alone under
-//! `/api/proposals/{id}`, whose destination the stored proposal names. Every write runs on its own
-//! task, is logged with its patch id and outcome, and counts toward the patch outcomes.
+//! Proposals (I6, C14; ARCHITECTURE, HTTP API: Resources): made by a patch that names one
+//! (`POST /api/{domain}/patches`, in `handlers`), then addressed under their destination,
+//! which the stored proposal names. Every write runs on its own task, is logged with its
+//! patch id and outcome, and counts toward the patch outcomes.
 
 use axum::Json;
 use axum::extract::{Extension, RawPathParams, RawQuery, State};
@@ -13,12 +13,12 @@ use cairn_service::{ProposalWritten, ProposeError, WriteError};
 use super::{Answer, committed, refusal_outcome, written_outcome};
 use crate::Api;
 use crate::error::ApiError;
-use crate::extract::{JsonBody, Path, segment};
+use crate::extract::{JsonBody, segment};
 use crate::observe;
 use crate::query::{self, Params};
 use cairn_service::wire::{
-    PatchAnswer, ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalList,
-    ProposalReview, ProposalStep,
+    PatchAnswer, ProposalAnswer, ProposalApply, ProposalEdit, ProposalList, ProposalReview,
+    ProposalStep,
 };
 
 /// Which kind of destination a proposal endpoint is under: the router tells each handler
@@ -36,12 +36,7 @@ pub enum Under {
 /// The proposals' endpoints and handlers.
 pub fn served() -> crate::Served {
     use crate::endpoints as at;
-    let mut served: crate::Served = vec![
-        (&at::PROPOSE_JOURNEY, post(propose_journey)),
-        (&at::PROPOSE_ROUTE, post(propose_route)),
-        (&at::PROPOSE_DEPLOYMENT, post(propose_deployment)),
-        (&at::PROPOSALS, get(listing)),
-    ];
+    let mut served: crate::Served = vec![(&at::PROPOSALS, get(listing))];
     for (under, set) in [
         (Under::Journey, &at::JOURNEY_PROPOSALS),
         (Under::Route, &at::ROUTE_PROPOSALS),
@@ -134,60 +129,6 @@ pub async fn listing(
         .proposals(&api.call(actor), scope.into(), after, size)
         .await?;
     Ok(Json(page.into()))
-}
-
-/// `POST /api/journeys/{id}/proposals`.
-pub async fn propose_journey(
-    State(api): State<Api>,
-    Extension(actor): Extension<Actor>,
-    Path(id): Path<String>,
-    JsonBody(request): JsonBody<ProposalCreate>,
-) -> Answer<ProposalAnswer> {
-    let id: JourneyId = segment(&id, "journey")?;
-    create(&api, actor, Domain::Journey(id), request).await
-}
-
-/// `POST /api/routes/{id}/proposals`.
-pub async fn propose_route(
-    State(api): State<Api>,
-    Extension(actor): Extension<Actor>,
-    Path(id): Path<String>,
-    JsonBody(request): JsonBody<ProposalCreate>,
-) -> Answer<ProposalAnswer> {
-    let id: RouteId = segment(&id, "route")?;
-    create(&api, actor, Domain::Route(id), request).await
-}
-
-/// `POST /api/deployment/proposals`.
-pub async fn propose_deployment(
-    State(api): State<Api>,
-    Extension(actor): Extension<Actor>,
-    JsonBody(request): JsonBody<ProposalCreate>,
-) -> Answer<ProposalAnswer> {
-    create(&api, actor, Domain::Deployment, request).await
-}
-
-/// I6: creates a proposal for `destination`; a create resubmitted by proposal id answers it.
-async fn create(
-    api: &Api,
-    actor: Actor,
-    destination: Domain,
-    request: ProposalCreate,
-) -> Answer<ProposalAnswer> {
-    let ProposalCreate {
-        patch_id,
-        id,
-        draft,
-    } = request;
-    let (service, call) = (api.service.clone(), api.call(actor));
-    let (logged_id, logged_patch) = (id.clone(), patch_id.clone());
-    let written = committed(async move {
-        service
-            .create_proposal(&call, patch_id, &destination, &id, draft)
-            .await
-    })
-    .await?;
-    proposal_written(&logged_patch, &logged_id, "create", written)
 }
 
 /// `GET /api/{destination}/proposals/{proposal}` (I6).

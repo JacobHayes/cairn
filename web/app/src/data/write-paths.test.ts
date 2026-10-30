@@ -57,22 +57,7 @@ const paths: Path[] = [
       host.proposed = [rejected, rejected, rejected];
     },
   },
-  {
-    name: "drafting a proposal and opening it",
-    edit: "save-as-route:j_one",
-    command: (id) => proposalCommand({ op: "save_as_route", journey: "j_one", request: { proposal: "pr_new", route: "r", name: "R" } }, id),
-    refuse: (host) => {
-      host.proposed = [rejected, rejected, rejected];
-    },
-  },
-  {
-    name: "an insertion's review",
-    edit: "insert:journey:j_one",
-    command: (id) => proposalCommand({ op: "create", destination: { journey: "j_one" }, request: { id: "pr_new", draft: { base_revision: 3 } as never } }, id),
-    refuse: (host) => {
-      host.proposed = [rejected, rejected, rejected];
-    },
-  },
+  { name: "drafting a proposal and opening it", edit: "save-as-route:j_one", command: (id) => authorCommand(authored, rename, 3, id, { id: "pr_new", title: "Rename" }), refuse: patchRefused },
   {
     name: "an import",
     edit: "import:new-route",

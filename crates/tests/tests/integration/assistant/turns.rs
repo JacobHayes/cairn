@@ -154,14 +154,13 @@ async fn a_tool_outside_the_offered_list_is_refused_when_named() {
     let owner = user("u_owner");
     world.empty_bakeoff().await;
     let structure = proposed_mutations(&scenario("bake-off"), 1);
-    let draft = json!({ "title": "Structure", "destination_revision": 1, "mutations": structure });
-    let create = json!({ "proposal": "pr_structure", "destination": { "journey": BAKEOFF },
-        "draft": draft, "patch_id": "p_structure" });
+    let create = json!({ "proposal": "pr_structure", "target": { "journey": BAKEOFF },
+        "base_revision": 1, "note": "Structure", "mutations": structure, "patch_id": "p_structure" });
     let apply =
         json!({ "proposal": "pr_structure", "reviewed_revision": 1, "patch_id": "p_apply" });
     let import = json!({ "patch_id": "p_import", "file": "route: x\nname: X\nnodes: []\n" });
     world.script([
-        Step::call("create_proposal", create),
+        Step::call("apply_patch", create),
         Step::calls([("apply_proposal", apply), ("import_route", import)]),
         Step::say("Ready for your review."),
     ]);
@@ -210,13 +209,12 @@ async fn an_empty_journey_is_structured_through_a_proposal_the_user_applies() {
     world.empty_bakeoff().await;
     let owner = user("u_owner");
     let structure = proposed_mutations(&scenario("bake-off"), 1);
-    let draft = json!({ "title": "Structure the bake-off", "destination_revision": 1,
-        "mutations": structure });
-    let create = json!({ "proposal": "pr_structure", "destination": { "journey": BAKEOFF },
-        "draft": draft, "patch_id": "p_structure" });
+    let create = json!({ "proposal": "pr_structure", "target": { "journey": BAKEOFF },
+        "base_revision": 1, "note": "Structure the bake-off", "mutations": structure,
+        "patch_id": "p_structure" });
     world.script([
         Step::call("get_snapshot", json!({ "journey": BAKEOFF })),
-        Step::call("create_proposal", create),
+        Step::call("apply_patch", create),
         Step::say("I drafted the bake-off's structure as a proposal for you to review."),
     ]);
     let turn = world
@@ -409,13 +407,12 @@ async fn a_missing_route_keeps_no_conversation_and_a_discard_is_reported_as_one(
     world.vendor_journey(&lead).await;
     let add = json!({ "op": "add_node", "node": { "key": "n_extra", "id": "extra",
         "kind": "action", "title": "An extra step" } });
-    let create = json!({ "proposal": "pr_extra", "destination": { "journey": VENDOR },
-        "draft": { "title": "Add a step", "destination_revision": 1, "mutations": [add] },
-        "patch_id": "p_extra" });
+    let create = json!({ "proposal": "pr_extra", "target": { "journey": VENDOR },
+        "base_revision": 1, "note": "Add a step", "mutations": [add], "patch_id": "p_extra" });
     let discard = json!({ "proposal": "pr_extra", "change": "discard", "base_revision": 1,
         "patch_id": "p_discard_extra" });
     world.script([
-        Step::call("create_proposal", create),
+        Step::call("apply_patch", create),
         Step::calls([
             ("edit_proposal", discard.clone()),
             ("edit_proposal", discard),

@@ -157,12 +157,11 @@ mod in_process {
             "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
         let add = json!({ "op": "add_node", "node": { "key": "n_extra", "id": "extra",
             "kind": "action", "title": "An extra step" } });
-        let create = json!({ "proposal": "pr_extra", "destination": { "journey": JOURNEY },
-            "draft": { "title": "Add a step", "destination_revision": 3, "mutations": [add] },
-            "patch_id": "p_extra" });
+        let create = json!({ "proposal": "pr_extra", "target": { "journey": JOURNEY },
+            "base_revision": 3, "note": "Add a step", "mutations": [add], "patch_id": "p_extra" });
         let provider = scripted(vec![
             Step::call("update_journey_state", complete),
-            Step::call("create_proposal", create),
+            Step::call("apply_patch", create),
             Step::say("Kickoff is done; the extra step is proposed."),
         ])
         .await;

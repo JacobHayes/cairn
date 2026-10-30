@@ -1,7 +1,7 @@
 // A host and a deriver for the data layer's unit tests: journeys held in memory at the
 // revisions a test sets, documents that count their fetches, and a tick stream the test
 // drives by hand. Shapes are the API's, cut to what the data layer reads.
-import type { Answered, HttpFailure, Patch, Tick, TickHandlers } from "@cairn/client";
+import type { Answered, HttpFailure, Patch, PatchExtras, Tick, TickHandlers } from "@cairn/client";
 import type { DerivationHandle, Derived, Loaded } from "@cairn/wasm";
 import { SimulatedClock } from "xstate";
 
@@ -177,8 +177,12 @@ export class FakeHost implements Host {
     return JSON.stringify(document);
   }
 
-  send(patch: Patch): Promise<Answered<HttpFailure>> {
+  /** What went with each patch sent: its note and the proposal it names. */
+  readonly extras: PatchExtras[] = [];
+
+  send(patch: Patch, extras: PatchExtras = {}): Promise<Answered<HttpFailure>> {
     this.sent.push(patch);
+    this.extras.push(extras);
     const answer = this.answers.shift();
     return answer === undefined ? Promise.reject(new Error("no answer scripted")) : Promise.resolve(answer);
   }
@@ -235,12 +239,10 @@ function scriptedProposals(host: FakeHost): ProposalHost {
     list: () => Promise.reject(new Missing("proposals")),
     listing: () => Promise.reject(new Missing("proposals")),
     preview: missing,
-    create: () => written("create"),
     edit: () => written("edit"),
     discard: () => written("discard"),
     refresh: () => written("refresh"),
     apply: () => written("apply"),
-    saveAsRoute: () => written("save_as_route"),
   };
 }
 

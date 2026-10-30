@@ -14,8 +14,8 @@ other. The copied root keeps a pointer to the route and version it came from, no
 2. **Choose where.** Pick the `parent` (a group, deliverable, or action; leave it out for
    the top level) and what the route's root should wait for and what should wait for it.
    Wiring goes through the root: containment carries it to everything inside.
-3. **Draft it as a proposal.** `create_proposal` on the journey (or route) with one
-   `insert_route` mutation: a new `insertion` key (`i_` and a slug; every new key derives
+3. **Draft it as a proposal.** `apply_patch` on the journey (or route) with `proposal`, a
+   `note` and one `insert_route` mutation: a new `insertion` key (`i_` and a slug; every new key derives
    from it), the `route` as `{"route": ..., "version": ...}`, the `parent`, and `edges`, each
    joining one node of the route and one node of the graph:
 

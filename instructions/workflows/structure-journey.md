@@ -13,13 +13,14 @@ but on the journey itself.
 2. **Understand the situation.** Ask what has to happen, what has to be decided first, who
    is involved, and what dates are fixed. Keep it small: a few groups with the decisions,
    deliverables, actions, and milestones under them. A phase that waits for a milestone `requires` it; one with a deadline is `due_by` a milestone (skip a milestone to drop the dates it sets).
-3. **Draft one proposal.** `create_proposal` with `destination` `{"journey": "<journey>"}`,
-   the journey's revision as `destination_revision`, and the `add_role`, `add_node`, and
+3. **Draft one proposal.** `apply_patch` to `{"journey": "<journey>"}` with `proposal`, a
+   `note`, the journey's revision as `base_revision`, and the `add_role`, `add_node`, and
    `add_edge` mutations in order. People involved who are not yet identities are created in
    the same proposal with `create_identity`.
 4. **Review and hand over.** `get_proposal` with `review` shows the frontier the journey
    would have and any violations. Fix violations with `edit_proposal`, then summarize the
    structure and what would be first to do, and ask the person to apply it.
 5. **Afterwards.** Once applied, `get_snapshot` and `list_nodes` show the journey as it now stands. If the
-   person wants to reuse the structure, `create_proposal` with `save_as_route` drafts a new
-   route from it.
+   person wants to reuse the structure, `apply_patch` to `{"route": "<new slug>"}` at `base_revision` 0 with `proposal` and the
+   mutations `create_route` (the name), then `open_draft` with `source` `{"save_as_route":
+   {"journey": "<journey>"}}`, and nothing else, drafts a new route from it.

@@ -1,8 +1,8 @@
-// Proposals (I6, C14): fetched, created, edited, previewed,
-// applied, discarded, and refreshed by id, and the save-as-route draft (B8). The server answers
-// over HTTP (`/api/{domain}/proposals`, `/api/proposals/{id}...`, `/api/journeys/{id}/save-as-route`).
-// Each write names a client patch id (H5) and a client proposal id (I6), so a
-// lost answer is resubmitted rather than guessed at; nothing retries on its own.
+// Proposals (I6, C14): fetched, edited, previewed, applied, discarded, and refreshed by id; a
+// proposal is made by a patch that names it (`POST /api/{domain}/patches`, in the write
+// machine). The server answers over HTTP (`/api/{domain}/proposals`, `/api/proposals/{id}...`).
+// Each write names a client patch id (H5), so a lost answer is resubmitted rather than guessed
+// at; nothing retries on its own.
 import { answerFailure, networkFailure, rejectionOf, type CairnClient, type HttpFailure, type Schema } from "@cairn/client";
 
 import { Missing, ReadFailed } from "./host.ts";
@@ -33,8 +33,6 @@ export interface ProposalHost {
   list(destination: Domain, after?: Cursor): Promise<ProposalList>;
   /** C14, C16: a page of the open proposals no one destination holds. */
   listing(scope: Listing, after?: Cursor): Promise<ProposalList>;
-  /** I6: a new proposal for `destination` (which may not exist yet: revision 0). */
-  create(destination: Domain, request: Schema<"ProposalCreate">): Promise<ProposalWritten<ProposalAnswer>>;
   /** I6, H5: its new content, against the editing revision its editor saw. */
   edit(destination: Domain, id: string, request: Schema<"ProposalEdit">): Promise<ProposalWritten<ProposalAnswer>>;
   /** I6: discards it. */
@@ -45,8 +43,6 @@ export interface ProposalHost {
   preview(destination: Domain, id: string): Promise<ProposalReview>;
   /** I6, H2: applies it as the caller, at the editing revision they reviewed. */
   apply(destination: Domain, id: string, request: Schema<"ProposalApply">): Promise<ProposalWritten<PatchAnswer>>;
-  /** B8: proposes saving `journey`'s structure as a draft of a route. */
-  saveAsRoute(journey: string, request: Schema<"SaveAsRouteRequest">): Promise<ProposalWritten<ProposalAnswer>>;
 }
 
 /** A fresh proposal id (I6): `pr_` and 32 hex digits from the browser's random UUID. */
@@ -54,9 +50,14 @@ export function newProposalId(): string {
   return `pr_${crypto.randomUUID().replaceAll("-", "")}`;
 }
 
-/** The proposal a write answered, or none when it was answered from an earlier receipt. */
-export function proposalOf(answer: ProposalAnswer): Proposal | undefined {
-  return answer.outcome === "already_saved" ? undefined : answer.proposal;
+/** `text` as a proposal's title: one line, cut to a title's size (256 bytes) without splitting a character. */
+export function titled(text: string): string {
+  const encoder = new TextEncoder();
+  let title = text.replace(/\s+/g, " ").trim();
+  while (encoder.encode(title).length > 256) {
+    title = Array.from(title).slice(0, -1).join("");
+  }
+  return title;
 }
 
 interface Reply<T> {
@@ -109,7 +110,6 @@ function byDestination<T>(destination: Domain, calls: { deployment: () => T; jou
   return "journey" in destination ? calls.journey(destination.journey) : calls.route(destination.route);
 }
 
-const at = (id: string) => ({ params: { path: { id } } });
 const under = (id: string, proposal: string) => ({ params: { path: { id, proposal } } });
 const held = (proposal: string) => ({ params: { path: { proposal } } });
 
@@ -148,14 +148,6 @@ function serverReads(client: CairnClient): Pick<ProposalHost, "get" | "list" | "
 /** The writes of the server's proposals, each under its destination's address. */
 function serverWrites(client: CairnClient): Omit<ProposalHost, "get" | "list" | "listing" | "preview"> {
   return {
-    create: (destination, body) =>
-      written(() =>
-        byDestination(destination, {
-          deployment: () => client.POST("/api/deployment/proposals", { body }),
-          journey: (journey) => client.POST("/api/journeys/{id}/proposals", { ...at(journey), body }),
-          route: (route) => client.POST("/api/routes/{id}/proposals", { ...at(route), body }),
-        }),
-      ),
     edit: (destination, id, body) =>
       written(() =>
         byDestination(destination, {
@@ -188,7 +180,6 @@ function serverWrites(client: CairnClient): Omit<ProposalHost, "get" | "list" | 
           route: (route) => client.POST("/api/routes/{id}/proposals/{proposal}/apply", { ...under(route, id), body }),
         }),
       ),
-    saveAsRoute: (journey, body) => written(() => client.POST("/api/journeys/{id}/save-as-route", { ...at(journey), body })),
   };
 }
 

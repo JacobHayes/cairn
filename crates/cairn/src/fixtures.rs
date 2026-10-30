@@ -16,7 +16,7 @@ use cairn_schema::{
     Actor, DraftSource, Email, Mutation, Mutations, Patch, PatchTarget, Revision, RouteFile,
     Scenario, ScenarioStep, SequentialKeys, Timestamp, from_yaml,
 };
-use cairn_service::{Call, DomainPatch, Service};
+use cairn_service::{Call, DomainPatch, Proposing, Service};
 use cairn_store::{LoginRecord, Store, UserRecord};
 
 /// One fixture: its name, its route file if it has one, and its journey scenario.
@@ -169,8 +169,25 @@ async fn seed_step(
     }
     match (&patch.target, patch.mutations.as_slice()) {
         (PatchTarget::Proposal { id, destination }, [Mutation::CreateProposal { proposal }]) => {
+            // The draft as the write that makes it: its mutations against the destination
+            // revision it was drafted at, titled by the note.
+            let drafted = Patch {
+                id: patch.id.clone(),
+                target: destination.clone().into(),
+                base_revision: proposal.destination_revision,
+                deployment_revision: None,
+                mutations: Mutations::new(proposal.mutations.as_slice().to_vec())
+                    .map_err(|error| failed(&error))?,
+            };
+            let note = proposal.title.as_str().parse().map_err(|e| failed(&e))?;
+            let drafted = DomainPatch::new(drafted, Some(note)).map_err(|error| failed(&error))?;
+            let Some(proposing) =
+                Proposing::named(Some(id.clone()), None).map_err(|e| failed(&e))?
+            else {
+                unreachable!("a proposal id was given");
+            };
             service
-                .create_proposal(&call, patch.id.clone(), destination, id, proposal.clone())
+                .propose(&call, &drafted, &proposing)
                 .await
                 .map_err(|error| failed(&error))?;
         }

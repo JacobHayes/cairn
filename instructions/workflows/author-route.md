@@ -8,11 +8,9 @@ A route is authored on its draft. Conversation is the expected way to author one
 draft, the person reviews on the canvas, and publishing makes the next version.
 
 1. **Find or start the route.** `list_routes` shows the routes and whether a draft is open.
-   For a new route, choose a slug for it and send `apply_patch` to `{"route": "<slug>"}` at
-   `base_revision` 0 with `create_route` (its name and description) then `open_draft`
-   (`source` `edit`). For an existing route with no draft open, send `open_draft` alone
-   against its `revision`. `get_route` reads the draft (or a published
-   `version`) with its roles, participation kinds, and a page of nodes.
+   For a new route, choose a slug for it; the proposal in step 3 creates it. `get_route`
+   reads the draft (or a published `version`) with its roles, participation kinds, and a page
+   of nodes.
 2. **Ask before you draft.** Learn the stages of the process, who takes part (roles such as
    an owner or a reviewer), what has to be decided up front, and which dates matter. Model:
    - questions as decisions (with an answer type and, for choices, the choices);
@@ -23,14 +21,17 @@ draft, the person reviews on the canvas, and publishing makes the next version.
    - "after" as an edge (`requires`), and dates as date rules (`due_by`, `not_before`)
      measured from a milestone or a date answer;
    - work each journey must break down as a `placeholder`.
-3. **Draft it as a proposal on the route.** `create_proposal` with `destination`
-   `{"route": "<route>"}`, the route's current revision as the draft's
-   `destination_revision`, and `add_role`, `add_participation_kind`, `add_node`, and
-   `add_edge` mutations in order (parents before children). Give every node a `key`
-   (`n_` and a slug) and an `id` (a slug unique among its siblings).
+3. **Draft it as a proposal on the route.** `apply_patch` to `{"route": "<route>"}` with
+   `proposal` (a new `pr_` id) and a `note` titling it, at the route's current `base_revision`
+   (0 for a new route). A new route starts with `create_route` (its name and description) then
+   `open_draft` (`source` `edit`); an existing route with no draft open starts with
+   `open_draft`. Then the `add_role`, `add_participation_kind`, `add_node`, and `add_edge`
+   mutations in order (parents before children). Give every node a `key` (`n_` and a slug) and
+   an `id` (a slug unique among its siblings). Add more later with the same call, naming the
+   `proposal` and its `proposal_revision`.
 4. **Check it.** `get_proposal` with `review` lists every violation the draft would cause
-   (a cycle, an unknown reference, a date rule that contradicts another). Fix them with
-   `edit_proposal` and `replace`, against the proposal's editing revision. The review also
+   (a cycle, an unknown reference, a date rule that contradicts another). Fix them by adding
+   corrections, or with `edit_proposal` and `replace`, against the proposal's editing revision. The review also
    lists **notices**: work with no chain to or from the route's `final` milestone, which
    neither its priority nor its dates feel (usually a missing edge or date rule; a decision
    that fills a role is exempt). A notice never blocks anything: add the missing edge, or

@@ -275,7 +275,9 @@ impl Mutation {
             Mutation::MergeIdentities { .. } => EventType::IdentitiesMerged,
             Mutation::DeleteIdentity { .. } => EventType::IdentityDeleted,
             Mutation::CreateProposal { .. } => EventType::ProposalCreated,
-            Mutation::EditProposal { .. } => EventType::ProposalEdited,
+            Mutation::EditProposal { .. } | Mutation::ExtendProposal { .. } => {
+                EventType::ProposalEdited
+            }
             Mutation::ApplyProposal { .. } => EventType::ProposalApplied,
             Mutation::DiscardProposal {} => EventType::ProposalDiscarded,
             graph_mutation => unreachable!("{graph_mutation:?} is typed by Mutation::event_type"),

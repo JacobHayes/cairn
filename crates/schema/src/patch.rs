@@ -882,6 +882,15 @@ pub enum Mutation {
         /// Its new content.
         proposal: ProposalDraft,
     },
+    /// Add mutations to the end of the target proposal, which keeps its review items, title
+    /// and description.
+    ExtendProposal {
+        /// The destination revision the proposal was drafted against, which these are
+        /// drafted against too.
+        destination_revision: Revision,
+        /// The mutations to add, in order; none of them edits a proposal.
+        mutations: BoundedVec<Mutation, MutationCountPerPatch>,
+    },
     /// Apply a proposal to its destination: its mutations follow its own revision check.
     ApplyProposal {
         /// The proposal.
@@ -915,24 +924,6 @@ pub enum ChangeClass {
     Structural,
     /// A change to what has happened in it.
     State,
-}
-
-impl ChangeClass {
-    /// What a change of this class is, in words: what the assistant tells its model about
-    /// which of its writes apply directly.
-    #[must_use]
-    pub const fn meaning(self) -> &'static str {
-        match self {
-            ChangeClass::Structural => {
-                "a change to what the graph is (its nodes, edges, roles, conditions, date \
-                 rules, resources), or any change to a route or its draft"
-            }
-            ChangeClass::State => {
-                "a change to what has happened in a journey (transitions, answers, \
-                 participations, pins, dates, snoozes, notes, overrides)"
-            }
-        }
-    }
 }
 
 impl Mutation {
@@ -993,6 +984,7 @@ impl Mutation {
             | Mutation::DeleteRoute { .. }
             | Mutation::CreateProposal { .. }
             | Mutation::EditProposal { .. }
+            | Mutation::ExtendProposal { .. }
             | Mutation::ApplyProposal { .. }
             | Mutation::DiscardProposal {} => None,
         }
@@ -1061,6 +1053,7 @@ impl Mutation {
             | Mutation::EditIdentity { .. }
             | Mutation::CreateProposal { .. }
             | Mutation::EditProposal { .. }
+            | Mutation::ExtendProposal { .. }
             | Mutation::DiscardProposal {} => ChangeClass::State,
         }
     }
@@ -1089,6 +1082,7 @@ impl Mutation {
             self,
             Mutation::CreateProposal { .. }
                 | Mutation::EditProposal { .. }
+                | Mutation::ExtendProposal { .. }
                 | Mutation::ApplyProposal { .. }
                 | Mutation::DiscardProposal {}
         )

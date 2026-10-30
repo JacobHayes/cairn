@@ -408,18 +408,33 @@ pub fn request(patch: &Patch) -> serde_json::Value {
     serde_json::json!({ "patch": patch })
 }
 
-/// A proposal for each kind of destination, as `(create endpoint, its path, proposal id,
-/// draft)`, against the vendor evaluation after kickoff: the journey's adds a charter that
-/// kickoff, already done, requires, so its preview has consequences (D7); the route's
-/// creates a route at revision 0; the deployment's creates an identity.
+/// The body of a patch to `target` that proposes instead of applying: `draft`'s mutations at
+/// its destination revision, written to proposal `id` and titled by the draft's title.
+pub fn proposing(
+    target: &serde_json::Value,
+    patch_id: &str,
+    id: &str,
+    draft: &serde_json::Value,
+) -> serde_json::Value {
+    serde_json::json!({
+        "patch": {
+            "id": patch_id,
+            "target": target,
+            "base_revision": draft["destination_revision"],
+            "mutations": draft["mutations"],
+        },
+        "note": draft["title"],
+        "proposal": id,
+    })
+}
+
+/// A proposal for each kind of destination, as `(destination, path under which it is
+/// addressed, proposal id, draft)`, against the vendor evaluation after kickoff: the journey's
+/// adds a charter that kickoff, already done, requires, so its preview has consequences (D7);
+/// the route's creates a route at revision 0; the deployment's creates an identity.
 pub async fn proposals_of_every_domain(
     transport: &Transport,
-) -> Vec<(
-    &'static cairn_api::endpoints::Endpoint,
-    String,
-    &'static str,
-    serde_json::Value,
-)> {
+) -> Vec<(serde_json::Value, String, &'static str, serde_json::Value)> {
     use cairn_api::endpoints as at;
     let journey: cairn_schema::Journey =
         get(transport, &at::JOURNEY.path_with(&["j_vendor_eval"])).await;
@@ -443,20 +458,20 @@ pub async fn proposals_of_every_domain(
     });
     vec![
         (
-            &at::PROPOSE_JOURNEY,
-            at::PROPOSE_JOURNEY.path_with(&["j_vendor_eval"]),
+            serde_json::json!({"journey": "j_vendor_eval"}),
+            "/api/journeys/j_vendor_eval".to_owned(),
             "pr_charter",
             charter,
         ),
         (
-            &at::PROPOSE_ROUTE,
-            at::PROPOSE_ROUTE.path_with(&["new-route"]),
+            serde_json::json!({"route": "new-route"}),
+            "/api/routes/new-route".to_owned(),
             "pr_route",
             route,
         ),
         (
-            &at::PROPOSE_DEPLOYMENT,
-            at::PROPOSE_DEPLOYMENT.path.to_owned(),
+            serde_json::json!("deployment"),
+            "/api/deployment".to_owned(),
             "pr_identity",
             identity,
         ),

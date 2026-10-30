@@ -9,12 +9,13 @@ mod writes;
 
 use std::collections::BTreeMap;
 
-use cairn_schema::{Consequences, Cursor, Date, JourneyId, Notice, Revision};
-use cairn_service::{Projected, Written};
+use cairn_schema::{
+    Consequences, Cursor, Date, Domain, JourneyId, Notice, Proposal, ProposalId, ProposalStatus,
+    Revision,
+};
+use cairn_service::{Projected, ProposalWritten, Written};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
-pub use proposals::ProposalOutput;
 
 use crate::limits::PAGE_ITEM_COUNT_MAX;
 use crate::toolset::Spec;
@@ -163,17 +164,21 @@ impl<T> Cut<T> {
 }
 
 // PRD: D7.
-/// What a direct write answers: the revision it produced and what it newly caused. The
-/// arguments it was sent, its domain and its content hash are not answered back.
+/// What a write answers: where it landed and what it newly caused. The arguments it was sent,
+/// its content hash and a proposal's content are not answered back.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct WriteOutput {
     // PRD: H5.
     /// `applied` now, or `already_applied`: the patch id was committed before with the same
-    /// content and is answered from its receipt, with no consequences.
+    /// content and is answered from its receipt, with no consequences. A write to a proposal
+    /// is `saved` now, or `already_saved`, answered from its receipt (fetch the proposal for
+    /// where it stands), or `existing`, a create of a proposal the caller already holds,
+    /// answered with it as it stands.
     status: WriteStatus,
-    /// The journey's, route's or deployment's revision the write produced: the base of your
-    /// next write when the status is `applied`. After `already_applied`, read again first:
-    /// others may have written since.
+    /// An applied write: the journey's, route's or deployment's revision it produced, the
+    /// base of your next write when the status is `applied`; after `already_applied`, read
+    /// again first, others may have written since. A write to a proposal: the proposal's
+    /// editing revision, which review (`get_proposal`) and the next change to it name.
     revision: Revision,
     // PRD: D7, D4.
     /// What it caused in each journey it changed: newly stale nodes, shortfalls,
@@ -187,14 +192,34 @@ pub struct WriteOutput {
     /// The write was accepted; add the missing edge or date rule, or leave it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     notices: Vec<Notice>,
+    // PRD: I6.
+    /// A write to a proposal: its id; absent when the answer is only a receipt
+    /// (`already_saved`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    proposal: Option<ProposalId>,
+    /// A write to a proposal: where it would land (a receipt names the destination too).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    destination: Option<Domain>,
+    /// A write to a proposal: the destination revision it was drafted against; the base of
+    /// anything you add to it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    destination_revision: Option<Revision>,
+    /// A write to a proposal: whether it is still open.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    state: Option<ProposalStatus>,
 }
 
-/// Whether a write was applied now or answered from its receipt.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema)]
+/// How a write ended.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 enum WriteStatus {
     Applied,
     AlreadyApplied,
+    Saved,
+    AlreadySaved,
+    Existing,
 }
 
 impl WriteOutput {
@@ -205,10 +230,60 @@ impl WriteOutput {
         matches!(self.status, WriteStatus::AlreadyApplied)
     }
 
+    /// Whether the write went to a proposal rather than a domain.
+    #[must_use]
+    pub fn is_proposal(&self) -> bool {
+        self.status > WriteStatus::AlreadyApplied
+    }
+
     /// The revision the write produced, and what it newly caused in each journey it changed.
     #[must_use]
     pub fn into_parts(self) -> (Revision, BTreeMap<JourneyId, Consequences>) {
         (self.revision, self.consequences)
+    }
+
+    /// A proposal write's destination, when the answer says (a receipt does not).
+    #[must_use]
+    pub fn destination(&self) -> Option<&Domain> {
+        self.destination.as_ref()
+    }
+
+    /// Whether the answer says where the proposal stands (a receipt does not).
+    #[must_use]
+    pub fn state_known(&self) -> bool {
+        self.state.is_some()
+    }
+
+    /// Whether the answer says the proposal is discarded.
+    #[must_use]
+    pub fn is_discarded(&self) -> bool {
+        self.state == Some(ProposalStatus::Discarded)
+    }
+
+    fn held(status: WriteStatus, proposal: Proposal) -> Self {
+        Self {
+            status,
+            revision: proposal.revision,
+            consequences: BTreeMap::new(),
+            notices: Vec::new(),
+            destination_revision: Some(proposal.draft.destination_revision),
+            state: Some(proposal.status),
+            proposal: Some(proposal.id),
+            destination: Some(proposal.destination),
+        }
+    }
+
+    fn receipt(status: WriteStatus, revision: Revision) -> Self {
+        Self {
+            status,
+            revision,
+            consequences: BTreeMap::new(),
+            notices: Vec::new(),
+            proposal: None,
+            destination: None,
+            destination_revision: None,
+            state: None,
+        }
     }
 }
 
@@ -220,17 +295,26 @@ impl From<Written> for WriteOutput {
                 consequences,
                 notices,
             } => Self {
-                status: WriteStatus::Applied,
-                revision: receipt.revision,
                 consequences,
                 notices,
+                ..Self::receipt(WriteStatus::Applied, receipt.revision)
             },
-            Written::AlreadyApplied { receipt } => Self {
-                status: WriteStatus::AlreadyApplied,
-                revision: receipt.revision,
-                consequences: BTreeMap::new(),
-                notices: Vec::new(),
+            Written::AlreadyApplied { receipt } => {
+                Self::receipt(WriteStatus::AlreadyApplied, receipt.revision)
+            }
+        }
+    }
+}
+
+impl From<ProposalWritten> for WriteOutput {
+    fn from(written: ProposalWritten) -> Self {
+        match written {
+            ProposalWritten::Saved { proposal, .. } => Self::held(WriteStatus::Saved, proposal),
+            ProposalWritten::AlreadySaved { receipt } => Self {
+                destination: Some(receipt.domain.clone()),
+                ..Self::receipt(WriteStatus::AlreadySaved, receipt.revision)
             },
+            ProposalWritten::Existing { proposal } => Self::held(WriteStatus::Existing, proposal),
         }
     }
 }

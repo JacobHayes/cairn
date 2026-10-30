@@ -104,11 +104,11 @@ test("a later page shows the edit, and a page on the index shows a journey start
   expect(fetched()).toBe(2);
   // A proposal drafted in another page appears in the Proposals tab with no reload.
   await expect(two.getByTestId("tab-proposals")).toHaveCount(0);
-  const drafted = await one.request.post(`/api/journeys/${id}/proposals`, {
+  const drafted = await one.request.post(`/api/journeys/${id}/patches`, {
     data: {
-      id: `pr_${crypto.randomUUID().replaceAll("-", "")}`,
-      patch_id: patchId(),
-      draft: { title: "Add a follow-up", destination_revision: await derivedRevision(two), mutations: [{ op: "add_node", node: { key: "n_followup", id: "followup", kind: "action", title: "Follow up" } }] },
+      patch: { id: patchId(), target: { journey: id }, base_revision: await derivedRevision(two), mutations: [{ op: "add_node", node: { key: "n_followup", id: "followup", kind: "action", title: "Follow up" } }] },
+      note: "Add a follow-up",
+      proposal: `pr_${crypto.randomUUID().replaceAll("-", "")}`,
     },
   });
   expect(drafted.ok(), await drafted.text()).toBe(true);
@@ -268,11 +268,11 @@ test("a failed read or a refused write says what happened in a sentence, and kee
 test("C14: the deployment's open proposals are the Identities inspector's Proposals tab, found at its own address", async ({ page }) => {
   await open(page, "/identities");
   const deployment = (await (await page.request.get("/api/deployment")).json()) as { revision: number };
-  const drafted = await page.request.post("/api/deployment/proposals", {
+  const drafted = await page.request.post("/api/deployment/patches", {
     data: {
-      id: `pr_${crypto.randomUUID().replaceAll("-", "")}`,
-      patch_id: patchId(),
-      draft: { title: "Add a reviewer", destination_revision: deployment.revision, mutations: [{ op: "create_identity", identity: { key: `who_${Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => "abcdefghijklmnopqrstuvwxyz234567"[byte % 32]).join("")}`, name: "Nina Alvarez", emails: [] } }] },
+      note: "Add a reviewer",
+      proposal: `pr_${crypto.randomUUID().replaceAll("-", "")}`,
+      patch: { id: patchId(), target: "deployment", base_revision: deployment.revision, mutations: [{ op: "create_identity", identity: { key: `who_${Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => "abcdefghijklmnopqrstuvwxyz234567"[byte % 32]).join("")}`, name: "Nina Alvarez", emails: [] } }] },
     },
   });
   expect(drafted.ok(), await drafted.text()).toBe(true);
@@ -304,11 +304,11 @@ test("C14, G5: a proposal that removes a ticked item and adds one of the same ti
   expect(written.ok(), await written.text()).toBe(true);
   await page.reload();
   const proposal = `pr_${crypto.randomUUID().replaceAll("-", "")}`;
-  const drafted = await context.request.post(`/api/journeys/${id}/proposals`, {
+  const drafted = await context.request.post(`/api/journeys/${id}/patches`, {
     data: {
-      id: proposal,
-      patch_id: patchId(),
-      draft: { title: "Trim the checklist", destination_revision: await derivedRevision(page), mutations: [{ op: "set_node_field", node: "n_screen", value: { checklist: [{ id: "beta", title: "Beta" }] } }] },
+      note: "Trim the checklist",
+      proposal,
+      patch: { id: patchId(), target: { journey: id }, base_revision: await derivedRevision(page), mutations: [{ op: "set_node_field", node: "n_screen", value: { checklist: [{ id: "beta", title: "Beta" }] } }] },
     },
   });
   expect(drafted.ok(), await drafted.text()).toBe(true);

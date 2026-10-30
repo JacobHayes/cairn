@@ -8,6 +8,8 @@
 // author types, so its fields show what the engine would say before Save.
 import type { Schema } from "@cairn/client";
 import { HostFailure } from "@cairn/wasm";
+import { useNavigate } from "react-router";
+import { proposalAddress } from "../address.ts";
 
 import type { Command } from "../data/edit-command.ts";
 import { unansweredOf } from "../data/edit-manager.ts";
@@ -17,6 +19,7 @@ import { beforeWork, DERIVE, previewPolicy, type ReadAt, type ReadKey, type Read
 import { useKeyedRead, useSession, useCaller, useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
 import type { ReceiptState } from "../ui/receipt.ts";
+import { newProposalId, titled } from "../data/proposals.ts";
 import { newPatchId, type Rejection } from "../data/writes.ts";
 import type { Mutation } from "./graph.ts";
 import { domainOf, type Authored } from "./target.ts";
@@ -38,9 +41,10 @@ export interface AuthorWrite {
   /**
    * Previews `mutations` on the graph as held, then sends them drafted against `base` (the
    * revision their author started from, H5; the one held by default) unless the preview
-   * rejects them; true when they landed.
+   * rejects them; true when they landed. With `propose` (a title) they are written to a new
+   * proposal of the graph instead of applied, and the review opens once it is saved (I6).
    */
-  run: (mutations: Mutation[], base?: number) => Promise<boolean>;
+  run: (mutations: Mutation[], base?: number, propose?: string) => Promise<boolean>;
   pending: boolean;
   /** Version skew or a write in flight: no new write starts. */
   disabled: boolean;
@@ -156,9 +160,16 @@ export function authorEdit(authored: Authored, scope: string): string {
   return `author:${domainOf(authored)}:${scope}`;
 }
 
-/** The patch authoring sends for `mutations`, drafted against `base` under the patch id `id`. */
-export function authorCommand(authored: Authored, mutations: Mutation[], base: number, id: string = newPatchId()): Command {
-  return { kind: "patch", patch: authoredPatchOf(authored, mutations, base, id) };
+/**
+ * The patch authoring sends for `mutations`, drafted against `base` under the patch id `id`.
+ * With `proposal` it lands in that proposal, titled by `title`: the proposal records one
+ * revision, so the patch names no deployment revision.
+ */
+export function authorCommand(authored: Authored, mutations: Mutation[], base: number, id: string = newPatchId(), proposal?: { id: string; title: string }): Command {
+  if (proposal === undefined) {
+    return { kind: "patch", patch: authoredPatchOf(authored, mutations, base, id) };
+  }
+  return { kind: "patch", patch: { id, target: authored.target, base_revision: base, mutations }, note: titled(proposal.title), proposal: proposal.id };
 }
 
 /** The write's first phase: what the engine says of `mutations`, as the rejection that stops it, or none. */
@@ -176,11 +187,17 @@ export function useAuthorWrite(authored: Authored, scope: string, label?: string
   const { deriver } = useSession();
   const { caller } = useCaller();
   const write = useWrite(authorEdit(authored, scope), label);
+  const navigate = useNavigate();
   const sent = write.write?.command.kind === "patch" ? write.write.command.patch.mutations : undefined;
   return {
-    run: async (mutations, base = authored.revision) => {
+    run: async (mutations, base = authored.revision, propose) => {
       const check = () => checkOf({ deriver, user: caller?.user ?? LOCAL_USER, authored, mutations });
-      return (await write.submit(authorCommand(authored, mutations, base), check)) !== undefined;
+      const proposal = propose === undefined ? undefined : { id: newProposalId(), title: propose };
+      const landed = (await write.submit(authorCommand(authored, mutations, base, newPatchId(), proposal), check)) !== undefined;
+      if (landed && proposal !== undefined && write.mounted()) {
+        void navigate(proposalAddress(authored.target, proposal.id));
+      }
+      return landed;
     },
     pending: write.busy,
     disabled: write.disabled,

@@ -48,9 +48,8 @@ test("I5, I7: a direct change reported as a receipt, and a breakdown proposed, r
     op: "add_node",
     node: { key: `n_piece_${String(index)}`, id: `piece-${String(index)}`, kind: "deliverable", title, parent: "n_workload" },
   }));
-  const draft = { title: "Break down the workload", destination_revision: 2, mutations: pieces };
   await script(page, [
-    { calls: [{ name: "create_proposal", arguments: { proposal: `pr_${patchId().slice(2, 14)}`, destination: { journey }, draft, patch_id: patchId() } }] },
+    { calls: [{ name: "apply_patch", arguments: { target: { journey }, base_revision: 2, patch_id: patchId(), proposal: `pr_${patchId().slice(2, 14)}`, note: "Break down the workload", mutations: pieces } }] },
     { say: "I drafted the breakdown for your review." },
   ]);
   await ask(page, "Break the test workload down into an ingest and a query workload.");

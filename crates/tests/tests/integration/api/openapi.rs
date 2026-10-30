@@ -38,6 +38,10 @@ mod in_process {
                 "patch",
                 vec![&at::PATCH_JOURNEY, &at::PATCH_ROUTE, &at::PATCH_DEPLOYMENT],
             ),
+            (
+                "propose",
+                vec![&at::PATCH_JOURNEY, &at::PATCH_ROUTE, &at::PATCH_DEPLOYMENT],
+            ),
             ("journey", vec![&at::JOURNEY]),
             ("document", vec![&at::DOCUMENT]),
             ("routes", vec![&at::ROUTES]),
@@ -69,14 +73,6 @@ mod in_process {
             ("explanations", vec![&at::EXPLANATIONS]),
             ("history", vec![&at::HISTORY]),
             (
-                "create_proposal",
-                vec![
-                    &at::PROPOSE_JOURNEY,
-                    &at::PROPOSE_ROUTE,
-                    &at::PROPOSE_DEPLOYMENT,
-                ],
-            ),
-            (
                 "proposals",
                 vec![
                     &at::JOURNEY_PROPOSALS.list,
@@ -91,7 +87,6 @@ mod in_process {
             under_each("apply_proposal", |set| &set.apply),
             under_each("discard_proposal", |set| &set.discard),
             under_each("refresh_proposal", |set| &set.refresh),
-            ("propose_save_as_route", vec![&at::SAVE_AS_ROUTE]),
             ("import_route", vec![&at::IMPORT_ROUTE]),
             ("export_route", vec![&at::EXPORT_ROUTE]),
         ]
@@ -352,17 +347,17 @@ mod in_process {
             "destination_revision": 2,
             "mutations": [{"op": "add_annotation", "annotation": {"key": "a_note", "note": "Seen."}}],
         });
-        let create = json!({"patch_id": "p_pr", "id": "pr_note", "draft": draft});
-        let proposals = &at::PROPOSE_JOURNEY.path_with(&["j_vendor_eval"]);
-        let mut lost = create.clone();
-        lost["patch_id"] = json!("p_pr_lost");
-        let mut reused = create.clone();
-        reused["draft"]["title"] = json!("Another");
-        for body in [&create, &create, &lost, &reused] {
+        let target = json!({"journey": "j_vendor_eval"});
+        let create = support::proposing(&target, "p_pr", "pr_note", &draft);
+        let patches = &at::PATCH_JOURNEY.path_with(&["j_vendor_eval"]);
+        let mut other = draft.clone();
+        other["title"] = json!("Another");
+        let reused = support::proposing(&target, "p_pr", "pr_note", &other);
+        for body in [&create, &create, &reused] {
             conforms(
                 &document,
-                &at::PROPOSE_JOURNEY,
-                &post(&ann, proposals, body).await,
+                &at::PATCH_JOURNEY,
+                &post(&ann, patches, body).await,
             );
         }
         let edit = json!({"patch_id": "p_edit", "base_revision": 7, "draft": draft});
@@ -460,15 +455,20 @@ mod in_process {
             &request(&free),
         )
         .await;
-        let save =
-            json!({"patch_id": "p_save", "proposal": "pr_save", "route": "saved", "name": "Saved"});
-        let saved = post(
-            &ann,
-            &at::SAVE_AS_ROUTE.path_with(&["j_vendor_eval"]),
-            &save,
-        )
-        .await;
-        conforms(&document, &at::SAVE_AS_ROUTE, &saved);
+        let save = json!({
+            "patch": {
+                "id": "p_save",
+                "target": {"route": "saved"},
+                "base_revision": 0,
+                "mutations": [
+                    {"op": "create_route", "name": "Saved"},
+                    {"op": "open_draft", "source": {"save_as_route": {"journey": "j_vendor_eval"}}},
+                ],
+            },
+            "proposal": "pr_save",
+        });
+        let saved = post(&ann, &at::PATCH_ROUTE.path_with(&["saved"]), &save).await;
+        conforms(&document, &at::PATCH_ROUTE, &saved);
     }
 
     /// Proposals for a route and for the deployment, and a preview with consequences, answer
@@ -478,19 +478,23 @@ mod in_process {
         let document = cairn_api::openapi::document();
         let world = World::start().await;
         let ann = world.vendor_after(3).await;
-        for (endpoint, target, id, draft) in
+        for (destination, base, id, draft) in
             crate::api::support::proposals_of_every_domain(&ann).await
         {
-            let create = json!({"patch_id": format!("p_{id}"), "id": id, "draft": draft});
-            conforms(&document, endpoint, &post(&ann, &target, &create).await);
-            let preview = post(&ann, &format!("{target}/{id}/preview"), &json!({})).await;
-            let under = if std::ptr::eq(endpoint, &raw const at::PROPOSE_JOURNEY) {
-                &at::JOURNEY_PROPOSALS
-            } else if std::ptr::eq(endpoint, &raw const at::PROPOSE_ROUTE) {
-                &at::ROUTE_PROPOSALS
+            let create = support::proposing(&destination, &format!("p_{id}"), id, &draft);
+            let (patches, under) = if base.starts_with("/api/journeys") {
+                (&at::PATCH_JOURNEY, &at::JOURNEY_PROPOSALS)
+            } else if base.starts_with("/api/routes") {
+                (&at::PATCH_ROUTE, &at::ROUTE_PROPOSALS)
             } else {
-                &at::DEPLOYMENT_PROPOSALS
+                (&at::PATCH_DEPLOYMENT, &at::DEPLOYMENT_PROPOSALS)
             };
+            conforms(
+                &document,
+                patches,
+                &post(&ann, &format!("{base}/patches"), &create).await,
+            );
+            let preview = post(&ann, &format!("{base}/proposals/{id}/preview"), &json!({})).await;
             conforms(&document, &under.preview, &preview);
         }
     }

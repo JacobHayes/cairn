@@ -1,57 +1,26 @@
-//! Bulk and import (ARCHITECTURE, HTTP API: Bulk and import): save as route, drafted by the
-//! engine and stored as a proposal that is reviewed and applied through the proposal
-//! endpoints (B8, I6); and route files exported and imported, an import being one route patch
-//! (A13).
+//! Bulk and import (ARCHITECTURE, HTTP API: Bulk and import): route files exported and
+//! imported, an import being one route patch (A13).
 
 use axum::Json;
 use axum::extract::{Extension, RawQuery, State};
 use axum::routing::{get, post};
-use cairn_schema::{Actor, JourneyId, RouteFile, RouteId};
+use cairn_schema::{Actor, RouteFile, RouteId};
 
-use super::proposals::drafted_written;
 use super::{Answer, committed, written_outcome};
 use crate::Api;
 use crate::error::ApiError;
 use crate::extract::{JsonBody, Path, segment};
 use crate::observe;
 use crate::query::{self, Params};
-use cairn_service::wire::{
-    PatchAnswer, ProblemCode, ProposalAnswer, RouteImport, SaveAsRouteRequest,
-};
+use cairn_service::wire::{PatchAnswer, ProblemCode, RouteImport};
 
 /// The bulk endpoints and their handlers.
 pub fn served() -> crate::Served {
     use crate::endpoints as at;
     vec![
-        (&at::SAVE_AS_ROUTE, post(save_as_route)),
         (&at::IMPORT_ROUTE, post(import)),
         (&at::EXPORT_ROUTE, get(export)),
     ]
-}
-
-/// `POST /api/journeys/{id}/save-as-route` (B8).
-pub async fn save_as_route(
-    State(api): State<Api>,
-    Extension(actor): Extension<Actor>,
-    Path(id): Path<String>,
-    JsonBody(request): JsonBody<SaveAsRouteRequest>,
-) -> Answer<ProposalAnswer> {
-    let journey: JourneyId = segment(&id, "journey")?;
-    let SaveAsRouteRequest {
-        patch_id,
-        proposal,
-        route,
-        name,
-    } = request;
-    let (service, call) = (api.service.clone(), api.call(actor));
-    let (logged_id, logged_patch) = (proposal.clone(), patch_id.clone());
-    let drafted = committed(async move {
-        service
-            .propose_save_as_route(&call, patch_id, &proposal, &journey, &route, &name)
-            .await
-    })
-    .await?;
-    drafted_written(&logged_patch, &logged_id, "save_as_route", drafted)
 }
 
 /// `POST /api/routes/{id}/import` (A13): one route patch opening a new route or a new draft.

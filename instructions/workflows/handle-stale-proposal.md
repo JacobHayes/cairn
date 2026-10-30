@@ -15,7 +15,9 @@ moves (someone else wrote to it), applying is refused as `stale`, and `get_propo
    choices. A save as route is drafted again by Cairn; any other proposal is
    re-based as it stands.
 3. **Check it again.** `get_proposal` with `review`: the refreshed proposal may now have
-   violations, or items to choose again. Fix them with `edit_proposal` and `replace`.
+   violations, or items to choose again. Fix them with `edit_proposal` and `replace`, or add to
+   it with the same write that made it (its `proposal` and `proposal_revision`; not a save as
+   route, which is only refreshed).
 4. **Ask for a new review.** A refreshed proposal has a new editing revision and must be
    reviewed again before it is applied; tell the person what changed.
 

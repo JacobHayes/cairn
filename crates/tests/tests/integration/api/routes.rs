@@ -14,7 +14,6 @@ mod in_process {
     use crate::api::support::{self, World, get, ok, post};
 
     const ROUTE: &str = "/api/routes/vendor-evaluation";
-    const JOURNEY: &str = "/api/journeys/j_vendor_eval";
 
     fn route_v2() -> RouteFile {
         let path = support::fixtures_root().join("vendor-evaluation/route-v2.yaml");
@@ -71,21 +70,36 @@ mod in_process {
         assert_eq!(draft, exported, "the draft is version 1, every key kept");
     }
 
+    /// The patch that proposes saving the vendor evaluation as a draft of the new route
+    /// `route`.
+    fn saving(patch_id: &str, proposal: &str, route: &str, name: &str) -> serde_json::Value {
+        json!({
+            "patch": {
+                "id": patch_id,
+                "target": {"route": route},
+                "base_revision": 0,
+                "mutations": [
+                    {"op": "create_route", "name": name},
+                    {"op": "open_draft", "source": {"save_as_route": {"journey": "j_vendor_eval"}}},
+                ],
+            },
+            "proposal": proposal,
+        })
+    }
+
     /// B8, I6: save as route is drafted as a proposal for the route, with a review item per
     /// node to exclude.
     #[tokio::test]
     async fn save_as_route_is_drafted_as_a_proposal() {
         let world = World::start().await;
         let ann = world.vendor_after(3).await;
-        let save = json!({
-            "patch_id": "p_save",
-            "proposal": "pr_save",
-            "route": "saved-evaluation",
-            "name": "Saved evaluation",
-        });
-        let drafted = saved(ok(
-            &post(&ann, &format!("{JOURNEY}/save-as-route"), &save).await
-        ));
+        let save = saving("p_save", "pr_save", "saved-evaluation", "Saved evaluation");
+        let drafted = saved(ok(&post(
+            &ann,
+            "/api/routes/saved-evaluation/patches",
+            &save,
+        )
+        .await));
         let route = Domain::Route("saved-evaluation".parse().unwrap());
         assert_eq!(drafted.destination, route);
         let exclusions = drafted.draft.items.as_slice().iter();
@@ -103,16 +117,11 @@ mod in_process {
         let mut file = serde_json::to_value(route_v2()).unwrap();
         file["route"] = json!("new");
         let import = json!({"patch_id": "p_import_new", "file": file});
-        let save = json!({
-            "patch_id": "p_save_new",
-            "proposal": "pr_save_new",
-            "route": "new",
-            "name": "New",
-        });
+        let save = saving("p_save_new", "pr_save_new", "new", "New");
         for (target, body) in [
             ("/api/routes/new/import".to_owned(), import.clone()),
             (format!("{ROUTE}/import"), import),
-            (format!("{JOURNEY}/save-as-route"), save),
+            ("/api/routes/new/patches".to_owned(), save),
         ] {
             let reply = post(&ann, &target, &body).await;
             assert!(reply.status.is_client_error(), "{target}: {}", reply.status);

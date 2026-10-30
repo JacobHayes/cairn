@@ -82,8 +82,7 @@ export interface paths {
         /** The destination's open proposals, newest first, with their count and the destination as it is now. */
         get: operations["listDeploymentProposals"];
         put?: never;
-        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal. */
-        post: operations["proposeToDeployment"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -476,8 +475,7 @@ export interface paths {
         /** The destination's open proposals, newest first, with their count and the destination as it is now. */
         get: operations["listJourneyProposals"];
         put?: never;
-        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal. */
-        post: operations["proposeToJourney"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -564,23 +562,6 @@ export interface paths {
         put?: never;
         /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying. */
         post: operations["refreshJourneyProposal"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/journeys/{id}/save-as-route": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Proposes saving the journey's structure as a route draft, with a participation mapping per explicit identity and an exclusion per node. */
-        post: operations["proposeSaveAsRoute"];
         delete?: never;
         options?: never;
         head?: never;
@@ -785,8 +766,7 @@ export interface paths {
         /** The destination's open proposals, newest first, with their count and the destination as it is now. */
         get: operations["listRouteProposals"];
         put?: never;
-        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal. */
-        post: operations["proposeToRoute"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3085,6 +3065,16 @@ export interface components {
             /** @description Its new content. */
             proposal: components["schemas"]["ProposalDraft"];
         } | {
+            /**
+             * @description The destination revision the proposal was drafted against, which these are
+             *     drafted against too.
+             */
+            destination_revision: components["schemas"]["Revision"];
+            /** @description The mutations to add, in order; none of them edits a proposal. */
+            mutations: components["schemas"]["Mutation"][];
+            /** @constant */
+            op: "extend_proposal";
+        } | {
             /** @constant */
             op: "apply_proposal";
             /** @description The proposal. */
@@ -3812,11 +3802,21 @@ export interface components {
          *     events carries.
          */
         PatchRequest: {
-            /** @description A note for each of its events. */
+            /** @description A note for each of its events; the title of a proposal this patch creates. */
             note?: components["schemas"]["Markdown"] | null;
             /** @description The patch; its target must be the path's domain. */
             patch: components["schemas"]["Patch"];
+            /**
+             * @description Write the patch into the proposal with this id, instead of applying it: a new id
+             *     creates the proposal (titled by the note), an open proposal's id adds the patch's
+             *     mutations to it.
+             */
+            proposal?: components["schemas"]["ProposalId"] | null;
+            /** @description With `proposal`, when it exists: its editing revision. */
+            proposal_revision?: components["schemas"]["Revision"] | null;
         };
+        /** @description What a submitted patch answers: its own answer, or with `proposal`, the proposal's. */
+        PatchSubmitted: components["schemas"]["PatchAnswer"] | components["schemas"]["ProposalAnswer"];
         /** @description What a patch targets: a domain, or a proposal within its destination domain. */
         PatchTarget: {
             journey: components["schemas"]["JourneyId"];
@@ -4112,21 +4112,6 @@ export interface components {
             patch_id: components["schemas"]["PatchId"];
             /** @description The proposal's editing revision the reviewer previewed. */
             reviewed_revision: components["schemas"]["Revision"];
-        };
-        /**
-         * @description `POST /api/{domain}/proposals`: a new proposal for the path's domain (which may not exist yet:
-         *     a proposal can create a journey or route at revision 0).
-         */
-        ProposalCreate: {
-            /** @description Its content. */
-            draft: components["schemas"]["ProposalDraft"];
-            /**
-             * @description The proposal's id, generated by the client: a create resubmitted under it answers
-             *     the proposal its caller already holds rather than a second one.
-             */
-            id: components["schemas"]["ProposalId"];
-            /** @description The write's patch id. */
-            patch_id: components["schemas"]["PatchId"];
         };
         /** @description Where a proposal listing resumes: pass its two fields as `after_at` and `after`. */
         ProposalCursor: {
@@ -4864,20 +4849,6 @@ export interface components {
             route: components["schemas"]["RouteId"];
             /** @description The version number. */
             version: components["schemas"]["VersionNumber"];
-        };
-        /**
-         * @description `POST /api/journeys/{id}/save-as-route`: proposes saving the journey's structure as a
-         *     draft of a route, created when it does not exist.
-         */
-        SaveAsRouteRequest: {
-            /** @description The route's name, when it is created. */
-            name: components["schemas"]["Title"];
-            /** @description The proposal write's patch id. */
-            patch_id: components["schemas"]["PatchId"];
-            /** @description The proposal's id, generated by the client. */
-            proposal: components["schemas"]["ProposalId"];
-            /** @description The route the draft is of. */
-            route: components["schemas"]["RouteId"];
         };
         Score: number;
         /** @description Where search text was found in a journey. */
@@ -5706,7 +5677,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PatchAnswer"];
+                    "application/json": components["schemas"]["PatchSubmitted"];
                 };
             };
             /** @description The request is malformed. */
@@ -5763,13 +5734,13 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path. */
+            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Rejection"];
+                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */
@@ -5843,112 +5814,6 @@ export interface operations {
                 };
                 content: {
                     "text/plain": string;
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "text/plain": string;
-                };
-            };
-        };
-    };
-    proposeToDeployment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProposalCreate"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProposalAnswer"];
-                };
-            };
-            /** @description The request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No credential, or one that is refused (the auth layer, in text). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description Stale (with what intervened) or a reused patch id. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The body is over the request size limit. */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The body is not application/json. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Invalid: every violation, by path. */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */
@@ -8077,7 +7942,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PatchAnswer"];
+                    "application/json": components["schemas"]["PatchSubmitted"];
                 };
             };
             /** @description The request is malformed. */
@@ -8143,13 +8008,13 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path. */
+            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Rejection"];
+                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */
@@ -8235,124 +8100,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "text/plain": string;
-                };
-            };
-        };
-    };
-    proposeToJourney: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The journey. */
-                id: components["schemas"]["JourneyId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProposalCreate"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProposalAnswer"];
-                };
-            };
-            /** @description The request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No credential, or one that is refused (the auth layer, in text). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description No such resource. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Stale (with what intervened) or a reused patch id. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The body is over the request size limit. */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The body is not application/json. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Invalid: every violation, by path. */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */
@@ -8911,124 +8658,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProposalStep"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProposalAnswer"];
-                };
-            };
-            /** @description The request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No credential, or one that is refused (the auth layer, in text). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description No such resource. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Stale (with what intervened) or a reused patch id. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The body is over the request size limit. */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The body is not application/json. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "text/plain": string;
-                };
-            };
-        };
-    };
-    proposeSaveAsRoute: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The journey. */
-                id: components["schemas"]["JourneyId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SaveAsRouteRequest"];
             };
         };
         responses: {
@@ -10073,7 +9702,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PatchAnswer"];
+                    "application/json": components["schemas"]["PatchSubmitted"];
                 };
             };
             /** @description The request is malformed. */
@@ -10139,13 +9768,13 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path. */
+            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Rejection"];
+                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */
@@ -10231,124 +9860,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "text/plain": string;
-                };
-            };
-        };
-    };
-    proposeToRoute: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The route. */
-                id: components["schemas"]["RouteId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProposalCreate"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProposalAnswer"];
-                };
-            };
-            /** @description The request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No credential, or one that is refused (the auth layer, in text). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description No such resource. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Stale (with what intervened) or a reused patch id. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The body is over the request size limit. */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The body is not application/json. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Invalid: every violation, by path. */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */

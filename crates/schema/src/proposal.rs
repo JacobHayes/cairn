@@ -332,6 +332,7 @@ fn tally_other(outline: &mut ProposalOutline, mutation: &Mutation) -> bool {
         // A proposal's own content never edits a proposal.
         Mutation::CreateProposal { .. }
         | Mutation::EditProposal { .. }
+        | Mutation::ExtendProposal { .. }
         | Mutation::ApplyProposal { .. }
         | Mutation::DiscardProposal {} => {}
         // `lifecycle_fact` took these above.

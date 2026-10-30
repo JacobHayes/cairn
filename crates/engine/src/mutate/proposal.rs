@@ -3,8 +3,8 @@
 //! mutations run in order exactly as if the patch held them and every check applies.
 
 use cairn_schema::{
-    Mutation, PatchTarget, Proposal, ProposalStatus, Record, RevisionConflict, RevisionOf, Subject,
-    ViolationCode, Write,
+    BoundedVec, Domain, Mutation, PatchTarget, Proposal, ProposalDraft, ProposalStatus, Record,
+    RevisionConflict, RevisionOf, Subject, ViolationCode, Write,
 };
 
 use super::{ARCHIVED_REFUSAL, Session};
@@ -17,6 +17,12 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
     let existing = session.candidate.proposals.get(id).cloned();
     let revision = session.patch.base_revision.next();
     let inputs = session.inputs;
+    if !matches!(mutation, Mutation::CreateProposal { .. })
+        && let Some((code, message)) = unfit(existing.as_ref(), destination)
+    {
+        reject(session, code, message);
+        return Vec::new();
+    }
     let next = match (mutation, existing) {
         (Mutation::CreateProposal { proposal }, None) => Proposal {
             id: id.clone(),
@@ -32,35 +38,29 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
             reject(session, ViolationCode::TargetExists, "the proposal exists");
             return Vec::new();
         }
-        (Mutation::EditProposal { .. } | Mutation::DiscardProposal {}, None) => {
-            reject(session, ViolationCode::TargetMissing, "no such proposal");
-            return Vec::new();
-        }
-        (Mutation::EditProposal { .. } | Mutation::DiscardProposal {}, Some(found))
-            if found.destination != *destination =>
-        {
-            reject(
-                session,
-                ViolationCode::MutationNotForTarget,
-                "the proposal belongs to another destination",
-            );
-            return Vec::new();
-        }
-        (Mutation::EditProposal { .. } | Mutation::DiscardProposal {}, Some(found))
-            if found.status != ProposalStatus::Open =>
-        {
-            reject(
-                session,
-                ViolationCode::ProposalNotOpen,
-                "the proposal was applied or discarded",
-            );
-            return Vec::new();
-        }
         (Mutation::EditProposal { proposal }, Some(found)) => Proposal {
             revision,
             draft: proposal.clone(),
             ..found
         },
+        (
+            Mutation::ExtendProposal {
+                destination_revision,
+                mutations,
+            },
+            Some(found),
+        ) => {
+            let Some(draft) =
+                extended(session, &found, *destination_revision, mutations.as_slice())
+            else {
+                return Vec::new();
+            };
+            Proposal {
+                revision,
+                draft,
+                ..found
+            }
+        }
         (Mutation::DiscardProposal {}, Some(found)) => Proposal {
             revision,
             status: ProposalStatus::Discarded,
@@ -74,6 +74,75 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
     );
     assert_eq!(next.id, *id);
     vec![Write::Put(Record::Proposal(next))]
+}
+
+/// Why `found`, the proposal an edit, extension, or discard is for, cannot take it: it is
+/// missing, belongs to another destination, or is no longer open.
+fn unfit(found: Option<&Proposal>, destination: &Domain) -> Option<(ViolationCode, &'static str)> {
+    match found {
+        None => Some((ViolationCode::TargetMissing, "no such proposal")),
+        Some(found) if found.destination != *destination => Some((
+            ViolationCode::MutationNotForTarget,
+            "the proposal belongs to another destination",
+        )),
+        Some(found) if found.status != ProposalStatus::Open => Some((
+            ViolationCode::ProposalNotOpen,
+            "the proposal was applied or discarded",
+        )),
+        Some(_) => None,
+    }
+}
+
+/// The draft with `added` at its end, or none when the write is refused: drafted against
+/// another destination revision than the proposal (stale), holding a mutation that edits a
+/// proposal, or past a proposal's mutation limit.
+fn extended(
+    session: &mut Session<'_>,
+    found: &Proposal,
+    destination_revision: cairn_schema::Revision,
+    added: &[Mutation],
+) -> Option<ProposalDraft> {
+    let drafted = found.draft.destination_revision;
+    if destination_revision != drafted {
+        stale_unless(
+            session,
+            RevisionOf::Domain(found.destination.clone()),
+            destination_revision,
+            drafted,
+        );
+        return None;
+    }
+    if added.iter().any(Mutation::edits_a_proposal) {
+        reject(
+            session,
+            ViolationCode::MutationNotForTarget,
+            "a proposal's mutations cannot create, edit, apply, or discard a proposal",
+        );
+        return None;
+    }
+    let all: Vec<Mutation> = found
+        .draft
+        .mutations
+        .as_slice()
+        .iter()
+        .chain(added)
+        .cloned()
+        .collect();
+    let Ok(mutations) = BoundedVec::new(all) else {
+        reject(
+            session,
+            ViolationCode::LimitExceeded,
+            "the proposal would hold more mutations than a proposal may",
+        );
+        if let Some(violation) = session.violations.last_mut() {
+            violation.limit = Some(cairn_schema::Limit::MutationCountPerPatch);
+        }
+        return None;
+    };
+    Some(ProposalDraft {
+        mutations,
+        ..found.draft.clone()
+    })
 }
 
 fn reject(session: &mut Session<'_>, code: ViolationCode, message: &str) {

@@ -56,7 +56,7 @@ fn the_mutation_vocabulary_is_spelled_out_by_the_tools_that_take_a_patch() {
         }
     }
     assert_eq!(spelled, ["update_journey_state", "apply_patch"]);
-    assert!(cited.contains(&"create_proposal"), "{cited:?}");
+    assert!(cited.contains(&"edit_proposal"), "{cited:?}");
 }
 
 /// What the providers refuse in a tool's arguments, from their documentation: Anthropic

@@ -109,7 +109,7 @@ impl Service {
     ///
     /// [`WriteError::Rejected`] when the id is taken otherwise, or the patch id is reused;
     /// [`WriteError::Failed`] when the store fails.
-    pub async fn create_proposal(
+    pub(crate) async fn put_new_proposal(
         &self,
         call: &Call,
         patch_id: PatchId,
@@ -135,7 +135,7 @@ impl Service {
             patina_dst::reachable!("service-proposal-create-resubmitted");
             return Ok(ProposalWritten::Existing { proposal: held });
         }
-        self.write_proposal(call, &patch, id).await
+        self.write_proposal(call, &patch, id, None).await
     }
 
     /// I6, H5: replaces the proposal's content, against `base_revision`, its editing revision
@@ -166,7 +166,7 @@ impl Service {
         if let Some(answer) = self.saved_before(&patch).await? {
             return answer;
         }
-        self.write_proposal(call, &patch, id).await
+        self.write_proposal(call, &patch, id, None).await
     }
 
     /// I6: discards the proposal, against its editing revision.
@@ -193,7 +193,7 @@ impl Service {
         if let Some(answer) = self.saved_before(&patch).await? {
             return answer;
         }
-        self.write_proposal(call, &patch, id).await
+        self.write_proposal(call, &patch, id, None).await
     }
 
     /// I6: the proposal with this id, with its destination, editing revision, and status, or
@@ -227,7 +227,7 @@ impl Service {
     /// I6: the proposal with this id under `destination`, which a write to it is addressed to:
     /// checked before its receipt (H5), so another destination's proposal is missing, never
     /// rejected.
-    async fn addressed(
+    pub(crate) async fn addressed(
         &self,
         destination: &Domain,
         id: &ProposalId,
@@ -403,7 +403,7 @@ impl Service {
     }
 
     /// I6, H5: what moved in `destination` since `drafted`, when it is not `current`.
-    async fn stale_base(
+    pub(crate) async fn stale_base(
         &self,
         destination: &Domain,
         drafted: Revision,
@@ -496,7 +496,7 @@ impl Service {
     }
 
     /// H5: the answer for a proposal patch id already committed, if it was.
-    async fn saved_before(
+    pub(crate) async fn saved_before(
         &self,
         patch: &Patch,
     ) -> Result<Option<Result<ProposalWritten, WriteError>>, WriteError> {
@@ -509,13 +509,14 @@ impl Service {
     }
 
     /// Writes a patch to proposal `id` and answers with the proposal as committed.
-    async fn write_proposal(
+    pub(crate) async fn write_proposal(
         &self,
         call: &Call,
         patch: &Patch,
         id: &ProposalId,
+        note: Option<Markdown>,
     ) -> Result<ProposalWritten, WriteError> {
-        match self.write(call, patch, None).await? {
+        match self.write(call, patch, note).await? {
             Written::Applied { receipt, .. } => {
                 let proposal = self.store.proposal(id).await?.ok_or_else(|| {
                     WriteError::Failed(ServiceError::Store(cairn_store::StoreError::Backend(
@@ -576,7 +577,7 @@ fn merged(
     }
 }
 
-fn proposal_patch(
+pub(crate) fn proposal_patch(
     patch_id: PatchId,
     destination: &Domain,
     id: &ProposalId,

@@ -163,8 +163,13 @@ impl Client {
                 return Err(Refused::Failed(ClientError::NotADomainPatch));
             }
         };
-        let body = serde_json::to_value(PatchRequest { patch, note })
-            .map_err(|error| Refused::Failed(TransportError(error.to_string()).into()))?;
+        let body = serde_json::to_value(PatchRequest {
+            patch,
+            note,
+            proposal: None,
+            proposal_revision: None,
+        })
+        .map_err(|error| Refused::Failed(TransportError(error.to_string()).into()))?;
         let reply = self
             .transport
             .send(Method::POST, &target, Some(&body))

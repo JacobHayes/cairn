@@ -61,7 +61,17 @@ undecided decision is `conditional` (see `pending_on`), not ruled out.
 
 ## Write directly or propose
 
-Write directly (`update_journey_state`) when the person asked for a state change: answers,
-transitions, who does a node, dates, snoozes. Structure goes through `apply_patch` only when the
-person asked for that exact change. Propose (`create_proposal`) when the person asks for one,
-when the change is structural, or when it is large or ambiguous: Cairn has no undo.
+Cairn has no undo, so one rule decides. Write directly (`update_journey_state`) when the person
+asked for a state change: answers, transitions, who does a node, dates, snoozes. Propose when
+the change is structural (it changes what the graph is: nodes, edges, roles, conditions, date
+rules, resources), creates or changes a route, is large or ambiguous, or the person
+asks to see it first.
+
+To propose, send the same write with `proposal` set to a new id (`pr_` and a slug) and a
+`note` that says in a line what it proposes (its title). The mutations are drafted, not
+applied: nothing changes until a person reviews and applies the proposal, which the answer
+says is saved. To add to it, send the same kind of write again with its `proposal` and the
+`proposal_revision` from the last answer, and the `base_revision` it was drafted against. A
+proposal can create its destination (`base_revision` 0). `get_proposal` with `review` lists
+what it would do and every violation; `edit_proposal` replaces its whole content, discards it,
+or refreshes it when its destination moved. Applying a proposal is a person's, never yours.

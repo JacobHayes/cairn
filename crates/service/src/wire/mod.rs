@@ -12,9 +12,8 @@ mod users;
 pub use crate::{AgentSignIn, AuthKind, AuthMethod, Capabilities, McpAccess};
 pub use projections::{ChildEntry, History, Mine, NodeDetail, Projected};
 pub use proposals::{
-    DestinationNow, ProposalAnswer, ProposalApply, ProposalCreate, ProposalCursor, ProposalEdit,
-    ProposalList, ProposalReview, ProposalStep, ProposalSummary, RouteImport, SaveAsRouteRequest,
-    StaleBase,
+    DestinationNow, ProposalAnswer, ProposalApply, ProposalCursor, ProposalEdit, ProposalList,
+    ProposalReview, ProposalStep, ProposalSummary, RouteImport, StaleBase,
 };
 pub use reads::{
     EventPage, IdentityReferences, JourneyMatches, JourneyPage, JourneySummary, LoggedEvent,
@@ -27,7 +26,8 @@ pub use users::{
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    Consequences, JourneyId, Markdown, Notice, Patch, PatchReceipt, Revision, RevisionOf,
+    Consequences, JourneyId, Markdown, Notice, Patch, PatchReceipt, ProposalId, Revision,
+    RevisionOf,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -40,9 +40,29 @@ use serde::{Deserialize, Serialize};
 pub struct PatchRequest {
     /// The patch; its target must be the path's domain.
     pub patch: Patch,
-    /// A note for each of its events.
+    /// A note for each of its events; the title of a proposal this patch creates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<Markdown>,
+    // PRD: I6.
+    /// Write the patch into the proposal with this id, instead of applying it: a new id
+    /// creates the proposal (titled by the note), an open proposal's id adds the patch's
+    /// mutations to it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposal: Option<ProposalId>,
+    /// With `proposal`, when it exists: its editing revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposal_revision: Option<Revision>,
+}
+
+// PRD: A17, I6.
+/// What a submitted patch answers: its own answer, or with `proposal`, the proposal's.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum PatchSubmitted {
+    /// The patch was applied, or answered from its receipt.
+    Patch(PatchAnswer),
+    /// The patch was written to a proposal.
+    Proposal(ProposalAnswer),
 }
 
 // PRD: A17, H5, D7.

@@ -3,10 +3,8 @@
 // other refusal is a failure with the server's problem or text.
 import type { Client } from "openapi-fetch";
 
-import type { components, paths } from "../generated/api.ts";
-import type { Answered, Patch, Rejection, Send } from "./patch.ts";
-
-type Markdown = components["schemas"]["Markdown"];
+import type { paths } from "../generated/api.ts";
+import type { Answered, Patch, PatchExtras, PatchSubmitted, Rejection, Send } from "./patch.ts";
 
 /** Why a request did not get an answer: the status (0 when none came) and what was said. */
 export interface HttpFailure {
@@ -38,8 +36,8 @@ export function rejectionOf(status: number, body: unknown): Rejection | undefine
   return undefined;
 }
 
-async function post(client: Client<paths>, patch: Patch, note: Markdown | undefined) {
-  const body = note === undefined ? { patch } : { patch, note };
+async function post(client: Client<paths>, patch: Patch, extras: PatchExtras) {
+  const body = { patch, ...extras };
   const target = patch.target;
   if (target === "deployment") {
     return client.POST("/api/deployment/patches", { body });
@@ -53,12 +51,12 @@ async function post(client: Client<paths>, patch: Patch, note: Markdown | undefi
   return undefined;
 }
 
-/** Sends patches to the server `client` talks to, each with `note` on its events (J1). */
-export function sendOver(client: Client<paths>, note?: Markdown): Send<HttpFailure> {
-  return async (patch): Promise<Answered<HttpFailure>> => {
+/** Sends patches to the server `client` talks to, each with `extras`: a note on its events (J1), or the proposal it is written to (I6). */
+export function sendOver(client: Client<paths>, extras: PatchExtras = {}): Send<HttpFailure> {
+  return async (patch): Promise<Answered<HttpFailure, PatchSubmitted>> => {
     let reply;
     try {
-      reply = await post(client, patch, note);
+      reply = await post(client, patch, extras);
     } catch (thrown) {
       return { outcome: "failed", error: networkFailure(thrown) };
     }

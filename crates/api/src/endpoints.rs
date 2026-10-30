@@ -122,21 +122,6 @@ pub static PATCH_ROUTE: Endpoint = endpoint(Method::POST, "/api/routes/{id}/patc
 /// `POST /api/deployment/patches`: a deployment patch (identities, merges).
 pub static PATCH_DEPLOYMENT: Endpoint =
     endpoint(Method::POST, "/api/deployment/patches", "patchDeployment");
-/// `POST /api/journeys/{id}/proposals`: a proposal for a journey, which may not exist yet (I6).
-pub static PROPOSE_JOURNEY: Endpoint = endpoint(
-    Method::POST,
-    "/api/journeys/{id}/proposals",
-    "proposeToJourney",
-);
-/// `POST /api/routes/{id}/proposals`: a proposal for a route, which may not exist yet (I6).
-pub static PROPOSE_ROUTE: Endpoint =
-    endpoint(Method::POST, "/api/routes/{id}/proposals", "proposeToRoute");
-/// `POST /api/deployment/proposals`: a proposal for the deployment (I6).
-pub static PROPOSE_DEPLOYMENT: Endpoint = endpoint(
-    Method::POST,
-    "/api/deployment/proposals",
-    "proposeToDeployment",
-);
 /// A destination's endpoints for the proposals under it, which are addressed under it (I6):
 /// the open ones listed, and each read, edited, previewed, applied, discarded, and refreshed
 /// at `/proposals/{proposal}`.
@@ -230,12 +215,6 @@ pub static DEPLOYMENT_PROPOSALS: ProposalEndpoints =
 /// destination holds: those waiting on the caller, and those that would create a journey or
 /// a route. A collection only; no proposal is addressed here (C14, C16).
 pub static PROPOSALS: Endpoint = endpoint(Method::GET, "/api/proposals", "listProposals");
-/// `POST /api/journeys/{id}/save-as-route`: proposes saving its structure as a route draft (B8).
-pub static SAVE_AS_ROUTE: Endpoint = endpoint(
-    Method::POST,
-    "/api/journeys/{id}/save-as-route",
-    "proposeSaveAsRoute",
-);
 /// `POST /api/routes/{id}/import`: imports a route file as a new route or draft (A13).
 pub static IMPORT_ROUTE: Endpoint =
     endpoint(Method::POST, "/api/routes/{id}/import", "importRoute");
@@ -383,15 +362,12 @@ pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = for_users(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 70] = [
+pub static ALL: [&Endpoint; 66] = [
     &HEALTH,
     &CAPABILITIES,
     &PATCH_JOURNEY,
     &PATCH_ROUTE,
     &PATCH_DEPLOYMENT,
-    &PROPOSE_JOURNEY,
-    &PROPOSE_ROUTE,
-    &PROPOSE_DEPLOYMENT,
     &JOURNEY_PROPOSALS.list,
     &JOURNEY_PROPOSALS.get,
     &JOURNEY_PROPOSALS.edit,
@@ -414,7 +390,6 @@ pub static ALL: [&Endpoint; 70] = [
     &DEPLOYMENT_PROPOSALS.discard,
     &DEPLOYMENT_PROPOSALS.refresh,
     &PROPOSALS,
-    &SAVE_AS_ROUTE,
     &IMPORT_ROUTE,
     &EXPORT_ROUTE,
     &JOURNEYS,

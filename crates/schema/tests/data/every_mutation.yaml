@@ -268,6 +268,13 @@ mutations:
   proposal:
     title: Add a review step
     destination_revision: 7
+- op: extend_proposal
+  destination_revision: 7
+  mutations:
+  - op: add_edge
+    edge:
+      node: n_review
+      requires: n_plan
 - op: apply_proposal
   proposal: pr_review
   reviewed_revision: 2

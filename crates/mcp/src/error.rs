@@ -227,6 +227,7 @@ impl From<ProposeError> for ToolError {
                 message: error.to_string(),
             },
             ProposeError::CannotDraft(error) => ToolError::refused(error),
+            ProposeError::Refused { path, message } => ToolError::Arguments { path, message },
             ProposeError::Write(error) => error.into(),
         }
     }

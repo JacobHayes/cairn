@@ -6,6 +6,8 @@
 import { OWNER_KIND } from "@cairn/client";
 import { useId, useState } from "react";
 
+import { Check } from "../acting/Controls.tsx";
+
 import { ENGINE_CHECK } from "../data/checks.ts";
 import { useDraft } from "../data/drafts.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
@@ -186,6 +188,7 @@ export function Breakdown({ authored, node }: NodeEditorProps) {
   const checks = useValueProblems(pieces.flatMap((piece, at) => (piece.title.trim() === "" ? [] : [{ field: String(at), kind: "title" as const, what: "A title", value: piece.title.trim() }])));
   const problem = Object.values(checks.problems).find((each) => each !== undefined);
   const message = useId();
+  const [proposing = false, setProposing] = useDraft<boolean>(`propose:${domainOf(authored)}:${node.key}`);
   const atomic = authored.graph.state?.nodes?.[node.key]?.atomic === true;
   const children = childrenOf(authored.tree, node.key).length;
   if (!canHoldChildren(node.kind) || node.kind === "group") {
@@ -200,10 +203,11 @@ export function Breakdown({ authored, node }: NodeEditorProps) {
         <Button
           primary
           disabled={write.disabled || filled.length === 0 || !checks.checked || problem !== undefined}
-          onClick={() => void write.run(breakdownMutations(authored, node.key, filled)).then((landed) => { if (landed) { setPieces(undefined); } })}
+          onClick={() => void write.run(breakdownMutations(authored, node.key, filled), undefined, proposing ? `Break down ${node.title}` : undefined).then((landed) => { if (landed) { setPieces(undefined); setProposing(undefined); } })}
         >
-          Break it down
+          {proposing ? "Propose the breakdown" : "Break it down"}
         </Button>
+        <Check label="Propose instead" checked={proposing} onChange={(next) => { setProposing(next ? true : undefined); }} testId="propose-instead" />
         {isJourney(authored) && node.placeholder === true ? (
           <Button disabled={write.disabled} onClick={() => void write.run([{ op: "set_atomic", node: node.key, atomic: !atomic }])}>
             {atomic ? "Needs breaking down after all" : "Mark atomic: nothing to break down"}

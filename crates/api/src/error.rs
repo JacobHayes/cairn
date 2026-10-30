@@ -166,6 +166,9 @@ impl From<ProposeError> for ApiError {
             ProposeError::CannotDraft(error) => {
                 ApiError::problem(ProblemCode::CannotDraft, error.to_string())
             }
+            ProposeError::Refused { path, message } => {
+                ApiError::problem(ProblemCode::BadRequest, format!("{path}: {message}"))
+            }
             ProposeError::Write(error) => error.into(),
         }
     }
