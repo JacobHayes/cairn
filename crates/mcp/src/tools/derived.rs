@@ -433,7 +433,7 @@ pub(crate) struct LeanDates {
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct LatestStart {
     /// The date.
-    date: Date,
+    date: When,
     /// The chain that produced it, when it differs from the due chain.
     #[serde(skip_serializing_if = "Option::is_none")]
     chain: Option<Chain>,

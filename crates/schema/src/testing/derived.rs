@@ -87,7 +87,7 @@ pub fn arb_chain() -> BoxedStrategy<Chain> {
         );
     let fixed = (
         arb_instant(),
-        arb_date(),
+        arb_when(),
         prop::sample::select(vec![
             FixedBy::Pin,
             FixedBy::Actual,
@@ -272,7 +272,7 @@ fn arb_date_link() -> BoxedStrategy<DateLink> {
 
 fn arb_node_dates() -> BoxedStrategy<NodeDates> {
     let bound = || {
-        prop::option::of((arb_date(), arb_chain()).prop_map(|(date, chain)| Bound { date, chain }))
+        prop::option::of((arb_when(), arb_chain()).prop_map(|(date, chain)| Bound { date, chain }))
     };
     (
         bound(),
@@ -576,10 +576,15 @@ fn arb_stalled() -> BoxedStrategy<Stalled> {
             }
         }),
     ];
-    (prop::collection::vec(cause, 1..3), any::<bool>())
-        .prop_map(|(waiting_on, all_blocked)| Stalled {
+    (
+        prop::collection::vec(cause, 1..3),
+        any::<bool>(),
+        prop::option::of(arb_when()),
+    )
+        .prop_map(|(waiting_on, all_blocked, sleeps_past)| Stalled {
             waiting_on,
             all_blocked,
+            sleeps_past,
         })
         .boxed()
 }
@@ -596,6 +601,7 @@ pub fn arb_derived() -> BoxedStrategy<Derived> {
         prop::option::of(arb_stalled()),
         prop::collection::vec(arb_node_key(), 0..3),
         prop::option::of(arb_node_key()),
+        prop::collection::vec(arb_node_key(), 0..3),
     )
         .prop_map(
             |(
@@ -608,6 +614,7 @@ pub fn arb_derived() -> BoxedStrategy<Derived> {
                 stalled,
                 current_stages,
                 final_milestone,
+                plan_order,
             )| {
                 Derived {
                     today,
@@ -619,6 +626,7 @@ pub fn arb_derived() -> BoxedStrategy<Derived> {
                     stalled,
                     current_stages,
                     final_milestone,
+                    plan_order,
                 }
             },
         )

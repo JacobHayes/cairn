@@ -36,7 +36,7 @@ fn dates_of(records: &Records, node: &str) -> NodeDates {
 }
 
 fn bound(found: Option<&cairn_schema::Bound>) -> Option<Date> {
-    found.map(|bound| bound.date)
+    found.map(|bound| bound.date.day())
 }
 
 /// What fixes a chain's ends.
@@ -127,7 +127,7 @@ fn the_examples_report_is_due_by_its_chain() {
     let report = derived.dates().node(&graph, &key("n_final_report"));
     assert_eq!(bound(report.due.as_ref()), Some(date("2026-11-20")));
     let latest = report.latest_start.unwrap();
-    assert_eq!(latest.date, date("2026-11-17"));
+    assert_eq!(latest.date.day(), date("2026-11-17"));
     let sources: Vec<_> = latest
         .chain
         .constraints
@@ -153,7 +153,7 @@ fn the_examples_report_is_due_by_its_chain() {
         ]
     );
     let end = latest.chain.fixed.last().unwrap();
-    assert_eq!(end.date, date("2026-11-20"));
+    assert_eq!(end.date.day(), date("2026-11-20"));
     assert_eq!(end.fixed_by, FixedBy::Pin);
     let meeting = derived
         .dates()
@@ -405,7 +405,7 @@ fn unrelated_pinned_chains_stay_apart() {
         ("n_right_work", "n_right", "2026-12-01"),
     ] {
         let found = dates_of(&records, work).due.unwrap();
-        assert_eq!(found.date, date(due));
+        assert_eq!(found.date.day(), date(due));
         let pins: Vec<_> = found
             .chain
             .fixed

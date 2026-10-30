@@ -528,7 +528,7 @@ test("The journey card's Stages list: a row per stage, choosing one selects and 
   const stages = page.getByTestId("card-stages");
   await stages.locator("summary").click();
   await expect(stages.getByTestId("stage-row")).toHaveCount(3);
-  for (const [at, key] of ["n_build", "n_beta", "n_materials"].entries()) {
+  for (const [at, key] of ["n_build", "n_materials", "n_beta"].entries()) {
     await expect(stages.getByTestId("stage-row").nth(at)).toHaveAttribute("data-node", key);
   }
   // Pointing at a row outlines its stage, and leaving it takes the outline away.

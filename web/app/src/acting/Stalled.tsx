@@ -9,7 +9,7 @@ import { ACT_LABELS } from "../detail/offers.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { SNOOZE_NODE_TAIL, snoozeEndWords } from "../status/snooze.ts";
-import { compareWhen, dateInk, dateWords, inkClass, whenWords } from "../status/when.ts";
+import { dateInk, dateWords, inkClass, whenWords } from "../status/when.ts";
 import { Button } from "../ui/kit.tsx";
 import { NodeLink } from "../detail/parts.tsx";
 
@@ -24,7 +24,7 @@ type Cause = NonNullable<Ready["derived"]["stalled"]>["waiting_on"][number];
 function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrite; cause: Cause; reach: Reach }) {
   const { today } = view.derived;
   const title = (node: string) => <NodeLink view={view} node={node} {...(reach.nodeTo === undefined ? {} : { to: reach.nodeTo(node) })} />;
-  const inkOf = (date: string) => inkClass(dateInk(date, today));
+  const inkOf = (date: string) => inkClass(dateInk(date, today, undefined));
   if ("gate" in cause) {
     return (
       <li className="stall-cause" data-testid="stall-cause" data-status="gate" data-node={cause.gate}>
@@ -59,7 +59,7 @@ function ScheduledLine({ view, write, cause, title, inkOf }: { view: Ready; writ
   const { node, date, marks_itself_done: marks } = cause;
   const kind = nodeOf(view, node)?.kind;
   const act = kind === "milestone" ? "done" : kind === "deliverable" || kind === "action" ? "start" : undefined;
-  const when = kind === "milestone" ? `${marks === true ? "marks itself done " : ""}${whenWords(date, undefined, today)}` : `not before ${dateWords(date, today)}`;
+  const when = kind === "milestone" ? `${marks === true ? "marks itself done " : ""}${whenWords(date, undefined, today, undefined)}` : `not before ${dateWords(date, today)}`;
   return (
     <li className="stall-cause" data-testid="stall-cause" data-status="scheduled" data-node={node}>
       <span>{title(node)} <span className={inkOf(date) ?? "muted"}>· {when}</span></span>
@@ -72,18 +72,13 @@ function ScheduledLine({ view, write, cause, title, inkOf }: { view: Ready; writ
   );
 }
 
-/** Whether every cause is a snooze to a date after `endDate`: the journey sleeps past its end. */
-function pastEnd(causes: Cause[], endDate: string | undefined): boolean {
-  return endDate !== undefined && causes.length > 0 && causes.every((cause) => "snooze" in cause && "date" in cause.snooze.until && compareWhen(cause.snooze.until.date, endDate) > 0);
-}
-
 /**
  * D5: the stalled diagnostic, or nothing when the journey is not stalled. `nodeTo` makes each
  * title lead to that address (the Summary's); where the page offers no write the causes are
- * listed without their actions. With `endDate` (the final milestone's), snoozes that run past
- * it are said to.
+ * listed without their actions. When the engine says every snooze runs past the final
+ * milestone, so it is said.
  */
-export function StalledPanel({ view, nodeTo, endDate }: { view: Ready; nodeTo?: (node: string) => string; endDate?: string | undefined }) {
+export function StalledPanel({ view, nodeTo }: { view: Ready; nodeTo?: (node: string) => string }) {
   const write = useNodeWrite(view, "stalled");
   const stalled = view.derived.stalled;
   if (stalled == null) {
@@ -95,7 +90,7 @@ export function StalledPanel({ view, nodeTo, endDate }: { view: Ready; nodeTo?: 
         <strong>Nothing is ready yet. Waiting on:</strong>
       </p>
       {stalled.all_blocked === true ? <span>Every remaining node is blocked.</span> : null}
-      {pastEnd(stalled.waiting_on, endDate) ? <span>Every snooze runs past the final milestone ({dateWords(endDate ?? "", view.derived.today)}), so the journey cannot reach it as things stand.</span> : null}
+      {stalled.sleeps_past == null ? null : <span>Every snooze runs past the final milestone ({dateWords(stalled.sleeps_past, view.derived.today)}), so the journey cannot reach it as things stand.</span>}
       <ul className="stall-causes">
         {stalled.waiting_on.map((cause) => (
           <CauseLine key={JSON.stringify(cause)} view={view} write={write} cause={cause} reach={{ nodeTo }} />

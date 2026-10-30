@@ -43,8 +43,8 @@ const withoutFinal: Timeline = {
 
 describe("C13: the end anchor", () => {
   it("is the final milestone at its date, even with a pin after it", () => {
-    expect(endAnchor(withFinal)).toEqual({ node: "n_meeting", day: dayOf("2026-11-20") });
-    expect(timelineAxis(withFinal, today).anchor).toEqual({ node: "n_meeting", day: dayOf("2026-11-20") });
+    expect(endAnchor(withFinal)).toEqual({ node: "n_meeting", day: dayOf("2026-11-20"), date: "2026-11-20" });
+    expect(timelineAxis(withFinal, today).anchor).toEqual({ node: "n_meeting", day: dayOf("2026-11-20"), date: "2026-11-20" });
   });
 
   it("is none without a final milestone, and the axis still ends after the latest date", () => {

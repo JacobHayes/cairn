@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { CountingClock, FakeDeriver, FakeHost, deferred, settled } from "./fake.test-support.ts";
 import { PARKED_JOURNEY_COUNT_MAX, journeyView, lagOf } from "./journeys.ts";
 import { Session } from "./session.ts";
-import { ROLLOVER_CHECK_MS } from "./today.ts";
+import { HOLDS_RETRY_MS, ROLLOVER_CHECK_MS } from "./today.ts";
 
 const TODAY = "2026-10-06";
 
@@ -323,6 +323,36 @@ describe("a journey deleted during a derive", () => {
     clock.increment(60_000);
     await turn();
     expect(host.fetches.get("j_one")).toBe(fetched);
+  });
+});
+
+describe("a derivation that holds until a time of day", () => {
+  it("is refetched at that moment, not at the next rollover check", async () => {
+    const { host, deriver, mount, turn, clock } = await started();
+    deriver.holdsUntil = `${TODAY}T12:00:20Z`;
+    mount("j_one");
+    await turn();
+    expect(host.fetches.get("j_one")).toBe(1);
+    clock.increment(19_999);
+    await turn();
+    expect(host.fetches.get("j_one")).toBe(1);
+    clock.increment(1);
+    await turn();
+    expect(host.fetches.get("j_one")).toBe(2);
+  });
+});
+
+describe("a derivation whose refetch at its moment failed", () => {
+  it("is not asked for again on the moment's own timer, only on the read's retry terms", async () => {
+    const { host, deriver, mount, turn, clock } = await started();
+    deriver.holdsUntil = `${TODAY}T12:00:20Z`;
+    mount("j_one");
+    await turn();
+    host.failNext = true;
+    clock.increment(20_000);
+    await turn();
+    expect(host.fetches.get("j_one")).toBe(2);
+    expect(clock.pending).not.toContain(HOLDS_RETRY_MS);
   });
 });
 

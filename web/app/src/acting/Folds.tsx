@@ -12,11 +12,11 @@ import { Link } from "react-router";
 import { ActButton } from "../detail/ActButton.tsx";
 import { newAttachmentKey } from "../detail/Attachments.tsx";
 import { namer, staleText } from "../detail/explain.ts";
-import { itemTitle, titleOf, type Ready, type Mutation } from "../detail/model.ts";
+import { itemTitle, lateOf, titleOf, type Ready, type Mutation } from "../detail/model.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
-import { daysUntil, daysWords, lateWords } from "../status/when.ts";
+import { daysWords, lateWords } from "../status/when.ts";
 import { upperFirst } from "../status/words.ts";
 import { Button } from "../ui/kit.tsx";
 import type { ListFlag } from "./address.ts";
@@ -119,7 +119,7 @@ function looksOf(view: Ready, stale: NodeRow[], short: NodeRow[], lapsed: NodeRo
     add({ row, reason: `${daysWords(row.shortfall_days ?? 0)} short of its plan`, fix: "open" });
   }
   for (const row of lapsed) {
-    const late = row.due == null ? undefined : -daysUntil(row.due, view.derived.today);
+    const late = lateOf(view, row.key);
     add({ row, reason: late === undefined ? "Snoozed, and overdue" : `Snoozed, and ${lateWords(late)}`, fix: "unsnooze" });
   }
   return [...found.values()];

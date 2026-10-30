@@ -50,7 +50,7 @@ impl DerivedJourney<'_> {
             needs_breakdown: blocking.needs_breakdown(key),
             shortfall_days: dates.shortfall_days(key),
             slack_days: dates.slack_days(key),
-            due: dates.due(key),
+            due: dates.due_when(key),
             gravity: priority.gravity(key),
             unlocks: priority.unlocks(key),
             rank: derived

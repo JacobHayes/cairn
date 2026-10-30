@@ -626,6 +626,21 @@ impl Dates {
         self.solved.latest(self.network.finish(at)).map(date)
     }
 
+    /// F3: the node's due date as it is shown: with its time when its own pin sets one on that
+    /// day, else the day.
+    #[must_use]
+    pub fn due_when(&self, key: &NodeKey) -> Option<When> {
+        let at = self.index(key)?;
+        let finish = self.network.finish(at);
+        let due = self.solved.latest(finish)?;
+        let moment = self
+            .seeds
+            .pin(finish)
+            .filter(|pin| pin.day == due)
+            .and_then(|pin| pin.moment);
+        Some(moment.unwrap_or_else(|| When::Day(date(due))))
+    }
+
     /// F3: latest start minus today; none is "no deadline". Work whose start is a fact is
     /// judged by its finish (F4, F6): its slack is its due date minus today.
     #[must_use]
@@ -764,7 +779,7 @@ impl Dates {
         let (start, finish) = (self.network.start(at), self.network.finish(at));
         let bound = |day: Option<i32>, found: Found| {
             day.map(|day| Bound {
-                date: date(day),
+                date: When::Day(date(day)),
                 chain: explain.chain(&found),
             })
         };
@@ -782,7 +797,11 @@ impl Dates {
             due: bound(
                 self.solved.latest(finish),
                 self.solved.latest_chain(&self.network, finish),
-            ),
+            )
+            .map(|due| Bound {
+                date: self.due_when(key).unwrap_or(due.date),
+                ..due
+            }),
             slack_days: self.slack_days(key),
             overdue_days: self.overdue_days(key),
             shortfall,

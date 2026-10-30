@@ -47,11 +47,11 @@ const whole = model(wholeLevel());
 describe("C1: what a card says", () => {
   test("a card's foot gives the one date in words, and its owner only when it is the viewer's or missing", () => {
     const mine = model(wholeLevel(), [], ["n_choose"]);
-    expect(card(mine, "n_choose").journey?.foot).toEqual({ words: dueWords("2026-10-09", "2026-10-06", true), tone: "warn" });
+    expect(card(mine, "n_choose").journey?.foot).toEqual({ words: dueWords("2026-10-09", "2026-10-06", true, undefined), tone: "warn" });
     expect(card(mine, "n_choose").journey?.owner).toEqual({ words: "You", missing: false });
     // Owned by someone else: the owner is not on the card.
     expect(card(whole, "n_build").journey?.owner).toBeUndefined();
-    expect(card(whole, "n_build").journey?.foot).toEqual({ words: dueWords("2026-10-01", "2026-10-06"), tone: "bad" });
+    expect(card(whole, "n_build").journey?.foot).toEqual({ words: dueWords("2026-10-01", "2026-10-06", false, 5), tone: "bad" });
     const unowned = changed((each) => {
       derivedOf(each, "n_check").unassigned = true;
     });

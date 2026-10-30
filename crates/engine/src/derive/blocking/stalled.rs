@@ -22,7 +22,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use cairn_schema::{NodeKey, NodeKind, SnoozeTarget, StallCause, Stalled};
+use cairn_schema::{NodeKey, NodeKind, Payload, SnoozeTarget, StallCause, Stalled, When};
 
 use super::{Blocking, Sweep};
 
@@ -75,9 +75,25 @@ pub(super) fn diagnose(blocking: &Blocking, sweep: &Sweep<'_>) -> Option<Stalled
         "a stalled journey with an open node it can reach names what it waits on"
     );
     Some(Stalled {
+        sleeps_past: sleeps_past(blocking, sweep, &waiting_on),
         waiting_on,
         all_blocked,
     })
+}
+
+/// The final milestone's date, when it is still to do and every cause of the stall is a snooze
+/// to a date after it: the journey sleeps past its end.
+fn sleeps_past(blocking: &Blocking, sweep: &Sweep<'_>, waiting_on: &[StallCause]) -> Option<When> {
+    let end = sweep.graph.document().nodes.values().find(|node| {
+        matches!(&node.payload, Payload::Milestone(milestone) if milestone.is_final)
+            && blocking.open(&node.key)
+    })?;
+    let end = sweep.dates.effective_date(&end.key)?.date;
+    (!waiting_on.is_empty()
+        && waiting_on.iter().all(|cause| {
+            matches!(cause, StallCause::Snooze { until: SnoozeTarget::Date(until), .. } if *until > end)
+        }))
+    .then_some(end)
 }
 
 /// Each hold on a frontier node, once, by the node it names: a held node, or the container

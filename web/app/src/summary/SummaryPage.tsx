@@ -69,12 +69,12 @@ function MilestoneWhen({ ready, line }: { ready: Ready; line: MilestoneLine }) {
   }
   // F1: a milestone that marks itself done and whose date has passed is done, whatever its date came from.
   const done = line.done;
-  const ink = done ? undefined : inkClass(dateInk(line.date, today));
+  const ink = done ? undefined : inkClass(dateInk(line.date, today, line.late));
   const origin = line.origin === undefined ? undefined : originWord(line.origin);
   return (
     <>
       <Tip tip={origin === undefined ? undefined : `This date is ${origin}`} tap>
-        <span className={ink}>{whenWords(line.date, done ? "actual" : line.origin, today)}</span>
+        <span className={ink}>{whenWords(line.date, done ? "actual" : line.origin, today, line.late)}</span>
       </Tip>
       .
       {line.shortfallDays === undefined ? null : <span className="ink-bad">{` ${shortfallWords(line.shortfallDays)}.`}</span>}
@@ -128,7 +128,7 @@ function Lead({ ready, model, note }: { ready: Ready; model: SummaryModel; note:
           {line.role === "final" ? (active ? "Final milestone" : "Planned final milestone") : "Next milestone"}: <Link to={nodeAddress(journey, line.key)}>{line.title}</Link>, <MilestoneWhen ready={ready} line={line} />
         </p>
       )}
-      {stalled ? <StalledPanel view={ready} nodeTo={(node) => nodeAddress(journey, node)} endDate={line?.role === "final" && !line.done ? line.date : undefined} /> : null}
+      {stalled ? <StalledPanel view={ready} nodeTo={(node) => nodeAddress(journey, node)} /> : null}
       {note}
     </section>
   );
@@ -156,7 +156,7 @@ function Dates({ ready, model, skip }: { ready: Ready; model: SummaryModel; skip
               {each.title}
             </Link>
             <Tip tip={`This date is ${originWord(each.origin)}`} tap>
-              <span className={`summary-date-when ${inkClass(dateInk(each.date, today)) ?? "muted"}`}>{whenWords(each.date, each.origin, today)}</span>
+              <span className={`summary-date-when ${inkClass(dateInk(each.date, today, each.late)) ?? "muted"}`}>{whenWords(each.date, each.origin, today, each.late)}</span>
             </Tip>
             {short === undefined ? null : <span className="ink-bad summary-date-short">{shortfallWords(short)}</span>}
           </li>

@@ -171,7 +171,7 @@ impl Explain<'_> {
     fn fixed(&self, slot: Slot, fix: Fix) -> FixedDate {
         FixedDate {
             instant: self.instant(slot),
-            date: date(fix.day),
+            date: fix.moment.unwrap_or_else(|| When::Day(date(fix.day))),
             fixed_by: fix.by,
         }
     }

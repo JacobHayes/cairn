@@ -1172,11 +1172,8 @@ export interface components {
         Bound: {
             /** @description The chain from a pin, actual, or today that produced it. */
             chain: components["schemas"]["Chain"];
-            /**
-             * Format: date
-             * @description The date.
-             */
-            date: string;
+            /** @description The date; a due date carries its time when the node's own pin sets one on that day. */
+            date: components["schemas"]["When"];
         };
         /**
          * @description A guard bypass as stored, written by a completion that went ahead anyway: why when a
@@ -1705,6 +1702,12 @@ export interface components {
              * @description The moment it was derived for.
              */
             now: string;
+            /**
+             * @description Every node in plan order: each container before what it holds, its children soonest
+             *     first (a container by the soonest thing beneath it), those without a date after those
+             *     with one, the final milestone last, and key order between any two that tie.
+             */
+            plan_order?: components["schemas"]["NodeKey"][];
             /** @description The stalled diagnostic, when stalled. */
             stalled?: components["schemas"]["Stalled"] | null;
             /**
@@ -1947,11 +1950,8 @@ export interface components {
         FixedBy: "pin" | "actual" | "answer" | "today";
         /** @description A date fixed on a chain. */
         FixedDate: {
-            /**
-             * Format: date
-             * @description The date.
-             */
-            date: string;
+            /** @description The date, with its time when a pin or an answer gives one. */
+            date: components["schemas"]["When"];
             /** @description A pin or an actual. */
             fixed_by: components["schemas"]["FixedBy"];
             /** @description The instant. */
@@ -3501,11 +3501,8 @@ export interface components {
             checklist_count?: components["schemas"]["ChecklistCount"] | null;
             /** @description The state every surface shows for the node. */
             display_state: components["schemas"]["DisplayState"];
-            /**
-             * Format: date
-             * @description The latest it can finish.
-             */
-            due?: string | null;
+            /** @description The latest it can finish. */
+            due?: components["schemas"]["When"] | null;
             /** @description Skipped through an ancestor. */
             effectively_skipped?: boolean;
             /** @description Gravity. */
@@ -5069,6 +5066,11 @@ export interface components {
         Stalled: {
             /** @description Every in-scope non-terminal node is blocked: shown as "blocked". */
             all_blocked?: boolean;
+            /**
+             * @description The final milestone's date, when every cause is a snooze to a date after it: the
+             *     journey sleeps past its end.
+             */
+            sleeps_past?: components["schemas"]["When"] | null;
             /** @description What it waits on. */
             waiting_on: components["schemas"]["StallCause"][];
         };

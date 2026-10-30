@@ -20,7 +20,8 @@ import type { AddressName } from "../src/address.ts";
 import { JOURNEY_OFFERS, ROUTE_OFFERS } from "../src/journeys/view.ts";
 import { openJourneyCard } from "./around.ts";
 import { draftBreakdown, reviewOpen } from "./proposals.ts";
-import { holdToday, nodeCard, nodePanel, open, openAt, reachCard, settled } from "./shell.ts";
+import { section } from "./detail.ts";
+import { holdToday, menuItem, nodeCard, nodePanel, open, openAt, reachCard, settled, whenSettled } from "./shell.ts";
 
 /** What the walk reaches states of: the journey and the route it opens, a node and an edge both have, an identity, and the proposals `seedProposals` made. */
 export interface Subject {
@@ -31,6 +32,8 @@ export interface Subject {
   identity: string;
   /** The proposals `seedProposals` drafted; none until it has run. */
   proposals?: Proposals;
+  /** Whether `seedTimes` has set the times of day; false until it has run. */
+  timed?: boolean;
 }
 
 /** The ids of the two proposals `seedProposals` drafted: the journey's breakdown, and its saving as the route `savedRoute`. */
@@ -54,6 +57,8 @@ export interface State {
   ready: (page: Page, on: Subject) => Locator;
   /** Narrows it to one width: a phone's Controls menu is not on a desktop. */
   only?: "desktop" | "phone";
+  /** It shows the times of day `seedTimes` sets, so the walk sets them before it. */
+  timed?: true;
 }
 
 /** The journey screen `view` of `journey`, with `node` open beside it when given. */
@@ -115,6 +120,104 @@ function routeReady(page: Page, view: string): Locator {
 
 const inspector = (page: Page) => page.locator(".inspector");
 
+/** The window the authoring forms (and so the drafting of proposals) need, which is a desktop's. */
+const DRAFTING_WINDOW = { width: 1440, height: 900 };
+
+/** The nodes the times of day are set on, the times (in the deployment's zone), and the day the walk holds. */
+const TIMED = { pin: "n_final_report", answer: "n_meeting_date", snooze: "n_final_review" } as const;
+const TIMES = { pin: { day: "2026-10-26", time: "09:30" }, answer: { day: "2026-11-18", time: "09:45" }, snooze: { day: "2026-10-28", time: "16:00" } } as const;
+
+/** Node `node`'s inspector in the list of `journey`. */
+async function inspectorOf(page: Page, journey: string, node: string): Promise<Locator> {
+  await journeyAt(page, journey, "list", node);
+  const panel = nodePanel(page, node);
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
+/** Node `node`'s inspector with any form a state before left open put away. */
+function settledInspector(page: Page, journey: string, node: string): Promise<void> {
+  return inDraftingWindow(page, async () => {
+    const panel = await inspectorOf(page, journey, node);
+    for (const form of ["pin-form", "snooze"]) {
+      const cancel = panel.getByTestId(form).getByRole("button", { name: "Cancel" });
+      if ((await whenSettled(page, () => cancel.count())) > 0) {
+        await cancel.click();
+      }
+    }
+  });
+}
+
+/** Runs `enter` in a desktop-sized window, where the forms can be reached at every width, and leaves the page at the size it had: the drafts it makes stay open. */
+async function inDraftingWindow(page: Page, enter: () => Promise<void>): Promise<void> {
+  const size = page.viewportSize();
+  await page.setViewportSize(DRAFTING_WINDOW);
+  await enter();
+  if (size !== null) {
+    await page.setViewportSize(size);
+  }
+}
+
+/** The pin form of the final report with the day and time entered; saved when `save`. */
+function enterPin(page: Page, on: Subject, save: boolean): Promise<void> {
+  return inDraftingWindow(page, () => pinTime(page, on, save));
+}
+
+async function pinTime(page: Page, on: Subject, save: boolean): Promise<void> {
+  const panel = await inspectorOf(page, on.journey, TIMED.pin);
+  const editor = (await section(panel, "dates")).getByTestId("pin");
+  if ((await whenSettled(page, () => editor.getByTestId("pin-form").count())) === 0) {
+    await editor.getByRole("button", { name: /^(Pin a date|Change the pin)$/ }).click();
+  }
+  await editor.getByLabel("Pin date", { exact: true }).fill(TIMES.pin.day);
+  await editor.getByLabel("Pin date, time of day").fill(TIMES.pin.time);
+  if (save) {
+    await editor.getByTestId("pin-form").getByRole("button", { name: "Save" }).click();
+    await expect(editor.getByTestId("pin-form")).toHaveCount(0);
+  }
+}
+
+/** The meeting date's answer with the day and time entered; saved when `save`. */
+function enterAnswer(page: Page, on: Subject, save: boolean): Promise<void> {
+  return inDraftingWindow(page, () => answerTime(page, on, save));
+}
+
+async function answerTime(page: Page, on: Subject, save: boolean): Promise<void> {
+  const panel = await inspectorOf(page, on.journey, TIMED.answer);
+  await panel.getByLabel("Answer", { exact: true }).fill(TIMES.answer.day);
+  await panel.getByLabel("Answer, time of day").fill(TIMES.answer.time);
+  if (save) {
+    await panel.getByRole("button", { name: /^Save/ }).click();
+    await expect(panel.getByRole("button", { name: /^Save/ })).toBeDisabled();
+  }
+}
+
+/** The final review's snooze to a day and time; set when `save`. */
+function enterSnooze(page: Page, on: Subject, save: boolean): Promise<void> {
+  return inDraftingWindow(page, () => snoozeTime(page, on, save));
+}
+
+async function snoozeTime(page: Page, on: Subject, save: boolean): Promise<void> {
+  const panel = await inspectorOf(page, on.journey, TIMED.snooze);
+  if ((await whenSettled(page, () => panel.getByTestId("snooze").count())) === 0) {
+    await menuItem(panel, "snooze");
+  }
+  await panel.getByRole("radio", { name: "A date" }).check();
+  await panel.getByLabel("Snooze until", { exact: true }).fill(TIMES.snooze.day);
+  await panel.getByLabel("Snooze until, time of day").fill(TIMES.snooze.time);
+  if (save) {
+    await panel.getByTestId("snooze").getByRole("button", { name: "Snooze", exact: true }).click();
+    await expect(panel.getByTestId("snooze")).toHaveCount(0);
+  }
+}
+
+/** Sets a pin, an answer and a snooze that carry a time of day on the journey (the pin is already gone by on the held day, so its work reads late today). It edits the journey, so the walk sets them just before the first state that shows them. */
+export async function seedTimes(page: Page, on: Subject): Promise<void> {
+  await enterPin(page, on, true);
+  await enterAnswer(page, on, true);
+  await enterSnooze(page, on, true);
+}
+
 /** The popover states of a journey's list: each opens one control and shows what it holds. */
 const POPOVERS: State[] = (
   [
@@ -175,12 +278,19 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
     ...POPOVERS,
     { name: "stages-open", reach: async (page, on) => { await journeyAt(page, on.journey, "list"); await page.getByTestId("card-stages").locator("summary").click(); }, ready: (page) => page.getByTestId("stage-row").first(), only: "desktop" },
     { name: "frontier", reach: (page, on) => journeyAt(page, on.journey, "list?frontier=1"), ready: (page) => page.getByTestId("list") },
+    { name: "timeline-timed", reach: (page, on) => journeyAt(page, on.journey, "timeline", TIMED.pin), ready: (page) => page.getByTestId("timeline"), timed: true },
     { name: "card-menu", reach: async (page, on) => { await journeyAt(page, on.journey, "graph"); await fitGraph(page); await openCardMenu(page, "n_kickoff"); }, ready: (page) => page.getByTestId("context-menu"), only: "desktop" },
     { name: "controls-menu", reach: async (page, on) => { await journeyAt(page, on.journey, "list"); await openControlsMenu(page); }, ready: (page) => page.getByTestId("controls-panel-phone"), only: "phone" },
   ],
   journeyNode: [
     { name: "list", reach: (page, on) => journeyAt(page, on.journey, "list", on.node), ready: (page) => inspector(page).getByTestId("detail-header") },
     { name: "graph", reach: async (page, on) => { await journeyAt(page, on.journey, "graph", on.node); await fitGraph(page); }, ready: (page, on) => nodePanel(page, on.node) },
+    { name: "pin-time-form", reach: (page, on) => enterPin(page, on, false), ready: (page) => page.getByTestId("pin-form"), only: "desktop" },
+    { name: "answer-time-form", reach: (page, on) => enterAnswer(page, on, false), ready: (page) => nodePanel(page, TIMED.answer).getByLabel("Answer, time of day"), only: "desktop" },
+    { name: "snooze-time-form", reach: (page, on) => enterSnooze(page, on, false), ready: (page) => nodePanel(page, TIMED.snooze).getByTestId("snooze"), only: "desktop" },
+    { name: "pinned-time", reach: async (page, on) => { await settledInspector(page, on.journey, TIMED.pin); await section(nodePanel(page, TIMED.pin), "dates"); }, ready: (page) => nodePanel(page, TIMED.pin).getByTestId("dates"), timed: true },
+    { name: "answered-time", reach: (page, on) => settledInspector(page, on.journey, TIMED.answer), ready: (page) => nodePanel(page, TIMED.answer), timed: true },
+    { name: "snoozed-time", reach: (page, on) => settledInspector(page, on.journey, TIMED.snooze), ready: (page) => nodePanel(page, TIMED.snooze), timed: true },
   ],
   journeyEdge: [{ name: "edge-card", reach: async (page, on) => { await journeyAt(page, on.journey, `graph/edges/${on.edge}`); await fitGraph(page); }, ready: (page) => page.getByTestId("edge-card") }],
   journeyProposals: [{ name: "tab", reach: (page, on) => indexAt(page, `/journeys/${proposalsOf(on).breakdownJourney}/proposals`), ready: (page) => page.getByTestId("proposals-pane") }],
@@ -233,9 +343,6 @@ const WALK_TODAY = "2026-10-26";
 /** The proposal addresses need the proposals drafted, which edits the journey: they come last. */
 const NEEDS_PROPOSALS: readonly AddressName[] = ["journeyProposals", "journeyProposal", "journeyProposalNode", "routeProposal", "routeProposalNode"];
 
-/** The window the authoring forms (and so the drafting of proposals) need, which is a desktop's. */
-const DRAFTING_WINDOW = { width: 1440, height: 900 };
-
 /**
  * Visits every state of the table that `phone` (or a desktop) reaches, in the window `size` that
  * the caller set on `page` (its theme and touch are the caller's too): the page at Home on the
@@ -262,6 +369,10 @@ export async function walkStates(
     }
     for (const state of SCREENS[address].filter((each: State) => each.only === undefined || each.only === (phone ? "phone" : "desktop"))) {
       try {
+        if (state.timed === true && on.timed !== true) {
+          await seedTimes(page, on);
+          on = { ...on, timed: true };
+        }
         await visit(address, state, () => reachState(page, address, state, on));
       } catch (error) {
         failed.push(`${address} ${state.name}: ${error instanceof Error ? error.message.replaceAll("\n", " | ").slice(0, 6000) : String(error)}`);

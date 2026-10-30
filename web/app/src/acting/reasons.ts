@@ -3,8 +3,8 @@
 // reason it ranks where it does ("Gates 6 nodes"). The fact is structured (`ActionFact`) so a
 // caller can tone it, and `factWords` says it. Every surface that shows a row's action-priority
 // fact takes it from `actionFact`, so a row reads the same wherever it is listed.
-import { nodeOf, type Ready } from "../detail/model.ts";
-import { dateWords, daysUntil, daysWords, dueWords, isSoon, lateWords } from "../status/when.ts";
+import { lateOf, nodeOf, type Ready } from "../detail/model.ts";
+import { dateWords, daysWords, dueWords, isSoon, lateWords } from "../status/when.ts";
 import { missingEvidence } from "./acts.ts";
 import type { SortBy } from "./address.ts";
 import { rankParts, type NodeRow, type RankPart } from "./why.ts";
@@ -19,7 +19,7 @@ function dateReason(view: Ready, row: NodeRow): string | undefined {
   if (slack == null) {
     return undefined;
   }
-  return row.due == null ? `Start within ${daysWords(slack)}` : dueWords(row.due, view.derived.today);
+  return row.due == null ? `Start within ${daysWords(slack)}` : dueWords(row.due, view.derived.today, false, lateOf(view, row.key));
 }
 
 /** What the row holds up: the nodes downstream of it, less itself; nothing when its gravity is only its own weight. */
@@ -118,7 +118,7 @@ export function factWords(fact: ActionFact, today: string): string {
     case "start":
       return "Start today";
     case "due":
-      return dueWords(fact.date, today, fact.decision);
+      return dueWords(fact.date, today, fact.decision, undefined);
     case "needs":
     case "reason":
       return fact.words;
@@ -143,7 +143,7 @@ export function actionFact(view: Ready, row: NodeRow, sort: SortBy = "rank"): Ac
   const today = view.derived.today;
   const decision = row.kind === "decision";
   if (row.overdue === true && row.due != null) {
-    return { kind: "late", tone: "bad", days: -daysUntil(row.due, today), decideBy: decision ? row.due : undefined };
+    return { kind: "late", tone: "bad", days: lateOf(view, row.key) ?? 0, decideBy: decision ? row.due : undefined };
   }
   const slack = row.slack_days;
   if (slack != null && slack < 0) {

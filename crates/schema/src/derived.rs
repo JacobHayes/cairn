@@ -448,8 +448,8 @@ pub struct Contribution {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Bound {
-    /// The date.
-    pub date: Date,
+    /// The date; a due date carries its time when the node's own pin sets one on that day.
+    pub date: When,
     /// The chain from a pin, actual, or today that produced it.
     pub chain: Chain,
 }
@@ -854,6 +854,11 @@ pub struct Stalled {
     /// Every in-scope non-terminal node is blocked: shown as "blocked".
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub all_blocked: bool,
+    // PRD: D5.
+    /// The final milestone's date, when every cause is a snooze to a date after it: the
+    /// journey sleeps past its end.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sleeps_past: Option<When>,
 }
 
 impl Stalled {
@@ -904,6 +909,12 @@ pub struct Derived {
     /// or out of scope.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub final_milestone: Option<NodeKey>,
+    // PRD: C2.
+    /// Every node in plan order: each container before what it holds, its children soonest
+    /// first (a container by the soonest thing beneath it), those without a date after those
+    /// with one, the final milestone last, and key order between any two that tie.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plan_order: Vec<NodeKey>,
 }
 
 /// A node's newly stale reasons.

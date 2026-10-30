@@ -30,7 +30,7 @@ import {
   type ReadSnapshot,
   type ReadSource,
 } from "./keyed-read.ts";
-import { ROLLOVER_CHECK_MS, todayIn } from "./today.ts";
+import { HOLDS_RETRY_MS, ROLLOVER_CHECK_MS, todayIn } from "./today.ts";
 
 export type Journey = Schema<"Journey">;
 export type DeriveInputs = Schema<"DeriveInputs">;
@@ -153,6 +153,7 @@ export type JourneysEvent =
   | { type: "mount"; id: string }
   | { type: "unmount"; id: string }
   | { type: "retry"; id: string }
+  | { type: "holds"; id: string }
   | { type: `xstate.snapshot.${string}`; snapshot: ReadSnapshot };
 
 const SNAPSHOT_PREFIX = "xstate.snapshot.";
@@ -217,14 +218,28 @@ export const journeyManager = setup({
       }
       enqueue.assign({ entries });
     }),
-    relay: assign(({ context, event }) => {
+    // A derivation holds until the next time of day that would change it: asking again is
+    // scheduled for that moment, once for each derivation adopted (a failed read keeps the
+    // one it has, and retries on the read's own terms).
+    relay: enqueueActions(({ context, event, enqueue }) => {
       const relayed = event as Extract<JourneysEvent, { type: `xstate.snapshot.${string}` }>;
       const id = relayed.type.slice(SNAPSHOT_PREFIX.length);
       const entry = context.entries[id];
-      return entry === undefined ? {} : { entries: { ...context.entries, [id]: { ...entry, snapshot: relayed.snapshot } } };
+      if (entry === undefined) {
+        return;
+      }
+      enqueue.assign({ entries: { ...context.entries, [id]: { ...entry, snapshot: relayed.snapshot } } });
+      const adopted = heldValue<JourneyHeld>(relayed.snapshot);
+      if (adopted === undefined || adopted === heldValue<JourneyHeld>(entry.snapshot)) {
+        return;
+      }
+      const holds = adopted.derived.holds_until;
+      enqueue.cancel(`holds:${id}`);
+      if (holds != null) {
+        enqueue.raise({ type: "holds", id }, { id: `holds:${id}`, delay: Math.max(Date.parse(holds) - context.today().getTime(), HOLDS_RETRY_MS) });
+      }
     }),
-    // Asked at each check until the host's today, and its now, catch up with the page's clock: a
-    // derivation holds until the next time of day that would change it.
+    // Asked at each check until the host's today catches up with the page's clock.
     rollover: enqueueActions(({ context, enqueue }) => {
       for (const entry of Object.values(context.entries)) {
         const held = heldValue<JourneyHeld>(entry.snapshot);
@@ -232,8 +247,7 @@ export const journeyManager = setup({
           continue;
         }
         try {
-          const holds = held.derived.holds_until;
-          if (todayIn(held.timezone, context.today()) !== held.today || (holds != null && context.today().getTime() >= Date.parse(holds))) {
+          if (todayIn(held.timezone, context.today()) !== held.today) {
             enqueue.sendTo(entry.ref, { type: "refresh" });
           }
         } catch {
@@ -254,6 +268,7 @@ export const journeyManager = setup({
     mount: { actions: ["mount", "greet"] },
     unmount: { actions: "park" },
     retry: { actions: "retry" },
+    holds: { actions: "retry" },
     "xstate.snapshot.*": { actions: "relay" },
   },
 });

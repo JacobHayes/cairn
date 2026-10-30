@@ -96,7 +96,7 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
           <NodeLink view={ready} node={next.key} />
         </div>
         <Tip tip={`This date is ${originWord(next.origin)}`} tap>
-          <span className={inkClass(dateInk(next.date, ready.derived.today)) ?? "muted"}>{whenWords(next.date, next.origin, ready.derived.today)}</span>
+          <span className={inkClass(dateInk(next.date, ready.derived.today, next.late)) ?? "muted"}>{whenWords(next.date, next.origin, ready.derived.today, next.late)}</span>
         </Tip>
       </div>
     </section>

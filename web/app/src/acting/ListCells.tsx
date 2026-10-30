@@ -6,13 +6,13 @@
 import { Link, useLocation } from "react-router";
 
 import type { DecisionRow } from "../decisions/model.ts";
-import { dueOf, type NodeKind, nodeOf, scheduledDate, type Ready, titleOf } from "../detail/model.ts";
+import { lateOf, type NodeKind, nodeOf, scheduledDate, type Ready, titleOf } from "../detail/model.ts";
 import { screenSwitched, useNodeAddresses } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { NO_OWNER, ownerWords } from "../detail/sections.tsx";
 import { snoozeWords } from "../status/snooze.ts";
 import { statusTone, statusWord } from "../status/words.ts";
-import { dateInk, dateWords, daysWords, dueWords, inkClass, lateWords } from "../status/when.ts";
+import { dateInk, dateWords, daysWords, dueWords, inkClass } from "../status/when.ts";
 import { Badge } from "../ui/kit.tsx";
 import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import type { ListSettings } from "./address.ts";
@@ -77,14 +77,12 @@ function Scheduled({ view, line }: { view: Ready; line: Line }) {
 
 /** A node's due in words and ink: late as the engine counts it (a time that passed today is late by no days), else the distance to its date. */
 function dueSaid(view: Ready, key: string, kind: NodeKind, fallback?: string): { words: string; ink: string | undefined } | undefined {
-  const due = dueOf(view, key) ?? fallback;
+  const due = view.derived.nodes[key]?.dates.due?.date ?? fallback;
   if (due === undefined) {
     return undefined;
   }
-  const late = view.derived.nodes[key]?.dates.overdue_days;
-  return late == null
-    ? { words: dueWords(due, view.derived.today, kind === "decision"), ink: inkClass(dateInk(due, view.derived.today)) }
-    : { words: lateWords(late), ink: inkClass("bad") };
+  const late = lateOf(view, key);
+  return { words: dueWords(due, view.derived.today, kind === "decision", late), ink: inkClass(dateInk(due, view.derived.today, late)) };
 }
 
 /** A phone drops the Due column, so the row says its due words under the title (a snoozed row says where the snooze ends instead, and a scheduled row the date it waits for: one secondary fact each). */
@@ -121,7 +119,7 @@ function Fact({ line, context }: { line: Line; context: CellContext }) {
   const { view } = context;
   const fact = line.row === undefined ? undefined : factOf(view, line.row, context.sort ?? "rank");
   const due = line.row?.due;
-  const saidByColumn = fact !== undefined && due != null && fact.words === dueWords(due, view.derived.today, line.row?.kind === "decision");
+  const saidByColumn = fact !== undefined && due != null && fact.words === dueWords(due, view.derived.today, line.row?.kind === "decision", lateOf(view, line.key));
   return fact === undefined ? null : (
     <span className={`${fact.tone === undefined ? "muted small" : `small ink-${fact.tone}`}${saidByColumn ? " list-fact-due" : ""}`} data-testid="fact">
       {fact.words}

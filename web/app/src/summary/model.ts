@@ -13,7 +13,7 @@ import { unblockersOf } from "../acting/waiting.ts";
 import type { FactTone } from "../acting/reasons.ts";
 import type { NodeRow } from "../acting/why.ts";
 import { namer, staleText } from "../detail/explain.ts";
-import { feedingDecision, itemTitle, milestonesFirst, nodeOf, recordOf, scheduledDate, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
+import { feedingDecision, itemTitle, lateOf, milestonesFirst, nodeOf, recordOf, scheduledDate, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
 import { dateWords, daysWords, lateWords } from "../status/when.ts";
 import { DISPLAY_STATES, stateWord, type DisplayState } from "../status/words.ts";
@@ -50,7 +50,7 @@ export interface SummaryModel {
   /** Stale nodes with why each is stale (D4). */
   stale: (Listed & { reasons: string[] })[];
   /** Milestones not yet done with their effective dates (F1), earliest first. */
-  upcoming: (Listed & { date: string; origin: DateOrigin; owners: string[] })[];
+  upcoming: (Listed & { date: string; origin: DateOrigin; late: number | undefined; owners: string[] })[];
   /** Open decisions with their owners (identity keys), in rank order; no owner is unassigned. */
   openDecisions: (Listed & { owners: string[] })[];
 }
@@ -83,6 +83,7 @@ export function summaryModel(ready: Ready, summary: StatusSummary): SummaryModel
       ...listed(ready, each.node),
       date: each.date.date,
       origin: each.date.origin,
+      late: lateOf(ready, each.node),
       owners: ownersOf(ready, each.node),
     })),
     openDecisions: (summary.open_decisions ?? []).map((each) => ({
@@ -101,6 +102,8 @@ export interface MilestoneLine {
   /** Its effective date (F1) and where it comes from; none while nothing gives it one. */
   date: string | undefined;
   origin: DateOrigin | undefined;
+  /** How many days late the engine counts it. */
+  late: number | undefined;
   /** Whether it is done, as its display state says: by an actual date, or by `auto_done` once its date has passed (F1). */
   done: boolean;
   /** Its own shortfall in days (F6), never another node's. */
@@ -126,6 +129,7 @@ export function milestoneLine(ready: Ready, model: SummaryModel): MilestoneLine 
       title: final.title,
       date: dates?.effective_date?.date,
       origin: dates?.effective_date?.origin,
+      late: lateOf(ready, final.key),
       done: ready.derived.nodes[final.key]?.display_state === "done",
       shortfallDays: dates?.shortfall?.shortfall_days,
       feeder: feeder === undefined ? undefined : { key: feeder.key, title: feeder.title },
@@ -141,6 +145,7 @@ export function milestoneLine(ready: Ready, model: SummaryModel): MilestoneLine 
     title: next.title,
     date: next.date,
     origin: next.origin,
+    late: next.late,
     done: ready.derived.nodes[next.key]?.display_state === "done",
     shortfallDays: ready.derived.nodes[next.key]?.dates.shortfall?.shortfall_days,
     feeder: undefined,

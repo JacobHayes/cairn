@@ -36,6 +36,7 @@ mod display;
 pub(crate) mod links;
 pub mod participation;
 pub mod pending;
+mod plan_order;
 pub mod priority;
 mod progress;
 mod project;

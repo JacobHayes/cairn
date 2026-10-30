@@ -521,9 +521,8 @@
             "description": "The chain from a pin, actual, or today that produced it."
           },
           "date": {
-            "description": "The date.",
-            "format": "date",
-            "type": "string"
+            "$ref": "#/components/schemas/When",
+            "description": "The date; a due date carries its time when the node's own pin sets one on that day."
           }
         },
         "required": [
@@ -2244,6 +2243,13 @@
             "format": "date-time",
             "type": "string"
           },
+          "plan_order": {
+            "description": "Every node in plan order: each container before what it holds, its children soonest\nfirst (a container by the soonest thing beneath it), those without a date after those\nwith one, the final milestone last, and key order between any two that tie.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          },
           "stalled": {
             "anyOf": [
               {
@@ -3051,9 +3057,8 @@
         "description": "A date fixed on a chain.",
         "properties": {
           "date": {
-            "description": "The date.",
-            "format": "date",
-            "type": "string"
+            "$ref": "#/components/schemas/When",
+            "description": "The date, with its time when a pin or an answer gives one."
           },
           "fixed_by": {
             "$ref": "#/components/schemas/FixedBy",
@@ -8586,12 +8591,15 @@
             "description": "The state every surface shows for the node."
           },
           "due": {
-            "description": "The latest it can finish.",
-            "format": "date",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/When"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest it can finish."
           },
           "effectively_skipped": {
             "description": "Skipped through an ancestor.",
@@ -13188,6 +13196,17 @@
           "all_blocked": {
             "description": "Every in-scope non-terminal node is blocked: shown as \"blocked\".",
             "type": "boolean"
+          },
+          "sleeps_past": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/When"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The final milestone's date, when every cause is a snooze to a date after it: the\njourney sleeps past its end."
           },
           "waiting_on": {
             "description": "What it waits on.",

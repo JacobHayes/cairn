@@ -8,7 +8,7 @@ import { conditionNames, conditionWords } from "../authoring/condition.ts";
 import { rankParts, type NodeRow } from "../acting/why.ts";
 import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { upperFirst } from "../status/words.ts";
-import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts";
+import { dateWords, daysUntil, lateWords, relativeDays } from "../status/when.ts";
 import { namer, staleText } from "./explain.ts";
 import { itemTitle, nodeOf, rankPlaces, scheduledDate, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
 import { answerText, identityName, ownersOf, ownerWords } from "./sections.tsx";
@@ -104,9 +104,9 @@ function staleWords(view: Ready, key: string, reasons: Schema<"StaleReason">[]):
 }
 
 /** That a node's date has come or gone, after "it": `is due in 5 days`, `is 2 days late`. */
-function dueClause(due: string, today: string): string {
-  const days = daysUntil(due, today);
-  return days < 0 ? `is ${daysWords(-days)} late` : `is due ${relativeDays(days)}`;
+function dueClause(derived: NodeDerived, due: string, today: string): string {
+  const late = derived.dates.overdue_days ?? undefined;
+  return late !== undefined ? `is ${lateWords(late)}` : `is due ${relativeDays(daysUntil(due, today))}`;
 }
 
 /** Priority: why the node ranks where it does, in the top one or two terms' words. */
@@ -121,7 +121,7 @@ export function rankClause(view: Ready, derived: NodeDerived, facts: RankFacts):
   const phrases = parts.flatMap((part): string[] => {
     switch (part.signal) {
       case "urgency":
-        return due === undefined ? (slack == null ? [] : [`must start ${relativeDays(slack)}`]) : [dueClause(due, view.derived.today)];
+        return due === undefined ? (slack == null ? [] : [`must start ${relativeDays(slack)}`]) : [dueClause(derived, due, view.derived.today)];
       case "late":
         return slack == null ? [] : [`is ${plural(-slack, "day")} past its latest start`];
       case "gravity":
@@ -133,7 +133,7 @@ export function rankClause(view: Ready, derived: NodeDerived, facts: RankFacts):
   // Whatever the blend's top terms were, say at least one thing in words: its date, or what it holds up.
   const fallback =
     due !== undefined
-      ? [dueClause(due, view.derived.today)]
+      ? [dueClause(derived, due, view.derived.today)]
       : derived.gravity_from.total > 0
         ? [`holds up ${plural(derived.gravity_from.total, "node")}`]
         : [];

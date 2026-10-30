@@ -29,6 +29,16 @@ function viewWith(key: string, from: { gravity?: number; unlocks?: { total: numb
   return view;
 }
 
+/** The acting view with the engine counting `key` five days late. */
+function lateView(key: string): Ready {
+  const view = viewWith(key, { gravity: 4 });
+  const derived = view.derived.nodes[key];
+  if (derived !== undefined) {
+    derived.dates = { ...derived.dates, overdue_days: 5 };
+  }
+  return view;
+}
+
 /** The fact a row says, as words and ink, under `sort`. */
 function said(view: Ready, each: NodeRow, sort?: Parameters<typeof actionFact>[2]) {
   const fact = actionFact(view, each, sort);
@@ -56,7 +66,7 @@ describe("actionFact", () => {
   });
 
   it("says lateness before what the row needs, in error ink, whatever the list is sorted by", () => {
-    const view = viewWith("n_work", { gravity: 4 });
+    const view = lateView("n_work");
     // The work really is missing its link: lateness still leads.
     const late = row("n_work", { overdue: true, due: "2026-10-01" });
     for (const sort of ["rank", "gravity", "unlocks", "due", "slack"] as const) {
@@ -71,7 +81,7 @@ describe("actionFact", () => {
   });
 
   it("names a decision's date: late with how late, soon in warning ink, otherwise plain after what it needs", () => {
-    const view = actingView();
+    const view = lateView("n_pick");
     const decide = (extra: Partial<NodeRow>) => said(view, row("n_pick", { kind: "decision", ...extra }));
     expect(decide({ due: "2026-10-01", overdue: true })).toEqual({ words: "Decide by Oct 1, 5 days late", tone: "bad" });
     expect(decide({ due: "2026-10-13" })).toEqual({ words: "Decide by Oct 13", tone: "warn" });

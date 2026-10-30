@@ -15,22 +15,16 @@ function viewWithStages() {
   }
   view.derived.nodes["n_stage"] = { ...stage, dates: { due: { date: "2026-11-20", chain: { constraints: [], fixed: [{ instant: "n_stage.finish", date: "2026-11-20", fixed_by: "pin" }] } } } };
   view.derived.nodes["n_later"] = { ...stage, display_state: "done", progress: { done: 4, total: 4, overdue: 0, decisions_needed: 0 } };
+  view.derived.plan_order = [...(view.derived.plan_order ?? []), "n_inner", "n_later"];
   return view;
 }
 
 describe("the stages of a journey", () => {
-  it("lists the top-level groups, not the groups inside them, the earlier due date first and the undated after", () => {
+  it("lists the top-level groups, not the groups inside them, in the order the engine plans them", () => {
     const view = viewWithStages();
     expect(stagesOf(view).map((row) => row.key)).toEqual(["n_stage", "n_later"]);
-    const stage = view.derived.nodes["n_stage"];
-    if (stage !== undefined) {
-      view.derived.nodes["n_later"] = { ...stage, dates: { due: { date: "2026-11-10", chain: { constraints: [], fixed: [] } } } };
-    }
+    view.derived.plan_order = ["n_later", ...(view.derived.plan_order ?? []).filter((key) => key !== "n_later")];
     expect(stagesOf(view).map((row) => row.key)).toEqual(["n_later", "n_stage"]);
-    // A stage with no due date at all comes after both.
-    view.derived.nodes["n_undated"] = { ...(stage as NonNullable<typeof stage>), dates: {} };
-    view.journey.graph.nodes = [{ key: "n_undated", id: "undated", kind: "group", title: "Undated" }, ...(view.journey.graph.nodes ?? [])];
-    expect(stagesOf(view).map((row) => row.key)).toEqual(["n_later", "n_stage", "n_undated"]);
   });
 
   it("carries each stage's state and done count, and the due date only while it is open", () => {
@@ -43,6 +37,10 @@ describe("the stages of a journey", () => {
   it("says a due date is late once it has gone by, and nothing once the stage is finished", () => {
     const view = viewWithStages();
     view.derived.today = "2026-12-01";
+    const stage = view.derived.nodes["n_stage"];
+    if (stage !== undefined) {
+      stage.dates = { ...stage.dates, overdue_days: 11 };
+    }
     const [open, finished] = stagesOf(view);
     expect([open?.dueInk, finished?.dueInk]).toEqual(["ink-bad", undefined]);
   });

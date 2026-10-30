@@ -564,7 +564,7 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
               "No final milestone has a date yet, so the timeline ends after its latest date."
             ) : (
               <>
-                Ends at <NodeLink view={ready} node={spec.anchor.node} /> on <strong>{dateWords(dateOf(spec.anchor.day), today)}</strong>, the final milestone.
+                Ends at <NodeLink view={ready} node={spec.anchor.node} /> on <strong>{dateWords(spec.anchor.date ?? dateOf(spec.anchor.day), today)}</strong>, the final milestone.
               </>
             )
           }

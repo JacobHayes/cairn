@@ -60,10 +60,11 @@ export interface Tick {
   at: number;
 }
 
-/** C13: the end anchor, the journey's `final` milestone at its day. */
+/** C13: the end anchor, the journey's `final` milestone at its day; a journey's carries its date too, with its time when it has one. */
 export interface Anchor {
   node: string;
   day: number;
+  date?: string;
 }
 
 /** The days an axis shows, from the first to the last. */
@@ -121,7 +122,7 @@ export interface AxisSpec {
  */
 export function endAnchor(timeline: Timeline): Anchor | undefined {
   const entry = timeline.entries.find((each) => each.node === timeline.end);
-  return entry === undefined ? undefined : { node: entry.node, day: dayOf(entry.date) };
+  return entry === undefined ? undefined : { node: entry.node, day: dayOf(entry.date), date: entry.date };
 }
 
 /** The finest step that keeps a span of `spanDays` within `TICK_COUNT_MAX` ticks; years beyond. */

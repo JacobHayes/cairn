@@ -6,7 +6,7 @@
 import type { Schema } from "@cairn/client";
 
 import { conditionNames } from "../authoring/condition.ts";
-import { dueOf, type GraphNode, isStage, type NodeDerived, nodeOf, rankPlaces, type Ready, titleOf } from "../detail/model.ts";
+import { type GraphNode, isStage, type NodeDerived, nodeOf, rankPlaces, type Ready, titleOf } from "../detail/model.ts";
 import { answerText, identityName, NO_OWNER, ownersOf, ownerWords, YOU } from "../detail/sections.tsx";
 import { currentStagesOf } from "../journeys/requests.ts";
 import { isFinished } from "../status/state.ts";
@@ -111,7 +111,7 @@ function footOf(context: Context, node: GraphNode, derived: NodeDerived, state: 
     kind: node.kind,
     state,
     today: view.derived.today,
-    due: dueOf(view, node.key),
+    due: view.derived.nodes[node.key]?.dates.due?.date,
     latestStart: latestStart?.date,
     overdueDays: derived.dates.overdue_days ?? undefined,
     open: derived.open === true,

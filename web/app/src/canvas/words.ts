@@ -48,7 +48,7 @@ export function footWords(facts: FootFacts): { words: string; tone: Tone } | und
   if (due === undefined) {
     return kind === "milestone" && doneOn !== undefined ? { words: dateWords(doneOn, today), tone: "plain" } : undefined;
   }
-  return { words: dueWords(due, today, kind === "decision"), tone: isSoon(due, today) ? "warn" : "plain" };
+  return { words: dueWords(due, today, kind === "decision", undefined), tone: isSoon(due, today) ? "warn" : "plain" };
 }
 
 /** Progress as words: `3 of 10 done`. */

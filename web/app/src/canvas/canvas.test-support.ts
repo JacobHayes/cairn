@@ -11,6 +11,8 @@ const none = { entries: [], total: 0 };
 const base = { gravity_from: none, unlocks_from: none, waits_on: none, actionable: false, gravity: 1, unlocks: 0, dates: {} };
 /** The build stage holds the build and its check, the build is overdue; the build holds the check. */
 const stageProgress = { done: 0, total: 2, overdue: 1, decisions_needed: 0 };
+/** The engine's plan order of the journey's nodes. */
+const PLAN_ORDER = ["n_choose", "n_option", "n_stage", "n_build", "n_check", "n_kick", "n_old", "n_scope"];
 const buildProgress = { done: 0, total: 1, overdue: 0, decisions_needed: 0 };
 const relevant = { relevance: { value: "relevant" as const }, snoozable: true, open: true };
 const owned = { participations: { k_owner: { identities: ["who_one"], origin: "explicit" as const } } };
@@ -57,7 +59,7 @@ export function canvasView(): Ready {
       today, now: inputs.now,
       frontier: ["n_choose"],
       acting_frontier: ["n_choose"],
-      current_stages: ["n_stage"],
+      current_stages: ["n_stage"], plan_order: PLAN_ORDER,
       nodes: {
         n_kick: { ...base, display_state: "done", ...relevant, snoozable: false, open: false, moves: ["reopen"], gravity: 9 },
         n_choose: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, moves: ["answer", "skip"], gravity: 8, unlocks: 1, dates: { due: bound("2026-10-09"), latest_start: bound("2026-10-08"), slack_days: 2 } },

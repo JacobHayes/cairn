@@ -66,7 +66,13 @@ describe("the next milestone", () => {
   it("names it and its date, warning when it is near and error when it has passed", () => {
     expect(milestoneOf(upcoming("2026-11-20"), today)).toMatchObject({ title: "Meeting", tone: undefined });
     expect(milestoneOf(upcoming("2026-10-09"), today)?.tone).toBe("warn");
-    expect(milestoneOf(upcoming("2026-10-01"), today)?.tone).toBe("bad");
+    const view = testView();
+    const meeting = view.derived.nodes["n_meeting"];
+    if (meeting !== undefined) {
+      meeting.dates = { ...meeting.dates, overdue_days: 5 };
+    }
+    const gone = summaryModel(view, { by_state: {}, by_display_state: { ready: 5 }, remaining: 5, upcoming_milestones: [{ node: "n_meeting", date: { date: "2026-10-01", origin: "pin" } }] });
+    expect(milestoneOf(gone, today)?.tone).toBe("bad");
   });
 
   it("is nothing when the summary lists none", () => {

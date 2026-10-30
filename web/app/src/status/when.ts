@@ -24,11 +24,6 @@ function atTime(when: string): string {
   return time === undefined ? "" : ` at ${time}`;
 }
 
-/** Which of two days or moments is earlier: by day, a day before any moment on it, then by instant (never by text). */
-export function compareWhen(left: string, right: string): number {
-  return dayOf(left) - dayOf(right) || Number(timeOf(left) !== undefined) - Number(timeOf(right) !== undefined) || Date.parse(left) - Date.parse(right) || 0;
-}
-
 /** A calendar date in words: `Oct 6`, with the year (`Oct 6, 2027`) when it is not in `today`'s, or always when there is no `today` to compare with; a moment adds its time (`Oct 6, 08:15`). */
 export function dateWords(date: string, today?: string): string {
   const parsed = new Date(`${date.slice(0, 10)}T00:00:00Z`);
@@ -83,9 +78,9 @@ export function isSoon(date: string, today: string): boolean {
   return away >= 0 && away <= SOON_DAYS;
 }
 
-/** The ink a date is said in (DESIGN, Dates): error once it has gone by, warning while it is soon, none after; the class is `ink-bad` or `ink-warn`. */
-export function dateInk(date: string, today: string): "bad" | "warn" | undefined {
-  return daysUntil(date, today) < 0 ? "bad" : isSoon(date, today) ? "warn" : undefined;
+/** The ink a date is said in (DESIGN, Dates): error once the engine calls the node late (`late`, its days overdue), warning while the date is soon, none after; the class is `ink-bad` or `ink-warn`. */
+export function dateInk(date: string, today: string, late: number | undefined): "bad" | "warn" | undefined {
+  return late !== undefined ? "bad" : isSoon(date, today) ? "warn" : undefined;
 }
 
 /** The class that says a date's ink, none when it has none. */
@@ -105,14 +100,14 @@ export function relativeDays(days: number): string {
 }
 
 /**
- * When a node is due, in words: late once it has passed, a distance while it is near, a date
- * after that. A decision is decided by a date, not due on it.
+ * When a node is due, in words: late once the engine says so (`late`, its days overdue), a
+ * distance while it is near, a date after that. A decision is decided by a date, not due on it.
  */
-export function dueWords(date: string, today: string, decision = false): string {
-  const days = daysUntil(date, today);
-  if (days < 0) {
-    return `${daysWords(-days)} late`;
+export function dueWords(date: string, today: string, decision: boolean, late: number | undefined): string {
+  if (late !== undefined) {
+    return lateWords(late);
   }
+  const days = daysUntil(date, today);
   const at = atTime(date);
   if (decision) {
     return days === 0 ? `Decide today${at}` : `Decide by ${dateWords(date, today)}`;
@@ -123,7 +118,7 @@ export function dueWords(date: string, today: string, decision = false): string 
   if (days === 1) {
     return `Due tomorrow${at}`;
   }
-  return days <= NEAR_DAYS ? `Due in ${daysWords(days)}${at}` : `Due ${dateWords(date, today)}`;
+  return days > 0 && days <= NEAR_DAYS ? `Due in ${daysWords(days)}${at}` : `Due ${dateWords(date, today)}`;
 }
 
 /** Where an effective date comes from: a recorded actual, a pin, or worked out from the plan (the engine's `DateOrigin`, or the inspector's bound origin). */
@@ -145,13 +140,12 @@ export function originWord(origin: Origin): string {
 /**
  * A milestone's date as a reader weighs it, the nearness first and the calendar date after it, so
  * it reads right after a verb title or a noun title: `in 18 days (Nov 23)`, `3 days late (Oct 2)`,
- * `today (Oct 6)`; an actual date is `done Nov 20` (never late).
+ * `today (Oct 6)`; an actual date is `done Nov 20` (never late). `late` is the engine's days overdue.
  */
-export function whenWords(date: string, origin: Origin | undefined, today: string): string {
+export function whenWords(date: string, origin: Origin | undefined, today: string, late: number | undefined): string {
   const when = dateWords(date, today);
   if (origin === "actual") {
     return `done ${when}`;
   }
-  const days = daysUntil(date, today);
-  return days < 0 ? `${daysWords(-days)} late (${when})` : `${relativeDays(days)} (${when})`;
+  return late !== undefined ? `${lateWords(late)} (${when})` : `${relativeDays(daysUntil(date, today))} (${when})`;
 }

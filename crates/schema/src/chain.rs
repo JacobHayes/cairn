@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::collections::{BoundedVec, ChainCountPerRejection};
 use crate::id::NodeKey;
 use crate::patch::Mutation;
-use jiff::civil::Date;
+use crate::when::When;
 
 // PRD: F2.
 /// Which instant of a node: work has a start and a finish; a decision or milestone has
@@ -295,8 +295,8 @@ pub enum FixedBy {
 pub struct FixedDate {
     /// The instant.
     pub instant: Instant,
-    /// The date.
-    pub date: Date,
+    /// The date, with its time when a pin or an answer gives one.
+    pub date: When,
     /// A pin or an actual.
     pub fixed_by: FixedBy,
 }

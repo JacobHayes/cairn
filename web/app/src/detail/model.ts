@@ -214,18 +214,15 @@ export function moveOf(change: Schema<"Transition">): Move {
   return "skip" in change ? "skip" : "mark_done";
 }
 
-/** A node's due date: the day the plan gives, with the time when its own pin sets one on that day. */
-export function dueOf(view: Ready, key: string): string | undefined {
-  const { due: bound, effective_date: effective } = view.derived.nodes[key]?.dates ?? {};
-  const due = bound?.date;
-  const pinned = view.journey.graph.state?.pins?.[key] ?? (effective?.origin === "pin" ? effective.date : undefined);
-  return due !== undefined && pinned?.slice(0, 10) === due ? pinned : due;
+/** How many days late the engine counts a node (none for a node that is not late). */
+export function lateOf(view: Ready, key: string): number | undefined {
+  return view.derived.nodes[key]?.dates.overdue_days ?? undefined;
 }
 
 /** When a node is due, in words, while it is open: none once it is finished, as a Contents row and a Stages row say it. */
 export function dueWordsOf(view: Ready, node: { key: string; kind: NodeKind; state: State; displayState: DisplayState }): string | undefined {
-  const date = isTerminal(node.state) || isFinished(node.displayState) ? undefined : dueOf(view, node.key);
-  return date === undefined ? undefined : dueWords(date, view.derived.today, node.kind === "decision");
+  const date = isTerminal(node.state) || isFinished(node.displayState) ? undefined : view.derived.nodes[node.key]?.dates.due?.date;
+  return date === undefined ? undefined : dueWords(date, view.derived.today, node.kind === "decision", lateOf(view, node.key));
 }
 
 /** D1: whether a node in `state` is finished (done, skipped, decided). */

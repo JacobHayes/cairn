@@ -19,3 +19,6 @@ export function todayIn(zone: string, at: Date): string {
  * long; the check itself is a date format per held journey.
  */
 export const ROLLOVER_CHECK_MS = 60_000;
+
+/** The soonest a derivation is asked for again after the moment it said it held until, so a host whose clock is a little behind the page's is not asked in a tight loop. */
+export const HOLDS_RETRY_MS = 1_000;

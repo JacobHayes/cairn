@@ -6,7 +6,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use jiff::civil::Date;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -700,7 +699,7 @@ pub struct NodeRow {
     pub slack_days: Option<i32>,
     /// The latest it can finish.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub due: Option<Date>,
+    pub due: Option<When>,
     /// Gravity.
     pub gravity: Score,
     /// Unlocks.
@@ -922,7 +921,7 @@ pub struct AgentRow {
     pub slack_days: Option<i32>,
     /// The latest it can finish.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub due: Option<Date>,
+    pub due: Option<When>,
     /// Its rank to three significant figures, for work still to do.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rank: Option<Real>,

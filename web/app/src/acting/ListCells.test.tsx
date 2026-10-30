@@ -15,13 +15,21 @@ const RANK = { rank: 0, urgency: 0, late: 0, gravity_norm: 0, unlocks_norm: 0, a
 
 const row = (extra: Partial<NodeRow>): NodeRow => ({ key: "n_work", kind: "deliverable", path: "n_work", title: "Write it", state: "todo", display_state: "ready", relevance: "relevant", gravity: 1, unlocks: 0, ...extra });
 
-/** The due line under `each`'s title with Frontier on, whose fact it dedupes against; empty when there is none. */
-function dueLine(each: NodeRow): string {
+const LATE_DAYS = 5;
+
+/** The acting view with `each`'s due date, and the days the engine counts it late when the row is overdue. */
+function viewWith(each: NodeRow) {
   const view = actingView();
   const derived = view.derived.nodes[each.key];
   if (derived !== undefined && each.due != null) {
-    derived.dates = { ...derived.dates, due: { date: each.due, chain: { constraints: [], fixed: [] } } };
+    derived.dates = { ...derived.dates, due: { date: each.due, chain: { constraints: [], fixed: [] } }, ...(each.overdue === true ? { overdue_days: LATE_DAYS } : {}) };
   }
+  return view;
+}
+
+/** The due line under `each`'s title with Frontier on, whose fact it dedupes against; empty when there is none. */
+function dueLine(each: NodeRow): string {
+  const view = viewWith(each);
   const line: Line = { key: each.key, depth: 0, row: each, container: false, foldable: false, open: false, guides: [] };
   return renderToStaticMarkup(<PhoneDue view={view} line={line} fact={factOf(view, each, "rank")?.words} />);
 }
@@ -29,13 +37,13 @@ function dueLine(each: NodeRow): string {
 describe("a phone's due line under a row's title", () => {
   it("is not said again when the row's fact is how late it is", () => {
     const late = row({ overdue: true, due: "2026-10-01", rank: { ...RANK, late: 1, adds: { ...RANK.adds, late: 0.15 }, rank: 0.15 } });
-    const view = actingView();
-    expect(factOf(view, late, "rank")?.words).toBe(dueWords("2026-10-01", view.derived.today, false));
+    const view = viewWith(late);
+    expect(factOf(view, late, "rank")?.words).toBe(dueWords("2026-10-01", view.derived.today, false, LATE_DAYS));
     expect(dueLine(late)).toBe("");
   });
 
   it("is kept under a row whose fact is something else", () => {
     const gated = row({ due: "2026-10-30", slack_days: 12, rank: { ...RANK, urgency: 0.1, gravity_norm: 1, adds: { ...RANK.adds, urgency: 0.04, gravity: 0.25 }, rank: 0.29 } });
-    expect(dueLine(gated)).toContain(dueWords("2026-10-30", actingView().derived.today, false));
+    expect(dueLine(gated)).toContain(dueWords("2026-10-30", actingView().derived.today, false, undefined));
   });
 });

@@ -62,6 +62,6 @@ describe.each([
     const mine = Object.fromEntries(Object.entries(view.derived.nodes).map(([key, each]) => [key, facts(each)]));
     const theirs = Object.fromEntries(Object.keys(view.derived.nodes).map((key) => [key, facts(derived.ready.derived.nodes[key] as Ready["derived"]["nodes"][string])]));
     expect(mine).toEqual(theirs);
-    expect({ stages: view.derived.current_stages ?? [], final: view.derived.final_milestone ?? null }).toEqual({ stages: derived.ready.derived.current_stages ?? [], final: derived.ready.derived.final_milestone ?? null });
+    expect({ stages: view.derived.current_stages ?? [], final: view.derived.final_milestone ?? null, order: view.derived.plan_order ?? [] }).toEqual({ stages: derived.ready.derived.current_stages ?? [], final: derived.ready.derived.final_milestone ?? null, order: derived.ready.derived.plan_order ?? [] });
   });
 });

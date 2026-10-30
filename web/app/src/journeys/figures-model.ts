@@ -94,5 +94,5 @@ export function milestoneOf(model: SummaryModel, today: string): { title: string
   if (next === undefined) {
     return undefined;
   }
-  return { title: next.title, when: whenWords(next.date, next.origin, today), tone: dateInk(next.date, today) };
+  return { title: next.title, when: whenWords(next.date, next.origin, today, next.late), tone: dateInk(next.date, today, next.late) };
 }

@@ -149,6 +149,7 @@ export function testView(): Ready {
       frontier: ["n_findings"],
       acting_frontier: ["n_findings"],
       current_stages: ["n_stage"],
+      plan_order: ["n_stage", "n_report", "n_findings", "n_pick", "n_meeting", "n_when"],
       nodes: derivedNodes(),
     },
   };

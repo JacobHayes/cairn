@@ -103,26 +103,6 @@ describe("the lines", () => {
 });
 
 describe("snoozed nodes", () => {
-  it("order a snoozed node by when its snooze lifts, as the engine says: later of its own date and the lift, undated when the lift is not known yet", () => {
-    const liftingOn = (lifts: string | undefined) => {
-      const copy = structuredClone(view);
-      const wait = copy.derived.nodes["n_wait"];
-      const work = copy.derived.nodes["n_work"];
-      if (wait === undefined || work === undefined) {
-        throw new Error("the fixture has both");
-      }
-      wait.snooze_lifts = lifts ?? null;
-      work.dates = {};
-      return planOrder(copy).filter((key) => ["n_wait", "n_inner", "n_later", "n_work"].includes(key));
-    };
-    // Its own date is Oct 6, as soon as any (it follows n_inner by plan order); a snooze to Oct 30 puts it after the node dated Oct 20.
-    expect(liftingOn("2026-10-30")).toEqual(["n_inner", "n_later", "n_wait", "n_work"]);
-    // A snooze lifting before its own date moves nothing.
-    expect(liftingOn("2026-10-01")).toEqual(["n_inner", "n_wait", "n_later", "n_work"]);
-    // No day yet: undated, after the dated.
-    expect(liftingOn(undefined)).toEqual(["n_inner", "n_later", "n_wait", "n_work"]);
-  });
-
   it("put snoozed rows after the others when sorted by a signal, keeping the order among them", () => {
     const snoozed = (key: string) => ({ ...row(key), display_state: "snoozed" as const });
     const keysOf = (lines: { key: string }[]) => lines.map((line) => line.key);

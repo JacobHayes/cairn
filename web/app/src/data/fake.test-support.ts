@@ -259,6 +259,8 @@ export class FakeDeriver implements Deriver {
   readonly released: DerivationHandle[] = [];
   /** While set, the next load answers when it settles (the worker has replaced the derivation by then). */
   holdLoad: Promise<void> | undefined;
+  /** The moment every derivation says it holds until, while set. */
+  holdsUntil: string | undefined;
   #loads = 0;
 
   async load(document: string, slot?: string): Promise<Loaded> {
@@ -284,7 +286,7 @@ export class FakeDeriver implements Deriver {
     if (!this.held.has(journey)) {
       return Promise.reject(new Error(`no document for ${journey} is loaded`));
     }
-    return Promise.resolve({ nodes: {}, frontier: [], acting_frontier: [], today: todayIn("UTC", new Date()), now: new Date().toISOString() });
+    return Promise.resolve({ nodes: {}, frontier: [], acting_frontier: [], today: todayIn("UTC", new Date()), now: new Date().toISOString(), ...(this.holdsUntil === undefined ? {} : { holds_until: this.holdsUntil }) });
   }
 
   project(): Promise<never> {

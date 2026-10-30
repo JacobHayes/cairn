@@ -59,8 +59,8 @@ describe("TimelineChart (C13)", () => {
     const rows = [...markup.matchAll(/data-testid="timeline-entry" data-node="([^"]+)" data-day="[^"]+" data-date="([^"]+)" data-origin="([^"]*)"/g)];
     expect(rows.map((row) => [row[1], row[2], row[3]])).toEqual([
       ["n_stage", "2026-11-02", ""],
-      ["n_findings", "2026-10-30", "due"],
       ["n_report", "2026-11-02", "pin"],
+      ["n_findings", "2026-10-30", "due"],
       ["n_meeting", "2026-11-20", "pin"],
     ]);
   });

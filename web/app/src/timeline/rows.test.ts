@@ -43,14 +43,14 @@ describe("the rows are the drawn nodes with dates", () => {
     const chart = chartOf(testView(), timeline, options);
     expect(chart.rows.map((row) => [row.key, row.depth, row.shape])).toEqual([
       ["n_stage", 0, "span"],
-      ["n_findings", 1, "tick"],
       ["n_report", 1, "tick"],
+      ["n_findings", 1, "tick"],
       ["n_meeting", 0, "milestone"],
     ]);
     const stage = chart.rows.find((row) => row.key === "n_stage");
     expect([stage?.from, stage?.to]).toEqual([dayOf("2026-10-03"), dayOf("2026-11-02")]);
     expect(chart.undated).toEqual(["n_pick"]);
-    expect(chart.rows.map((row) => [row.key, row.guides])).toEqual([["n_stage", []], ["n_findings", [true]], ["n_report", [false]], ["n_meeting", []]]);
+    expect(chart.rows.map((row) => [row.key, row.guides])).toEqual([["n_stage", []], ["n_report", [true]], ["n_findings", [false]], ["n_meeting", []]]);
   });
 
   it("folds a container as asked, which keeps its bar over what it holds", () => {

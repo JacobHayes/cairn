@@ -23,6 +23,7 @@ use cairn_schema::{
 use super::checklist::checklist_count;
 use super::dependencies::EdgeSet;
 use super::links::date_links_by_node;
+use super::plan_order::plan_order;
 use super::relevance::Producer;
 use super::stale::{Annotated, annotated_nodes, static_failures};
 use super::{Derived, held_by, skips_beneath, stored_state};
@@ -68,6 +69,7 @@ impl Derived {
             "the graph derived"
         );
         let current_stages = self.current_stages(graph, &nodes);
+        let plan_order = plan_order(graph, &nodes);
         cairn_schema::Derived {
             today: self.today,
             now: self.now,
@@ -78,6 +80,7 @@ impl Derived {
             stalled: self.blocking.stalled().cloned(),
             current_stages,
             final_milestone: self.final_milestone(graph),
+            plan_order,
         }
     }
 

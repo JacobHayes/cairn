@@ -304,3 +304,98 @@ fn a_shortfall_held_by_a_timed_pin_offers_the_unpin_and_no_shift() {
             .any(|found| matches!(found, cairn_schema::Mutation::ShiftPin { .. }))
     );
 }
+
+/// A due date set by the node's own timed pin carries the time, and so does the pin on a chain
+/// that explains a date; a day stays a day.
+#[test]
+fn a_due_date_and_the_pin_on_its_chain_carry_the_pinned_time() {
+    let records = support::accepted(
+        &support::journey(&add(&[GATE, WORK])),
+        &format!(
+            "{}{}",
+            pin("n_gate", "2026-10-10T08:15+00:00"),
+            pin("n_work", "2026-10-12")
+        ),
+    );
+    let graph = support::journey_graph(&records, support::JOURNEY);
+    let shown = support::derived(&records, support::JOURNEY).to_schema(&graph);
+    let gate = &shown.nodes[&key("n_gate")].dates;
+    let due = gate.due.as_ref().unwrap();
+    assert_eq!(due.date, when("2026-10-10T08:15+00:00"));
+    assert!(due.chain.fixed.iter().any(|fixed| fixed.date == due.date));
+    assert_eq!(
+        shown.nodes[&key("n_work")].dates.due.as_ref().unwrap().date,
+        when("2026-10-12")
+    );
+}
+
+/// Siblings are in plan order by their dates: a snooze to a day lifts before one to a time on
+/// it, then by the minute, and the final milestone is last whatever its date.
+#[test]
+fn plan_order_ranks_a_day_before_the_times_on_it() {
+    let records = support::accepted(
+        &support::journey(&add(&[
+            "{key: n_a, id: a, kind: action, title: A}",
+            "{key: n_b, id: b, kind: action, title: B}",
+            "{key: n_c, id: c, kind: action, title: C}",
+            "{key: n_end, id: end, kind: milestone, title: End, final: true}",
+        ])),
+        &format!(
+            "{}{}{}{}",
+            snooze("n_a", "2026-10-12T09:00+00:00"),
+            snooze("n_b", "2026-10-12T08:00+00:00"),
+            snooze("n_c", "2026-10-12"),
+            pin("n_end", "2026-10-01"),
+        ),
+    );
+    let graph = support::journey_graph(&records, support::JOURNEY);
+    let shown = support::derived(&records, support::JOURNEY).to_schema(&graph);
+    let order: Vec<&str> = shown
+        .plan_order
+        .iter()
+        .map(cairn_schema::NodeKey::as_str)
+        .collect();
+    assert_eq!(order, ["n_c", "n_b", "n_a", "n_end"]);
+}
+
+/// Two milestones pinned at different times on one day are in the order of those times, not of
+/// their keys.
+#[test]
+fn plan_order_ranks_pinned_times_on_one_day_by_the_minute() {
+    let records = support::accepted(
+        &support::journey(&add(&[
+            "{key: n_a, id: a, kind: milestone, title: A}",
+            "{key: n_b, id: b, kind: milestone, title: B}",
+        ])),
+        &format!(
+            "{}{}",
+            pin("n_a", "2026-10-12T09:00+00:00"),
+            pin("n_b", "2026-10-12T08:00+00:00"),
+        ),
+    );
+    let graph = support::journey_graph(&records, support::JOURNEY);
+    let shown = support::derived(&records, support::JOURNEY).to_schema(&graph);
+    assert_eq!(shown.plan_order, [key("n_b"), key("n_a")]);
+}
+
+/// A journey whose every cause is a snooze past the final milestone says the milestone's date.
+#[test]
+fn a_journey_sleeping_past_its_final_milestone_says_its_date() {
+    let records = support::accepted(
+        &support::journey(&add(&[
+            WORK,
+            "{key: n_end, id: end, kind: milestone, title: End, final: true, requires: [n_work]}",
+        ])),
+        &format!(
+            "{}{}",
+            pin("n_end", "2026-10-20T09:00+00:00"),
+            snooze("n_work", "2026-10-20T10:00+00:00")
+        ),
+    );
+    let graph = support::journey_graph(&records, support::JOURNEY);
+    let shown = support::derived(&records, support::JOURNEY).to_schema(&graph);
+    assert_eq!(
+        shown.stalled.unwrap().sleeps_past,
+        Some(when("2026-10-20T09:00+00:00"))
+    );
+}
