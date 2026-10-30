@@ -13,9 +13,15 @@
 //!
 //! The same mapping is made over the stored history, so it still reads back: a node an event
 //! writes, and a stage field an event writes on its own (kept per graph in order, since
-//! moving an opening means removing the old requirement). A proposal that holds anything of
-//! the removed fields loses those mutations and review items; an open one is discarded, with
-//! a reason, since what is left of it is not what its author meant. A rerun changes nothing.
+//! moving an opening means removing the old requirement; a closing edit on a group with a
+//! rule of its own rewrites that rule with the closing merged in). A graph copied whole
+//! (a draft published, a draft opened from a version) carries what is known of its groups
+//! to the copy. A proposal, in the table and in the events that wrote it, has its added and
+//! replaced nodes converted the same way and loses every other mutation and review item that
+//! holds a removed field or anything a stage bound said (a violation of that rule, a chain
+//! through a stage's bound); an open one that lost a mutation is discarded, with a reason,
+//! since what is left of it is not what its author meant (a lost review item does not count:
+//! it is derived from the mutations). A rerun changes nothing.
 
 use std::collections::BTreeMap;
 
@@ -194,11 +200,22 @@ fn require(
     Ok(Ok(()))
 }
 
+/// What moving a node's bounds did.
+#[derive(PartialEq)]
+enum Moved {
+    /// The node had none.
+    Nothing,
+    /// Its bounds are now a requirement and a due-by.
+    All,
+    /// Its own rule cannot take the closing, which is left out.
+    WithoutClosing,
+}
+
 /// A whole group node as stored in a write or a mutation: its bounds moved into `requires`
-/// and `due_by`. Where the node's own rule cannot take the closing, the closing is left out.
-fn rewrite_node(node: &mut Map<String, Value>) -> bool {
+/// and `due_by`.
+fn rewrite_node(node: &mut Map<String, Value>) -> Moved {
     if !FIELDS.iter().any(|field| node.contains_key(*field)) {
-        return false;
+        return Moved::Nothing;
     }
     let bounds = Bounds {
         opens_at: node
@@ -225,22 +242,38 @@ fn rewrite_node(node: &mut Map<String, Value>) -> bool {
             requires.sort_by_key(Value::to_string);
         }
     }
-    if let Some(milestone) = bounds.deadline()
-        && let Ok(Some(rule)) = with_deadline(node.get("due_by"), milestone)
-    {
-        node.insert("due_by".to_owned(), rule);
+    if let Some(milestone) = bounds.deadline() {
+        match with_deadline(node.get("due_by"), milestone) {
+            Ok(Some(rule)) => {
+                node.insert("due_by".to_owned(), rule);
+            }
+            Ok(None) => {}
+            Err(_) => return Moved::WithoutClosing,
+        }
     }
-    true
+    Moved::All
 }
 
 /// The stage state of the groups one graph's events have written so far, with the rule each
 /// has of its own, so a field written on its own can be read as the requirement or due-by it
 /// moves.
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Groups(BTreeMap<String, (Bounds, Option<Value>)>);
 
 /// One write of an event rewritten: the writes it becomes, or none when it is left as it is.
 fn rewrite_write(groups: &mut BTreeMap<String, Groups>, write: &Value) -> Option<Vec<Value>> {
+    if let Some(copy) = write.get("copy_graph") {
+        let (from, to) = (copy.get("from")?.to_string(), copy.get("to")?.to_string());
+        match groups.get(&from).cloned() {
+            Some(known) => groups.insert(to, known),
+            None => groups.remove(&to),
+        };
+        return None;
+    }
+    if let Some(graph) = write.pointer("/remove/graph") {
+        groups.remove(&graph.to_string());
+        return None;
+    }
     let record = write.pointer("/put/graph/record")?;
     let graph = write.pointer("/put/graph/graph")?;
     let known = groups.entry(graph.to_string()).or_default();
@@ -266,7 +299,7 @@ fn node_write(known: &mut Groups, write: &Value, node: &Map<String, Value>) -> O
     };
     known.0.insert(key, (bounds, node.get("due_by").cloned()));
     let mut node = node.clone();
-    if !rewrite_node(&mut node) {
+    if rewrite_node(&mut node) == Moved::Nothing {
         return None;
     }
     let mut changed = write.clone();
@@ -290,7 +323,9 @@ fn field_write(
         .or_insert_with(|| (Bounds::new(), None));
     if name == "due_by" {
         *own_rule = (!written.is_null()).then(|| written.clone());
-        return None;
+        // A closing still bounds the group: the rule written takes it as one more source.
+        let merged = with_deadline(own_rule.as_ref(), bounds.deadline()?).ok()??;
+        return Some(vec![due_by_write(graph, &key, &merged)]);
     }
     if !FIELDS.contains(&name.as_str()) {
         return None;
@@ -321,12 +356,21 @@ fn field_write(
             writes.push(json!({"put": {"graph": {"graph": graph, "record": {"edge": edge(new)}}}}));
         }
     }
-    if was_deadline != now_deadline && own_rule.is_none() {
-        let rule = now_deadline.map_or(Value::Null, |milestone| json!({"before": milestone}));
-        writes.push(json!({"put": {"graph": {"graph": graph, "record": {
-            "node_field": {"node": key, "value": {"due_by": rule}}}}}}));
+    if was_deadline != now_deadline {
+        let own = own_rule.clone();
+        let rule = now_deadline
+            .and_then(|milestone| with_deadline(own.as_ref(), &milestone).ok().flatten())
+            .or(own)
+            .unwrap_or(Value::Null);
+        writes.push(due_by_write(graph, &key, &rule));
     }
     Some(writes)
+}
+
+/// A put of a group's due-by rule on its own.
+fn due_by_write(graph: &Value, key: &str, rule: &Value) -> Value {
+    json!({"put": {"graph": {"graph": graph, "record": {
+        "node_field": {"node": key, "value": {"due_by": rule}}}}}})
 }
 
 /// An event's delta, rewritten write by write; whether it changed.
@@ -347,7 +391,8 @@ fn rewrite_delta(groups: &mut BTreeMap<String, Groups>, delta: &mut Value) -> bo
     }
     for write in &mut converted {
         if let Some(draft) = write.pointer_mut("/put/proposal/draft") {
-            changed |= strip(draft);
+            let done = strip(draft);
+            changed |= done.converted || done.dropped || done.items_dropped;
         }
     }
     *writes = converted;
@@ -355,12 +400,19 @@ fn rewrite_delta(groups: &mut BTreeMap<String, Groups>, delta: &mut Value) -> bo
 }
 
 /// Whether anything in `value` is of the removed fields: one of their names as a key, or as
-/// the value of a `field` entry (a field being cleared). Text a person wrote is never read.
+/// the value of a `field` or `kind` entry (a field being cleared or named); the violation
+/// code of a stage bound that named no milestone; a constraint source that is a stage's
+/// bound. Text a person wrote is never read.
 fn mentions(value: &Value) -> bool {
     match value {
         Value::Object(object) => object.iter().any(|(key, value)| {
             FIELDS.contains(&key.as_str())
-                || (key == "field" && value.as_str().is_some_and(|name| FIELDS.contains(&name)))
+                || value.as_str().is_some_and(|text| match key.as_str() {
+                    "field" | "kind" => FIELDS.contains(&text),
+                    "code" => text == "stage_bound_not_milestone",
+                    "source" => text.starts_with("stage_close:") || text.contains(":opening:"),
+                    _ => false,
+                })
                 || mentions(value)
         }),
         Value::Array(items) => items.iter().any(mentions),
@@ -368,18 +420,65 @@ fn mentions(value: &Value) -> bool {
     }
 }
 
-/// Removes, from a proposal's draft, the mutations and review items that hold the removed
-/// fields; whether any were.
-fn strip(draft: &mut Value) -> bool {
-    let mut changed = false;
+/// What stripping a draft did.
+#[derive(Default)]
+struct Stripped {
+    /// An added or replaced node had its bounds moved.
+    converted: bool,
+    /// A mutation was removed: what the proposal's author meant is no longer all there.
+    dropped: bool,
+    /// A review item was removed: derived from the draft, so the draft means what it did.
+    items_dropped: bool,
+}
+
+/// An added or replaced node in a mutation, its bounds moved into `requires` and `due_by`;
+/// whether it was, or `Err` when its own rule cannot take the closing, so the mutation
+/// cannot say what its author meant.
+fn convert(mutation: &mut Value) -> Result<bool, ()> {
+    let is_node = matches!(
+        mutation.get("op").and_then(Value::as_str),
+        Some("add_node" | "replace_node")
+    );
+    let Some(node) = mutation
+        .get_mut("node")
+        .and_then(Value::as_object_mut)
+        .filter(|_| is_node)
+    else {
+        return Ok(false);
+    };
+    match rewrite_node(node) {
+        Moved::Nothing => Ok(false),
+        Moved::All => Ok(true),
+        Moved::WithoutClosing => Err(()),
+    }
+}
+
+/// Converts, in a proposal's draft, the nodes its mutations add or replace, then removes the
+/// mutations and review items that still hold the removed fields.
+fn strip(draft: &mut Value) -> Stripped {
+    let mut done = Stripped::default();
     for list in ["mutations", "items"] {
         if let Some(Value::Array(entries)) = draft.get_mut(list) {
             let before = entries.len();
+            if list == "mutations" {
+                entries.retain_mut(|entry| match convert(entry) {
+                    Ok(moved) => {
+                        done.converted |= moved;
+                        true
+                    }
+                    Err(()) => false,
+                });
+            }
             entries.retain(|entry| !mentions(entry));
-            changed |= entries.len() != before;
+            let lost = entries.len() != before;
+            if list == "mutations" {
+                done.dropped |= lost;
+            } else {
+                done.items_dropped |= lost;
+            }
         }
     }
-    changed
+    done
 }
 
 /// The stored proposals: stripped, and an open one that lost anything discarded.
@@ -391,11 +490,12 @@ fn proposals(connection: &Connection) -> Result<(), SqlError> {
                 .map_err(|error| SqlError::Other(format!("stored JSON: {error}")))
         };
         let mut draft = json!({"mutations": parse(2)?, "items": parse(3)?});
-        if !strip(&mut draft) {
+        let done = strip(&mut draft);
+        if !(done.converted || done.dropped || done.items_dropped) {
             continue;
         }
         let id = text(&row.text(0).map_err(failed)?);
-        if row.text(1).map_err(failed)? == "open" {
+        if done.dropped && row.text(1).map_err(failed)? == "open" {
             execute(
                 connection,
                 "UPDATE proposals SET status = 'discarded', description = ?1, \

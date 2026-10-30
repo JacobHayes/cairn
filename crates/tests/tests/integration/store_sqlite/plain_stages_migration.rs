@@ -3,14 +3,16 @@
 //! history, and proposals that edited them. An opening becomes a requirement and a closing a
 //! due-by (merged into the group's own rule where it has one); a bound that did not gate or
 //! close is dropped; groups whose own rule cannot take the closing stop the migration and are
-//! all listed; stored events still read back; an open proposal that held a stage edit is
+//! all listed; stored events still read back, including a closing edit on a group with its
+//! own rule and groups of a copied graph; a proposal's added nodes are converted, its other
+//! stage edits and stage-bound review items dropped, and an open one that lost an edit is
 //! discarded with a reason.
 
 #[cfg(test)]
 mod plain_stages {
     use std::path::PathBuf;
 
-    use cairn_schema::Write;
+    use cairn_schema::{Mutation, ReviewItem, Write};
     use cairn_store_sqlite::SqliteStore;
 
     const DUMP: &str = include_str!("at_migration_13.sql");
@@ -35,8 +37,16 @@ INSERT INTO "events" VALUES (60, 'p_g1', 0, 'journey', 'j_one', 'node_added', 'u
 INSERT INTO "events" VALUES (61, 'p_g2', 0, 'journey', 'j_one', 'node_changed', 'u_lead', NULL, NULL, '{"node":"n_ev"}', 1791288000000000061, NULL, '[{"put":{"graph":{"graph":{"journey":"j_one"},"record":{"node_field":{"node":"n_ev","value":{"opens_at":"n_gate"}}}}}}]');
 INSERT INTO "events" VALUES (62, 'p_g3', 0, 'journey', 'j_one', 'node_changed', 'u_lead', NULL, NULL, '{"node":"n_ev"}', 1791288000000000062, NULL, '[{"put":{"graph":{"graph":{"journey":"j_one"},"record":{"node_field":{"node":"n_ev","value":{"gates":false}}}}}}]');
 INSERT INTO "events" VALUES (63, 'p_g4', 0, 'journey', 'j_one', 'node_changed', 'u_lead', NULL, NULL, '{"node":"n_ev"}', 1791288000000000063, NULL, '[{"put":{"graph":{"graph":{"journey":"j_one"},"record":{"node_field":{"node":"n_ev","value":{"closes_at":null}}}}}}]');
-INSERT INTO "proposals" VALUES ('pr_stage', 'journey', 'j_one', 1, 'open', 'Stage edit', NULL, 1, '[{"op":"edit_node","node":"n_both","fields":{"opens_at":"n_gate"}}]', '[]', NULL, 'u_lead', 1791288000000000000);
-INSERT INTO "proposals" VALUES ('pr_old', 'journey', 'j_one', 1, 'applied', 'Mixed', NULL, 1, '[{"op":"edit_node","node":"n_both","fields":{"closes_at":"n_gate"}},{"op":"transition","node":"n_work","transition":"complete"}]', '[]', NULL, 'u_lead', 1791288000000000000);
+INSERT INTO "events" VALUES (64, 'p_g5', 0, 'journey', 'j_one', 'node_added', 'u_lead', NULL, NULL, '{"node":"n_ruled"}', 1791288000000000064, NULL, '[{"put":{"graph":{"graph":{"journey":"j_one"},"record":{"node":{"key":"n_ruled","id":"ruled","kind":"group","title":"Ruled","due_by":{"after":"n_kick","offset":0}}}}}}]');
+INSERT INTO "events" VALUES (65, 'p_g6', 0, 'journey', 'j_one', 'node_changed', 'u_lead', NULL, NULL, '{"node":"n_ruled"}', 1791288000000000065, NULL, '[{"put":{"graph":{"graph":{"journey":"j_one"},"record":{"node_field":{"node":"n_ruled","value":{"closes_at":"n_gate"}}}}}}]');
+INSERT INTO "events" VALUES (66, 'p_g7', 0, 'route', 'r_copy', 'draft_opened', 'u_lead', NULL, NULL, '{"route":"r_copy"}', 1791288000000000066, NULL, '[{"put":{"graph":{"graph":{"route_version":{"route":"r_copy","version":1}},"record":{"node":{"key":"n_ruled","id":"ruled","kind":"group","title":"Ruled","due_by":{"after":"n_kick","offset":0}}}}}},{"copy_graph":{"from":{"route_version":{"route":"r_copy","version":1}},"to":{"route_draft":"r_copy"}}}]');
+INSERT INTO "events" VALUES (67, 'p_g8', 0, 'route', 'r_copy', 'node_changed', 'u_lead', NULL, NULL, '{"node":"n_ruled"}', 1791288000000000067, NULL, '[{"put":{"graph":{"graph":{"route_draft":"r_copy"},"record":{"node_field":{"node":"n_ruled","value":{"closes_at":"n_gate"}}}}}}]');
+INSERT INTO "events" VALUES (68, 'p_g9', 0, 'journey', 'j_one', 'proposal_created', 'u_lead', NULL, NULL, '{"proposal":"pr_ev"}', 1791288000000000068, NULL, '[{"put":{"proposal":{"id":"pr_ev","destination":{"journey":"j_one"},"revision":1,"status":"open","draft":{"title":"Stage","destination_revision":1,"mutations":[{"op":"add_node","node":{"key":"n_stg","id":"stg","kind":"group","title":"Stg","opens_at":"n_kick"}},{"op":"set_node_field","node":"n_both","value":{"closes_at":"n_gate"}}],"items":[{"item":"violation","violation":{"code":"stage_bound_not_milestone","at":{"field":"closes_at"},"message":"m"}}]},"created_by":"u_lead","created_at":"2026-10-18T21:14:56Z"}}}]');
+INSERT INTO "events" VALUES (69, 'p_g10', 0, 'journey', 'j_one', 'node_changed', 'u_lead', NULL, NULL, '{"node":"n_ruled"}', 1791288000000000069, NULL, '[{"put":{"graph":{"graph":{"journey":"j_one"},"record":{"node_field":{"node":"n_ruled","value":{"due_by":{"before":"n_x"}}}}}}}]');
+INSERT INTO "proposals" VALUES ('pr_bad', 'journey', 'j_one', 1, 'open', 'Unsayable stage', NULL, 1, '[{"op":"add_node","node":{"key":"n_bad","id":"bad","kind":"group","title":"Bad","closes_at":"n_gate","due_by":{"before":"n_x","offset":3}}}]', '[]', NULL, 'u_lead', 1791288000000000000);
+INSERT INTO "proposals" VALUES ('pr_stage', 'journey', 'j_one', 1, 'open', 'Stage edit', NULL, 1, '[{"op":"set_node_field","node":"n_both","value":{"opens_at":"n_gate"}}]', '[]', NULL, 'u_lead', 1791288000000000000);
+INSERT INTO "proposals" VALUES ('pr_old', 'journey', 'j_one', 1, 'applied', 'Mixed', NULL, 1, '[{"op":"set_node_field","node":"n_both","value":{"closes_at":"n_gate"}},{"op":"transition","node":"n_work","transition":"complete"}]', '[]', NULL, 'u_lead', 1791288000000000000);
+INSERT INTO "proposals" VALUES ('pr_add', 'journey', 'j_one', 1, 'open', 'Add a stage', NULL, 1, '[{"op":"add_node","node":{"key":"n_stg","id":"stg","kind":"group","title":"Stg","opens_at":"n_kick","closes_at":"n_gate"}}]', '[{"item":"violation","violation":{"code":"contradictory_chain","at":{},"message":"m","chains":{"chains":[{"chain":{"constraints":[{"before":"n_kick:finish","after":"n_gate:start","days":0,"source":"stage_close:n_stg"}]},"shortfall_days":1}]}}},{"item":"exclusion","node":"n_x","excluded":false}]', NULL, 'u_lead', 1791288000000000000);
 "#;
 
     fn open(name: &str, script: &str) -> (PathBuf, Result<SqliteStore, String>) {
@@ -132,7 +142,6 @@ INSERT INTO "proposals" VALUES ('pr_old', 'journey', 'j_one', 1, 'applied', 'Mix
                 &format!("SELECT delta FROM events WHERE seq = {seq}"),
             )
             .unwrap();
-            serde_json::from_str::<Vec<Write>>(&text).expect("a stored delta deserializes");
             serde_json::from_str(&text).unwrap()
         };
         let created = delta(60);
@@ -172,6 +181,63 @@ INSERT INTO "proposals" VALUES ('pr_old', 'journey', 'j_one', 1, 'applied', 'Mix
             cleared[0]["put"]["graph"]["record"]["node_field"]["value"],
             serde_json::json!({"due_by": null})
         );
+
+        let merged = serde_json::json!({"due_by": {"after": ["n_gate", "n_kick"], "offset": 0}});
+        assert_eq!(
+            delta(65)[0]["put"]["graph"]["record"]["node_field"]["value"],
+            merged,
+            "a closing edit on a group with its own rule rewrites the rule"
+        );
+        assert_eq!(
+            delta(67)[0]["put"]["graph"]["record"]["node_field"]["value"],
+            merged,
+            "a graph copied whole carries its groups' rules to the copy"
+        );
+        assert_eq!(
+            delta(69)[0]["put"]["graph"]["record"]["node_field"]["value"],
+            serde_json::json!({"due_by": {"before": ["n_gate", "n_x"]}}),
+            "a rule written while a closing still bounds the group keeps the closing"
+        );
+    }
+
+    #[test]
+    fn everything_stored_reads_back() {
+        let (path, opened) = open("typed", &groups(HISTORY));
+        drop(opened.unwrap());
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        let strings = |sql: &str| -> Vec<String> {
+            connection
+                .prepare(sql)
+                .unwrap()
+                .query_map([], |row| row.get(0))
+                .unwrap()
+                .collect::<Result<_, _>>()
+                .unwrap()
+        };
+        for delta in strings("SELECT delta FROM events") {
+            serde_json::from_str::<Vec<Write>>(&delta).expect("a stored delta deserializes");
+        }
+        for mutations in strings("SELECT mutations FROM proposals") {
+            serde_json::from_str::<Vec<Mutation>>(&mutations)
+                .expect("a stored proposal's mutations deserialize");
+        }
+        for items in strings("SELECT items FROM proposals") {
+            serde_json::from_str::<Vec<ReviewItem>>(&items)
+                .expect("a stored proposal's items deserialize");
+        }
+        let created: String = column(&path, "SELECT delta FROM events WHERE seq = 68").unwrap();
+        let created: serde_json::Value = serde_json::from_str(&created).unwrap();
+        let draft = &created[0]["put"]["proposal"]["draft"];
+        assert_eq!(
+            draft["mutations"].as_array().unwrap().len(),
+            1,
+            "the stage edit is dropped from a proposal's event, the added stage kept"
+        );
+        assert_eq!(
+            draft["mutations"][0]["node"]["requires"],
+            serde_json::json!(["n_kick"])
+        );
+        assert_eq!(draft["items"], serde_json::json!([]));
     }
 
     #[test]
@@ -186,6 +252,11 @@ INSERT INTO "proposals" VALUES ('pr_old', 'journey', 'j_one', 1, 'applied', 'Mix
             .unwrap()
         };
         assert_eq!(status("pr_stage"), "discarded");
+        assert_eq!(
+            status("pr_bad"),
+            "discarded",
+            "a stage whose rule cannot take its closing is not kept weaker"
+        );
         let reason: String = column(
             &path,
             "SELECT description FROM proposals WHERE id = 'pr_stage'",
@@ -214,6 +285,21 @@ INSERT INTO "proposals" VALUES ('pr_old', 'journey', 'j_one', 1, 'applied', 'Mix
             "a settled proposal keeps its other mutations"
         );
         assert_eq!(kept[0]["op"], "transition");
+        assert_eq!(
+            status("pr_add"),
+            "open",
+            "a proposal that only added a stage is converted, not discarded"
+        );
+        let added: serde_json::Value = serde_json::from_str(
+            &column::<String>(&path, "SELECT mutations FROM proposals WHERE id = 'pr_add'")
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(added[0]["node"]["requires"], serde_json::json!(["n_kick"]));
+        assert_eq!(
+            added[0]["node"]["due_by"],
+            serde_json::json!({"before": "n_gate"})
+        );
         assert_eq!(
             status("pr_one"),
             "open",
