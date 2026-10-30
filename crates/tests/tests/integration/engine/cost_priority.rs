@@ -66,7 +66,7 @@ mod cost {
             .filter(|node| !derived.blocking().deps_done(&node.key))
             .filter(|node| {
                 let due = derived.dates().effective_date(&node.key);
-                due.is_some_and(|due| due.date <= derived.today())
+                due.is_some_and(|due| due.date.day() <= derived.today())
             })
             .count();
         u64::try_from(count).unwrap()

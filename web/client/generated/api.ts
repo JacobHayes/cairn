@@ -1131,8 +1131,7 @@ export interface components {
         } | {
             text: components["schemas"]["AnswerText"];
         } | {
-            /** Format: date */
-            date: string;
+            date: components["schemas"]["When"];
         } | {
             identity: components["schemas"]["IdentityKey"];
         } | {
@@ -1160,11 +1159,10 @@ export interface components {
         /** @description A dependency that blocks a node (Gating: Blocked). */
         Blocker: {
             /**
-             * Format: date
              * @description The date the dependency is scheduled for, while it is held for a date ahead, so what
              *     waits on it can say when.
              */
-            date?: string | null;
+            date?: components["schemas"]["When"] | null;
             /** @description The unsatisfied dependency. */
             node: components["schemas"]["NodeKey"];
             /** @description How the dependency arose. */
@@ -1659,6 +1657,12 @@ export interface components {
         DeriveInputs: {
             /** @description The deployment context: identities, emails, and aliases at a revision. */
             deployment: components["schemas"]["Deployment"];
+            /**
+             * Format: date-time
+             * @description Now: the moment of the request, which a time of day on a pin, an answer, or a snooze is
+             *     read against.
+             */
+            now: string;
             /** @description The deployment's time zone. */
             timezone: components["schemas"]["TimeZoneName"];
             /**
@@ -1686,10 +1690,21 @@ export interface components {
             final_milestone?: components["schemas"]["NodeKey"] | null;
             /** @description The frontier, ranked (Priority: ties by slack, gravity, key). */
             frontier: components["schemas"]["NodeKey"][];
+            /**
+             * Format: date-time
+             * @description The first moment after `now`, today, at which a derivation would differ because a time
+             *     came: absent when none does. A derivation holds for every moment from `now` to here.
+             */
+            holds_until?: string | null;
             /** @description Per node. */
             nodes: {
                 [key: string]: components["schemas"]["NodeDerived"];
             };
+            /**
+             * Format: date-time
+             * @description The moment it was derived for.
+             */
+            now: string;
             /** @description The stalled diagnostic, when stalled. */
             stalled?: components["schemas"]["Stalled"] | null;
             /**
@@ -1793,11 +1808,8 @@ export interface components {
          *     derived due. What other constraints see when they reference it.
          */
         EffectiveDate: {
-            /**
-             * Format: date
-             * @description The date.
-             */
-            date: string;
+            /** @description The date, with its time when a pin gives one. */
+            date: components["schemas"]["When"];
             /** @description Where it comes from. */
             origin: components["schemas"]["DateOrigin"];
         };
@@ -2109,11 +2121,8 @@ export interface components {
             };
         } | {
             pin: {
-                /**
-                 * Format: date
-                 * @description The date.
-                 */
-                date: string;
+                /** @description The date, or the moment. */
+                date: components["schemas"]["When"];
                 /** @description The node. */
                 node: components["schemas"]["NodeKey"];
             };
@@ -2382,7 +2391,7 @@ export interface components {
              *     `feeds_milestone` answer is derived from the answer, not stored here.
              */
             pins?: {
-                [key: string]: string;
+                [key: string]: components["schemas"]["When"];
             };
             /**
              * @description The rationale each answer was given with, by decision. A key here has an answer
@@ -2922,11 +2931,8 @@ export interface components {
             /** @description The role. */
             role: components["schemas"]["RoleKey"];
         } | {
-            /**
-             * Format: date
-             * @description The date.
-             */
-            date: string;
+            /** @description The day, or a moment on it with the deployment's offset. */
+            date: components["schemas"]["When"];
             /** @description The node. */
             node: components["schemas"]["NodeKey"];
             /** @constant */
@@ -3334,13 +3340,12 @@ export interface components {
              */
             snoozable?: boolean;
             /**
-             * Format: date
-             * @description The day the snooze holding the node lifts, while one holds: the latest of its own and
-             *     each holding container's, a date snooze lifting on its date and a node snooze at the
-             *     finish of the node it waits on (a milestone's effective date, else its due date). Absent
-             *     when nothing holds it, and when a hold has no date yet.
+             * @description When the snooze holding the node lifts, while one holds: the latest of its own and
+             *     each holding container's, a date snooze lifting on its date or at its time and a node
+             *     snooze at the finish of the node it waits on (a milestone's effective date, else its due
+             *     date). Absent when nothing holds it, and when a hold has no date yet.
              */
-            snooze_lifts?: string | null;
+            snooze_lifts?: components["schemas"]["When"] | null;
             /**
              * @description A snooze that holds over the node: its own, else the one of the container it is
              *     held through (`snoozed_via`).
@@ -3413,11 +3418,8 @@ export interface components {
             parent?: components["schemas"]["NodeKey"] | null;
             /** @description Where it sits. */
             path: components["schemas"]["Path"];
-            /**
-             * Format: date
-             * @description Its pin.
-             */
-            pin?: string | null;
+            /** @description Its pin. */
+            pin?: components["schemas"]["When"] | null;
             /** @description The rationale the recorded answer was given with, markdown. */
             rationale?: components["schemas"]["Markdown"] | null;
             /** @description Its stored state and actual dates. */
@@ -5014,8 +5016,7 @@ export interface components {
         };
         /** @description What a snooze waits for: exactly one of a date or a node. */
         SnoozeTarget: {
-            /** Format: date */
-            date: string;
+            date: components["schemas"]["When"];
         } | {
             node: components["schemas"]["NodeKey"];
         };
@@ -5053,11 +5054,8 @@ export interface components {
             };
         } | {
             scheduled: {
-                /**
-                 * Format: date
-                 * @description The date it waits for.
-                 */
-                date: string;
+                /** @description The date it waits for, with its time when it has one. */
+                date: components["schemas"]["When"];
                 /**
                  * @description It marks itself done on that date; otherwise someone finishes it once the date
                  *     has come.
@@ -5174,11 +5172,8 @@ export interface components {
         };
         /** @description One date on the timeline. */
         TimelineEntry: {
-            /**
-             * Format: date
-             * @description The date.
-             */
-            date: string;
+            /** @description The date, with its time when a pin gives one. */
+            date: components["schemas"]["When"];
             /** @description The journey's `final` milestone: the end anchor. */
             final?: boolean;
             /** @description Its kind. */
@@ -5400,12 +5395,14 @@ export interface components {
          * @description What a violation breaks.
          * @enum {string}
          */
-        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_id" | "draft_exists" | "no_draft" | "route_in_use" | "insertion_invalid" | "insertion_key_taken" | "identity_key_taken" | "identity_empty" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "identity_in_use" | "proposal_not_open" | "unresolved_review_item";
+        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "invalid_time" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_id" | "draft_exists" | "no_draft" | "route_in_use" | "insertion_invalid" | "insertion_key_taken" | "identity_key_taken" | "identity_empty" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "identity_in_use" | "proposal_not_open" | "unresolved_review_item";
         /** @description A violation list with at least one entry (a rejection always says why). */
         Violations: components["schemas"]["Violation"][];
         /** @description What a stream watches: `deployment`, `journey:<id>`, `route:<id>`, `proposal:<id>`, `journeys`, `routes`, or `proposals`. */
         WatchName: string;
         Weight: number;
+        /** @description A day (2026-10-10) or a moment on one, to the minute, with the deployment's UTC offset (2026-10-10T08:15+01:00). */
+        When: string;
         /**
          * @description One change to the stored records: a record's after-state, a removal, or a whole-graph
          *     copy (publishing copies a draft into a version; a removal of a whole graph clears it).

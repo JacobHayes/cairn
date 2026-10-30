@@ -6,13 +6,13 @@
 import { Link, useLocation } from "react-router";
 
 import type { DecisionRow } from "../decisions/model.ts";
-import { nodeOf, scheduledDate, type Ready, titleOf } from "../detail/model.ts";
+import { dueOf, type NodeKind, nodeOf, scheduledDate, type Ready, titleOf } from "../detail/model.ts";
 import { screenSwitched, useNodeAddresses } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { NO_OWNER, ownerWords } from "../detail/sections.tsx";
 import { snoozeWords } from "../status/snooze.ts";
 import { statusTone, statusWord } from "../status/words.ts";
-import { dateInk, dateWords, daysWords, dueWords, inkClass } from "../status/when.ts";
+import { dateInk, dateWords, daysWords, dueWords, inkClass, lateWords } from "../status/when.ts";
 import { Badge } from "../ui/kit.tsx";
 import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import type { ListSettings } from "./address.ts";
@@ -75,19 +75,30 @@ function Scheduled({ view, line }: { view: Ready; line: Line }) {
   );
 }
 
+/** A node's due in words and ink: late as the engine counts it (a time that passed today is late by no days), else the distance to its date. */
+function dueSaid(view: Ready, key: string, kind: NodeKind, fallback?: string): { words: string; ink: string | undefined } | undefined {
+  const due = dueOf(view, key) ?? fallback;
+  if (due === undefined) {
+    return undefined;
+  }
+  const late = view.derived.nodes[key]?.dates.overdue_days;
+  return late == null
+    ? { words: dueWords(due, view.derived.today, kind === "decision"), ink: inkClass(dateInk(due, view.derived.today)) }
+    : { words: lateWords(late), ink: inkClass("bad") };
+}
+
 /** A phone drops the Due column, so the row says its due words under the title (a snoozed row says where the snooze ends instead, and a scheduled row the date it waits for: one secondary fact each). */
 export function PhoneDue({ view, line, fact }: { view: Ready; line: Line; fact: string | undefined }) {
   const derived = view.derived.nodes[line.key];
   const node = nodeOf(view, line.key);
   const state = line.row?.display_state ?? derived?.display_state;
-  const due = derived?.dates.due?.date;
+  const said = dueSaid(view, line.key, node?.kind ?? "action");
   const open = state !== undefined && state !== "done" && state !== "skipped" && state !== "not_relevant" && state !== "snoozed" && state !== "scheduled";
-  if (!open || due == null || node === undefined) {
+  if (!open || said === undefined || node === undefined) {
     return null;
   }
-  const words = dueWords(due, view.derived.today, node.kind === "decision");
   // The fact under the title already says it when it is the due words ("14 days late").
-  return words === fact ? null : <span className={`list-due-phone small ${inkClass(dateInk(due, view.derived.today)) ?? "muted"}`}>{words}</span>;
+  return said.words === fact ? null : <span className={`list-due-phone small ${said.ink ?? "muted"}`}>{said.words}</span>;
 }
 
 /** How far a container is, and the one thing beneath it that needs attention. */
@@ -201,7 +212,10 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
     case "owner":
       return (row.owners ?? []).length > 0 ? ownerWords(view, row.owners, context.viewer) : row.unassigned === true ? <span className="list-unassigned">{NO_OWNER}</span> : null;
     case "due":
-      return row.due == null || !open ? null : <span className={inkClass(dateInk(row.due, today))} data-testid="list-due">{dueWords(row.due, today, node.kind === "decision")}</span>;
+    {
+      const said = row.due == null || !open ? undefined : dueSaid(view, line.key, node.kind, row.due);
+      return said === undefined ? null : <span className={said.ink} data-testid="list-due">{said.words}</span>;
+    }
     case "rank": {
       const place = context.ranks.get(line.key);
       return place !== undefined ? `#${String(place)}` : open ? <Tip tip="Not on the frontier" kind="name" tap><span className="muted" role="img" aria-label="Not on the frontier">–</span></Tip> : null;

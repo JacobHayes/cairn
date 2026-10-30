@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use cairn_schema::{
     Annotation, AnswerEffects, AnswerValue, Date, DisplayState, KeyRefs, Markdown, MineEntry, Node,
     NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, Revision, State,
-    StillWaiting, Title,
+    StillWaiting, Title, When,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -98,7 +98,7 @@ pub struct NodeDetail {
     // PRD: F2.
     /// Its pin.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pin: Option<Date>,
+    pub pin: Option<When>,
     // PRD: D4.
     /// Its overrides.
     #[serde(default, skip_serializing_if = "Option::is_none")]

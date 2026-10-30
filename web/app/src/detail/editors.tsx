@@ -9,6 +9,7 @@ import { snoozeEndWords } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { Button, Input } from "../ui/kit.tsx";
 import { Saving, type Sending } from "../ui/Receipt.tsx";
+import { WhenInput } from "../ui/WhenInput.tsx";
 import { type Mutation, type NodeDetail, nodeOf, type Ready, titleOf, transition } from "./model.ts";
 import { NodeLink } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
@@ -64,9 +65,7 @@ function DraftForm({
   );
 }
 
-const dateInput = (label: string) => (value: string, change: (value: string) => void) => (
-  <Input type="date" aria-label={label} value={value} onChange={(event) => { change(event.target.value); }} />
-);
+const dateInput = (label: string, zone: string) => (value: string, change: (value: string) => void) => <WhenInput label={label} value={value} zone={zone} onChange={change} />;
 
 /**
  * F2, E3: the node's pin. A milestone a date decision feeds is pinned only through that
@@ -101,7 +100,7 @@ export function PinEditor({ view, detail }: { view: Ready; detail: NodeDetail })
           form="pin"
           start={current ?? view.key.today}
           label={current === undefined ? "Pin a date" : "Change the pin"}
-          input={dateInput("Pin date")}
+          input={dateInput("Pin date", view.inputs.timezone)}
           mutations={set}
         />
         {current === undefined || !write.writable ? null : (
@@ -165,7 +164,7 @@ export function UntilFields({ view, group, exclude, value, onChange }: { view: R
           ))}
         </div>
       </fieldset>
-      {until === "date" ? <Input type="date" aria-label="Snooze until" value={date} onChange={(event) => { onChange({ date: event.target.value }); }} /> : null}
+      {until === "date" ? <WhenInput label="Snooze until" value={date} zone={view.inputs.timezone} onChange={(next) => { onChange({ date: next }); }} /> : null}
       {until === "node" ? <UntilNode view={view} label="Snooze until node" exclude={exclude} value={target} onChange={(next) => { onChange({ target: next }); }} /> : null}
     </>
   );

@@ -29,6 +29,7 @@ function sample(): string {
     },
     inputs: {
       today: "2026-10-06",
+      now: "2026-10-06T12:00:00Z",
       timezone: "UTC",
       deployment: { revision: 1, identities: [] },
     },

@@ -11,7 +11,7 @@ use cairn_engine::{Applied, ApplyInputs, Records, apply};
 use cairn_schema::{
     Consequences, Domain, EventType, IdentityKey, JourneyId, Location, Markdown, Mutation, Notice,
     Patch, PatchReceipt, PatchTarget, ProposalId, Record, Rejection, Revision, RevisionOf, Subject,
-    Violation, ViolationCode, Write,
+    Violation, ViolationCode, Violations, When, Write,
 };
 use cairn_store::{Commit, CommitError, Committed, EventQuery, PageSize};
 
@@ -180,8 +180,32 @@ impl Service {
             actor: call.actor.clone(),
             note,
         };
+        let wrong_offsets = self.wrong_offsets(patch);
         let applied = match engine(&domain, || apply(&loaded.records, patch, &inputs))? {
-            Ok(applied) => applied,
+            Ok(applied) => match wrong_offsets {
+                None => applied,
+                Some(violations) => {
+                    return self
+                        .rejected(patch, Rejection::Invalid { violations })
+                        .await;
+                }
+            },
+            // Every violation at once: the wrong offsets beside what the engine found.
+            Err(Rejection::Invalid { violations }) if wrong_offsets.is_some() => {
+                let all = wrong_offsets
+                    .iter()
+                    .flat_map(cairn_schema::Violations::as_slice)
+                    .chain(violations.as_slice())
+                    .cloned()
+                    .collect();
+                return match Violations::new(all) {
+                    Ok(violations) => {
+                        self.rejected(patch, Rejection::Invalid { violations })
+                            .await
+                    }
+                    Err(_) => Err(WriteError::Rejected(Rejection::Invalid { violations })),
+                };
+            }
             Err(Rejection::Stale { conflicts, .. }) => {
                 // After the load, so that this covers every commit up to it.
                 let intervening = self.store.intervening(&conflicts).await?;
@@ -202,13 +226,43 @@ impl Service {
                 &patch.target,
                 &loaded.records,
                 applied.records(),
-                today,
+                call.now,
                 &self.settings,
             );
             (caused, notices::of(patch, &loaded.records, &applied))
         })?;
         self.commit(patch, &loaded, &applied, (caused, noticed))
             .await
+    }
+
+    /// A time of day is stored with the deployment's offset at that moment, which the engine
+    /// cannot work out: a patch writing one with another offset is refused here, naming the
+    /// right one.
+    fn wrong_offsets(&self, patch: &Patch) -> Option<Violations> {
+        let wrong = patch
+            .mutations
+            .as_slice()
+            .iter()
+            .enumerate()
+            .flat_map(|(ordinal, mutation)| {
+                mutation.moments().into_iter().filter_map(move |moment| {
+                    let When::Moment(wall, offset) = moment else {
+                        return None;
+                    };
+                    let right = self.settings.offset_instead(wall, offset)?;
+                    let message = format!(
+                        "the time {moment} is written with the deployment's offset at that moment, {}",
+                        When::offset_text(right)
+                    );
+                    Some(violation(
+                        ViolationCode::InvalidTime,
+                        u32::try_from(ordinal).ok(),
+                        message,
+                    ))
+                })
+            })
+            .collect();
+        Violations::new(wrong).ok()
     }
 
     /// H5: the answer for a patch the engine rejected. A stale one first checks for the

@@ -202,7 +202,7 @@ function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => 
 function Mark({ row, axis, y }: { row: ChartRow; axis: Axis; y: number }) {
   const from = positionOf(axis, row.from);
   const to = positionOf(axis, row.to);
-  const classes = `timeline-mark timeline-shape-${row.shape}${row.late > 0 || row.shortfallDays !== undefined ? " timeline-bad" : ""}`;
+  const classes = `timeline-mark timeline-shape-${row.shape}${row.late !== undefined || row.shortfallDays !== undefined ? " timeline-bad" : ""}`;
   switch (row.shape) {
     case "milestone":
     case "decision": {
@@ -269,7 +269,7 @@ function Label({ axis, row, selected, onFold, title, mark }: { axis: Axis; row: 
       data-day={row.to}
       data-date={axis.mode === "calendar" ? dateOf(row.to) : undefined}
       data-origin={row.origin ?? ""}
-      data-overdue={row.late > 0}
+      data-overdue={row.late !== undefined}
       data-shortfall={row.shortfallDays ?? ""}
       data-end={row.end}
       data-state={row.state}
@@ -286,7 +286,7 @@ function Label({ axis, row, selected, onFold, title, mark }: { axis: Axis; row: 
         <div className="timeline-text">
           {title(row.key)}
           <Tip tip={row.words} kind="cut">
-          <span className={row.late > 0 || row.shortfallDays !== undefined ? "small timeline-words timeline-late" : "muted small timeline-words"} data-testid="timeline-words" data-marked={mark === undefined ? undefined : true}>
+          <span className={row.late !== undefined || row.shortfallDays !== undefined ? "small timeline-words timeline-late" : "muted small timeline-words"} data-testid="timeline-words" data-marked={mark === undefined ? undefined : true}>
             {mark === undefined ? null : (
               <span className="layer-word" data-testid="row-diff" data-diff={mark.kind}>
                 {DIFF_LABELS[mark.kind]}
@@ -363,7 +363,7 @@ function Tracks({ chart, axis, selected, activate, marks }: { chart: Chart; axis
           return (
             <g key={row.key} className="timeline-row" data-state={row.state} data-faded={row.faded} data-selected={row.key === selected} data-testid="timeline-track" data-node={row.key}>
               <rect className="timeline-hit" x={0} y={at * ROW_PX} width="100%" height={ROW_PX} data-activatable={activate !== undefined} onClick={activate === undefined ? undefined : () => { activate(row.key); }} />
-              {row.late > 0 ? <rect className="timeline-overdue" x={percent(positionOf(axis, row.to))} y={y - BAR_PX} width={percent(Math.max(0, axis.now - positionOf(axis, row.to)))} height={BAR_PX * 2} /> : null}
+              {row.late !== undefined ? <rect className="timeline-overdue" x={percent(positionOf(axis, row.to))} y={y - BAR_PX} width={percent(Math.max(0, axis.now - positionOf(axis, row.to)))} height={BAR_PX * 2} /> : null}
               {floatFrom === undefined || floatTo === undefined ? null : (
                 <g className="timeline-float" data-testid="timeline-float" data-from={row.float?.from} data-to={row.float?.to}>
                   <line x1={percent(floatFrom)} x2={percent(floatTo)} y1={y} y2={y} />

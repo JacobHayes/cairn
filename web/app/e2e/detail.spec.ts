@@ -119,6 +119,22 @@ test("a later pin is rejected with its chain, counted away from it, discarded or
   await markDoneKeepsTypedText(page);
 });
 
+test("a pin carries a time of day, which is shown on the node and kept across a reload, and clearing the time leaves the day (A9)", async ({ page }) => {
+  const panel = await openNode(page, "j_vendor_eval", "n_final_report");
+  const editor = (await section(panel, "dates")).getByTestId("pin");
+  await editor.getByRole("button", { name: /^(Pin a date|Change the pin)$/ }).click();
+  await editor.getByLabel("Pin date", { exact: true }).fill("2026-11-02");
+  await editor.getByLabel("Pin date, time of day").fill("14:30");
+  await editor.getByTestId("pin-form").getByRole("button", { name: "Save" }).click();
+  await expect(editor).toContainText("14:30");
+  await page.reload();
+  await expect(nodePanel(page, "n_final_report").getByTestId("pin")).toContainText("14:30");
+  await editor.getByRole("button", { name: "Change the pin" }).click();
+  await editor.getByLabel("Pin date, time of day").fill("");
+  await editor.getByTestId("pin-form").getByRole("button", { name: "Save" }).click();
+  await expect(editor).not.toContainText("14:30");
+});
+
 test("a node held by its container's snooze offers Unsnooze of the container, which lifts it (B6)", async ({ page }) => {
   const panel = await openNode(page, "j_launch", "n_announcement");
   await menuItem(panel, "snooze");

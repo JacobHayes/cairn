@@ -12,7 +12,7 @@ use crate::engine::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::{Derived, Records};
-use cairn_schema::{Date, DisplayState, NodeKey, StallCause};
+use cairn_schema::{Date, DisplayState, NodeKey, StallCause, When};
 use support::{add_nodes as add, key};
 
 fn date(text: &str) -> Date {
@@ -88,7 +88,7 @@ fn a_date_ahead_holds_each_kind_off_the_acting_frontier() {
         let held = blocking.scheduled(&key(node)).expect(node);
         assert_eq!(
             (held.date, held.marks_itself_done),
-            (date(on), marks_itself_done),
+            (date(on).into(), marks_itself_done),
             "{node}"
         );
         assert!(blocking.frontier().contains(&key(node)), "{node}");
@@ -143,13 +143,13 @@ fn started_work_children_and_dependents_of_a_dated_node() {
     );
     assert_eq!(shown(&derived, &records, "n_after"), DisplayState::Blocked);
     let waits = derived.node_derived(&graph, &key("n_after")).waits_on;
-    let dates: Vec<(&str, Option<Date>)> = waits
+    let dates: Vec<(&str, Option<When>)> = waits
         .entries
         .as_slice()
         .iter()
         .map(|blocker| (blocker.node.as_str(), blocker.date))
         .collect();
-    assert_eq!(dates, [("n_launch", Some(date("2026-11-01")))]);
+    assert_eq!(dates, [("n_launch", Some(date("2026-11-01").into()))]);
 }
 
 /// D4, A8: work finished before its own not-before date is accepted plainly, falls short of
@@ -200,7 +200,7 @@ fn a_journey_held_only_by_a_not_before_date_names_it() {
         stalled.waiting_on,
         [StallCause::Scheduled {
             node: key("n_start"),
-            date: date("2026-10-09"),
+            date: date("2026-10-09").into(),
             marks_itself_done: false,
         }]
     );

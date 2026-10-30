@@ -71,7 +71,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
     let derived = derive_at(
         &graph,
         Some(journey.header.created_on),
-        session.inputs.today,
+        (session.inputs.today, session.inputs.at),
         &session.candidate.deployment,
     );
     for (key, ordinal) in &session.guarded {

@@ -18,6 +18,7 @@ const bound = (date: string) => ({ date, chain: { constraints: [], fixed: [] } }
 
 const inputs: Ready["inputs"] = {
   today,
+  now: `${today}T12:00:00Z`,
   timezone: "UTC",
   deployment: { revision: 1, identities: [{ key: "who_one", name: "Person One" }] },
 };
@@ -25,7 +26,7 @@ const inputs: Ready["inputs"] = {
 export function canvasView(): Ready {
   return {
     status: "ready",
-    key: { journey: "j_canvas", revision: 3, deployment_revision: 1, today },
+    key: { journey: "j_canvas", revision: 3, deployment_revision: 1, today, now: `${today}T12:00:00Z` },
     inputs,
     journey: {
       header: { id: "j_canvas", name: "Canvas journey", status: "active", created_at: "2026-10-01T00:00:00Z", created_on: "2026-10-01" },
@@ -53,7 +54,7 @@ export function canvasView(): Ready {
       },
     },
     derived: {
-      today,
+      today, now: inputs.now,
       frontier: ["n_choose"],
       acting_frontier: ["n_choose"],
       current_stages: ["n_stage"],

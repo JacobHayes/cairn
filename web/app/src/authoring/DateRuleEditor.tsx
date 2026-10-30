@@ -18,7 +18,7 @@ export interface DateRuleEditorProps {
   node: string | undefined;
 }
 
-const WORDS = { due_by: "Finishes by", not_before: "Starts no sooner than" };
+const WORDS = { due_by: "Finishes", not_before: "Starts" };
 
 function Sources({ parts, set, options }: { parts: RuleParts; set: (next: RuleParts) => void; options: { source: string; label: string }[] }) {
   const unused = options.filter((option) => !parts.sources.includes(option.source));
@@ -70,7 +70,7 @@ export function DateRuleEditor({ which, value, onChange, tree, node }: DateRuleE
   return (
     <div className="stack" data-testid={`rule-${which}`}>
       <span className="muted small" data-testid="rule-words">
-        {parts.offset.trim() === "" ? WORDS[which] : `${WORDS[which]} ${ruleWords(ruleOf(parts), label)}`}
+        {parts.offset.trim() === "" ? `${WORDS[which]} ...` : `${WORDS[which]} ${ruleWords(ruleOf(parts), label)}`}
       </span>
       <span className="row">
         <Input

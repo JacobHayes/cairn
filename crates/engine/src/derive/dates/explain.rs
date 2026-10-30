@@ -8,7 +8,7 @@ use cairn_schema::{
     AnswerValue, Chain, Constraint as ShownConstraint, ConstraintSource, DateRule, Days,
     DependencyVia, Direction as RuleDirection, Edge as ExplicitEdge, FixedBy, FixedDate,
     Instant as ShownInstant, InstantPoint, Mutation, NodeFieldValue, NodeKey, ShortChain,
-    SignedDays,
+    SignedDays, When,
 };
 
 use super::network::{Constraint, Network, Origin, Place, Rule, Slot, estimate_days};
@@ -296,19 +296,23 @@ impl Explain<'_> {
     fn seed_moves(&self, by: Mover, fix: Fix, days: i32, moves: &mut Vec<Mutation>) {
         let shifted = date(fix.day.saturating_add(days));
         match by {
+            // A time of day is kept by setting it again, not by moving it by days.
+            Mover::Answer(_) if fix.moment.is_some() => {}
             Mover::Answer(decision) => {
                 let decision = self.key(decision);
                 // Moving the date revises the value; the reason it was given stays.
                 let rationale = self.document.state.rationales.get(&decision).cloned();
                 moves.push(Mutation::Answer {
                     decision,
-                    value: AnswerValue::Date(shifted),
+                    value: AnswerValue::Date(When::Day(shifted)),
                     rationale,
                 });
             }
             Mover::Pin(node) => {
                 let node = self.key(node);
-                if let Ok(offset_days) = SignedDays::try_from(days) {
+                if let Ok(offset_days) = SignedDays::try_from(days)
+                    && fix.moment.is_none()
+                {
                     moves.push(Mutation::ShiftPin {
                         node: node.clone(),
                         offset_days,

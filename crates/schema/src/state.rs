@@ -14,6 +14,7 @@ use crate::limits::{Limit, LimitExceeded};
 use crate::node::{AnswerType, IdentitySet, NodeKind};
 use crate::number::Revision;
 use crate::text::{Markdown, Reason};
+use crate::when::When;
 use jiff::civil::Date;
 
 // PRD: D1.
@@ -182,8 +183,8 @@ pub enum AnswerValue {
     MultiChoice(BoundedSet<Slug, ChoiceCountPerDecision>),
     /// Text, possibly empty.
     Text(AnswerText),
-    /// A date.
-    Date(Date),
+    /// A day, or a moment on one.
+    Date(When),
     /// An identity.
     Identity(IdentityKey),
     /// Identities, possibly none.
@@ -246,8 +247,8 @@ impl From<AnswerText> for String {
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum SnoozeTarget {
-    /// Holds while today is before the date.
-    Date(Date),
+    /// Holds until the day starts, or the moment comes.
+    Date(When),
     /// Holds while the node neither satisfies dependencies nor is not relevant.
     Node(NodeKey),
 }
@@ -451,7 +452,7 @@ pub struct JourneyState {
         deserialize_with = "crate::serde_util::unique_map_per_node"
     )]
     #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
-    pub pins: BTreeMap<NodeKey, Date>,
+    pub pins: BTreeMap<NodeKey, When>,
     // PRD: B6.
     /// Snoozes by node.
     #[serde(

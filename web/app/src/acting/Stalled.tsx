@@ -9,7 +9,7 @@ import { ACT_LABELS } from "../detail/offers.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { SNOOZE_NODE_TAIL, snoozeEndWords } from "../status/snooze.ts";
-import { dateInk, dateWords, inkClass, whenWords } from "../status/when.ts";
+import { compareWhen, dateInk, dateWords, inkClass, whenWords } from "../status/when.ts";
 import { Button } from "../ui/kit.tsx";
 import { NodeLink } from "../detail/parts.tsx";
 
@@ -74,7 +74,7 @@ function ScheduledLine({ view, write, cause, title, inkOf }: { view: Ready; writ
 
 /** Whether every cause is a snooze to a date after `endDate`: the journey sleeps past its end. */
 function pastEnd(causes: Cause[], endDate: string | undefined): boolean {
-  return endDate !== undefined && causes.length > 0 && causes.every((cause) => "snooze" in cause && "date" in cause.snooze.until && cause.snooze.until.date > endDate);
+  return endDate !== undefined && causes.length > 0 && causes.every((cause) => "snooze" in cause && "date" in cause.snooze.until && compareWhen(cause.snooze.until.date, endDate) > 0);
 }
 
 /**

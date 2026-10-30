@@ -316,6 +316,7 @@ input[type="range"] {
 }
 input[type="number"],
 input[type="date"],
+input[type="time"],
 textarea {
   font-family: var(--font-mono);
   font-size: 13px;

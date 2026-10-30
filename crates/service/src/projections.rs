@@ -18,7 +18,7 @@ use cairn_schema::{
     Domain, ExplainedField, ExplanationPage, IdentityKey, JourneyId, KeyRefs, KindKey, Level,
     LevelQuery, ListPage, ListQuery, Markdown, MineEntry, Next, NextQuery, Node, NodeDerived,
     NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, ProposalId, RemovalRead, Revision,
-    Snapshot, State, StatusSummary, StillWaiting, Timeline, Title, Trace,
+    Snapshot, State, StatusSummary, StillWaiting, Timeline, Title, Trace, When,
 };
 use cairn_store::{EventQuery, PageSize};
 
@@ -111,7 +111,7 @@ pub struct NodeDetail {
     /// The rationale the recorded answer was given with (B2).
     pub rationale: Option<Markdown>,
     /// Its pin (F2).
-    pub pin: Option<Date>,
+    pub pin: Option<When>,
     /// Its overrides (D4).
     pub overrides: Option<Overrides>,
     /// The notes and links on it (G1), in key order.
@@ -460,13 +460,13 @@ impl Service {
             today: self.settings.today(call.now),
             viewer: crate::caller::identities_of(&logins, &deployment),
         };
-        if let Some(found) = self.memo.get(&key) {
+        if let Some(found) = self.memo.get(&key, call.now) {
             patina_dst::reachable!("service-derived-read-answered-from-memo");
             return Ok(found);
         }
         let inputs = self
             .settings
-            .derive_inputs(key.today, key.viewer.clone(), deployment);
+            .derive_inputs(call.now, key.viewer.clone(), deployment);
         let derivation = engine(&Domain::Journey(id.clone()), || {
             Derivation::new(journey, &inputs.deployment, &inputs)
         })?;

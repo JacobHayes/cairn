@@ -38,9 +38,9 @@ export type TickUnit = (typeof UNITS)[number]["unit"];
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** A calendar date (`YYYY-MM-DD`) as days since 1970-01-01. */
+/** A calendar date (`YYYY-MM-DD`), or the day of a moment on one (`YYYY-MM-DDTHH:MM+01:00`), as days since 1970-01-01. */
 export function dayOf(date: string): number {
-  const parsed = Date.parse(`${date}T00:00:00Z`);
+  const parsed = Date.parse(`${date.slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(parsed)) {
     throw new Error(`not a calendar date: ${date}`);
   }

@@ -2,7 +2,7 @@
 
 use std::str::FromStr;
 
-use cairn_schema::{Date, Domain, GraphId, Timestamp};
+use cairn_schema::{Domain, GraphId, Timestamp};
 use cairn_store::{CommitError, StoreError};
 use rusqlite::types::Value;
 use rusqlite::{Connection, ErrorCode, params_from_iter};
@@ -229,8 +229,8 @@ pub(crate) fn time(value: Timestamp) -> Result<Value, StoreError> {
         .map_err(|_| StoreError::Malformed(format!("timestamp {value} is out of range")))
 }
 
-/// A calendar date, as ISO text.
-pub(crate) fn date(value: Date) -> Value {
+/// A calendar date or a moment on one, as ISO text.
+pub(crate) fn date(value: impl std::fmt::Display) -> Value {
     Value::Text(value.to_string())
 }
 

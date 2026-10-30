@@ -20,8 +20,8 @@ use crate::proposal::Proposal;
 use crate::refs::KeyRefs;
 use crate::state::{AnswerValue, NodeState, Overrides, SnoozeTarget};
 use crate::text::Markdown;
+use crate::when::When;
 use jiff::Timestamp;
-use jiff::civil::Date;
 
 // PRD: Invariants: never reused.
 /// A key a graph has retired.
@@ -115,8 +115,8 @@ pub enum GraphRecord {
     Pin {
         /// The node.
         node: NodeKey,
-        /// The date.
-        date: Date,
+        /// The date, or the moment.
+        date: When,
     },
     /// A snooze.
     Snooze {

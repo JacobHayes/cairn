@@ -26,7 +26,7 @@
 //! descendants, 2,000 x 2,000 at worst over every node, O(nodes) per container.
 
 use cairn_schema::{
-    Date, DisplayState, NodeKey, NodeKind, Payload, Relevance, SnoozeTarget, State,
+    DisplayState, NodeKey, NodeKind, Payload, Relevance, SnoozeTarget, State, When,
 };
 
 use super::dependencies::{Instant, Point};
@@ -123,16 +123,17 @@ impl Derived {
             .cloned()
     }
 
-    /// B6: the day the snooze holding the node lifts: the latest of its own snooze and each
-    /// holding container's. A date snooze lifts on its date; a node snooze at the finish of the
+    /// B6: when the snooze holding the node lifts: the latest of its own snooze and each
+    /// holding container's, a day before any moment on it. A date snooze lifts on its date or at
+    /// its time; a node snooze at the finish of the
     /// node it waits on (a milestone's effective date, else its due date). None when no snooze
     /// holds the node or a hold has no date yet.
     #[must_use]
-    pub fn snooze_lifts(&self, graph: &Graph, key: &NodeKey) -> Option<Date> {
+    pub fn snooze_lifts(&self, graph: &Graph, key: &NodeKey) -> Option<When> {
         self.blocking.snoozed(key)?;
         let own = self.blocking.snoozed_own(key).map(|target| (key, target));
         let above = self.blocking.snoozes_above(graph.tree(), key);
-        let mut latest: Option<Date> = None;
+        let mut latest: Option<When> = None;
         for (_, target) in own.into_iter().chain(above) {
             let lifts = match target {
                 SnoozeTarget::Date(date) => Some(*date),
@@ -140,7 +141,7 @@ impl Derived {
                     .dates
                     .effective_date(awaited)
                     .map(|effective| effective.date)
-                    .or_else(|| self.dates.due(awaited)),
+                    .or_else(|| self.dates.due(awaited).map(When::Day)),
             }?;
             latest = latest.max(Some(lifts));
         }

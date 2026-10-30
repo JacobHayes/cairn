@@ -11,7 +11,9 @@
 use std::collections::BTreeSet;
 
 use cairn_engine::{Derived, DerivedJourney, Graph, derive, notices};
-use cairn_schema::{Date, Deployment, DeriveInputs, Graph as GraphDocument, Notice, RouteSchedule};
+use cairn_schema::{
+    Date, Deployment, DeriveInputs, Graph as GraphDocument, Notice, RouteSchedule, Timestamp,
+};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -55,6 +57,7 @@ impl RouteDerivation {
             .map_err(|violations| HostError::Invalid { violations })?;
         let inputs = DeriveInputs {
             today: SCHEDULE_START,
+            now: Timestamp::UNIX_EPOCH,
             timezone: "UTC"
                 .parse()
                 .map_err(|error| HostError::unreadable("timezone", error))?,

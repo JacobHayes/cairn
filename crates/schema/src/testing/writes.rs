@@ -10,7 +10,7 @@ use super::{
     arb_markdown, arb_node, arb_node_field_value, arb_node_key, arb_node_state, arb_overrides,
     arb_participation_kind, arb_patch_id, arb_proposal_id, arb_reason, arb_resource, arb_revision,
     arb_role, arb_role_key, arb_route_header, arb_route_id, arb_slug, arb_snooze_target,
-    arb_timestamp, arb_title, arb_user_id, arb_version_number,
+    arb_timestamp, arb_title, arb_user_id, arb_version_number, arb_when,
 };
 use crate::domain::{DeletedId, Domain, GraphId};
 use crate::event::{Actor, ChangeSet, Event, PatchReceipt, Subject};
@@ -257,7 +257,7 @@ fn arb_state_mutation() -> BoxedStrategy<Mutation> {
         (arb_role_key(), arb_identity_set())
             .prop_map(|(role, identities)| Mutation::FillRole { role, identities }),
         arb_role_key().prop_map(|role| Mutation::ClearRoleFill { role }),
-        (arb_node_key(), arb_date()).prop_map(|(node, date)| Mutation::SetPin { node, date }),
+        (arb_node_key(), arb_when()).prop_map(|(node, date)| Mutation::SetPin { node, date }),
         (arb_node_key(), shift)
             .prop_map(|(node, offset_days)| Mutation::ShiftPin { node, offset_days }),
         arb_node_key().prop_map(|node| Mutation::ClearPin { node }),
@@ -516,7 +516,7 @@ fn arb_state_record() -> BoxedStrategy<GraphRecord> {
             }),
         (arb_role_key(), arb_identity_set())
             .prop_map(|(role, identities)| GraphRecord::RoleFill { role, identities }),
-        (arb_node_key(), arb_date()).prop_map(|(node, date)| GraphRecord::Pin { node, date }),
+        (arb_node_key(), arb_when()).prop_map(|(node, date)| GraphRecord::Pin { node, date }),
         (arb_node_key(), arb_snooze_target())
             .prop_map(|(node, until)| GraphRecord::Snooze { node, until }),
         (arb_node_key(), arb_overrides())

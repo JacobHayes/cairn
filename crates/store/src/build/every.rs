@@ -15,7 +15,7 @@ use cairn_schema::{
     GuardFailure, Identity, JourneyHeader, JourneyState, JourneyStatus, Keyed, Lineage, Milestone,
     Node, NodeKey, NodeKind, NodeState, Overrides, ParticipationKind, ParticipationSource,
     Participations, Payload, Proposal, ProposalDraft, ProposalStatus, Reopened, Resource,
-    ResourceContent, RetiredKeys, Revision, Role, RouteHeader, SnoozeTarget, State, Weight,
+    ResourceContent, RetiredKeys, Revision, Role, RouteHeader, SnoozeTarget, State, Weight, When,
     refs::KeyRefs,
 };
 use serde_json::json;
@@ -64,6 +64,13 @@ fn day(number: i8) -> Date {
     Date::new(2026, 11, number).unwrap()
 }
 
+/// A moment on a November day, for a value that carries a time.
+fn moment(number: i8) -> When {
+    format!("2026-11-{number:02}T08:15+00:00")
+        .parse()
+        .unwrap_or_else(|error| panic!("{error}"))
+}
+
 fn node_key(index: usize) -> NodeKey {
     id(&format!("n_{index}"))
 }
@@ -100,7 +107,7 @@ pub fn answer_values() -> Vec<AnswerValue> {
                 AnswerValue::MultiChoice(BoundedSet::new([id("narrow"), id("wide")]).unwrap())
             }
             AnswerType::Text => AnswerValue::Text("Some remarks.".to_owned().try_into().unwrap()),
-            AnswerType::Date => AnswerValue::Date(day(20)),
+            AnswerType::Date => AnswerValue::Date(moment(20)),
             AnswerType::Identity => AnswerValue::Identity(id("who_a")),
             AnswerType::IdentityList => {
                 AnswerValue::IdentityList(BoundedSet::new([id("who_a"), id("who_b")]).unwrap())
@@ -112,7 +119,7 @@ pub fn answer_values() -> Vec<AnswerValue> {
 /// Every snooze target.
 #[must_use]
 pub fn snooze_targets() -> Vec<SnoozeTarget> {
-    chain(SnoozeTarget::Date(day(10)), |target| match target {
+    chain(SnoozeTarget::Date(day(10).into()), |target| match target {
         SnoozeTarget::Date(_) => Some(SnoozeTarget::Node(node_key(2))),
         SnoozeTarget::Node(_) => None,
     })
@@ -442,7 +449,7 @@ pub fn state(fill: Fill) -> JourneyState {
                 (id(role), BoundedSet::new(identities).unwrap())
             })
             .collect(),
-        pins: BTreeMap::from([(node_key(0), day(if fill.on() { 3 } else { 4 }))]),
+        pins: BTreeMap::from([(node_key(0), moment(if fill.on() { 3 } else { 4 }))]),
         snoozes: by_node(fill.rotate(snooze_targets())),
         overrides: BTreeMap::from([(
             node_key(0),

@@ -105,6 +105,8 @@ export interface DerivationKey {
   revision: Schema<"Revision">;
   deployment_revision: Schema<"Revision">;
   today: string;
+  /** The instant it was derived for: a time of day that passes changes what a derivation says. */
+  now: string;
   /** A slot's derivation is numbered by its load, so two previews of one slot never share a key. */
   generation?: number;
 }

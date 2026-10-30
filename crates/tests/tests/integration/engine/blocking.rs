@@ -293,7 +293,7 @@ fn a_date_snooze_holds_until_its_date() {
     let held = derived_on(&snoozed, "2026-10-07").1;
     assert_eq!(
         held.blocking().snoozed(&key("n_work")),
-        Some(&SnoozeTarget::Date(date("2026-10-08")))
+        Some(&SnoozeTarget::Date(date("2026-10-08").into()))
     );
     assert_eq!(frontier(&held), ["n_work"]);
     assert_eq!(acting(&held), [] as [&str; 0]);
@@ -432,7 +432,7 @@ fn stalled_names_a_gate_a_snooze_and_an_auto_done_date() {
         [
             StallCause::Scheduled {
                 node: key("n_kickoff"),
-                date: date("2026-10-10"),
+                date: date("2026-10-10").into(),
                 marks_itself_done: true,
             },
             StallCause::Snooze {
@@ -441,7 +441,7 @@ fn stalled_names_a_gate_a_snooze_and_an_auto_done_date() {
             },
             StallCause::Snooze {
                 node: key("n_read"),
-                until: SnoozeTarget::Date(date("2026-10-09")),
+                until: SnoozeTarget::Date(date("2026-10-09").into()),
             },
             StallCause::Gate(key("n_access")),
         ]

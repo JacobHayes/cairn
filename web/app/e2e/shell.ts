@@ -174,12 +174,13 @@ export async function holdToday(page: Page, day: string): Promise<void> {
   await page.clock.setFixedTime(new Date(`${day}T12:00:00Z`));
   await page.route("**/api/journeys/*/document", async (route) => {
     const response = await route.fetch();
-    const document = (await response.json()) as { inputs?: { today: string } };
+    const document = (await response.json()) as { inputs?: { today: string; now: string } };
     if (document.inputs === undefined) {
       await route.fulfill({ response, json: document });
       return;
     }
     document.inputs.today = day;
+    document.inputs.now = `${day}T12:00:00Z`;
     await route.fulfill({ response, json: document });
   });
 }

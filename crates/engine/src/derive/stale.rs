@@ -240,7 +240,7 @@ impl Reopens {
             && milestone.auto_done
             && early.relevance.value(&node.key) == Relevance::Relevant
         {
-            let date = dates.effective_date(&node.key)?.date;
+            let date = dates.effective_date(&node.key)?.date.day();
             return waits()?.and(Span {
                 from_day: Some(date),
                 ..Span::ALWAYS

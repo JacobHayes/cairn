@@ -71,6 +71,7 @@ pub enum ViolationCode {
     SnoozedThroughContainer,
     FilledThroughDecision,
     PinnedThroughDecision,
+    InvalidTime,
     // Domains and lifecycle.
     MutationNotForTarget,
     LineageInvalid,

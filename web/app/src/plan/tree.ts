@@ -4,6 +4,7 @@
 //
 // Cost: O(nodes log nodes) per journey document and per derivation, then O(1) per lookup.
 import { recordOf, type GraphNode, type Ready } from "../detail/model.ts";
+import { compareWhen } from "../status/when.ts";
 
 /** The nodes' containment: roots, then each container's children, siblings in plan order. */
 export interface Tree {
@@ -29,11 +30,11 @@ function ownDate(view: Ready, node: GraphNode): string | undefined {
   }
   // The engine says the day the holding snooze lifts; none yet means the hold has no date, so the row is undated.
   const lifts = derived.snooze_lifts ?? undefined;
-  return lifts === undefined ? undefined : current === undefined || current < lifts ? lifts : current;
+  return lifts === undefined ? undefined : current === undefined || compareWhen(current, lifts) < 0 ? lifts : current;
 }
 
 function soonestOf(dates: readonly (string | undefined)[]): string | undefined {
-  return dates.reduce<string | undefined>((soonest, date) => (date !== undefined && (soonest === undefined || date < soonest) ? date : soonest), undefined);
+  return dates.reduce<string | undefined>((soonest, date) => (date !== undefined && (soonest === undefined || compareWhen(date, soonest) < 0) ? date : soonest), undefined);
 }
 
 /**
@@ -54,7 +55,7 @@ function planSort(view: Ready, nodes: readonly GraphNode[], children: Map<string
   const compare = <T>(left: T, right: T) => (left < right ? -1 : left > right ? 1 : 0);
   return (left, right) => {
     const [from, to] = [scheduleOf(left), scheduleOf(right)];
-    return final(left) - final(right) || Number(from === undefined) - Number(to === undefined) || (from === undefined || to === undefined ? 0 : compare(from, to)) || compare(left, right);
+    return final(left) - final(right) || Number(from === undefined) - Number(to === undefined) || (from === undefined || to === undefined ? 0 : compareWhen(from, to)) || compare(left, right);
   };
 }
 

@@ -47,8 +47,8 @@ pub(crate) mod stale;
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Blocker, Date, DependencyVia, Deployment, DeriveInputs, KeyRefs, Node, NodeKey, Relevance,
-    StaleReason, State,
+    AnswerValue, Blocker, Date, DependencyVia, Deployment, DeriveInputs, KeyRefs, Node, NodeKey,
+    Relevance, SnoozeTarget, StaleReason, State, Timestamp, When,
 };
 
 use crate::graph::{Document, Graph, Tree};
@@ -77,6 +77,8 @@ pub struct Derived {
     ranking: Ranking,
     stale: stale::Staleness,
     today: Date,
+    now: Timestamp,
+    holds_until: Option<Timestamp>,
 }
 
 impl Derived {
@@ -133,6 +135,19 @@ impl Derived {
     #[must_use]
     pub fn today(&self) -> Date {
         self.today
+    }
+
+    /// The moment it was derived for (D7: both sides of a consequence share it).
+    #[must_use]
+    pub fn now(&self) -> Timestamp {
+        self.now
+    }
+
+    /// The first moment after `now`, today, at which a time of day on a pin, an answer, or a
+    /// snooze changes what a derivation says; none when no such moment is left today.
+    #[must_use]
+    pub fn holds_until(&self) -> Option<Timestamp> {
+        self.holds_until
     }
 
     /// D4: the node is finished and stale: something it relied on was reopened, or evidence
@@ -366,7 +381,12 @@ pub fn derive(journey: &Graph, created_on: Option<Date>, inputs: &DeriveInputs) 
         state.is_empty() || state.len() == document.nodes.len(),
         "every node of a journey has a stored state"
     );
-    derive_at(journey, created_on, inputs.today, &inputs.deployment)
+    derive_at(
+        journey,
+        created_on,
+        (inputs.today, inputs.now),
+        &inputs.deployment,
+    )
 }
 
 /// Derives a journey at `today` over `deployment` every pass that
@@ -376,13 +396,13 @@ pub fn derive(journey: &Graph, created_on: Option<Date>, inputs: &DeriveInputs) 
 pub(crate) fn derive_at(
     journey: &Graph,
     created_on: Option<Date>,
-    today: Date,
+    (today, now): (Date, Timestamp),
     deployment: &Deployment,
 ) -> Derived {
     let early = early(journey, deployment);
     let participation = participation::pass(journey, &early.relevance, deployment);
-    let mut dates = Dates::pass(journey, &early, today, created_on);
-    let blocking = Blocking::pass(journey, &early, &dates, today);
+    let mut dates = Dates::pass(journey, &early, today, now, created_on);
+    let blocking = Blocking::pass(journey, &early, &dates, today, now);
     dates.settle_done(journey, |key| blocking.done_by_date(key));
     let priority = Priority::pass(journey, &early, &participation, &blocking);
     let ranking = Ranking::pass(&priority, &dates, &blocking);
@@ -403,7 +423,38 @@ pub(crate) fn derive_at(
         ranking,
         stale,
         today,
+        now,
+        holds_until: holds_until(journey.document(), today, now),
     }
+}
+
+/// The first moment after `now` at which a time of day today changes a derivation: each one
+/// arriving, and a pin's passing a minute later (work with its own time past is late). Every
+/// time in the journey counts, in scope or not, so this is the earliest a derivation can differ.
+fn holds_until(document: &Document, today: Date, now: Timestamp) -> Option<Timestamp> {
+    let state = &document.state;
+    let snoozes = state.snoozes.values().filter_map(|until| match until {
+        SnoozeTarget::Date(when) => Some(*when),
+        SnoozeTarget::Node(_) => None,
+    });
+    let answers = state.answers.values().filter_map(|answer| match answer {
+        AnswerValue::Date(when) => Some(*when),
+        _ => None,
+    });
+    snoozes
+        .chain(answers)
+        .chain(state.pins.values().copied())
+        .filter(|when| when.day() == today)
+        .filter_map(When::instant)
+        .flat_map(|instant| {
+            [
+                Some(instant),
+                instant.checked_add(jiff::SignedDuration::from_mins(1)).ok(),
+            ]
+        })
+        .flatten()
+        .filter(|moment| *moment > now)
+        .min()
 }
 
 /// Passes 1 and 2, which the plan check reads as well as derive.

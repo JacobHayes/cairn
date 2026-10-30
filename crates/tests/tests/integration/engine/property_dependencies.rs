@@ -218,7 +218,7 @@ mod property {
                 let arrived = derived
                     .dates()
                     .effective_date(key)
-                    .is_some_and(|date| date.date <= today);
+                    .is_some_and(|date| date.date.day() <= today);
                 deps_done && milestone.auto_done && relevant && arrived
             }
             _ => false,

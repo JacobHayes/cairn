@@ -368,11 +368,10 @@
           },
           {
             "additionalProperties": false,
-            "description": "A date.",
+            "description": "A day, or a moment on one.",
             "properties": {
               "date": {
-                "format": "date",
-                "type": "string"
+                "$ref": "#/components/schemas/When"
               }
             },
             "required": [
@@ -488,12 +487,15 @@
         "description": "A dependency that blocks a node (Gating: Blocked).",
         "properties": {
           "date": {
-            "description": "The date the dependency is scheduled for, while it is held for a date ahead, so what\nwaits on it can say when.",
-            "format": "date",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/When"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The date the dependency is scheduled for, while it is held for a date ahead, so what\nwaits on it can say when."
           },
           "node": {
             "$ref": "#/components/schemas/NodeKey",
@@ -2152,6 +2154,11 @@
             "$ref": "#/components/schemas/Deployment",
             "description": "The deployment context: identities, emails, and aliases at a revision."
           },
+          "now": {
+            "description": "Now: the moment of the request, which a time of day on a pin, an answer, or a snooze is\nread against.",
+            "format": "date-time",
+            "type": "string"
+          },
           "timezone": {
             "$ref": "#/components/schemas/TimeZoneName",
             "description": "The deployment's time zone."
@@ -2172,6 +2179,7 @@
         },
         "required": [
           "today",
+          "now",
           "timezone",
           "deployment"
         ],
@@ -2213,6 +2221,14 @@
             },
             "type": "array"
           },
+          "holds_until": {
+            "description": "The first moment after `now`, today, at which a derivation would differ because a time\ncame: absent when none does. A derivation holds for every moment from `now` to here.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "nodes": {
             "additionalProperties": false,
             "description": "Per node.",
@@ -2222,6 +2238,11 @@
               }
             },
             "type": "object"
+          },
+          "now": {
+            "description": "The moment it was derived for.",
+            "format": "date-time",
+            "type": "string"
           },
           "stalled": {
             "anyOf": [
@@ -2242,6 +2263,7 @@
         },
         "required": [
           "today",
+          "now",
           "nodes",
           "frontier",
           "acting_frontier"
@@ -2605,9 +2627,8 @@
         "description": "A milestone's effective date: its actual date if done, else its pin, else its\nderived due. What other constraints see when they reference it.",
         "properties": {
           "date": {
-            "description": "The date.",
-            "format": "date",
-            "type": "string"
+            "$ref": "#/components/schemas/When",
+            "description": "The date, with its time when a pin gives one."
           },
           "origin": {
             "$ref": "#/components/schemas/DateOrigin",
@@ -3768,9 +3789,8 @@
                 "additionalProperties": false,
                 "properties": {
                   "date": {
-                    "description": "The date.",
-                    "format": "date",
-                    "type": "string"
+                    "$ref": "#/components/schemas/When",
+                    "description": "The date, or the moment."
                   },
                   "node": {
                     "$ref": "#/components/schemas/NodeKey",
@@ -4456,8 +4476,7 @@
             "maxProperties": 2000,
             "patternProperties": {
               "^n_[a-z0-9][a-z0-9_-]*$": {
-                "format": "date",
-                "type": "string"
+                "$ref": "#/components/schemas/When"
               }
             },
             "type": "object"
@@ -6113,9 +6132,8 @@
             "description": "Pin a node's date (`repin`).",
             "properties": {
               "date": {
-                "description": "The date.",
-                "format": "date",
-                "type": "string"
+                "$ref": "#/components/schemas/When",
+                "description": "The day, or a moment on it with the deployment's offset."
               },
               "node": {
                 "$ref": "#/components/schemas/NodeKey",
@@ -7786,12 +7804,15 @@
             "type": "boolean"
           },
           "snooze_lifts": {
-            "description": "The day the snooze holding the node lifts, while one holds: the latest of its own and\neach holding container's, a date snooze lifting on its date and a node snooze at the\nfinish of the node it waits on (a milestone's effective date, else its due date). Absent\nwhen nothing holds it, and when a hold has no date yet.",
-            "format": "date",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/When"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the snooze holding the node lifts, while one holds: the latest of its own and\neach holding container's, a date snooze lifting on its date or at its time and a node\nsnooze at the finish of the node it waits on (a milestone's effective date, else its due\ndate). Absent when nothing holds it, and when a hold has no date yet."
           },
           "snoozed": {
             "anyOf": [
@@ -7942,12 +7963,15 @@
             "description": "Where it sits."
           },
           "pin": {
-            "description": "Its pin.",
-            "format": "date",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/When"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its pin."
           },
           "rationale": {
             "anyOf": [
@@ -12935,11 +12959,10 @@
         "oneOf": [
           {
             "additionalProperties": false,
-            "description": "Holds while today is before the date.",
+            "description": "Holds until the day starts, or the moment comes.",
             "properties": {
               "date": {
-                "format": "date",
-                "type": "string"
+                "$ref": "#/components/schemas/When"
               }
             },
             "required": [
@@ -13132,9 +13155,8 @@
                 "additionalProperties": false,
                 "properties": {
                   "date": {
-                    "description": "The date it waits for.",
-                    "format": "date",
-                    "type": "string"
+                    "$ref": "#/components/schemas/When",
+                    "description": "The date it waits for, with its time when it has one."
                   },
                   "marks_itself_done": {
                     "description": "It marks itself done on that date; otherwise someone finishes it once the date\nhas come.",
@@ -13514,9 +13536,8 @@
         "description": "One date on the timeline.",
         "properties": {
           "date": {
-            "description": "The date.",
-            "format": "date",
-            "type": "string"
+            "$ref": "#/components/schemas/When",
+            "description": "The date, with its time when a pin gives one."
           },
           "final": {
             "description": "The journey's `final` milestone: the end anchor.",
@@ -14187,6 +14208,7 @@
           "snoozed_through_container",
           "filled_through_decision",
           "pinned_through_decision",
+          "invalid_time",
           "mutation_not_for_target",
           "lineage_invalid",
           "archived_journey",
@@ -14226,6 +14248,11 @@
         "maximum": 1000,
         "minimum": 0,
         "type": "integer"
+      },
+      "When": {
+        "description": "A day (2026-10-10) or a moment on one, to the minute, with the deployment's UTC offset (2026-10-10T08:15+01:00).",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}[+-]\\d{2}:\\d{2})?$",
+        "type": "string"
       },
       "Write": {
         "description": "One change to the stored records: a record's after-state, a removal, or a whole-graph\ncopy (publishing copies a draft into a version; a removal of a whole graph clears it).",

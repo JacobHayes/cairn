@@ -16,7 +16,7 @@ import { itemTitle, titleOf, type Ready, type Mutation } from "../detail/model.t
 import { Rejected } from "../detail/Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
-import { daysUntil, daysWords } from "../status/when.ts";
+import { daysUntil, daysWords, lateWords } from "../status/when.ts";
 import { upperFirst } from "../status/words.ts";
 import { Button } from "../ui/kit.tsx";
 import type { ListFlag } from "./address.ts";
@@ -120,7 +120,7 @@ function looksOf(view: Ready, stale: NodeRow[], short: NodeRow[], lapsed: NodeRo
   }
   for (const row of lapsed) {
     const late = row.due == null ? undefined : -daysUntil(row.due, view.derived.today);
-    add({ row, reason: late === undefined ? "Snoozed, and overdue" : `Snoozed, and ${daysWords(late)} late`, fix: "unsnooze" });
+    add({ row, reason: late === undefined ? "Snoozed, and overdue" : `Snoozed, and ${lateWords(late)}`, fix: "unsnooze" });
   }
   return [...found.values()];
 }

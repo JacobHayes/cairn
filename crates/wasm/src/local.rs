@@ -260,7 +260,11 @@ pub fn apply_locally(
         None => unreachable!("an accepted journey patch leaves its journey"),
     };
     after.inputs.deployment = records.deployment.clone();
-    let consequences = caused(document, &after);
+    // Both sides are derived at the minute of the apply, as the server derives them.
+    let mut before = document.clone();
+    before.inputs.now = request.at;
+    after.inputs.now = request.at;
+    let consequences = caused(&before, &after);
     Ok(AppliedLocally {
         document: after,
         consequences,
@@ -293,13 +297,16 @@ pub fn preview_locally(
     };
     let mut derive_inputs = document.inputs.clone();
     derive_inputs.viewer = BTreeSet::new();
+    derive_inputs.now = request.at;
     let candidate =
         cairn_engine::candidate(&records, &proposal.destination, &proposal.draft, &inputs);
     let preview =
         cairn_engine::preview_of(&records, &proposal.destination, &candidate, &derive_inputs);
     // The views derive the journey after as its viewer sees it, like the journey itself.
     let after = candidate.after.as_ref().ok().map(|after| {
-        cairn_engine::destination_after(after, &proposal.destination, &document.inputs)
+        let mut at = document.inputs.clone();
+        at.now = request.at;
+        cairn_engine::destination_after(after, &proposal.destination, &at)
     });
     Ok(PreviewAnswer { preview, after })
 }

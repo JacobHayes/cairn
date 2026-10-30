@@ -95,7 +95,7 @@ async fn reference(
     let journey = service.journey(id).await.unwrap().unwrap();
     let deployment = service.deployment().await.unwrap();
     let graph = Graph::new(journey.graph.clone(), &deployment).unwrap();
-    let inputs = settings().derive_inputs(settings().today(call.now), BTreeSet::new(), deployment);
+    let inputs = settings().derive_inputs(call.now, BTreeSet::new(), deployment);
     let derived = derive(&graph, Some(journey.header.created_on), &inputs);
     (graph, derived, journey.header)
 }

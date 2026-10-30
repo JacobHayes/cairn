@@ -2,7 +2,7 @@
 // after that, late once it has passed, and one reading of where a date comes from.
 import { describe, expect, it } from "vitest";
 
-import { dateWords, daysUntil, dueWords, NEAR_DAYS, originWord, relativeDays, whenWords } from "./when.ts";
+import { compareWhen, dateWords, daysUntil, dueWords, momentIn, NEAR_DAYS, originWord, relativeDays, timeOf, whenWords } from "./when.ts";
 
 const today = "2026-10-06";
 
@@ -53,5 +53,39 @@ describe("where a date comes from", () => {
   it("is said one way whichever vocabulary the engine used for it", () => {
     expect(originWord("derived")).toBe(originWord("due"));
     expect(new Set([originWord("actual"), originWord("pin"), originWord("due")]).size).toBe(3);
+  });
+});
+
+describe("a time of day", () => {
+  it("is read from a moment and absent from a day", () => {
+    expect(timeOf("2026-10-10T08:15+01:00")).toBe("08:15");
+    expect(timeOf("2026-10-10")).toBeUndefined();
+  });
+
+  it("follows its date in words and keeps the day's distance", () => {
+    expect(dateWords("2026-10-30T08:15+01:00", today)).toBe(`${dateWords("2026-10-30", today)}, 08:15`);
+    expect(dueWords("2026-10-09T08:15+01:00", today)).toContain("08:15");
+  });
+
+  it("is written in a zone with that zone's offset at the time", () => {
+    expect(momentIn("UTC", "2026-10-10", "08:15")).toBe("2026-10-10T08:15+00:00");
+    expect(momentIn("Europe/London", "2026-07-10", "08:15")).toBe("2026-07-10T08:15+01:00");
+    expect(momentIn("Europe/London", "2026-12-10", "08:15")).toBe("2026-12-10T08:15+00:00");
+    expect(momentIn("America/New_York", "2026-10-10", "08:15")).toBe("2026-10-10T08:15-04:00");
+    expect(momentIn("Asia/Kolkata", "2026-10-10", "08:15")).toBe("2026-10-10T08:15+05:30");
+  });
+
+  it("reads a repeated wall time as its first and a skipped one as the time on", () => {
+    expect(momentIn("Europe/London", "2026-10-25", "01:30")).toBe("2026-10-25T01:30+01:00");
+    expect(momentIn("Europe/London", "2026-03-29", "01:30")).toBe("2026-03-29T02:30+01:00");
+  });
+
+  it("orders by day, a bare day before a moment on it, then by instant", () => {
+    const early = "2026-10-10T08:15+01:00";
+    const late = "2026-10-10T08:00+00:00";
+    expect(compareWhen("2026-10-10", early)).toBeLessThan(0);
+    expect(compareWhen(early, late)).toBeLessThan(0);
+    expect(compareWhen(late, "2026-10-11")).toBeLessThan(0);
+    expect(compareWhen(early, early)).toBe(0);
   });
 });

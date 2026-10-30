@@ -289,14 +289,21 @@ pub fn derived(records: &Records, journey: &str) -> cairn_engine::Derived {
     derived_on(records, journey, "2026-10-06".parse().unwrap())
 }
 
-/// Derives a journey in the records at `today`.
+/// Derives a journey in the records at noon on `today` (the deployment is in UTC).
 pub fn derived_on(
     records: &Records,
     journey: &str,
     today: cairn_schema::Date,
 ) -> cairn_engine::Derived {
+    derived_at(records, journey, &format!("{today}T12:00:00Z"))
+}
+
+/// Derives a journey in the records at the moment `now`, a UTC timestamp (the deployment is in
+/// UTC, so its today is the timestamp's date).
+pub fn derived_at(records: &Records, journey: &str, now: &str) -> cairn_engine::Derived {
     let mut inputs = cairn_engine::testing::derive_inputs(records.deployment.clone());
-    inputs.today = today;
+    inputs.now = now.parse().unwrap();
+    inputs.today = now[..10].parse().unwrap();
     let created_on = records.journeys[&journey.parse().unwrap()]
         .header
         .created_on;

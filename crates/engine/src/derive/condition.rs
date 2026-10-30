@@ -198,7 +198,7 @@ fn equal(answer: &AnswerValue, value: &ConditionValue, deployment: &Deployment) 
         (AnswerValue::Date(date), ConditionValue::Text(text)) => text
             .as_str()
             .parse::<Date>()
-            .is_ok_and(|value| value == *date),
+            .is_ok_and(|value| value == date.day()),
         (AnswerValue::Identity(identity), value) => same_identity(deployment, identity, value),
         (
             AnswerValue::Boolean(_)

@@ -7,7 +7,7 @@ use super::model::{bounded_set, bounded_vec, keyed};
 use super::{
     ArbRefs, arb_annotation, arb_date, arb_email, arb_identity_key, arb_identity_set,
     arb_journey_id, arb_kind_key, arb_markdown, arb_node, arb_node_key, arb_reason, arb_revision,
-    arb_role_key, arb_route_id, arb_slug, arb_timestamp, arb_title, arb_version_number,
+    arb_role_key, arb_route_id, arb_slug, arb_timestamp, arb_title, arb_version_number, arb_when,
 };
 
 use crate::domain::{
@@ -123,7 +123,7 @@ pub fn arb_answer_value() -> impl Strategy<Value = AnswerValue> {
             Ok(text) => text,
             Err(error) => panic!("strategy exceeded a limit: {error}"),
         })),
-        arb_date().prop_map(AnswerValue::Date),
+        arb_when().prop_map(AnswerValue::Date),
         arb_identity_key().prop_map(AnswerValue::Identity),
         arb_identity_set().prop_map(AnswerValue::IdentityList),
     ]
@@ -179,7 +179,7 @@ pub fn arb_overrides() -> impl Strategy<Value = Overrides> {
 /// A snooze target.
 pub fn arb_snooze_target() -> impl Strategy<Value = SnoozeTarget> {
     prop_oneof![
-        arb_date().prop_map(SnoozeTarget::Date),
+        arb_when().prop_map(SnoozeTarget::Date),
         arb_node_key().prop_map(SnoozeTarget::Node)
     ]
 }
@@ -202,7 +202,7 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
             0..3,
         ),
         prop::collection::btree_map(arb_role_key(), arb_identity_set(), 0..2),
-        prop::collection::btree_map(arb_node_key(), arb_date(), 0..2),
+        prop::collection::btree_map(arb_node_key(), arb_when(), 0..2),
         prop::collection::btree_map(arb_node_key(), arb_snooze_target(), 0..2),
         prop::collection::btree_map(arb_node_key(), arb_overrides(), 0..2),
         prop::collection::vec(arb_annotation(), 0..2),

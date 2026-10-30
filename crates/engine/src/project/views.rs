@@ -19,7 +19,7 @@ use cairn_schema::{
     AnswerSpec, Condition, Date, DateOrigin, DateSource, DecisionEntry, DecisionView, DisplayState,
     Instant, KeyRefs, LevelQuery, Node, NodeKey, NodeKind, OpenDecision, Payload, Relevance,
     RouteSchedule, ScheduleEntry, StatusSummary, Timeline, TimelineEntry, UndatedEntry,
-    UpcomingMilestone,
+    UpcomingMilestone, When,
 };
 
 use super::DerivedJourney;
@@ -143,7 +143,7 @@ impl DerivedJourney<'_> {
             } else if !derived.open(key) {
                 None
             } else {
-                dates.due(key).map(|due| (due, DateOrigin::Due))
+                dates.due(key).map(|due| (When::Day(due), DateOrigin::Due))
             };
             if let Some((date, origin)) = placed {
                 entries.push(TimelineEntry {

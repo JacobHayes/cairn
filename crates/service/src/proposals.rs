@@ -317,7 +317,7 @@ impl Service {
         };
         let derive_inputs =
             self.settings
-                .derive_inputs(today, BTreeSet::new(), records.deployment.clone());
+                .derive_inputs(call.now, BTreeSet::new(), records.deployment.clone());
         let (preview, after, consequences) = engine(destination, || {
             let candidate = cairn_engine::candidate(records, destination, &proposal.draft, &inputs);
             let preview =
@@ -568,7 +568,7 @@ fn merged(
             &patch.target,
             records,
             applied.records(),
-            inputs.today,
+            inputs.at,
             settings,
         ),
         Err(

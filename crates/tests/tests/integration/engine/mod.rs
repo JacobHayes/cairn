@@ -55,5 +55,6 @@ mod scheduled;
 mod skip;
 mod snapshot;
 mod state_machines;
+mod time_of_day;
 mod trace;
 mod views;

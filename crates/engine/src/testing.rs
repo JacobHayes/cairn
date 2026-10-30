@@ -54,6 +54,7 @@ pub fn fixed_inputs() -> ApplyInputs {
 pub fn derive_inputs(deployment: cairn_schema::Deployment) -> cairn_schema::DeriveInputs {
     cairn_schema::DeriveInputs {
         today: parse("2026-10-06"),
+        now: parse("2026-10-06T12:00:00Z"),
         timezone: parse("UTC"),
         viewer: BTreeSet::new(),
         deployment,

@@ -7,7 +7,7 @@ use super::{
     arb_answer_value, arb_date, arb_deployment, arb_domain, arb_guard_failure, arb_identity_key,
     arb_journey, arb_kind_key, arb_node_field, arb_node_key, arb_patch_id, arb_path,
     arb_proposal_id, arb_revision, arb_role_key, arb_snooze_target, arb_stale_reason, arb_subject,
-    arb_write,
+    arb_timestamp, arb_when, arb_write,
 };
 use crate::chain::{
     Chain, ChainList, Constraint, ConstraintSource, DependencyVia, FixedBy, FixedDate, Instant,
@@ -282,7 +282,7 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
         prop::option::of(arb_short_chain()),
         (
             prop::option::of((
-                arb_date(),
+                arb_when(),
                 prop::sample::select(vec![DateOrigin::Actual, DateOrigin::Pin, DateOrigin::Due]),
             )),
             prop::option::of(arb_date()),
@@ -437,7 +437,7 @@ fn arb_blocker() -> BoxedStrategy<Blocker> {
     (
         arb_node_key(),
         arb_dependency_via(),
-        prop::option::of(arb_date()),
+        prop::option::of(arb_when()),
     )
         .prop_map(|(node, via, date)| Blocker { node, via, date })
         .boxed()
@@ -470,7 +470,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         any::<u32>(),
         prop::option::of(arb_answer_value()),
         prop::collection::btree_set(prop::sample::select(NodeMove::ALL.to_vec()), 0..3),
-        prop::option::of(arb_date()),
+        prop::option::of(arb_when()),
     )
         .prop_map(
             |(node, skip_count, answer, moves, snooze_lifts)| NodeDerived {
@@ -568,7 +568,7 @@ fn arb_stalled() -> BoxedStrategy<Stalled> {
         arb_node_key().prop_map(StallCause::Gate),
         (arb_node_key(), arb_snooze_target())
             .prop_map(|(node, until)| StallCause::Snooze { node, until }),
-        (arb_node_key(), arb_date(), any::<bool>()).prop_map(|(node, date, marks_itself_done)| {
+        (arb_node_key(), arb_when(), any::<bool>()).prop_map(|(node, date, marks_itself_done)| {
             StallCause::Scheduled {
                 node,
                 date,
@@ -588,6 +588,8 @@ fn arb_stalled() -> BoxedStrategy<Stalled> {
 pub fn arb_derived() -> BoxedStrategy<Derived> {
     (
         arb_date(),
+        arb_timestamp(),
+        prop::option::of(arb_timestamp()),
         prop::collection::btree_map(arb_node_key(), arb_node_derived(), 0..3),
         prop::collection::vec(arb_node_key(), 0..3),
         prop::collection::vec(arb_node_key(), 0..3),
@@ -598,6 +600,8 @@ pub fn arb_derived() -> BoxedStrategy<Derived> {
         .prop_map(
             |(
                 today,
+                now,
+                holds_until,
                 nodes,
                 frontier,
                 acting_frontier,
@@ -607,6 +611,8 @@ pub fn arb_derived() -> BoxedStrategy<Derived> {
             )| {
                 Derived {
                     today,
+                    now,
+                    holds_until,
                     nodes,
                     frontier,
                     acting_frontier,
@@ -679,12 +685,14 @@ pub fn arb_derive_inputs() -> BoxedStrategy<DeriveInputs> {
     ]);
     (
         arb_date(),
+        arb_timestamp(),
         timezone,
         prop::collection::btree_set(arb_identity_key(), 0..2),
         arb_deployment(),
     )
-        .prop_map(|(today, timezone, viewer, deployment)| DeriveInputs {
+        .prop_map(|(today, now, timezone, viewer, deployment)| DeriveInputs {
             today,
+            now,
             timezone: super::parsed(timezone),
             viewer,
             deployment,

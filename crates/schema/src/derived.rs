@@ -16,6 +16,8 @@ use crate::id::{IdentityKey, KindKey, NodeKey, RoleKey};
 use crate::limits::{EXPLANATION_ENTRY_COUNT_MAX, Limit};
 use crate::node::NodeKind;
 use crate::state::{AnswerValue, Guard, SnoozeTarget, StaleReason};
+use crate::when::When;
+use jiff::Timestamp;
 use jiff::civil::Date;
 
 /// A node's relevance (Gating): three-valued.
@@ -200,7 +202,7 @@ pub struct Blocker {
     /// The date the dependency is scheduled for, while it is held for a date ahead, so what
     /// waits on it can say when.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub date: Option<Date>,
+    pub date: Option<When>,
 }
 
 /// A derived weight sum (Priority: gravity, unlocks, and their contributions) in millionths
@@ -500,8 +502,8 @@ pub enum DateOrigin {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EffectiveDate {
-    /// The date.
-    pub date: Date,
+    /// The date, with its time when a pin gives one.
+    pub date: When,
     /// Where it comes from.
     pub origin: DateOrigin,
 }
@@ -705,12 +707,12 @@ pub struct NodeDerived {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snoozed_via: Option<NodeKey>,
     // PRD: B6.
-    /// The day the snooze holding the node lifts, while one holds: the latest of its own and
-    /// each holding container's, a date snooze lifting on its date and a node snooze at the
-    /// finish of the node it waits on (a milestone's effective date, else its due date). Absent
-    /// when nothing holds it, and when a hold has no date yet.
+    /// When the snooze holding the node lifts, while one holds: the latest of its own and
+    /// each holding container's, a date snooze lifting on its date or at its time and a node
+    /// snooze at the finish of the node it waits on (a milestone's effective date, else its due
+    /// date). Absent when nothing holds it, and when a hold has no date yet.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub snooze_lifts: Option<Date>,
+    pub snooze_lifts: Option<When>,
     // PRD: B6.
     /// Whether a snooze can sit on the node: it is in scope with something left to do, and a
     /// group has work in scope left beneath it.
@@ -833,8 +835,8 @@ pub enum StallCause {
     Scheduled {
         /// The node.
         node: NodeKey,
-        /// The date it waits for.
-        date: Date,
+        /// The date it waits for, with its time when it has one.
+        date: When,
         /// It marks itself done on that date; otherwise someone finishes it once the date
         /// has come.
         #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
@@ -876,6 +878,12 @@ impl Stalled {
 pub struct Derived {
     /// The today it was derived for.
     pub today: Date,
+    /// The moment it was derived for.
+    pub now: Timestamp,
+    /// The first moment after `now`, today, at which a derivation would differ because a time
+    /// came: absent when none does. A derivation holds for every moment from `now` to here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub holds_until: Option<Timestamp>,
     /// Per node.
     pub nodes: BTreeMap<NodeKey, NodeDerived>,
     /// The frontier, ranked (Priority: ties by slack, gravity, key).
@@ -1015,6 +1023,9 @@ crate::serde_util::string_serde!(TimeZoneName, "TimeZoneName", "An IANA time zon
 pub struct DeriveInputs {
     /// Today, in the deployment's time zone.
     pub today: Date,
+    /// Now: the moment of the request, which a time of day on a pin, an answer, or a snooze is
+    /// read against.
+    pub now: Timestamp,
     /// The deployment's time zone.
     pub timezone: TimeZoneName,
     // PRD: H3.

@@ -26,7 +26,7 @@ export async function pin(panel: Locator, date: string): Promise<void> {
   if ((await whenSettled(panel.page(), () => editor.getByTestId("pin-form").count())) === 0) {
     await editor.getByRole("button", { name: /^(Pin a date|Change the pin)$/ }).click();
   }
-  await editor.getByLabel("Pin date").fill(date);
+  await editor.getByLabel("Pin date", { exact: true }).fill(date);
   await editor.getByTestId("pin-form").getByRole("button", { name: "Save" }).click();
 }
 

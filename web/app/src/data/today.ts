@@ -1,6 +1,6 @@
-// Date rollover (ARCHITECTURE, Web UI: data flow): a document is derived for the today its
-// host computed in the deployment's time zone, so when that date passes, the shell refetches
-// what it holds. The browser's Intl knows every zone, so the page can tell when it passes.
+// Date rollover (ARCHITECTURE, Web UI: data flow): a document is derived for the today (and now) its
+// host computed in the deployment's time zone, so when that date passes, or the next time of
+// day that would change the derivation, the shell refetches what it holds. The browser's Intl knows every zone, so the page can tell when it passes.
 
 /** The date (YYYY-MM-DD) it is at `at` in `zone`, an IANA time zone name. */
 export function todayIn(zone: string, at: Date): string {

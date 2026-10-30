@@ -9,7 +9,7 @@ use proptest::prelude::*;
 use crate::{
     AgentId, AttachmentKey, Date, Days, Email, IdentityKey, InsertionKey, JourneyId, KindKey,
     Markdown, NodeKey, PatchId, Path, ProposalId, Reason, Revision, RoleKey, RouteId, Slug,
-    Timestamp, Title, Url, UserId, VersionNumber, Weight,
+    Timestamp, Title, Url, UserId, VersionNumber, Weight, When,
 };
 
 const SLUG_REGEX: &str = "[a-z0-9][a-z0-9_-]{0,11}";
@@ -145,6 +145,25 @@ pub fn arb_weight() -> impl Strategy<Value = Weight> {
 pub fn arb_date() -> impl Strategy<Value = Date> {
     (2020i16..2040, 1i8..=12, 1i8..=28)
         .prop_map(|(year, month, day)| Date::constant(year, month, day))
+}
+
+/// A day, or a moment on one at a whole-minute offset.
+pub fn arb_when() -> impl Strategy<Value = When> {
+    let moment = (
+        arb_date(),
+        0i8..24,
+        0i8..60,
+        -12i32..=14,
+        prop::sample::select(vec![0, 30]),
+    )
+        .prop_map(|(day, hour, minute, hours, minutes)| {
+            let seconds = (hours * 60 + if hours < 0 { -minutes } else { minutes }) * 60;
+            When::Moment(
+                day.at(hour, minute, 0, 0),
+                jiff::tz::Offset::from_seconds(seconds).unwrap_or(jiff::tz::Offset::UTC),
+            )
+        });
+    prop_oneof![arb_date().prop_map(When::Day), moment]
 }
 
 /// A timestamp, whole seconds, between 2020 and 2039.

@@ -113,9 +113,10 @@ export function checklistView(ticked: string[] = ["b"]): Ready {
 export function testView(): Ready {
   const view: Ready = {
     status: "ready",
-    key: { journey: "j_test", revision: 7, deployment_revision: 2, today },
+    key: { journey: "j_test", revision: 7, deployment_revision: 2, today, now: `${today}T12:00:00Z` },
     inputs: {
       today,
+      now: `${today}T12:00:00Z`,
       timezone: "UTC",
       deployment: { revision: 2, identities: [{ key: "who_one", name: "Person One" }, { key: "who_two", name: "Person Two" }] },
     },
@@ -144,6 +145,7 @@ export function testView(): Ready {
     },
     derived: {
       today,
+      now: `${today}T12:00:00Z`,
       frontier: ["n_findings"],
       acting_frontier: ["n_findings"],
       current_stages: ["n_stage"],

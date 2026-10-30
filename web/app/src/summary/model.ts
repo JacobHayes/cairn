@@ -15,7 +15,7 @@ import type { NodeRow } from "../acting/why.ts";
 import { namer, staleText } from "../detail/explain.ts";
 import { feedingDecision, itemTitle, milestonesFirst, nodeOf, recordOf, scheduledDate, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
-import { dateWords, daysWords } from "../status/when.ts";
+import { dateWords, daysWords, lateWords } from "../status/when.ts";
 import { DISPLAY_STATES, stateWord, type DisplayState } from "../status/words.ts";
 import { treeOf } from "../plan/tree.ts";
 import type { DateOrigin } from "../timeline/model.ts";
@@ -172,7 +172,7 @@ export function attentionRows(ready: Ready, model: SummaryModel): Attention[] {
     found.set(key, held);
   };
   for (const each of model.overdue) {
-    add(each.key, 0, each.lateDays === undefined ? "Overdue" : `${daysWords(each.lateDays)} late`);
+    add(each.key, 0, each.lateDays === undefined ? "Overdue" : lateWords(each.lateDays));
   }
   for (const each of model.shortfalls) {
     add(each.key, 1, shortfallWords(each.days));

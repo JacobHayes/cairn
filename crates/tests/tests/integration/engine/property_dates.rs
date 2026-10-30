@@ -180,7 +180,10 @@ mod property {
         let document = graph.document();
         for (key, date) in &document.state.pins {
             if derived.relevance().in_scope(key) && !skipped(graph, derived, key) {
-                seeds.insert(finish(key), (Some(day(*date)), Some(day(*date)), false));
+                seeds.insert(
+                    finish(key),
+                    (Some(day(date.day())), Some(day(date.day())), false),
+                );
             }
         }
         for (key, stored) in &document.state.nodes {

@@ -171,7 +171,7 @@ export class FakeHost implements Host {
       throw new Skewed();
     }
     const document = {
-      inputs: { deployment: { revision: held.deployment }, timezone: "UTC", today: held.today },
+      inputs: { deployment: { revision: held.deployment }, timezone: "UTC", today: held.today, now: `${held.today}T12:00:00Z` },
       journey: { header: { id: journey, name: journey, status: "active" }, revision: held.revision, graph: {} },
     };
     return JSON.stringify(document);
@@ -263,7 +263,7 @@ export class FakeDeriver implements Deriver {
 
   async load(document: string, slot?: string): Promise<Loaded> {
     const parsed = JSON.parse(document) as {
-      inputs: { deployment: { revision: number }; today: string };
+      inputs: { deployment: { revision: number }; today: string; now: string };
       journey: { header: { id: string }; revision: number };
     };
     const journey = slot ?? parsed.journey.header.id;
@@ -275,7 +275,7 @@ export class FakeDeriver implements Deriver {
     this.holdLoad = undefined;
     await hold;
     return {
-      key: { journey, revision: parsed.journey.revision, deployment_revision: parsed.inputs.deployment.revision, today: parsed.inputs.today },
+      key: { journey, revision: parsed.journey.revision, deployment_revision: parsed.inputs.deployment.revision, today: parsed.inputs.today, now: parsed.inputs.now },
       handle,
     };
   }
@@ -284,7 +284,7 @@ export class FakeDeriver implements Deriver {
     if (!this.held.has(journey)) {
       return Promise.reject(new Error(`no document for ${journey} is loaded`));
     }
-    return Promise.resolve({ nodes: {}, frontier: [], acting_frontier: [], today: todayIn("UTC", new Date()) });
+    return Promise.resolve({ nodes: {}, frontier: [], acting_frontier: [], today: todayIn("UTC", new Date()), now: new Date().toISOString() });
   }
 
   project(): Promise<never> {

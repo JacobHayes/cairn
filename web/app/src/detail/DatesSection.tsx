@@ -10,7 +10,7 @@ import { dateLinkRowWords } from "../canvas/dates.ts";
 import { dateWords, originWord } from "../status/when.ts";
 import { ChainView } from "./ChainView.tsx";
 import { parseInstant, type Bound } from "./explain.ts";
-import { nodeOf, titleOf, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { dueOf, nodeOf, titleOf, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { LinkedDateRow, NodeLink, Section } from "./parts.tsx";
 import { ShortfallView } from "./ShortfallView.tsx";
 
@@ -34,7 +34,8 @@ export function boundOrigin(bound: Bound, node: string): BoundOrigin {
   return fixed.fixed_by === "actual" ? "actual" : fixed.fixed_by === "today" ? "derived" : "pin";
 }
 
-function BoundRow({ view, node, label, bound }: { view: Ready; node: string; label: string; bound: Bound | null | undefined }) {
+/** A bound is a day; `moment` is the node's own pinned moment, shown in its place when it falls on that day. */
+function BoundRow({ view, node, label, bound, moment }: { view: Ready; node: string; label: string; bound: Bound | null | undefined; moment?: string | undefined }) {
   if (bound == null) {
     return (
       <div className="date-row" data-testid="date" data-label={label} data-origin="none">
@@ -45,7 +46,7 @@ function BoundRow({ view, node, label, bound }: { view: Ready; node: string; lab
   const origin = boundOrigin(bound, node);
   return (
     <div className="date-row" data-testid="date" data-label={label} data-origin={origin}>
-      <span className="date-label">{label}</span> <strong>{dateWords(bound.date, view.derived.today)}</strong> <span className="muted small">{originWord(origin)}</span>
+      <span className="date-label">{label}</span> <strong>{dateWords(moment?.startsWith(bound.date) === true ? moment : bound.date, view.derived.today)}</strong> <span className="muted small">{originWord(origin)}</span>
       <details>
         <summary className="muted small">Why this date</summary>
         <ChainView view={view} chain={bound.chain} />
@@ -114,7 +115,7 @@ export function DatesSection({
   const key = detail.node.key;
   return (
     <Section title="Dates" summary={dates.links === undefined || dates.links.length === 0 ? undefined : `${String(dates.links.length)} linked`} open={open} {...(fold === undefined ? {} : { fold })} testId="dates">
-      <BoundRow view={view} node={key} label="Due" bound={dates.due} />
+      <BoundRow view={view} node={key} label="Due" bound={dates.due} moment={dueOf(view, key)} />
       <Actuals view={view} detail={detail} />
       <LinkedDates view={view} detail={detail} />
       <details className="date-more" data-testid="more-dates">

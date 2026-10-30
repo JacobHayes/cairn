@@ -17,7 +17,7 @@ import { nodeOf, recordOf, waitsOn, type GraphNode, type NodeKind, type Ready } 
 import { snoozeWords } from "../status/snooze.ts";
 import { ancestorsOf, planOrder, treeOf } from "../plan/tree.ts";
 import { isFinished } from "../status/state.ts";
-import { dateWords, daysWords, dueWords, originWord } from "../status/when.ts";
+import { dateWords, daysWords, dueWords, lateWords, originWord } from "../status/when.ts";
 import { upperFirst, type DisplayState } from "../status/words.ts";
 import { dayOf, dayWords, type DateOrigin, type Timeline, type TimelineEntry } from "./model.ts";
 
@@ -42,8 +42,8 @@ export interface ChartRow {
   origin: DateOrigin | undefined;
   /** Its date in plain words: "Due in 3 days", "3 days late", "Pinned Oct 30". */
   words: string;
-  /** Days past due, when it is. */
-  late: number;
+  /** Days past due when it is overdue (none for a time that has passed today), else none. */
+  late: number | undefined;
   shortfallDays: number | undefined;
   /** The `final` milestone: the end anchor. */
   end: boolean;
@@ -81,8 +81,8 @@ interface Extent {
   to: string;
 }
 
-const earlier = (left: string, right: string) => (left <= right ? left : right);
-const later = (left: string, right: string) => (left >= right ? left : right);
+const earlier = (left: string, right: string) => (dayOf(left) <= dayOf(right) ? left : right);
+const later = (left: string, right: string) => (dayOf(left) >= dayOf(right) ? left : right);
 
 function union(left: Extent | undefined, right: Extent | undefined): Extent | undefined {
   return left === undefined ? right : right === undefined ? left : { from: earlier(left.from, right.from), to: later(left.to, right.to) };
@@ -112,12 +112,12 @@ function ownOf(view: Ready, node: GraphNode, entry: TimelineEntry | undefined): 
   }
   const derived = view.derived.nodes[node.key];
   const started = derived?.display_state === "done" ? (record.started_on ?? undefined) : derived?.dates.latest_start?.date;
-  const from = started !== undefined && started < at ? started : at;
+  const from = started !== undefined && dayOf(started) < dayOf(at) ? started : at;
   const soonest = derived?.display_state === "done" ? undefined : derived?.dates.earliest_start?.date;
-  return { from, to: at, shape: from < at ? "bar" : "tick", origin: entry?.origin, entry, earliest: soonest !== undefined && soonest < from ? soonest : undefined };
+  return { from, to: at, shape: dayOf(from) < dayOf(at) ? "bar" : "tick", origin: entry?.origin, entry, earliest: soonest !== undefined && soonest < from ? soonest : undefined };
 }
 
-function wordsOf(view: Ready, node: GraphNode, own: Own | undefined, progress: ChartRow["progress"], late: number): string {
+function wordsOf(view: Ready, node: GraphNode, own: Own | undefined, progress: ChartRow["progress"], late: number | undefined): string {
   const today = view.derived.today;
   if (own === undefined || own.shape === "span") {
     return progress === undefined || progress.total === 0 ? "" : `${String(progress.done)} of ${String(progress.total)} done`;
@@ -125,11 +125,11 @@ function wordsOf(view: Ready, node: GraphNode, own: Own | undefined, progress: C
   const finished = recordOf(view, node).finished_on ?? undefined;
   switch (own.shape) {
     case "milestone":
-      return late > 0 ? `${daysWords(late)} late` : view.derived.nodes[node.key]?.display_state === "done" ? `Done ${dateWords(own.to, today)}` : `${upperFirst(originWord(own.origin ?? "due"))} ${dateWords(own.to, today)}`;
+      return late !== undefined ? lateWords(late) : view.derived.nodes[node.key]?.display_state === "done" ? `Done ${dateWords(own.to, today)}` : `${upperFirst(originWord(own.origin ?? "due"))} ${dateWords(own.to, today)}`;
     case "decision":
-      return finished !== undefined && own.entry === undefined ? `Decided ${dateWords(finished, today)}` : dueWords(own.to, today, true);
+      return finished !== undefined && own.entry === undefined ? `Decided ${dateWords(finished, today)}` : late !== undefined ? lateWords(late) : dueWords(own.to, today, true);
     default:
-      return finished !== undefined && late === 0 && view.derived.nodes[node.key]?.display_state === "done" ? `Finished ${dateWords(finished, today)}` : dueWords(own.to, today);
+      return finished !== undefined && late === undefined && view.derived.nodes[node.key]?.display_state === "done" ? `Finished ${dateWords(finished, today)}` : late !== undefined ? lateWords(late) : dueWords(own.to, today);
   }
 }
 
@@ -226,7 +226,7 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
     const own = container ? undefined : owns.get(key);
     const progress = container ? (derived.progress ?? undefined) : undefined;
     // A container's span is not coloured late, only its own dated item.
-    const late = own === undefined ? 0 : (derived.dates.overdue_days ?? 0);
+    const late = own === undefined ? undefined : (derived.dates.overdue_days ?? undefined);
     const shortfallDays = entries.get(key)?.shortfall_days ?? undefined;
     const snoozed = snoozeWords(view, derived);
     rows.push({
@@ -408,7 +408,7 @@ function routeRowOf(tree: Tree, schedule: RouteSchedule, options: ChartOptions, 
     to: reach.to,
     origin: undefined,
     words: [routeWords(reach), waiting.length === 0 ? "" : `waits on ${waiting.join(", ")}`].filter(Boolean).join(", "),
-    late: 0,
+    late: undefined,
     shortfallDays: undefined,
     end: key === schedule.end,
     progress: undefined,

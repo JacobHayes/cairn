@@ -70,6 +70,8 @@ impl Derived {
         let current_stages = self.current_stages(graph, &nodes);
         cairn_schema::Derived {
             today: self.today,
+            now: self.now,
+            holds_until: self.holds_until,
             nodes,
             frontier: self.ranking.frontier().to_vec(),
             acting_frontier: self.ranking.acting_frontier().to_vec(),

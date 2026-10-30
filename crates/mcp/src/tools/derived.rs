@@ -12,7 +12,7 @@ use cairn_schema::{
     InstantPoint, JourneyId, KeyRefs, KindKey, Level, LevelDateLink, LevelDisplay, LevelNode,
     LevelQuery, ListFlag, ListQuery, Markdown, Node, NodeDerived, NodeKey, NodeKind, NodeMove,
     NodeState, Overrides, Progress, Real, Relevance, RelevanceExplanation, RemovalRead, Score,
-    ShortChain, Snapshot, SnoozeTarget, SortBy, StaleReason, StillWaiting,
+    ShortChain, Snapshot, SnoozeTarget, SortBy, StaleReason, StillWaiting, When,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -224,7 +224,7 @@ pub(crate) struct Detail {
     // PRD: F2.
     /// Its pin.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pin: Option<Date>,
+    pin: Option<When>,
     // PRD: D4.
     /// Its overrides.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -300,7 +300,7 @@ pub(crate) struct LeanDerived {
     snoozed_via: Option<NodeKey>,
     /// The day the snooze that holds it lifts, when that is known.
     #[serde(skip_serializing_if = "Option::is_none")]
-    snooze_lifts: Option<Date>,
+    snooze_lifts: Option<When>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     snoozable: bool,
     /// What can be done to it now, beyond snoozing: the moves a write of that one move would be

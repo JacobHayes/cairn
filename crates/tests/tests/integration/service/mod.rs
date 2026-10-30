@@ -10,4 +10,5 @@ mod property_write;
 mod proposals;
 mod reads;
 mod routes;
+mod time_of_day;
 mod writes;

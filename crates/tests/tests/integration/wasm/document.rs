@@ -44,3 +44,32 @@ fn a_document_derives_once_and_answers_each_projection_or_names_what_is_missing(
         HostError::Unreadable { .. }
     ));
 }
+
+/// A patch applied in the browser reports what it caused as the server does, with both sides
+/// derived at the minute of the apply: a pin to a time already past is overdue even though the
+/// document was read a minute before it.
+#[test]
+fn a_local_apply_derives_both_sides_at_the_minute_of_the_apply() {
+    use crate::engine::support;
+    let records = support::journey(&support::add_nodes(&[
+        "{key: n_work, id: work, kind: action, title: Work}",
+    ]));
+    let journey = records.journeys[&support::JOURNEY.parse().unwrap()].clone();
+    let mut inputs = derive_inputs(Deployment::default());
+    inputs.now = "2026-10-06T08:14:00Z".parse().unwrap();
+    let document =
+        serde_json::to_string(&cairn_engine::project::document(&journey, &inputs)).unwrap();
+    let patch = support::patch_to(
+        &records,
+        &format!("{{journey: {}}}", support::JOURNEY),
+        "- op: set_pin\n  node: n_work\n  date: \"2026-10-06T08:15+00:00\"\n",
+    );
+    let request = serde_json::json!({
+        "patch": patch,
+        "at": "2026-10-06T08:16:00Z",
+        "actor": {"user": "u_local"},
+    });
+    let answer = cairn_wasm::apply(&document, &request.to_string()).unwrap();
+    let applied: cairn_wasm::AppliedLocally = serde_json::from_str(&answer).unwrap();
+    assert_eq!(applied.consequences.overdue.len(), 1);
+}

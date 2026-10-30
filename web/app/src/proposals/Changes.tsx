@@ -24,6 +24,7 @@ import { Section } from "../detail/parts.tsx";
 import { fieldWords } from "../status/words.ts";
 import { NODE_FIELDS } from "@cairn/client";
 import { Button, Input, PickBox } from "../ui/kit.tsx";
+import { WhenInput } from "../ui/WhenInput.tsx";
 import { carryIds, withFieldValue, withMutation, withMutationsAdded, withoutMutation, type ProposalDraft } from "./model.ts";
 import { addNodeKey, isNewNodeValues, useNodeTyped } from "./typed.ts";
 import { mutationWords, type Names } from "./words.ts";
@@ -238,7 +239,7 @@ function MutationEditor({ editor, mutation, onChange, context }: { editor: strin
     case "set_node_field":
       return <FieldValue editor={editor} mutation={mutation} onChange={onChange} context={context} />;
     case "set_pin":
-      return <Input type="date" aria-label="Pinned date" value={mutation.date} onChange={(event) => { onChange({ ...mutation, date: event.target.value }); }} />;
+      return <WhenInput label="Pinned date" value={mutation.date} zone={context.ready?.inputs.timezone ?? "UTC"} onChange={(date) => { onChange({ ...mutation, date }); }} />;
     case "answer": {
       const decision = context.tree.byKey.get(mutation.decision);
       return context.ready === undefined || decision === undefined ? null : (

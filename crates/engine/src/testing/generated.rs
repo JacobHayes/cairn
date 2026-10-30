@@ -301,7 +301,10 @@ pub fn date_limits() -> Graph {
     }
     let pinned: cairn_schema::Date = parse("2026-11-02");
     for milestone in milestones.iter().step_by(10) {
-        document.state.pins.insert(milestone.clone(), pinned);
+        document
+            .state
+            .pins
+            .insert(milestone.clone(), cairn_schema::When::Day(pinned));
     }
     Graph::new(document, &cairn_schema::Deployment::default())
         .unwrap_or_else(|violations| panic!("{violations:#?}"))
@@ -631,10 +634,10 @@ impl Shape {
                 finish.map(|_| revision(1 + u32::from(seed.recorded.0) % 10));
         }
         if let Some(pin) = seed.pin {
-            document
-                .state
-                .pins
-                .insert(key(index), day(u32::from(pin % 60)));
+            document.state.pins.insert(
+                key(index),
+                cairn_schema::When::Day(day(u32::from(pin % 60))),
+            );
         }
         let Some(mut node) = document.nodes.get(&key(index)).cloned() else {
             return;
@@ -729,7 +732,7 @@ impl Shape {
                 .unwrap_or_else(|e| panic!("{e}"));
             state
                 .snoozes
-                .insert(key(index), cairn_schema::SnoozeTarget::Date(until));
+                .insert(key(index), cairn_schema::SnoozeTarget::Date(until.into()));
         }
         state.nodes.insert(key(index), stored);
         let overrides = Overrides {

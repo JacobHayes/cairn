@@ -14,7 +14,7 @@ export class Derivation {
     derived(): string;
     /**
      * What it was derived from, as a query cache keys it (ARCHITECTURE, Web UI): the
-     * journey, its revision, the deployment revision, and today, as JSON.
+     * journey, its revision, the deployment revision, today, and now, as JSON.
      */
     key(): string;
     /**

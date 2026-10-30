@@ -10,7 +10,8 @@ description: Record answers a person gives in conversation as decision answers, 
    - `boolean`: true or false;
    - `single_choice`: one choice's id; `multi_choice`: a list of choice ids;
    - `text`: free text, possibly empty;
-   - `date`: a calendar date;
+   - `date`: a calendar date, or a day with a time (`2026-10-10T08:15+01:00`, with the
+     deployment's UTC offset at that time; a wrong offset is refused naming the right one);
    - `identity`: one identity key; `identity_list`: a list of identity keys.
 2. **People are identities.** An identity answer names an identity's key. If the person named
    someone Cairn does not know, create them in the same patch: a `create_identity` with a new

@@ -5,7 +5,7 @@
 use cairn_schema::{
     AnswerValue, GraphKey, GraphRecord, Limit, Markdown, Mutation, NodeKey, NodeKind, NodeState,
     OverrideKind, Overrides, RecordedEnd, Revision, RoleKey, SignedDays, Slug, State, Subject,
-    Transition, ViolationCode, Write,
+    Transition, ViolationCode, When, Write,
 };
 
 use super::Session;
@@ -488,7 +488,7 @@ fn direct_pin(
     session: &mut Session<'_>,
     node: &NodeKey,
     existing: bool,
-) -> Result<Option<cairn_schema::Date>, Rejected> {
+) -> Result<Option<When>, Rejected> {
     if !session.require(node) {
         return Err(Rejected);
     }
@@ -517,8 +517,16 @@ fn shift_pin(session: &mut Session<'_>, node: &NodeKey, offset_days: SignedDays)
     let Ok(Some(pin)) = direct_pin(session, node, true) else {
         return Vec::new();
     };
+    if pin.is_moment() {
+        session.reject(
+            ViolationCode::InvalidTime,
+            Some(node),
+            "a pin with a time is set again rather than shifted by days",
+        );
+        return Vec::new();
+    }
     let span = jiff::Span::new().days(i64::from(offset_days.get()));
-    let Ok(date) = pin.checked_add(span) else {
+    let Ok(date) = pin.day().checked_add(span) else {
         session.reject(
             ViolationCode::LimitExceeded,
             Some(node),
@@ -531,7 +539,7 @@ fn shift_pin(session: &mut Session<'_>, node: &NodeKey, offset_days: SignedDays)
     };
     vec![session.put(GraphRecord::Pin {
         node: node.clone(),
-        date,
+        date: When::Day(date),
     })]
 }
 

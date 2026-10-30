@@ -59,7 +59,7 @@ use std::cell::Cell;
 use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
 use cairn_schema::{
     Date, DateOrigin, KeyRefs, Node, NodeKey, NodeKind, Payload, Relevance, SnoozeTarget, Stalled,
-    State,
+    State, Timestamp, When,
 };
 
 use super::dates::Dates;
@@ -106,8 +106,8 @@ struct Flags {
 /// D8: what holds an actionable node off the acting frontier until a date.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Scheduled {
-    /// The date it waits for.
-    pub date: Date,
+    /// The date it waits for, with its time when it has one.
+    pub date: When,
     /// An `auto_done` milestone: it marks itself done on that date.
     pub marks_itself_done: bool,
 }
@@ -137,6 +137,7 @@ struct Sweep<'a> {
     early: &'a Early,
     dates: &'a Dates,
     today: Date,
+    now: Timestamp,
     /// Edges read so far.
     operations: Cell<u64>,
 }
@@ -144,13 +145,20 @@ struct Sweep<'a> {
 impl Blocking {
     /// Pass 5 over passes 1, 2, and 4, at `today`.
     #[must_use]
-    pub(crate) fn pass(graph: &Graph, early: &Early, dates: &Dates, today: Date) -> Self {
+    pub(crate) fn pass(
+        graph: &Graph,
+        early: &Early,
+        dates: &Dates,
+        today: Date,
+        now: Timestamp,
+    ) -> Self {
         let dependencies = &early.dependencies;
         let sweep = Sweep {
             graph,
             early,
             dates,
             today,
+            now,
             operations: Cell::new(0),
         };
         let (order, ordering) = topological_order(dependencies);
@@ -446,7 +454,10 @@ impl Sweep<'_> {
         let pending = stored_state(self.graph.document(), node) == State::Pending;
         let relevant = self.early.relevance.value(&node.key) == Relevance::Relevant;
         let due = self.dates.effective_date(&node.key);
-        milestone.auto_done && pending && relevant && due.is_some_and(|due| due.date <= self.today)
+        milestone.auto_done
+            && pending
+            && relevant
+            && due.is_some_and(|due| due.date.arrived(self.today, self.now))
     }
 
     /// D8: the date ahead that holds the node, whatever its other flags: an `auto_done`
@@ -464,11 +475,11 @@ impl Sweep<'_> {
                 (effective.date, milestone.auto_done)
             }
             Payload::Deliverable(_) | Payload::Action(_) | Payload::Decision(_) => {
-                (self.dates.not_before(key)?, false)
+                (When::Day(self.dates.not_before(key)?), false)
             }
             Payload::Group => return None,
         };
-        (date > self.today).then_some(Scheduled {
+        (!date.arrived(self.today, self.now)).then_some(Scheduled {
             date,
             marks_itself_done,
         })
@@ -550,7 +561,7 @@ impl Sweep<'_> {
     fn holding(&self, key: &NodeKey, satisfied: &[bool]) -> Option<SnoozeTarget> {
         let until = self.graph.document().state.snoozes.get(key)?;
         let holds = match until {
-            SnoozeTarget::Date(date) => self.today < *date,
+            SnoozeTarget::Date(date) => !date.arrived(self.today, self.now),
             SnoozeTarget::Node(target) => {
                 let in_scope = self.early.relevance.in_scope(target);
                 let done = self.dependencies().node_index(target).is_some_and(|at| {

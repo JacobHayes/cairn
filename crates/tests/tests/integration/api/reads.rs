@@ -329,9 +329,9 @@ mod in_process {
         );
 
         let deployment = world.service.deployment().await.unwrap();
-        let today = support::settings().today("2026-10-06T03:00:00Z".parse().unwrap());
+        let now = "2026-10-06T03:00:00Z".parse().unwrap();
         let inputs =
-            support::settings().derive_inputs(today, document.inputs.viewer.clone(), deployment);
+            support::settings().derive_inputs(now, document.inputs.viewer.clone(), deployment);
         assert_eq!(inputs, document.inputs);
         let journey = &document.journey;
         let graph = Graph::new(journey.graph.clone(), &inputs.deployment).unwrap();

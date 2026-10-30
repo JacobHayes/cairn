@@ -7,7 +7,9 @@
 //! aliases, E6), today in the deployment's zone (A9), and the viewer; the time zone is
 //! the service's own setting, fixed for its life. A commit moves a revision and
 //! midnight moves today, so neither ever meets an entry derived before it (D6: caching is
-//! invisible). The memo holds at most [`MEMO_ENTRY_COUNT_MAX`] derivations and drops the least
+//! invisible). A time of day on a pin, an answer, or a snooze changes a derivation at its
+//! minute, so an entry also serves only the moments from its own to the one its derive says
+//! it holds until. The memo holds at most [`MEMO_ENTRY_COUNT_MAX`] derivations and drops the least
 //! recently read one first.
 //!
 //! Cost: a hit is one lock and a scan of at most `MEMO_ENTRY_COUNT_MAX` keys; a miss is one
@@ -18,7 +20,9 @@ use std::collections::{BTreeSet, VecDeque};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use cairn_engine::{Derived, Graph, derive};
-use cairn_schema::{Date, Deployment, IdentityKey, Journey, JourneyHeader, JourneyId, Revision};
+use cairn_schema::{
+    Date, Deployment, IdentityKey, Journey, JourneyHeader, JourneyId, Revision, Timestamp,
+};
 
 /// How many derivations the memo keeps. A derivation at the limits holds a 2,000-node graph
 /// and its derive, tens of MiB, so the bound keeps the worst case within a few hundred MiB
@@ -99,10 +103,15 @@ pub(crate) struct Memo {
 }
 
 impl Memo {
-    /// The derivation for `key`, if the memo holds it; it becomes the most recent.
-    pub fn get(&self, key: &MemoKey) -> Option<Arc<Derivation>> {
+    /// The derivation for `key` at `now`, if the memo holds it; it becomes the most recent.
+    /// A derivation holds from its own moment until the next time of day that changes it.
+    pub fn get(&self, key: &MemoKey, now: Timestamp) -> Option<Arc<Derivation>> {
         let mut entries = self.entries.lock().unwrap_or_else(PoisonError::into_inner);
-        let position = entries.iter().position(|entry| entry.key == *key)?;
+        let position = entries.iter().position(|entry| {
+            entry.key == *key
+                && entry.derived.now() <= now
+                && entry.derived.holds_until().is_none_or(|until| now < until)
+        })?;
         let found = entries.remove(position)?;
         entries.push_back(Arc::clone(&found));
         Some(found)
@@ -143,6 +152,7 @@ mod tests {
     fn derivation(id: &str, revision: u32, today: &str) -> Arc<Derivation> {
         let inputs = DeriveInputs {
             today: today.parse().unwrap(),
+            now: format!("{today}T12:00:00Z").parse().unwrap(),
             timezone: "UTC".parse().unwrap(),
             viewer: BTreeSet::new(),
             deployment: Deployment::default(),
@@ -165,10 +175,16 @@ mod tests {
         tomorrow.today = "2026-10-07".parse().unwrap();
         let mut viewer = first.key.clone();
         viewer.viewer.insert("who_someone".parse().unwrap());
+        let now = first.derived.now();
         for other in [&moved, &tomorrow, &viewer] {
-            assert!(memo.get(other).is_none(), "{other:?}");
+            assert!(memo.get(other, now).is_none(), "{other:?}");
         }
-        assert!(Arc::ptr_eq(&memo.get(&first.key).unwrap(), &first));
+        let before: Timestamp = "2026-10-06T11:59:00Z".parse().unwrap();
+        assert!(
+            memo.get(&first.key, before).is_none(),
+            "not before its own moment"
+        );
+        assert!(Arc::ptr_eq(&memo.get(&first.key, now).unwrap(), &first));
         // Fill past the bound: reading the first keeps it, the next oldest goes.
         let others: Vec<_> = (1..=MEMO_ENTRY_COUNT_MAX)
             .map(|index| derivation(&format!("j_{index}"), 1, "2026-10-06"))
@@ -176,11 +192,17 @@ mod tests {
         for (index, other) in others.iter().enumerate() {
             memo.put(Arc::clone(other));
             if index == 0 {
-                assert!(memo.get(&first.key).is_some());
+                assert!(memo.get(&first.key, now).is_some());
             }
         }
-        assert!(memo.get(&first.key).is_some());
-        assert!(memo.get(&others[0].key).is_none(), "the least recent went");
-        assert!(memo.get(&others[MEMO_ENTRY_COUNT_MAX - 1].key).is_some());
+        assert!(memo.get(&first.key, now).is_some());
+        assert!(
+            memo.get(&others[0].key, now).is_none(),
+            "the least recent went"
+        );
+        assert!(
+            memo.get(&others[MEMO_ENTRY_COUNT_MAX - 1].key, now)
+                .is_some()
+        );
     }
 }

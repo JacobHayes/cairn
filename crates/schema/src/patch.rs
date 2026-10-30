@@ -37,6 +37,7 @@ use crate::proposal::ProposalDraft;
 use crate::refs::KeyRefs;
 use crate::state::{AnswerValue, OverrideKind, SnoozeTarget};
 use crate::text::{Markdown, Reason, Title};
+use crate::when::When;
 use jiff::civil::Date;
 
 // PRD: A17.
@@ -721,8 +722,8 @@ pub enum Mutation {
     SetPin {
         /// The node.
         node: NodeKey,
-        /// The date.
-        date: Date,
+        /// The day, or a moment on it with the deployment's offset.
+        date: When,
     },
     // PRD: F5.
     /// Move a pin by a number of days (`shift`).
@@ -927,6 +928,39 @@ pub enum ChangeClass {
 }
 
 impl Mutation {
+    // PRD: F5.
+    /// The times of day this mutation sets: a pin, a date answer, or a snooze until a date,
+    /// written with a time, and those of the mutations a proposal carries.
+    #[must_use]
+    pub fn moments(&self) -> Vec<When> {
+        match self {
+            Mutation::SetPin { date, .. }
+            | Mutation::Answer {
+                value: AnswerValue::Date(date),
+                ..
+            }
+            | Mutation::Snooze {
+                until: SnoozeTarget::Date(date),
+                ..
+            } => Some(*date)
+                .filter(|when| when.is_moment())
+                .into_iter()
+                .collect(),
+            Mutation::CreateProposal { proposal } | Mutation::EditProposal { proposal } => proposal
+                .mutations
+                .as_slice()
+                .iter()
+                .flat_map(Mutation::moments)
+                .collect(),
+            Mutation::ExtendProposal { mutations, .. } => mutations
+                .as_slice()
+                .iter()
+                .flat_map(Mutation::moments)
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
     /// The node this mutation adds, changes, or removes (the decision, for an answer); none
     /// for a mutation about an edge, a role, a kind, an annotation, or its domain.
     #[must_use]

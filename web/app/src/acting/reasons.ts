@@ -4,7 +4,7 @@
 // caller can tone it, and `factWords` says it. Every surface that shows a row's action-priority
 // fact takes it from `actionFact`, so a row reads the same wherever it is listed.
 import { nodeOf, type Ready } from "../detail/model.ts";
-import { dateWords, daysUntil, daysWords, dueWords, isSoon } from "../status/when.ts";
+import { dateWords, daysUntil, daysWords, dueWords, isSoon, lateWords } from "../status/when.ts";
 import { missingEvidence } from "./acts.ts";
 import type { SortBy } from "./address.ts";
 import { rankParts, type NodeRow, type RankPart } from "./why.ts";
@@ -110,7 +110,7 @@ export function factWords(fact: ActionFact, today: string): string {
     case "conditional":
       return "May not apply";
     case "late": {
-      const late = `${daysWords(fact.days)} late`;
+      const late = lateWords(fact.days);
       return fact.decideBy === undefined ? late : `Decide by ${dateWords(fact.decideBy, today)}, ${late}`;
     }
     case "behind":

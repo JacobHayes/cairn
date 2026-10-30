@@ -50,6 +50,7 @@ let loads = 0;
 
 /** The day in a route's key: a route has no calendar date, and nothing it answers depends on one. */
 const ROUTE_DAY = "2000-01-01";
+const ROUTE_NOW = `${ROUTE_DAY}T00:00:00Z`;
 
 function holdingAny(name: string): Held {
   const found = held.get(name);
@@ -89,9 +90,9 @@ function ready(): Engine {
   return engine;
 }
 
-/** Whether `posted` is older than `held`: an earlier revision, deployment, or day. */
+/** Whether `posted` is older than `held`: an earlier revision, deployment, or instant. */
 function older(posted: DerivationKey, held: DerivationKey): boolean {
-  const order = (key: DerivationKey): [number, number, string] => [key.revision, key.deployment_revision, key.today];
+  const order = (key: DerivationKey): [number, number, number] => [key.revision, key.deployment_revision, Date.parse(key.now)];
   const [a, b] = [order(posted), order(held)];
   return a[0] !== b[0] ? a[0] < b[0] : a[1] !== b[1] ? a[1] < b[1] : a[2] < b[2];
 }
@@ -130,7 +131,7 @@ function loadRoute(request: RouteDeriveRequest, slot: string): string {
   loads += 1;
   held.set(slot, { kind: "route", derivation, load: loads });
   const handle: DerivationHandle = { journey: slot, load: loads };
-  const key: DerivationKey = { journey: slot, revision: 0, deployment_revision: request.deployment.revision, today: ROUTE_DAY, generation: loads };
+  const key: DerivationKey = { journey: slot, revision: 0, deployment_revision: request.deployment.revision, today: ROUTE_DAY, now: ROUTE_NOW, generation: loads };
   return JSON.stringify({ key, handle });
 }
 
@@ -141,7 +142,7 @@ function loadRoute(request: RouteDeriveRequest, slot: string): string {
 function preview(journey: string, posted: DerivationKey, request: PreviewRequest, slot: string): string {
   const source = holding(journey);
   const now = source.derivation.key;
-  if (now.revision !== posted.revision || now.deployment_revision !== posted.deployment_revision || now.today !== posted.today) {
+  if (now.revision !== posted.revision || now.deployment_revision !== posted.deployment_revision || now.now !== posted.now) {
     throw new HostFailure({ error: "superseded", held: now, posted });
   }
   const answer = ready().preview(source.document, request);

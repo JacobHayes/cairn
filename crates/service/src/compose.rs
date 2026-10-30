@@ -8,6 +8,8 @@ use std::sync::Arc;
 
 use cairn_schema::{Date, Deployment, DeriveInputs, IdentityKey, Slug, TimeZoneName, Timestamp};
 use cairn_store::{Notifier, Store};
+use jiff::civil::DateTime;
+use jiff::tz::Offset;
 use jiff::tz::TimeZone;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -56,6 +58,14 @@ impl DeploymentSettings {
         &self.timezone
     }
 
+    /// The UTC offset the deployment's zone has at the instant a time of day written with
+    /// `offset` names, when it is not that offset: the one to write it with.
+    #[must_use]
+    pub fn offset_instead(&self, wall: DateTime, offset: Offset) -> Option<Offset> {
+        let instant = offset.to_timestamp(wall).ok()?;
+        Some(self.zone.to_offset(instant)).filter(|right| *right != offset)
+    }
+
     /// A9: the calendar day `now` falls on in the deployment's time zone, the today every
     /// user of the deployment shares.
     #[must_use]
@@ -63,17 +73,18 @@ impl DeploymentSettings {
         now.to_zoned(self.zone.clone()).date()
     }
 
-    /// The derive inputs for one call: today, these settings, the viewer's identities, and
-    /// the deployment context at its revision.
+    /// The derive inputs for one call: `now` and its today, these settings, the viewer's
+    /// identities, and the deployment context at its revision.
     #[must_use]
     pub fn derive_inputs(
         &self,
-        today: Date,
+        now: Timestamp,
         viewer: BTreeSet<IdentityKey>,
         deployment: Deployment,
     ) -> DeriveInputs {
         DeriveInputs {
-            today,
+            today: self.today(now),
+            now,
             timezone: self.timezone.clone(),
             viewer,
             deployment,

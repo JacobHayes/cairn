@@ -16,6 +16,7 @@ import { newIdentityKey } from "../people/model.ts";
 import { choiceId, choiceLabel } from "../status/answer.ts";
 import { Button, Input as TextInput } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
+import { WhenInput } from "../ui/WhenInput.tsx";
 import { effectOf, effectOfOption, outgoing, sameAnswer } from "./answer.ts";
 import { accepts, titleOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
 import { IdentityOptions, NodeLink, Rationale } from "./parts.tsx";
@@ -91,7 +92,7 @@ export function Input({ view, node, value, onChange }: { view: Ready; node: Grap
     return <Checks options={identities} chosen={value.identity_list} onChange={(next) => { onChange({ identity_list: next }); }} />;
   }
   if ("date" in value) {
-    return <TextInput type="date" aria-label="Answer" value={value.date} onChange={(event) => { onChange({ date: event.target.value }); }} />;
+    return <WhenInput label="Answer" value={value.date} zone={view.inputs.timezone} onChange={(next) => { onChange({ date: next }); }} />;
   }
   return <TextInput aria-label="Answer" value={value.text} onChange={(event) => { onChange({ text: event.target.value }); }} />;
 }
@@ -262,7 +263,7 @@ function AnswerInput(props: InputProps) {
     case "multi_choice":
       return <MultiInput {...props} />;
     case "date":
-      return <TextInput type="date" aria-label="Answer" data-testid="answer" value={value !== undefined && "date" in value ? value.date : ""} onChange={(event) => { pick({ date: event.target.value }); }} />;
+      return <WhenInput label="Answer" testid="answer" value={value !== undefined && "date" in value ? value.date : ""} zone={props.view.inputs.timezone} onChange={(date) => { pick({ date }); }} />;
     case "identity":
       return <IdentityInput {...props} />;
     case "identity_list":

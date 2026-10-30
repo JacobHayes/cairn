@@ -292,7 +292,7 @@ impl Derivation {
     }
 
     /// What it was derived from, as a query cache keys it (ARCHITECTURE, Web UI): the
-    /// journey, its revision, the deployment revision, and today, as JSON.
+    /// journey, its revision, the deployment revision, today, and now, as JSON.
     #[must_use]
     pub fn key(&self) -> String {
         let journey = &self.document.journey;
@@ -301,6 +301,7 @@ impl Derivation {
             "revision": journey.revision,
             "deployment_revision": self.document.inputs.deployment.revision,
             "today": self.document.inputs.today,
+            "now": self.document.inputs.now,
         }))
     }
 }

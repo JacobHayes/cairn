@@ -4,7 +4,7 @@
 import { conditionWords, decisionOf, decisionsIn, type ConditionNames } from "../authoring/condition.ts";
 import { isLeaf } from "../authoring/graph.ts";
 import type { GraphNode, NodeKind } from "../detail/model.ts";
-import { dateWords, daysUntil, daysWords, dueWords, isSoon, NEAR_DAYS, SOON_DAYS } from "../status/when.ts";
+import { dateWords, daysUntil, dueWords, isSoon, lateWords, NEAR_DAYS, SOON_DAYS } from "../status/when.ts";
 import type { DisplayState } from "../status/words.ts";
 import type { Line, LineKind, LineLink, Tone } from "./model.ts";
 
@@ -38,7 +38,7 @@ export function footWords(facts: FootFacts): { words: string; tone: Tone } | und
     return undefined;
   }
   if (overdueDays !== undefined) {
-    return { words: `${daysWords(overdueDays)} late`, tone: "bad" };
+    return { words: lateWords(overdueDays), tone: "bad" };
   }
   const started = state === "active";
   if (latestStart !== undefined && !started && !isLeaf(kind) && daysUntil(latestStart, today) <= NEAR_DAYS) {

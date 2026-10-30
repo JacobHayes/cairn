@@ -71,10 +71,12 @@ mod solve;
 
 use std::collections::BTreeSet;
 
+use jiff::SignedDuration;
+
 use cairn_schema::{
     AnswerSpec, AnswerValue, Bound, BoundedVec, ChainList, Date, DateOrigin, Deployment,
     EffectiveDate, FixedBy, NodeDates, NodeKey, NodeKind, Payload, ShortChain, State, Subject,
-    Violation, ViolationCode,
+    Timestamp, Violation, ViolationCode, When,
 };
 
 use super::dependencies::{Dependencies, NodeIndex};
@@ -92,6 +94,8 @@ pub(crate) struct Fix {
     pub day: i32,
     /// A pin, an answer, an actual, or today.
     pub by: FixedBy,
+    /// The pin or answer, when it carries a time.
+    pub moment: Option<When>,
 }
 
 /// What fixes each slot: the plan's pins and date answers, and in the execution layer the
@@ -131,7 +135,7 @@ impl Seeds {
                 .node_index(key)
                 .filter(|at| scope.in_scope(*at) && !scope.skipped(*at))
             {
-                seeds.set_pin(network.finish(at), day(*date), FixedBy::Pin);
+                seeds.set_pin(network.finish(at), *date, FixedBy::Pin);
             }
         }
         for node in document.nodes.values() {
@@ -148,12 +152,12 @@ impl Seeds {
             let Some(at) = dependencies.node_index(&node.key) else {
                 continue;
             };
-            seeds.set_pin(network.answer(at), day(*answered), FixedBy::Answer);
+            seeds.set_pin(network.answer(at), *answered, FixedBy::Answer);
             let fed = feeds_milestone
                 .as_ref()
                 .and_then(|m| dependencies.node_index(m));
             if let Some(milestone) = fed.filter(|m| scope.in_scope(*m) && !scope.skipped(*m)) {
-                seeds.set_pin(network.finish(milestone), day(*answered), FixedBy::Pin);
+                seeds.set_pin(network.finish(milestone), *answered, FixedBy::Pin);
                 if let Some(feeding) = seeds.feeding.get_mut(milestone.get()) {
                     *feeding = Some(at);
                 }
@@ -210,6 +214,7 @@ impl Seeds {
             *today = Some(Fix {
                 day,
                 by: FixedBy::Today,
+                moment: None,
             });
         }
     }
@@ -219,13 +224,18 @@ impl Seeds {
             *actual = Some(Fix {
                 day,
                 by: FixedBy::Actual,
+                moment: None,
             });
         }
     }
 
-    fn set_pin(&mut self, slot: Slot, day: i32, by: FixedBy) {
+    fn set_pin(&mut self, slot: Slot, when: When, by: FixedBy) {
         if let Some(pin) = self.pins.get_mut(slot.index()) {
-            *pin = Some(Fix { day, by });
+            *pin = Some(Fix {
+                day: day(when.day()),
+                by,
+                moment: when.is_moment().then_some(when),
+            });
         }
     }
 
@@ -435,6 +445,8 @@ pub(crate) fn plan_violation(graph: &Graph, deployment: &Deployment) -> Option<V
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Dates {
     today: i32,
+    /// The moment of the derivation, for a node's own time of day.
+    now: Timestamp,
     /// Node keys in index order (key order), for lookups and chains.
     keys: Vec<NodeKey>,
     network: Network,
@@ -455,6 +467,7 @@ impl Dates {
         graph: &Graph,
         early: &Early,
         today: Date,
+        now: Timestamp,
         created_on: Option<Date>,
     ) -> Self {
         let document = graph.document();
@@ -490,6 +503,7 @@ impl Dates {
         assert_eq!(keys.len(), network.node_count());
         Dates {
             today: day(today),
+            now,
             keys,
             network,
             seeds,
@@ -641,9 +655,25 @@ impl Dates {
         if !self.unfinished.get(at.get()).copied().unwrap_or(false) {
             return None;
         }
-        let due = self.solved.latest(self.network.finish(at))?;
-        let days = self.today.checked_sub(due).filter(|days| *days > 0)?;
-        Some(u32::try_from(days).unwrap_or(u32::MAX))
+        let finish = self.network.finish(at);
+        let due = self.solved.latest(finish)?;
+        match self.today.checked_sub(due).filter(|days| *days > 0) {
+            Some(days) => Some(u32::try_from(days).unwrap_or(u32::MAX)),
+            None => self.own_time_passed(finish).then_some(0),
+        }
+    }
+
+    /// Whether the node's own pin carries a time today that has passed by a minute: the one
+    /// place a minute, not a day, makes work late.
+    fn own_time_passed(&self, finish: Slot) -> bool {
+        self.seeds.pin(finish).is_some_and(|pin| {
+            pin.day == self.today
+                && pin
+                    .moment
+                    .and_then(When::instant)
+                    .and_then(|instant| instant.checked_add(SignedDuration::from_mins(1)).ok())
+                    .is_some_and(|late| late <= self.now)
+        })
     }
 
     /// F1: a milestone's effective date: its actual date if done, else its pin, else its
@@ -656,14 +686,16 @@ impl Dates {
         }
         let slot = self.network.finish(at);
         let effective = |day, origin| EffectiveDate {
-            date: date(day),
+            date: When::Day(date(day)),
             origin,
         };
         if let Some(actual) = self.seeds.actual(slot) {
             return Some(effective(actual.day, DateOrigin::Actual));
         }
         if let Some(pin) = self.seeds.pin(slot) {
-            return Some(effective(pin.day, DateOrigin::Pin));
+            let mut found = effective(pin.day, DateOrigin::Pin);
+            found.date = pin.moment.unwrap_or(found.date);
+            return Some(found);
         }
         let due = self.solved.latest(slot)?;
         Some(effective(due, DateOrigin::Due))

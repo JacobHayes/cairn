@@ -161,7 +161,7 @@ fn the_examples_report_is_due_by_its_chain() {
         .unwrap();
     assert_eq!(
         (meeting.date, meeting.origin),
-        (date("2026-11-20"), DateOrigin::Pin)
+        (date("2026-11-20").into(), DateOrigin::Pin)
     );
 }
 
@@ -381,7 +381,7 @@ fn a_deadline_follows_its_milestones_actual() {
     let kickoff = dates_of(&finished, "n_kickoff").effective_date.unwrap();
     assert_eq!(
         (kickoff.date, kickoff.origin),
-        (date("2026-10-06"), DateOrigin::Actual)
+        (date("2026-10-06").into(), DateOrigin::Actual)
     );
 }
 

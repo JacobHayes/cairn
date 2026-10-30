@@ -23,6 +23,7 @@ use crate::node::{AnswerType, NodeKind};
 use crate::patch::{Mutation, Removal};
 use crate::state::{AnswerValue, SnoozeTarget, State};
 use crate::text::{Markdown, Title};
+use crate::when::When;
 
 // PRD: I3, J4.
 /// A position in a projection's order: where the next page starts. Valid for the
@@ -1184,8 +1185,8 @@ pub struct TimelineEntry {
     pub node: NodeKey,
     /// Its kind.
     pub kind: NodeKind,
-    /// The date.
-    pub date: Date,
+    /// The date, with its time when a pin gives one.
+    pub date: When,
     /// Where the date comes from: a milestone's actual, a pin, or a derived due date.
     pub origin: DateOrigin,
     /// Non-terminal with its due before today.

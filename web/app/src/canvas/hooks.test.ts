@@ -113,7 +113,7 @@ describe("what the other canvas reads are keyed by", () => {
   });
 
   test("a route's graph derived again is the same read, read anew, though its slot is new each time", () => {
-    const route = (slot: string, generation: number) => ({ key: { journey: slot, revision: 0, deployment_revision: 1, today: "2000-01-01", generation }, reads: "route:r:draft" });
+    const route = (slot: string, generation: number) => ({ key: { journey: slot, revision: 0, deployment_revision: 1, today: "2000-01-01", now: "2000-01-01T00:00:00Z", generation }, reads: "route:r:draft" });
     const request: ProjectionRequest = { projection: "level", shown: ["group"] };
     const first = projectedKey(deriver, route("route:r:draft#1", 1), request);
     const next = projectedKey(deriver, route("route:r:draft#2", 2), request);

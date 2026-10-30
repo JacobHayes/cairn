@@ -223,7 +223,8 @@ export const journeyManager = setup({
       const entry = context.entries[id];
       return entry === undefined ? {} : { entries: { ...context.entries, [id]: { ...entry, snapshot: relayed.snapshot } } };
     }),
-    // Asked at each check until the host's today catches up with the page's clock.
+    // Asked at each check until the host's today, and its now, catch up with the page's clock: a
+    // derivation holds until the next time of day that would change it.
     rollover: enqueueActions(({ context, enqueue }) => {
       for (const entry of Object.values(context.entries)) {
         const held = heldValue<JourneyHeld>(entry.snapshot);
@@ -231,7 +232,8 @@ export const journeyManager = setup({
           continue;
         }
         try {
-          if (todayIn(held.timezone, context.today()) !== held.today) {
+          const holds = held.derived.holds_until;
+          if (todayIn(held.timezone, context.today()) !== held.today || (holds != null && context.today().getTime() >= Date.parse(holds))) {
             enqueue.sendTo(entry.ref, { type: "refresh" });
           }
         } catch {

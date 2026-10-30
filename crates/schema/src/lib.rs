@@ -40,6 +40,7 @@ pub mod state;
 pub mod testing;
 pub mod text;
 pub mod touched;
+pub mod when;
 
 pub use attachment::{
     Annotation, AnnotationBody, AnnotationContent, AttachmentScope, JourneyField, MessageTemplate,
@@ -125,3 +126,4 @@ pub use state::{
 };
 pub use text::{Email, Markdown, Reason, TextError, Title, Url};
 pub use touched::TouchedSet;
+pub use when::When;
