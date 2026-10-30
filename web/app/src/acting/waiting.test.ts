@@ -19,9 +19,9 @@ describe("waitingDecisions", () => {
     expect(waiting.find((each) => each.decision === "n_later")?.unblockers).toEqual([{ node: "n_meet", kind: "milestone", stage: false, via: "explicit" }]);
   });
 
-  it("names the stage opening a decision waits on through its stage, not the stage's own children", () => {
+  it("names what a decision waits on through its stage, not the stage's own children", () => {
     expect(waiting.find((each) => each.decision === "n_inner")?.unblockers).toEqual([
-      { node: "n_meet", kind: "milestone", stage: false, via: { stage_opening: { group: "n_stage" } }, through: "n_stage" },
+      { node: "n_meet", kind: "milestone", stage: false, via: { inherited: { ancestor: "n_stage" } }, through: "n_stage" },
     ]);
   });
 

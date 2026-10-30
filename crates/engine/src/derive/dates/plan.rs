@@ -1,5 +1,5 @@
 //! The plan layer's check (F5; Invariants: the date line): pins, rules, estimates,
-//! containment, stage bounds, and dependencies, with no actuals and no today, must hold no
+//! containment, and dependencies, with no actuals and no today, must hold no
 //! contradictory chain. Two kinds are found:
 //!
 //! - A positive cycle, pinned or not: Bellman-Ford with every instant of a cyclic component

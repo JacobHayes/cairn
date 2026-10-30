@@ -18,7 +18,7 @@ use cairn_schema::{
 
 use super::rows::{count, page};
 use super::{DerivedJourney, ProjectionError};
-use crate::derive::dependencies::{EdgeClass, EdgeSet, EdgeSource, Instant, Point};
+use crate::derive::dependencies::{EdgeSet, EdgeSource, Instant, Point};
 
 impl DerivedJourney<'_> {
     /// A page of the node's explanation list for `field`, largest first, from the cursor; the
@@ -102,17 +102,11 @@ impl DerivedJourney<'_> {
             .into_iter()
             .map(|freed| freed.node)
             .collect();
-        // The nodes whose own requirement, condition gate, or stage opening waits for this
+        // The nodes whose own requirement or condition gate waits for this
         // node's finish; what an ancestor's holds reaches a descendant through the ancestor.
         let dependents: BTreeSet<&NodeKey> = dependencies
             .waited_by(Instant::new(index, Point::Finish), EdgeSet::Pruned)
-            .filter(|edge| edge.class == EdgeClass::Gate)
-            .filter(|edge| {
-                matches!(
-                    edge.source,
-                    EdgeSource::Explicit | EdgeSource::Condition | EdgeSource::StageOpening
-                )
-            })
+            .filter(|edge| matches!(edge.source, EdgeSource::Explicit | EdgeSource::Condition))
             .filter_map(|edge| dependencies.key(edge.dependent.node))
             .collect();
         let mut held: Vec<HeldDependent> = dependents

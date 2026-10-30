@@ -1,14 +1,14 @@
-//! The effective dependency graph (PRD Containment, Gating, F4; Invariants: the cycle check
-//! over implicit edges): inherited requirements through the entry chain with the ancestor
-//! named, force include dropping condition gates but not requirements, gate and date-only
-//! edges, a container completing only at its own finish, and cycles judged on gate edges.
+//! The effective dependency graph (PRD Containment, Gating; Invariants: the cycle check over
+//! implicit edges): inherited requirements through the entry chain with the ancestor named,
+//! force include dropping condition gates but not requirements, a container completing only
+//! at its own finish, and cycles judged with the implicit edges included.
 #![cfg(test)]
 
 use crate::engine::support;
 
 use std::collections::BTreeSet;
 
-use cairn_engine::derive::dependencies::{EdgeClass, EdgeSource, Instant, Point};
+use cairn_engine::derive::dependencies::{EdgeSource, Instant, Point};
 use cairn_engine::derive::{Dependencies, EdgeSet, EffectiveDependency};
 use cairn_schema::{DependencyVia, NodeKey, ViolationCode};
 use support::key;
@@ -17,25 +17,16 @@ fn dependency(node: &str, via: DependencyVia) -> EffectiveDependency {
     EffectiveDependency {
         node: key(node),
         via,
-        class: EdgeClass::Gate,
     }
 }
 
-/// Every node whose finish `from` reaches through edges of the set and classes given.
-fn reached(
-    graph: &Dependencies,
-    from: Instant,
-    set: EdgeSet,
-    gates_only: bool,
-) -> BTreeSet<NodeKey> {
+/// Every node whose finish `from` reaches through edges of the set given.
+fn reached(graph: &Dependencies, from: Instant, set: EdgeSet) -> BTreeSet<NodeKey> {
     let mut seen = BTreeSet::from([from]);
     let mut stack = vec![from];
     let mut found = BTreeSet::new();
     while let Some(instant) = stack.pop() {
         for edge in graph.waits(instant, set) {
-            if gates_only && edge.class != EdgeClass::Gate {
-                continue;
-            }
             if edge.requirement.point == Point::Finish {
                 found.insert(graph.key(edge.requirement.node).unwrap().clone());
             }
@@ -66,7 +57,7 @@ fn a_childs_actions_wait_for_their_parents_requirement() {
             },
         );
         assert!(listed.contains(&inherited), "{child}: {listed:#?}");
-        let waits_on = reached(graph, start_of(graph, child), EdgeSet::Pruned, true);
+        let waits_on = reached(graph, start_of(graph, child), EdgeSet::Pruned);
         assert!(
             waits_on.contains(&key("n_access")),
             "{child} waits for access"
@@ -119,12 +110,7 @@ fn a_child_fits_between_its_parents_entry_and_start() {
             .of(&key("n_plan"), EdgeSet::Pruned)
             .contains(&dependency("n_plan_draft", DependencyVia::Containment))
     );
-    let ahead = reached(
-        graph,
-        Instant::new(plan, Point::Entry),
-        EdgeSet::Full,
-        false,
-    );
+    let ahead = reached(graph, Instant::new(plan, Point::Entry), EdgeSet::Full);
     assert!(
         !ahead.contains(&key("n_plan_draft")),
         "no cycle through the entry"
@@ -204,57 +190,26 @@ fn force_include_drops_condition_gates_and_keeps_requirements() {
             full.contains(&condition) && full.contains(&requirement),
             "{label}"
         );
-        let waits_on = reached(graph, start_of(graph, "n_inner"), EdgeSet::Pruned, true);
+        let waits_on = reached(graph, start_of(graph, "n_inner"), EdgeSet::Pruned);
         assert_eq!(waits_on, BTreeSet::from([key("n_prior")]), "{label}");
     }
 }
 
-fn stage(gates: bool) -> String {
-    format!(
-        "- op: add_node\n  node: {{key: n_opens, id: opens, kind: milestone, title: Opens}}\n\
-- op: add_node\n  node: {{key: n_stage, id: stage, kind: group, title: Stage, opens_at: n_opens, gates: {gates}}}\n\
-- op: add_node\n  node: {{key: n_work, id: work, parent: n_stage, kind: action, title: Work}}\n"
-    )
+fn stage() -> String {
+    "- op: add_node\n  node: {key: n_opens, id: opens, kind: milestone, title: Opens}\n\
+- op: add_node\n  node: {key: n_stage, id: stage, kind: group, title: Stage, requires: [n_opens]}\n\
+- op: add_node\n  node: {key: n_work, id: work, parent: n_stage, kind: action, title: Work}\n"
+        .to_owned()
 }
 
-/// F4: a stage's contents inherit its opening; with `gates: false` the opening holds dates
-/// (date-only) but never blocks.
+/// Invariants: the acyclicity check reads every edge, the implicit ones included: a stage's
+/// milestone that requires the stage is a cycle, and so is work inside a box whose condition
+/// reads a decision, requiring work inside the box.
 #[test]
-fn a_non_gating_opening_holds_dates_but_never_blocks() {
-    for gates in [true, false] {
-        let derived = support::derived(&support::journey(&stage(gates)), support::JOURNEY);
-        let graph = derived.dependencies();
-        let class = if gates {
-            EdgeClass::Gate
-        } else {
-            EdgeClass::DateOnly
-        };
-        let opening = EffectiveDependency {
-            node: key("n_opens"),
-            via: DependencyVia::StageOpening {
-                group: key("n_stage"),
-            },
-            class,
-        };
-        assert!(graph.of(&key("n_work"), EdgeSet::Pruned).contains(&opening));
-        let start = start_of(graph, "n_work");
-        let blocking = reached(graph, start, EdgeSet::Pruned, true);
-        let dating = reached(graph, start, EdgeSet::Pruned, false);
-        assert_eq!(blocking.contains(&key("n_opens")), gates, "gates: {gates}");
-        assert!(dating.contains(&key("n_opens")), "gates: {gates}");
-    }
-}
-
-/// Invariants: the acyclicity check reads gate edges only, so a non-gating opening whose
-/// milestone requires the group is accepted, and the same with a gating opening is a cycle.
-/// Condition gates and stage openings join the check.
-#[test]
-fn cycles_are_judged_on_gate_edges_with_implicit_ones_included() {
+fn cycles_are_judged_with_implicit_edges_included() {
     let requires_stage = "- op: add_edge\n  edge: {node: n_opens, requires: n_stage}\n";
-    let date_only = support::journey(&stage(false));
-    assert!(support::journey_patch(&date_only, requires_stage).is_ok());
-    let gating = support::journey(&stage(true));
-    let found = support::codes(support::journey_patch(&gating, requires_stage));
+    let records = support::journey(&stage());
+    let found = support::codes(support::journey_patch(&records, requires_stage));
     assert_eq!(found, [ViolationCode::DependencyCycle]);
     // A decision the box's condition reads, requiring work inside the box.
     let records = support::journey(GATED_BOX);
@@ -295,7 +250,7 @@ fn the_graph_stays_linear_at_the_limits() {
         .sum();
     let edges = dependencies.edges(EdgeSet::Full).count();
     // Six per node for work, entries, and containment; one per reference; conditions here
-    // read at most two decisions, and every group has an opening.
+    // read at most two decisions, and every group has a requirement.
     assert!(
         edges <= 6 * count + explicit + 3 * count,
         "{edges} edges, {explicit} explicit"

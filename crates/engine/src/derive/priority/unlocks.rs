@@ -12,7 +12,7 @@ use cairn_schema::NodeKind;
 
 use super::super::Early;
 use super::super::blocking::Blocking;
-use super::super::dependencies::{Dependencies, EdgeClass, EdgeSet, Instant, NodeIndex, Point};
+use super::super::dependencies::{Dependencies, EdgeSet, Instant, NodeIndex, Point};
 use super::super::skip::Skips;
 use super::super::skips_beneath;
 use crate::graph::Graph;
@@ -108,7 +108,6 @@ impl<'a> Simulation<'a> {
                 }
                 let open_waits = dependencies
                     .waits(instant, EdgeSet::Pruned)
-                    .filter(|edge| edge.class == EdgeClass::Gate)
                     .filter(|edge| unsatisfied(edge.requirement))
                     .count();
                 let skipped = graph
@@ -179,7 +178,6 @@ impl<'a> Simulation<'a> {
             let dependents: Vec<Instant> = self
                 .dependencies
                 .waited_by(instant, EdgeSet::Pruned)
-                .filter(|edge| edge.class == EdgeClass::Gate)
                 .map(|edge| edge.dependent)
                 .collect();
             let kept_by: Vec<Instant> = match instant.point {

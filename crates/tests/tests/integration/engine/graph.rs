@@ -199,17 +199,6 @@ const BREAKAGES: &[(&str, Breakage, ViolationCode)] = &[
         ViolationCode::WrongReferenceKind,
     ),
     (
-        "a stage opened by a deliverable",
-        |d| {
-            edit(d, "n_setup", |n| {
-                if let Payload::Group(group) = &mut n.payload {
-                    group.opens_at = Some(key("n_findings"));
-                }
-            });
-        },
-        ViolationCode::StageBoundNotMilestone,
-    ),
-    (
         "an undeclared kind",
         |d| {
             edit(d, "n_access", |n| {

@@ -248,3 +248,14 @@ describe("a tile's pieces from its card", () => {
     expect(tilePiecesOf(card("loose"), undefined)).toMatchObject({ title: "loose", chip: undefined, words: undefined, meter: false, date: undefined, fact: undefined });
   });
 });
+
+describe("a tile's date line", () => {
+  it("is judged by the mono face it is set in, which is wider than the body face", () => {
+    const text = "Due by Beta ends";
+    const alone = { title: "Beta", message: undefined, date: undefined } as TilePieces;
+    const widths = Array.from({ length: 300 }, (_, step) => 120 + step);
+    const roomFor = (piece: "message" | "date") => widths.filter((width) => tileLayoutOf({ width, height: 120 }, { ...alone, [piece]: text })[piece]);
+    // The same characters need a wider tile as a date than as a message.
+    expect(roomFor("date")[0]).toBeGreaterThan(roomFor("message")[0] ?? Infinity);
+  });
+});

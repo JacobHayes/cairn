@@ -4,7 +4,7 @@
 //! is never stale, since its move required nothing):
 //!
 //! - **a reopened dependency it relied on**: a gate dependency (its own, inherited, its
-//!   children, an opening that gates; an undecided node's condition gates aside) that is open
+//!   children; an undecided node's condition gates aside) that is open
 //!   now because something was reopened that was done when the node finished. Reopening is the
 //!   one signal: a dependency added later, an answer that brings one into scope, or a date
 //!   that moves never makes a finished node stale, and neither does finishing ahead of
@@ -50,7 +50,7 @@ use cairn_schema::{
 
 use super::blocking::Blocking;
 use super::dates::Dates;
-use super::dependencies::{Dependencies, EdgeClass, EdgeSet, Instant, NodeIndex, Point};
+use super::dependencies::{Dependencies, EdgeSet, Instant, NodeIndex, Point};
 use super::relevance::Relevances;
 use super::{Early, stored_state, unexpanded};
 use crate::graph::{Document, Graph, Tree};
@@ -193,7 +193,6 @@ impl Reopens {
         let waits = || {
             dependencies
                 .waits(instant, EdgeSet::Pruned)
-                .filter(|edge| edge.class == EdgeClass::Gate)
                 .try_fold(Span::ALWAYS, |span, edge| {
                     span_of(edge.requirement).and_then(|other| span.and(other))
                 })
@@ -339,7 +338,6 @@ pub(crate) fn open_dependencies(
     let open: BTreeSet<NodeKey> = dependencies
         .of(key, EdgeSet::Pruned)
         .into_iter()
-        .filter(|dependency| dependency.class == EdgeClass::Gate)
         .filter(|dependency| !blocking.satisfies(&dependency.node))
         .map(|dependency| dependency.node)
         .collect();
@@ -369,7 +367,6 @@ pub(crate) fn guard_open_dependencies(
     let held: BTreeSet<NodeKey> = dependencies
         .of(key, EdgeSet::Pruned)
         .into_iter()
-        .filter(|dependency| dependency.class == EdgeClass::Gate)
         .filter(|dependency| !matches!(dependency.via, DependencyVia::Condition { .. }))
         .filter(|dependency| open.contains(&dependency.node))
         .map(|dependency| dependency.node)
@@ -423,7 +420,7 @@ pub(crate) fn static_failures(
             (deliverable.requires_artifact, deliverable.requires_note)
         }
         Payload::Action(action) => (false, action.requires_note),
-        Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => (false, false),
+        Payload::Decision(_) | Payload::Milestone(_) | Payload::Group => (false, false),
     };
     if requires_artifact && !annotated.artifacts.contains(&node.key) {
         found.insert(GuardFailure::MissingArtifact);

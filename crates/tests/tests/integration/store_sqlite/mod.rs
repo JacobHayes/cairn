@@ -10,6 +10,7 @@ mod journey_owners_migration;
 mod milestone_done_migration;
 mod one_route_migration;
 mod open;
+mod plain_stages_migration;
 mod pointer_migration;
 mod property_round_trip;
 mod reason_migration;

@@ -10,8 +10,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::{DerivedJourney, ProjectionError, Records};
 use cairn_schema::{
-    DateLink, DateLinkKind, DisplayState, EdgeOrigin, Level, LevelDateLink, LevelDisplay,
-    LevelNode, LevelQuery, NodeKind,
+    DateLink, DateLinkKind, DisplayState, Level, LevelDateLink, LevelDisplay, LevelNode,
+    LevelQuery, NodeKind,
 };
 use support::{add_nodes as add, key};
 
@@ -115,13 +115,6 @@ fn every_kind_shown_draws_the_whole_graph() {
             ("n_testing", "n_reporting", 1),
         ]
     );
-    let opening = whole
-        .edges
-        .iter()
-        .find(|edge| edge.to.as_str() == "n_setup");
-    let opening = opening.unwrap();
-    assert!(opening.implicit, "an opening is a dotted gate");
-    assert_eq!(opening.underlying[0].origin, EdgeOrigin::StageOpening);
 }
 
 /// C2, C4: with actions hidden, each rolls up into its deliverable or group as a checklist
@@ -424,7 +417,7 @@ fn a_container_rolls_up_its_childrens_badges() {
 fn every_open_child_blocked_shows_all_blocked() {
     let records = support::journey(&add(&[
         "{key: n_gate, id: gate, kind: milestone, title: Gate}",
-        "{key: n_stage, id: stage, kind: group, title: Stage, opens_at: n_gate}",
+        "{key: n_stage, id: stage, kind: group, title: Stage, requires: [n_gate]}",
         "{key: n_one, id: one, parent: n_stage, kind: action, title: One}",
         "{key: n_two, id: two, parent: n_stage, kind: action, title: Two}",
     ]));
@@ -636,8 +629,6 @@ fn describe(link: &DateLink) -> String {
             "{rule:?} {direction:?} {days}{}",
             if *answer { " answer" } else { "" }
         ),
-        DateLinkKind::StageClose => "close".to_owned(),
-        DateLinkKind::StageOpening => "opening".to_owned(),
         DateLinkKind::FedDate => "fed".to_owned(),
     };
     format!("{} {} {kind}", link.node, link.source)
@@ -654,7 +645,7 @@ fn single(from: &str, to: &str, orders: bool, link: &str) -> (String, String, bo
 }
 
 /// C1: the launch fixture's date relationships, each with its direction by meaning and whether
-/// it fixes an order: closes run stage to milestone, a due-before runs work to the milestone it
+/// it fixes an order: a due-before runs work to the milestone it
 /// is due before, a not-before runs the milestone to the work, and a due-after, which fixes no
 /// order, is drawn from its source to its node.
 #[test]
@@ -668,9 +659,14 @@ fn date_links_say_their_direction_and_whether_they_fix_an_order() {
             "n_build",
             "n_code_freeze",
             true,
-            "n_build n_code_freeze close",
+            &rule("n_build", "n_code_freeze", "DueBy Before 0"),
         ),
-        single("n_beta", "n_beta_end", true, "n_beta n_beta_end close"),
+        single(
+            "n_beta",
+            "n_beta_end",
+            true,
+            &rule("n_beta", "n_beta_end", "DueBy Before 0"),
+        ),
         single(
             "n_code_freeze",
             "n_launch",
@@ -831,9 +827,6 @@ fn a_ruled_out_end_has_no_date_links() {
             format!(
                 "{{key: n_a, id: a, kind: action, title: A, due_by: {{before: n_m}}, relevant_when: {condition}}}"
             ),
-            "{key: n_g, id: g, kind: group, title: G, opens_at: n_o, gates: false, closes_at: n_m}"
-                .to_string(),
-            format!("{{key: n_o, id: o, kind: milestone, title: O, relevant_when: {condition}}}"),
         ]
     };
     let level_of = |records: &Records| every_date_link(records, support::JOURNEY, &NodeKind::ALL);
@@ -851,37 +844,17 @@ fn a_ruled_out_end_has_no_date_links() {
     };
     let condition = "{equals: {decision: n_d, value: true}}";
     let undecided = date_links(&level_of(&build(condition, None)));
-    assert_eq!(undecided.len(), 3, "{undecided:?}");
+    assert_eq!(undecided.len(), 1, "{undecided:?}");
     let ruled_in = date_links(&level_of(&build(condition, Some("true"))));
     assert_eq!(
         ruled_in, undecided,
         "answering it the way it asks changes nothing"
     );
     let ruled_out = date_links(&level_of(&build(condition, Some("false"))));
-    assert_eq!(
-        ruled_out,
-        [single("n_g", "n_m", true, "n_g n_m close")],
-        "the rule's node and the opening milestone are ruled out; the close stays"
+    assert!(
+        ruled_out.is_empty(),
+        "the rule's node is ruled out: {ruled_out:?}"
     );
-}
-
-/// C1, F4, D1: a stage opening that does not gate is a date link and not an edge, and the
-/// stage's work is not blocked while the opening milestone is unreached.
-#[test]
-fn an_opening_that_does_not_gate_is_a_date_link_not_an_edge() {
-    let records = support::journey(&support::add_nodes(&[
-        "{key: n_o, id: o, kind: milestone, title: O}",
-        "{key: n_g, id: g, kind: group, title: G, opens_at: n_o, gates: false}",
-        "{key: n_w, id: w, kind: action, title: W, parent: n_g}",
-    ]));
-    let found = level(&records, support::JOURNEY, &NodeKind::ALL, None);
-    assert!(found.edges.is_empty(), "{:?}", found.edges);
-    assert_eq!(
-        date_links(&every_date_link(&records, support::JOURNEY, &NodeKind::ALL)),
-        [single("n_o", "n_g", true, "n_g n_o opening")]
-    );
-    let derived = support::derived(&records, support::JOURNEY);
-    assert!(!derived.blocking().blocked(&key("n_w")));
 }
 
 /// C8: a node's dates list its direct relationships both ways: the launch milestone's own

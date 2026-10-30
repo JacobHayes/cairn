@@ -41,10 +41,9 @@ pub enum ViolationCode {
     RequiresDuplicatesCondition,
     // Dates (F5).
     ContradictoryChain,
-    // Conditions, stages, roles, kinds, flags.
+    // Conditions, roles, kinds, flags.
     ConditionAnswerTypeMismatch,
     ConditionOnOwnSubtree,
-    StageBoundNotMilestone,
     UndeclaredKind,
     SingleKindOnMultiRole,
     FillsRoleCardinality,

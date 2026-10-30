@@ -226,12 +226,12 @@ impl Derived {
         waiting
     }
 
-    /// Gating, Blocked: what blocks the node itself: its own explicit requirements,
-    /// condition gates, and stage opening, and its children, each that does not satisfy
+    /// Gating, Blocked: what blocks the node itself: its own explicit requirements
+    /// and condition gates, and its children, each that does not satisfy
     /// dependencies. What it inherits from an ancestor is listed once, on that ancestor
     /// ([`Derived::blocked_through`]), never copied onto each descendant. A node that is not
-    /// blocked (closed, or not relevant) lists what its own requirements, conditions, and
-    /// opening still hold back beneath it, so a descendant blocked through it can follow
+    /// blocked (closed, or not relevant) lists what its own requirements and conditions
+    /// still hold back beneath it, so a descendant blocked through it can follow
     /// them; empty when nothing is held back.
     #[must_use]
     pub fn blocked_by(&self, key: &NodeKey) -> Vec<Blocker> {
@@ -286,7 +286,7 @@ impl Derived {
         held
     }
 
-    /// Gating, Blocked: the ancestors whose own unsatisfied requirements, openings, or
+    /// Gating, Blocked: the ancestors whose own unsatisfied requirements or
     /// conditions block the node through its entry chains, nearest first; each lists them in
     /// its own [`Derived::blocked_by`]. Empty when the node is not blocked. `graph` is the one
     /// derived.
@@ -328,7 +328,6 @@ impl Derived {
     fn unsatisfied(&self, listed: Vec<EffectiveDependency>) -> impl Iterator<Item = Blocker> + '_ {
         listed
             .into_iter()
-            .filter(|dependency| dependency.class == dependencies::EdgeClass::Gate)
             .filter(|dependency| !self.blocking.satisfies(&dependency.node))
             .map(|dependency| Blocker {
                 date: self
@@ -342,13 +341,12 @@ impl Derived {
 }
 
 /// The node whose structure makes a dependency: the dependent itself for its own edges and
-/// its children, none for those; the ancestor whose requirement, condition, or opening it is.
+/// its children, none for those; the ancestor whose requirement or condition it is.
 pub(crate) fn held_by(via: &DependencyVia) -> Option<&NodeKey> {
     match via {
         DependencyVia::Explicit | DependencyVia::Containment => None,
         DependencyVia::Inherited { ancestor } => Some(ancestor),
         DependencyVia::Condition { condition_on } => Some(condition_on),
-        DependencyVia::StageOpening { group } => Some(group),
     }
 }
 

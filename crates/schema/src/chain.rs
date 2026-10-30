@@ -128,22 +128,15 @@ pub enum DependencyVia {
         /// The node whose condition creates the gate.
         condition_on: NodeKey,
     },
-    // PRD: F4.
-    /// A stage's opening milestone.
-    StageOpening {
-        /// The stage.
-        group: NodeKey,
-    },
 }
 
 // PRD: F2, F7.
 /// Where a constraint comes from: what to edit to change it.
 ///
 /// On the wire it is one short string of the kind and the nodes it names, separated by
-/// colons: `due_by:n_a`, `not_before:n_a`, `estimate:n_a`, `stage_close:n_g`,
+/// colons: `due_by:n_a`, `not_before:n_a`, `estimate:n_a`,
 /// `containment:n_parent:n_child`, and `dependency:n_a:n_b:` then how it arose
-/// (`explicit`, `containment`, `inherited:n_ancestor`, `condition:n_decision`,
-/// `opening:n_stage`).
+/// (`explicit`, `containment`, `inherited:n_ancestor`, `condition:n_decision`).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ConstraintSource {
     /// A node's `due_by` rule.
@@ -177,12 +170,6 @@ pub enum ConstraintSource {
         /// The child.
         child: NodeKey,
     },
-    // PRD: F4.
-    /// A stage's closing milestone bounding the group's finish.
-    StageClose {
-        /// The stage.
-        group: NodeKey,
-    },
 }
 
 impl fmt::Display for ConstraintSource {
@@ -191,7 +178,6 @@ impl fmt::Display for ConstraintSource {
             Self::DueBy { node } => write!(formatter, "due_by:{node}"),
             Self::NotBefore { node } => write!(formatter, "not_before:{node}"),
             Self::Estimate { node } => write!(formatter, "estimate:{node}"),
-            Self::StageClose { group } => write!(formatter, "stage_close:{group}"),
             Self::Containment { parent, child } => {
                 write!(formatter, "containment:{parent}:{child}")
             }
@@ -210,7 +196,6 @@ impl fmt::Display for ConstraintSource {
                     DependencyVia::Condition { condition_on } => {
                         write!(formatter, "condition:{condition_on}")
                     }
-                    DependencyVia::StageOpening { group } => write!(formatter, "opening:{group}"),
                 }
             }
         }
@@ -228,7 +213,6 @@ impl FromStr for ConstraintSource {
             ["due_by", node] => Ok(Self::DueBy { node: key(node)? }),
             ["not_before", node] => Ok(Self::NotBefore { node: key(node)? }),
             ["estimate", node] => Ok(Self::Estimate { node: key(node)? }),
-            ["stage_close", group] => Ok(Self::StageClose { group: key(group)? }),
             ["containment", parent, child] => Ok(Self::Containment {
                 parent: key(parent)?,
                 child: key(child)?,
@@ -243,7 +227,6 @@ impl FromStr for ConstraintSource {
                     ["condition", on] => DependencyVia::Condition {
                         condition_on: key(on)?,
                     },
-                    ["opening", group] => DependencyVia::StageOpening { group: key(group)? },
                     _ => return Err(bad()),
                 };
                 Ok(Self::Dependency {
@@ -260,7 +243,7 @@ impl FromStr for ConstraintSource {
 crate::serde_util::text_serde!(
     ConstraintSource,
     "ConstraintSource",
-    "Where a constraint comes from, the kind then the nodes it names, colon-separated: `due_by:n_a`, `not_before:n_a`, `estimate:n_a`, `stage_close:n_stage`, `containment:n_parent:n_child`, or `dependency:n_a:n_b:` then `explicit`, `containment`, `inherited:n_ancestor`, `condition:n_decision` or `opening:n_stage`.",
+    "Where a constraint comes from, the kind then the nodes it names, colon-separated: `due_by:n_a`, `not_before:n_a`, `estimate:n_a`, `containment:n_parent:n_child`, or `dependency:n_a:n_b:` then `explicit`, `containment`, `inherited:n_ancestor`, or `condition:n_decision`.",
     None::<&str>
 );
 
@@ -367,7 +350,7 @@ pub struct ShortChain {
     /// The resolution moves: each an ordinary mutation that, applied alone, gives
     /// this chain the days it lacks (shift, repin, or unpin a pin on it; revise the answer
     /// behind a pin; adjust a rule's offset; revise an estimate; drop an explicit
-    /// requirement or a stage's close). Nothing applies them automatically.
+    /// requirement). Nothing applies them automatically.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resolutions: Vec<Mutation>,
 }
@@ -425,15 +408,11 @@ mod tests {
             DependencyVia::Condition {
                 condition_on: node("n_gate"),
             },
-            DependencyVia::StageOpening {
-                group: node("n_stage"),
-            },
         ];
         let mut sources = vec![
             ConstraintSource::DueBy { node: node("n_a") },
             ConstraintSource::NotBefore { node: node("n_a") },
             ConstraintSource::Estimate { node: node("n_a") },
-            ConstraintSource::StageClose { group: node("n_g") },
             ConstraintSource::Containment {
                 parent: node("n_p"),
                 child: node("n_c"),

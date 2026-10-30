@@ -74,11 +74,7 @@ fn every_node_of_a_route_is_on_its_canvas_with_its_implicit_gates() {
         .collect();
     assert_eq!(
         origins,
-        BTreeSet::from([
-            EdgeOrigin::Explicit,
-            EdgeOrigin::Condition,
-            EdgeOrigin::StageOpening
-        ])
+        BTreeSet::from([EdgeOrigin::Explicit, EdgeOrigin::Condition])
     );
 }
 

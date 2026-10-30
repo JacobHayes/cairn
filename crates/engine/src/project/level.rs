@@ -19,16 +19,16 @@
 //!   has none. A visible node is drawn under the
 //!   stand-in of its parent, or at the top level; a hidden one rolls up into its stand-in. A
 //!   collapsed container rolls its whole subtree into its own card (or its stand-in's).
-//! - Edges are the explicit requirements, condition gates, and gating stage openings of the
+//! - Edges are the explicit requirements, and condition gates of the
 //!   full structural graph. Each is drawn between its ends' stand-ins; it is left off when either
 //!   has none (still traceable, C7) and when both land on the same node; edges landing on the
 //!   same pair collapse into one. A node hidden for its relevance class leaves no orphan
 //!   line: its edges re-target like any hidden node's.
 //! - A blocked visible node shows the hidden-prerequisites marker for each unsatisfied gate
-//!   dependency (its own, inherited, condition, or opening; not its children, which roll up
+//!   dependency (its own, inherited, or condition; not its children, which roll up
 //!   into it) that no drawn edge stands for: the edge from the dependency's stand-in to the
 //!   stand-in of the node holding it (the node itself, or the ancestor whose requirement,
-//!   condition, or opening it is) is not drawn. A node that rolled up into a visible one
+//!   or condition it is) is not drawn. A node that rolled up into a visible one
 //!   counts toward it when its own unsatisfied dependency has no stand-in at all (so no edge
 //!   could be drawn for it). So hiding a kind, a class, or a stage never makes blocked work
 //!   look free.
@@ -70,7 +70,7 @@ use cairn_schema::{
 
 use super::{DerivedJourney, ProjectionError};
 use crate::derive::Relevances;
-use crate::derive::dependencies::{EdgeClass, EdgeSet, EdgeSource};
+use crate::derive::dependencies::{EdgeSet, EdgeSource};
 use crate::derive::held_by;
 use crate::derive::links::collapse;
 use crate::derive::pending::{RelevanceClass, classify};
@@ -451,7 +451,7 @@ impl<'a> DerivedJourney<'a> {
         chain
     }
 
-    /// The canvas edges (explicit, condition, opening) of the full set between stand-ins.
+    /// The canvas edges (explicit and condition) of the full set between stand-ins.
     fn level_edges(&self, stand_ins: &StandIns<'_>) -> Vec<LevelEdge> {
         let dependencies = self.derived.dependencies();
         let mut drawn: BTreeMap<(&NodeKey, &NodeKey), BTreeSet<UnderlyingEdge>> = BTreeMap::new();
@@ -459,8 +459,6 @@ impl<'a> DerivedJourney<'a> {
             let origin = match edge.source {
                 EdgeSource::Explicit => EdgeOrigin::Explicit,
                 EdgeSource::Condition => EdgeOrigin::Condition,
-                EdgeSource::StageOpening if edge.class == EdgeClass::DateOnly => continue,
-                EdgeSource::StageOpening => EdgeOrigin::StageOpening,
                 EdgeSource::Work
                 | EdgeSource::Entry
                 | EdgeSource::Chain
@@ -548,7 +546,6 @@ impl<'a> DerivedJourney<'a> {
         };
         dependencies
             .into_iter()
-            .filter(|dependency| dependency.class == EdgeClass::Gate)
             .filter(|dependency| dependency.via != DependencyVia::Containment)
             .filter(move |dependency| !blocking.satisfies(&dependency.node))
             .filter(move |dependency| {

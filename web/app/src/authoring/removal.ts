@@ -46,9 +46,6 @@ function fixWords(each: Schema<"Dangling">, tree: Tree): string {
         case "due_by":
         case "not_before":
           return cleared ? `clear its ${name} rule` : `measure its ${name} rule without what is removed`;
-        case "opens_at":
-        case "closes_at":
-          return `clear its stage bound ${name}`;
         case "feeds_milestone":
           return "stop it pinning the milestone";
         default:

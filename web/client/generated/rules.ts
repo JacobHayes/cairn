@@ -138,10 +138,10 @@ export const STATUS_HOLDS_CURRENT_WORK: Record<JourneyStatus, boolean> = {
 };
 
 /** A1a: the name of a field only some kinds have, which a node's form shows beyond the shared ones. */
-export type KindFieldName = "estimate" | "requires_artifact" | "requires_note" | "checklist" | "requires_checklist" | "placeholder" | "final" | "auto_done" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "answer_type" | "choices" | "fills_role" | "feeds_milestone";
+export type KindFieldName = "estimate" | "requires_artifact" | "requires_note" | "checklist" | "requires_checklist" | "placeholder" | "final" | "auto_done" | "prompt" | "help" | "answer_type" | "choices" | "fills_role" | "feeds_milestone";
 
 /** Every node field, in the order a node form shows the shared ones. */
-export const NODE_FIELDS: readonly NodeField[] = ["id", "parent", "title", "description", "weight", "relevant_when", "due_by", "not_before", "estimate", "placeholder", "requires_artifact", "requires_note", "checklist", "requires_checklist", "final", "auto_done", "opens_at", "closes_at", "gates", "closes", "prompt", "help", "choices", "fills_role", "feeds_milestone"];
+export const NODE_FIELDS: readonly NodeField[] = ["id", "parent", "title", "description", "weight", "relevant_when", "due_by", "not_before", "estimate", "placeholder", "requires_artifact", "requires_note", "checklist", "requires_checklist", "final", "auto_done", "prompt", "help", "choices", "fills_role", "feeds_milestone"];
 
 /** A4: every answer type. */
 export const ANSWER_TYPES: readonly AnswerType[] = ["boolean", "single_choice", "multi_choice", "text", "date", "identity", "identity_list"];
@@ -152,7 +152,7 @@ export const KIND_FIELDS: Record<NodeKind, readonly KindFieldName[]> = {
   deliverable: ["estimate", "requires_artifact", "requires_note", "checklist", "requires_checklist", "placeholder"],
   action: ["estimate", "requires_note", "checklist", "requires_checklist", "placeholder"],
   milestone: ["final", "auto_done"],
-  group: ["opens_at", "closes_at", "gates", "closes"],
+  group: [],
 };
 
 /** A1a: the fields a decision of each answer type has beyond the shared ones. */
@@ -176,7 +176,7 @@ export const DEFAULT_WEIGHT: Record<NodeKind, number> = {
 };
 
 /** A1a: the value of each flag a node does not write. */
-export const FLAG_DEFAULTS: Record<"requires_artifact" | "requires_note" | "requires_checklist" | "placeholder" | "final" | "auto_done" | "gates" | "closes", boolean> = { requires_artifact: false, requires_note: false, requires_checklist: false, placeholder: false, final: false, auto_done: false, gates: true, closes: true };
+export const FLAG_DEFAULTS: Record<"requires_artifact" | "requires_note" | "requires_checklist" | "placeholder" | "final" | "auto_done", boolean> = { requires_artifact: false, requires_note: false, requires_checklist: false, placeholder: false, final: false, auto_done: false };
 
 /** A2: the kinds that hold no children. */
 export const LEAF_KINDS: readonly NodeKind[] = ["decision", "milestone"];
@@ -200,8 +200,6 @@ export const REFERENCE_TARGETS: Record<ReferenceField, { kinds: readonly NodeKin
   relevant_when: { kinds: ["decision"], answer_types: null },
   due_by: { kinds: ["decision", "milestone"], answer_types: ["date"] },
   not_before: { kinds: ["decision", "milestone"], answer_types: ["date"] },
-  opens_at: { kinds: ["milestone"], answer_types: null },
-  closes_at: { kinds: ["milestone"], answer_types: null },
   feeds_milestone: { kinds: ["milestone"], answer_types: null },
   message_draft: { kinds: ["decision"], answer_types: null },
   snooze: { kinds: ["decision", "deliverable", "action", "milestone", "group"], answer_types: null },

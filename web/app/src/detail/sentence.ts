@@ -53,18 +53,13 @@ function onDate(view: Ready, held: Holding): Piece[] {
 
 /** One thing the node waits on, as a phrase with its link and owner, and its date when a date holds it. */
 export function holdingPhrase(view: Ready, held: Holding, viewer: readonly string[] = []): Piece[] {
-  if (typeof held.via === "object" && "stage_opening" in held.via) {
-    return ["the ", { node: held.via.stage_opening.group }, " stage opening", ...onDate(view, held)];
-  }
   return [...namedWithOwner(view, held.node, viewer), ...onDate(view, held)];
 }
 
-/** The things the node waits on, as a phrase: "A (Ben) and the B stage opening", "Launch on Nov 1". */
+/** The things the node waits on, as a phrase: "A (Ben) and B", "Launch on Nov 1". */
 export function waitingPhrase(view: Ready, key: string, viewer: readonly string[] = []): Piece[] {
   const held = waitsOn(view, key);
-  // A stage's own opening is what holds it: name the milestone, not the stage itself.
-  const own = (each: Holding) => each.holder === undefined && typeof each.via === "object" && "stage_opening" in each.via && each.via.stage_opening.group === key;
-  return held.length === 0 ? ["earlier work"] : listed(held.map((each) => (own(each) ? [...namedWithOwner(view, each.node, viewer), ...onDate(view, each)] : holdingPhrase(view, each, viewer))));
+  return held.length === 0 ? ["earlier work"] : listed(held.map((each) => holdingPhrase(view, each, viewer)));
 }
 
 /** D8: what a scheduled node waits for, in a sentence: a milestone marks itself done on its day or is marked done once it comes; work or a decision waits for its own date. */

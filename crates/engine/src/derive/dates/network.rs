@@ -1,18 +1,15 @@
 //! The network itself: instant slots and the constraints between them, built from the
-//! dependency pass's pruned effective dependency graph and the graph's date rules, estimates, and stage closes,
+//! dependency pass's pruned effective dependency graph and the graph's date rules and estimates,
 //! as the translation table in [`super`] lays out. Pins, answers, actuals, and today are not
 //! constraints; the layers seed them onto slots.
 
-use std::collections::BTreeMap;
-
-use cairn_schema::limits::{CONTAINMENT_DEPTH_MAX, NODE_COUNT_MAX};
+use cairn_schema::limits::NODE_COUNT_MAX;
 use cairn_schema::{
-    AnswerSpec, DateRule, DateSource, Direction, KeyRefs, Node, NodeKey, NodeKind, Payload,
-    Relevance, State,
+    AnswerSpec, DateRule, DateSource, Direction, KeyRefs, Node, NodeKey, Payload, Relevance, State,
 };
 
 use crate::derive::dependencies::{
-    Dependencies, Edge, EdgeClass, EdgeSet, EdgeSource, Instant, NodeIndex, Point,
+    Dependencies, Edge, EdgeSet, EdgeSource, Instant, NodeIndex, Point,
 };
 use crate::derive::relevance::Relevances;
 use crate::derive::skip::Skips;
@@ -73,11 +70,6 @@ pub(crate) enum Origin {
         /// Which rule.
         rule: Rule,
     },
-    /// A stage's closing milestone bounding the group's finish (F4).
-    StageClose {
-        /// The stage.
-        group: NodeIndex,
-    },
 }
 
 /// One constraint: `after >= before + offset_days`.
@@ -101,7 +93,7 @@ pub(crate) struct Constraint {
 /// Which layer a network is built for (F5, F6).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Layer {
-    /// Pins, rules, estimates, containment, stage bounds, dependencies.
+    /// Pins, rules, estimates, containment, dependencies.
     Plan,
     /// The plan with actuals and today: finished work took the time its actual dates say,
     /// so its estimate no longer holds its finish after its start.
@@ -259,10 +251,6 @@ impl Scope {
     pub(crate) fn finished(&self, node: NodeIndex) -> bool {
         self.finished.get(node.get()).copied().unwrap_or(false)
     }
-
-    fn execution(&self) -> bool {
-        self.layer == Layer::Execution
-    }
 }
 
 fn index(at: usize) -> NodeIndex {
@@ -320,7 +308,6 @@ impl Network {
         for edge in dependencies.edges(scope.edges) {
             network.push_edge(document, dependencies, scope, *edge, &mut constraints);
         }
-        network.push_openings(document, dependencies, scope, &mut constraints);
         for node in document.nodes.values() {
             let Some(at) = dependencies.node_index(&node.key) else {
                 continue;
@@ -329,7 +316,6 @@ impl Network {
                 continue;
             }
             network.push_rules(document, dependencies, scope, node, at, &mut constraints);
-            network.push_close(document, dependencies, scope, node, at, &mut constraints);
         }
         (network, constraints)
     }
@@ -337,10 +323,9 @@ impl Network {
     /// A dependency edge as a constraint: the requirement's instant before the dependent's,
     /// by the node's estimate for its own work edge and by nothing otherwise.
     ///
-    /// In the execution layer a date-only stage opening is not an edge of the network (see
-    /// [`Network::push_openings`]), and an edge into the start of work that is underway ends at
-    /// the node's held instant instead (see [`Network::held`]), exempt once the node is
-    /// finished: a recorded finish never answers to what it went ahead of.
+    /// In the execution layer an edge into the start of work that is underway ends at the
+    /// node's held instant instead (see [`Network::held`]), exempt once the node is finished:
+    /// a recorded finish never answers to what it went ahead of.
     fn push_edge(
         &self,
         document: &Document,
@@ -349,12 +334,6 @@ impl Network {
         edge: Edge,
         out: &mut Vec<Constraint>,
     ) {
-        if scope.execution()
-            && edge.class == EdgeClass::DateOnly
-            && edge.source == EdgeSource::StageOpening
-        {
-            return;
-        }
         let node = edge.dependent.node;
         let offset_days = match edge.source {
             EdgeSource::Work => {
@@ -368,8 +347,7 @@ impl Network {
             | EdgeSource::Chain
             | EdgeSource::Containment
             | EdgeSource::Explicit
-            | EdgeSource::Condition
-            | EdgeSource::StageOpening => 0,
+            | EdgeSource::Condition => 0,
         };
         let conditional = undecided(scope, node) || undecided(scope, edge.requirement.node);
         let underway = edge.dependent.point == Point::Start && scope.underway(node);
@@ -398,70 +376,6 @@ impl Network {
                 exempt: scope.finished(node),
             },
         );
-    }
-
-    /// F4: in the execution layer, a stage opening that does not gate holds each node of its
-    /// stage that is not a container directly, rather than through the stage's entry: a
-    /// container waits for its contents, so it is held exactly while some content is. The
-    /// opening's constraint into work that is underway is exempt: the work was begun or
-    /// finished ahead of an opening that does not gate.
-    fn push_openings(
-        &self,
-        document: &Document,
-        dependencies: &Dependencies,
-        scope: &Scope,
-        out: &mut Vec<Constraint>,
-    ) {
-        if !scope.execution() {
-            return;
-        }
-        let mut openings: BTreeMap<NodeIndex, Edge> = BTreeMap::new();
-        for edge in dependencies.edges(scope.edges) {
-            if edge.class == EdgeClass::DateOnly && edge.source == EdgeSource::StageOpening {
-                openings.insert(edge.dependent.node, *edge);
-            }
-        }
-        if openings.is_empty() {
-            return;
-        }
-        for node in document.nodes.values() {
-            let Some(at) = dependencies.node_index(&node.key) else {
-                continue;
-            };
-            if !scope.in_scope(at) || dependencies.is_container(at) {
-                continue;
-            }
-            let after = self.held(scope, at);
-            let exempt = scope.underway(at);
-            let mut conditional = false;
-            let mut current = Some(node);
-            let mut steps = 0_u32;
-            while let Some(found) = current {
-                let Some(owner) = dependencies.node_index(&found.key) else {
-                    break;
-                };
-                conditional |= undecided(scope, owner);
-                if let Some(edge) = openings.get(&owner) {
-                    self.push(
-                        out,
-                        Constraint {
-                            before: self.slot(edge.requirement),
-                            after,
-                            offset_days: 0,
-                            origin: Origin::Dependency(*edge),
-                            conditional: conditional || undecided(scope, edge.requirement.node),
-                            exempt,
-                        },
-                    );
-                }
-                steps += 1;
-                assert!(steps <= CONTAINMENT_DEPTH_MAX + 1, "containment is bounded");
-                current = found
-                    .parent
-                    .as_ref()
-                    .and_then(|parent| document.nodes.get(parent));
-            }
-        }
     }
 
     /// A8: each source of the node's `due_by` caps its finish, and each source of its
@@ -512,51 +426,6 @@ impl Network {
         }
     }
 
-    /// F4: a stage's closing milestone, outside it and in scope, bounds the group's finish
-    /// unless the group declares `closes: false`.
-    fn push_close(
-        &self,
-        document: &Document,
-        dependencies: &Dependencies,
-        scope: &Scope,
-        node: &Node<KeyRefs>,
-        at: NodeIndex,
-        out: &mut Vec<Constraint>,
-    ) {
-        let Payload::Group(group) = &node.payload else {
-            return;
-        };
-        let Some(closes_at) = group.closes_at.as_ref().filter(|_| group.closes) else {
-            return;
-        };
-        // Validation refuses a bound that is not a milestone outside the stage.
-        let closing = dependencies
-            .node_index(closes_at)
-            .unwrap_or_else(|| unreachable!("a stage bound names a node of the graph"));
-        assert!(
-            document
-                .nodes
-                .get(closes_at)
-                .is_some_and(|found| found.kind() == NodeKind::Milestone),
-            "a stage bound is a milestone"
-        );
-        if !scope.in_scope(closing) {
-            return;
-        }
-        let conditional = undecided(scope, at) || undecided(scope, closing);
-        self.push(
-            out,
-            Constraint {
-                before: self.finish(at),
-                after: self.finish(closing),
-                offset_days: 0,
-                origin: Origin::StageClose { group: at },
-                conditional,
-                exempt: false,
-            },
-        );
-    }
-
     /// Keeps a constraint unless it is a loop on one slot that asks for nothing.
     fn push(&self, out: &mut Vec<Constraint>, constraint: Constraint) {
         assert!(constraint.before.index() < self.slot_count());
@@ -594,7 +463,7 @@ impl Network {
                 Payload::Decision(_)
                 | Payload::Deliverable(_)
                 | Payload::Action(_)
-                | Payload::Group(_),
+                | Payload::Group,
             )
             | None => unreachable!("a date source is a milestone or a date decision"),
         }
@@ -856,7 +725,6 @@ mod tests {
                         EdgeSource::Containment => "containment",
                         EdgeSource::Explicit => "explicit",
                         EdgeSource::Condition => "condition",
-                        EdgeSource::StageOpening => "opening",
                     },
                     Origin::Rule {
                         rule: Rule::DueBy, ..
@@ -865,7 +733,6 @@ mod tests {
                         rule: Rule::NotBefore,
                         ..
                     } => "not_before",
-                    Origin::StageClose { .. } => "close",
                 };
                 let conditional = if constraint.conditional {
                     " conditional"
@@ -923,14 +790,6 @@ mod tests {
             "a condition gate holds the node after the decision, its one instant",
             "- {key: n_d, id: d, kind: decision, title: D, prompt: P, answer_type: boolean}\n- {key: n_a, id: a, kind: action, title: A, relevant_when: {equals: {decision: d, value: true}}}\n",
             &["n_d.finish -> n_a.start +0 condition conditional"],
-            &[],
-        );
-        row(
-            "a stage opening holds the stage after its milestone, gating or not",
-            &format!(
-                "{MILESTONE}- {{key: n_g, id: g, kind: group, title: G, opens_at: m, gates: false}}\n"
-            ),
-            &["n_m.finish -> n_g.start +0 opening"],
             &[],
         );
     }
@@ -994,29 +853,6 @@ mod tests {
                 "n_d.answer -> n_b.start +0 not_before",
             ],
             &[],
-        );
-    }
-
-    #[test]
-    fn a_stage_close_caps_the_group_unless_it_does_not_close() {
-        row(
-            "a stage close caps the group's finish at its milestone",
-            &format!(
-                "{MILESTONE}- {{key: n_g, id: g, kind: group, title: G, closes_at: m}}\n- {{key: n_c, id: c, parent: g, kind: action, title: C}}\n"
-            ),
-            &[
-                "n_g.finish -> n_m.finish +0 close",
-                "n_c.finish -> n_g.start +0 containment",
-            ],
-            &[],
-        );
-        row(
-            "closes: false drops the close",
-            &format!(
-                "{MILESTONE}- {{key: n_g, id: g, kind: group, title: G, closes_at: m, closes: false}}\n"
-            ),
-            &[],
-            &["n_g.finish -> n_m.finish +0 close"],
         );
     }
 }

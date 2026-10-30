@@ -627,11 +627,10 @@ pub struct NodeDerived {
     /// yet done, which its dependents still wait for. Empty otherwise.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub kept_work_pending: Vec<NodeKey>,
-    /// What blocks it itself: its own explicit requirements, condition gates, and stage
-    /// opening, and its children, each unsatisfied. What it inherits is listed once, on the
-    /// ancestor that holds it (`blocked_through`), never copied onto each descendant. A node
-    /// that is not blocked lists what its own requirements, conditions, and opening still
-    /// hold back beneath it.
+    /// What blocks it itself: its own explicit requirements and condition gates, and its
+    /// children, each unsatisfied. What it inherits is listed once, on the ancestor that holds
+    /// it (`blocked_through`), never copied onto each descendant. A node that is not blocked
+    /// lists what its own requirements and conditions still hold back beneath it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocked_by: Vec<Blocker>,
     /// The ancestors, nearest first, whose own unsatisfied requirements, openings, or
@@ -776,8 +775,8 @@ pub struct NodeDerived {
 pub struct HeldDependent {
     /// The direct dependent that stays held.
     pub node: NodeKey,
-    /// What else it waits on, besides the node: its unsatisfied requirements, condition
-    /// gates, and stage openings, each with how it arose. Never empty.
+    /// What else it waits on, besides the node: its unsatisfied requirements and condition
+    /// gates, each with how it arose. Never empty.
     pub also_waits_on: Vec<Blocker>,
 }
 

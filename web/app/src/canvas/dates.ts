@@ -22,10 +22,6 @@ export function dateIdOf(from: string, to: string): string {
  */
 export function dateLinkSentence<T>(link: DateLink, node: T, source: T, options: { decision: boolean }): (T | string)[] {
   switch (link.kind) {
-    case "stage_close":
-      return [node, ": must finish by ", source, ", where it closes"];
-    case "stage_opening":
-      return [node, ": opens at ", source, " for its dates; nothing waits for it"];
     case "fed_date":
       return [node, ": its answer sets the date of ", source];
     case "rule": {

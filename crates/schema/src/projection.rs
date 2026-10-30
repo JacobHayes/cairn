@@ -74,9 +74,6 @@ pub enum EdgeOrigin {
     Explicit,
     /// A condition gate: the dependent's condition reads the decision (Gating).
     Condition,
-    // PRD: F4.
-    /// A stage's opening milestone.
-    StageOpening,
 }
 
 /// One edge of the graph a canvas edge stands for: `dependent` waits on `requirement`.
@@ -87,7 +84,7 @@ pub enum EdgeOrigin {
 pub struct UnderlyingEdge {
     /// The node waited on.
     pub requirement: NodeKey,
-    /// The node whose `requires`, condition, or opening it is.
+    /// The node whose `requires` or condition it is.
     pub dependent: NodeKey,
     /// How it arose.
     pub origin: EdgeOrigin,
@@ -143,10 +140,6 @@ pub enum DateLinkKind {
         #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
         answer: bool,
     },
-    /// The stage must finish by its closing milestone.
-    StageClose,
-    /// The stage opens at the milestone for its dates only; nothing waits for it.
-    StageOpening,
     /// The decision's answer sets the milestone's date.
     FedDate,
 }
@@ -157,10 +150,10 @@ pub enum DateLinkKind {
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
 pub struct DateLink {
-    /// The node whose rule, bound or answer it is: the rule's node, the stage, the decision.
+    /// The node whose rule or answer it is: the rule's node, the decision.
     pub node: NodeKey,
-    /// The node it reads: the rule's milestone or date decision, the stage's milestone, the
-    /// milestone the decision sets.
+    /// The node it reads: the rule's milestone or date decision, or the milestone the decision
+    /// sets.
     pub source: NodeKey,
     /// What it is.
     #[serde(flatten)]
@@ -555,7 +548,7 @@ pub struct AnswerEffects {
 pub struct Trace {
     /// The node traced.
     pub node: NodeKey,
-    /// Its transitive dependencies (gating decisions, stage openings, its children), in key
+    /// Its transitive dependencies (gating decisions, its children), in key
     /// order.
     pub upstream: Vec<NodeKey>,
     /// Its transitive dependents (its ancestors, the nodes whose relevance it determines), in
@@ -1250,7 +1243,7 @@ pub struct ScheduleEntry {
 }
 
 /// C13: a route read as a journey that starts on day 0: for each node in scope, the earliest
-/// day it can start and finish from the rules, estimates, stage bounds and dependencies alone.
+/// day it can start and finish from the rules, estimates and dependencies alone.
 /// A route pins nothing, so there are no due days: this is how soon each thing can happen.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -1417,10 +1410,6 @@ pub enum ReferenceField {
     DueBy,
     /// The node's not-before rule measures from a node inside.
     NotBefore,
-    /// A stage's opening milestone is inside.
-    OpensAt,
-    /// A stage's closing milestone is inside.
-    ClosesAt,
     /// A date decision feeds a milestone inside.
     FeedsMilestone,
     /// A message draft on the node quotes the answer of a decision inside.
@@ -1437,20 +1426,16 @@ impl ReferenceField {
             NodeField::RelevantWhen => Some(ReferenceField::RelevantWhen),
             NodeField::DueBy => Some(ReferenceField::DueBy),
             NodeField::NotBefore => Some(ReferenceField::NotBefore),
-            NodeField::OpensAt => Some(ReferenceField::OpensAt),
-            NodeField::ClosesAt => Some(ReferenceField::ClosesAt),
             NodeField::FeedsMilestone => Some(ReferenceField::FeedsMilestone),
             _ => None,
         }
     }
 
     /// Every reference field.
-    pub const ALL: [ReferenceField; 8] = [
+    pub const ALL: [ReferenceField; 6] = [
         ReferenceField::RelevantWhen,
         ReferenceField::DueBy,
         ReferenceField::NotBefore,
-        ReferenceField::OpensAt,
-        ReferenceField::ClosesAt,
         ReferenceField::FeedsMilestone,
         ReferenceField::MessageDraft,
         ReferenceField::Snooze,
@@ -1458,7 +1443,7 @@ impl ReferenceField {
 
     /// Whether the field may name a node of `kind` (a decision of `answer`): a condition
     /// and a message draft name decisions; a date rule a milestone or a date decision; a
-    /// stage bound and a fed milestone a milestone; a snooze any node.
+    /// fed milestone a milestone; a snooze any node.
     #[must_use]
     pub const fn takes(self, kind: NodeKind, answer: Option<AnswerType>) -> bool {
         match self {
@@ -1470,9 +1455,7 @@ impl ReferenceField {
                 NodeKind::Decision => matches!(answer, Some(AnswerType::Date)),
                 NodeKind::Deliverable | NodeKind::Action | NodeKind::Group => false,
             },
-            ReferenceField::OpensAt | ReferenceField::ClosesAt | ReferenceField::FeedsMilestone => {
-                matches!(kind, NodeKind::Milestone)
-            }
+            ReferenceField::FeedsMilestone => matches!(kind, NodeKind::Milestone),
             ReferenceField::Snooze => true,
         }
     }
@@ -1500,7 +1483,7 @@ pub struct OutsideReference {
 pub struct RemovalRead {
     /// The removal to send in a `remove_node` mutation.
     pub removal: Removal,
-    /// A page of the conditions, date rules, stage bounds, fed milestones, message drafts,
+    /// A page of the conditions, date rules, fed milestones, message drafts,
     /// and snoozes elsewhere that name a node being removed. Edges into the subtree are
     /// already in the removal.
     pub outside_references: Vec<OutsideReference>,
@@ -1524,10 +1507,6 @@ pub enum DanglingKind {
     DueBy,
     /// A not-before rule measures from it.
     NotBefore,
-    /// A stage's opening milestone.
-    OpensAt,
-    /// A stage's closing milestone.
-    ClosesAt,
     /// A date decision feeds it.
     FeedsMilestone,
     /// A decision fills the removed role.

@@ -1483,7 +1483,7 @@ export interface components {
             /** @description Where it comes from. */
             source: components["schemas"]["ConstraintSource"];
         };
-        /** @description Where a constraint comes from, the kind then the nodes it names, colon-separated: `due_by:n_a`, `not_before:n_a`, `estimate:n_a`, `stage_close:n_stage`, `containment:n_parent:n_child`, or `dependency:n_a:n_b:` then `explicit`, `containment`, `inherited:n_ancestor`, `condition:n_decision` or `opening:n_stage`. */
+        /** @description Where a constraint comes from, the kind then the nodes it names, colon-separated: `due_by:n_a`, `not_before:n_a`, `estimate:n_a`, `containment:n_parent:n_child`, or `dependency:n_a:n_b:` then `explicit`, `containment`, `inherited:n_ancestor`, or `condition:n_decision`. */
         ConstraintSource: string;
         /** @description A lower-case hex SHA-256 digest. */
         ContentHash: string;
@@ -1545,14 +1545,14 @@ export interface components {
             what: components["schemas"]["DanglingKind"];
         };
         /** @description What a removal leaves dangling, by where the reference sits. */
-        DanglingKind: "relevant_when" | "due_by" | "not_before" | "opens_at" | "closes_at" | "feeds_milestone" | "fills_role" | "participation" | "default_owner" | "snooze" | "message_draft";
+        DanglingKind: "relevant_when" | "due_by" | "not_before" | "feeds_milestone" | "fills_role" | "participation" | "default_owner" | "snooze" | "message_draft";
         /** @description One authored date relationship between two nodes. */
         DateLink: {
-            /** @description The node whose rule, bound or answer it is: the rule's node, the stage, the decision. */
+            /** @description The node whose rule or answer it is: the rule's node, the decision. */
             node: components["schemas"]["NodeKey"];
             /**
-             * @description The node it reads: the rule's milestone or date decision, the stage's milestone, the
-             *     milestone the decision sets.
+             * @description The node it reads: the rule's milestone or date decision, or the milestone the decision
+             *     sets.
              */
             source: components["schemas"]["NodeKey"];
         } & ({
@@ -1569,12 +1569,6 @@ export interface components {
             kind: "rule";
             /** @description Which rule. */
             rule: components["schemas"]["DateRuleKind"];
-        } | {
-            /** @constant */
-            kind: "stage_close";
-        } | {
-            /** @constant */
-            kind: "stage_opening";
         } | {
             /** @constant */
             kind: "fed_date";
@@ -1662,11 +1656,6 @@ export interface components {
             condition: {
                 /** @description The node whose condition creates the gate. */
                 condition_on: components["schemas"]["NodeKey"];
-            };
-        } | {
-            stage_opening: {
-                /** @description The stage. */
-                group: components["schemas"]["NodeKey"];
             };
         };
         /** @description The deployment domain. */
@@ -1818,7 +1807,7 @@ export interface components {
             host: components["schemas"]["NodeKey"];
         };
         /** @description How an edge on the canvas arose (implicit gates are drawn dotted). */
-        EdgeOrigin: "explicit" | "condition" | "stage_opening";
+        EdgeOrigin: "explicit" | "condition";
         /**
          * @description A milestone's effective date: its actual date if done, else its pin, else its
          *     derived due. What other constraints see when they reference it.
@@ -2193,8 +2182,8 @@ export interface components {
          */
         HeldDependent: {
             /**
-             * @description What else it waits on, besides the node: its unsatisfied requirements, condition
-             *     gates, and stage openings, each with how it arose. Never empty.
+             * @description What else it waits on, besides the node: its unsatisfied requirements and condition
+             *     gates, each with how it arose. Never empty.
              */
             also_waits_on: components["schemas"]["Blocker"][];
             /** @description The direct dependent that stays held. */
@@ -3080,12 +3069,6 @@ export interface components {
             /** @description Setting it replaces the whole list. */
             checklist?: components["schemas"]["Checklist"];
             choices?: components["schemas"]["Choices"];
-            closes?: boolean;
-            /**
-             * @description The milestone that closes the stage: it bounds the group's finish and its contents' due
-             *     dates unless `closes` is false. Consecutive stages share one.
-             */
-            closes_at?: components["schemas"]["NodeKey"];
             description?: components["schemas"]["Markdown"] | null;
             /**
              * @description The latest finish, a node or the journey's creation (a fixed date is a pinned milestone);
@@ -3097,12 +3080,6 @@ export interface components {
             fills_role?: components["schemas"]["RoleKey"];
             final?: boolean;
             from_route?: components["schemas"]["Lineage"] | null;
-            /**
-             * @description False lets the contents be done before the opening milestone. A stage holds the work done
-             *     during it; work that can as well be done ahead goes in a stage with this false; prep that
-             *     must come first sits outside, due before the opening milestone.
-             */
-            gates?: boolean;
             help?: components["schemas"]["Markdown"];
             id: components["schemas"]["Slug"];
             key: components["schemas"]["NodeKey"];
@@ -3112,8 +3089,6 @@ export interface components {
              *     can be started early. What waits on it is `blocked`, its `waits_on` carrying the date.
              */
             not_before?: components["schemas"]["DateRule"] | null;
-            /** @description The milestone that opens the stage: the contents wait for it unless `gates` is false. */
-            opens_at?: components["schemas"]["NodeKey"];
             parent?: components["schemas"]["NodeKey"] | null;
             participations?: components["schemas"]["ParticipationsResolved"];
             placeholder?: boolean;
@@ -3140,12 +3115,6 @@ export interface components {
             /** @description Setting it replaces the whole list. */
             checklist?: components["schemas"]["Checklist"];
             choices?: components["schemas"]["Choices"];
-            closes?: boolean;
-            /**
-             * @description The milestone that closes the stage: it bounds the group's finish and its contents' due
-             *     dates unless `closes` is false. Consecutive stages share one.
-             */
-            closes_at?: components["schemas"]["Path"];
             description?: components["schemas"]["Markdown"] | null;
             /**
              * @description The latest finish, a node or the journey's creation (a fixed date is a pinned milestone);
@@ -3157,12 +3126,6 @@ export interface components {
             fills_role?: components["schemas"]["Slug"];
             final?: boolean;
             from_route?: components["schemas"]["Lineage"] | null;
-            /**
-             * @description False lets the contents be done before the opening milestone. A stage holds the work done
-             *     during it; work that can as well be done ahead goes in a stage with this false; prep that
-             *     must come first sits outside, due before the opening milestone.
-             */
-            gates?: boolean;
             help?: components["schemas"]["Markdown"];
             id: components["schemas"]["Slug"];
             key?: components["schemas"]["NodeKey"] | null;
@@ -3172,8 +3135,6 @@ export interface components {
              *     can be started early. What waits on it is `blocked`, its `waits_on` carrying the date.
              */
             not_before?: components["schemas"]["DateRule2"] | null;
-            /** @description The milestone that opens the stage: the contents wait for it unless `gates` is false. */
-            opens_at?: components["schemas"]["Path"];
             parent?: components["schemas"]["Path"] | null;
             participations?: components["schemas"]["Participations"];
             placeholder?: boolean;
@@ -3239,11 +3200,10 @@ export interface components {
              */
             answer?: components["schemas"]["AnswerValue"] | null;
             /**
-             * @description What blocks it itself: its own explicit requirements, condition gates, and stage
-             *     opening, and its children, each unsatisfied. What it inherits is listed once, on the
-             *     ancestor that holds it (`blocked_through`), never copied onto each descendant. A node
-             *     that is not blocked lists what its own requirements, conditions, and opening still
-             *     hold back beneath it.
+             * @description What blocks it itself: its own explicit requirements and condition gates, and its
+             *     children, each unsatisfied. What it inherits is listed once, on the ancestor that holds
+             *     it (`blocked_through`), never copied onto each descendant. A node that is not blocked
+             *     lists what its own requirements and conditions still hold back beneath it.
              */
             blocked_by?: components["schemas"]["Blocker"][];
             /**
@@ -3430,7 +3390,7 @@ export interface components {
             ticks?: components["schemas"]["Slug"][];
         };
         /** @description A node field, by name. */
-        NodeField: "id" | "parent" | "title" | "description" | "weight" | "relevant_when" | "due_by" | "not_before" | "estimate" | "placeholder" | "requires_artifact" | "requires_note" | "checklist" | "requires_checklist" | "final" | "auto_done" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "choices" | "fills_role" | "feeds_milestone";
+        NodeField: "id" | "parent" | "title" | "description" | "weight" | "relevant_when" | "due_by" | "not_before" | "estimate" | "placeholder" | "requires_artifact" | "requires_note" | "checklist" | "requires_checklist" | "final" | "auto_done" | "prompt" | "help" | "choices" | "fills_role" | "feeds_milestone";
         /** @description A new value for one node field. */
         NodeFieldValueResolved: {
             id: components["schemas"]["Slug"];
@@ -3464,14 +3424,6 @@ export interface components {
             final: boolean;
         } | {
             auto_done: boolean;
-        } | {
-            opens_at: components["schemas"]["NodeKey"] | null;
-        } | {
-            closes_at: components["schemas"]["NodeKey"] | null;
-        } | {
-            gates: boolean;
-        } | {
-            closes: boolean;
         } | {
             prompt: components["schemas"]["Markdown"];
         } | {
@@ -4473,7 +4425,7 @@ export interface components {
         /** @description Which recorded date a [`Mutation::SetRecordedDate`] edits. */
         RecordedEnd: "start" | "finish";
         /** @description Which field of a node outside a removed subtree names a node inside it. */
-        ReferenceField: "relevant_when" | "due_by" | "not_before" | "opens_at" | "closes_at" | "feeds_milestone" | "message_draft" | "snooze";
+        ReferenceField: "relevant_when" | "due_by" | "not_before" | "feeds_milestone" | "message_draft" | "snooze";
         /** @description Why a patch was not applied. */
         Rejection: {
             /** @description The revisions that moved on. */
@@ -4560,7 +4512,7 @@ export interface components {
             /** @description Where the next page of outside references starts, when there is one. */
             next?: components["schemas"]["Cursor"] | null;
             /**
-             * @description A page of the conditions, date rules, stage bounds, fed milestones, message drafts,
+             * @description A page of the conditions, date rules, fed milestones, message drafts,
              *     and snoozes elsewhere that name a node being removed. Edges into the subtree are
              *     already in the removal.
              */
@@ -4924,7 +4876,7 @@ export interface components {
              * @description The resolution moves: each an ordinary mutation that, applied alone, gives
              *     this chain the days it lacks (shift, repin, or unpin a pin on it; revise the answer
              *     behind a pin; adjust a rule's offset; revise an estimate; drop an explicit
-             *     requirement or a stage's close). Nothing applies them automatically.
+             *     requirement). Nothing applies them automatically.
              */
             resolutions?: components["schemas"]["Mutation"][];
             /**
@@ -5279,7 +5231,7 @@ export interface components {
             /** @description The node traced. */
             node: components["schemas"]["NodeKey"];
             /**
-             * @description Its transitive dependencies (gating decisions, stage openings, its children), in key
+             * @description Its transitive dependencies (gating decisions, its children), in key
              *     order.
              */
             upstream: components["schemas"]["NodeKey"][];
@@ -5343,7 +5295,7 @@ export interface components {
         };
         /** @description One edge of the graph a canvas edge stands for: `dependent` waits on `requirement`. */
         UnderlyingEdge: {
-            /** @description The node whose `requires`, condition, or opening it is. */
+            /** @description The node whose `requires` or condition it is. */
             dependent: components["schemas"]["NodeKey"];
             /** @description How it arose. */
             origin: components["schemas"]["EdgeOrigin"];
@@ -5425,7 +5377,7 @@ export interface components {
          * @description What a violation breaks.
          * @enum {string}
          */
-        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_id" | "draft_exists" | "no_draft" | "route_in_use" | "insertion_invalid" | "insertion_key_taken" | "identity_key_taken" | "identity_empty" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "identity_in_use" | "proposal_not_open" | "unresolved_review_item";
+        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_id" | "draft_exists" | "no_draft" | "route_in_use" | "insertion_invalid" | "insertion_key_taken" | "identity_key_taken" | "identity_empty" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "identity_in_use" | "proposal_not_open" | "unresolved_review_item";
         /** @description A violation list with at least one entry (a rejection always says why). */
         Violations: components["schemas"]["Violation"][];
         /** @description What a stream watches: `deployment`, `journey:<id>`, `route:<id>`, `proposal:<id>`, `journeys`, `routes`, or `proposals`. */

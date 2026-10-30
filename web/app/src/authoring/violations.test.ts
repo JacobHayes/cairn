@@ -16,12 +16,12 @@ const on = (node: string, code: Schema<"ViolationCode">, at: Partial<Violation["
 });
 
 describe("byPlace (A15)", () => {
-  it("puts three violations of one node at three fields", () => {
+  it("puts violations of one node at their fields", () => {
     const places = byPlace(
-      [on("n_stage", "duplicate_sibling_id", { field: "id" }), on("n_stage", "edge_to_ancestor_or_descendant", { field: "opens_at" }), on("n_stage", "edge_to_ancestor_or_descendant", { field: "closes_at" })],
+      [on("n_stage", "duplicate_sibling_id", { field: "id" }), on("n_stage", "edge_to_ancestor_or_descendant", { field: "due_by" })],
       "n_stage",
     );
-    expect([...places.keys()].sort()).toEqual(["closes_at", "id", "opens_at"]);
+    expect([...places.keys()].sort()).toEqual(["due_by", "id"]);
   });
 
   it("puts a violation that names an edge at the node's requirements", () => {

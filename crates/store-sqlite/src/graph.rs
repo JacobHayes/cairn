@@ -26,7 +26,7 @@ use crate::sql::{
 /// The nodes table's columns after `graph_id`, in the order [`node_values`] writes them and
 /// [`node_from_row`] reads them (A1a): the fields every kind shares, then [`KindColumns`].
 /// A node's `requires`, `participations`, and `resources` are rows of their own tables.
-pub(crate) const NODE_COLUMNS: [&str; 30] = [
+pub(crate) const NODE_COLUMNS: [&str; 26] = [
     "key",
     "parent_key",
     "id",
@@ -45,10 +45,6 @@ pub(crate) const NODE_COLUMNS: [&str; 30] = [
     "requires_checklist",
     "is_final",
     "auto_done",
-    "opens_at",
-    "closes_at",
-    "gates",
-    "closes",
     "prompt",
     "answer_type",
     "choices",
@@ -116,10 +112,6 @@ fn kind_values(payload: &Payload<KeyRefs>) -> Result<Vec<Value>, StoreError> {
         requires_checklist,
         is_final,
         auto_done,
-        opens_at,
-        closes_at,
-        gates,
-        closes,
         prompt,
         answer_type,
         choices,
@@ -137,10 +129,6 @@ fn kind_values(payload: &Payload<KeyRefs>) -> Result<Vec<Value>, StoreError> {
         opt_flag(requires_checklist),
         opt_flag(is_final),
         opt_flag(auto_done),
-        opt_text(opens_at),
-        opt_text(closes_at),
-        opt_flag(gates),
-        opt_flag(closes),
         opt_text(prompt),
         opt_text(answer_type.map(AnswerType::name)),
         opt_json(choices.as_ref())?,
@@ -167,19 +155,15 @@ fn payload_from_row(row: &Row, kind: NodeKind) -> Result<Payload<KeyRefs>, Store
         requires_checklist: row.opt_flag(at(5))?,
         is_final: row.opt_flag(at(6))?,
         auto_done: row.opt_flag(at(7))?,
-        opens_at: row.opt_parse(at(8))?,
-        closes_at: row.opt_parse(at(9))?,
-        gates: row.opt_flag(at(10))?,
-        closes: row.opt_flag(at(11))?,
-        prompt: row.opt_parse(at(12))?,
+        prompt: row.opt_parse(at(8))?,
         answer_type: row
-            .opt_text(at(13))?
+            .opt_text(at(9))?
             .map(|name| answer_type_from(&name))
             .transpose()?,
-        choices: row.opt_json(at(14))?,
-        fills_role: row.opt_parse(at(15))?,
-        feeds_milestone: row.opt_parse(at(16))?,
-        help: row.opt_parse(at(17))?,
+        choices: row.opt_json(at(10))?,
+        fills_role: row.opt_parse(at(11))?,
+        feeds_milestone: row.opt_parse(at(12))?,
+        help: row.opt_parse(at(13))?,
     };
     columns
         .into_payload(kind)
@@ -253,8 +237,8 @@ fn node_from_row(row: &Row, children: &mut Children) -> Result<Node<KeyRefs>, St
 
 /// The route version a node was inserted from, from its two columns.
 fn from_route(row: &Row) -> Result<Option<Lineage>, StoreError> {
-    let route = row.opt_parse(28)?;
-    let version = row.opt_int(29)?.map(sql::number).transpose()?;
+    let route = row.opt_parse(24)?;
+    let version = row.opt_int(25)?.map(sql::number).transpose()?;
     match (route, version) {
         (Some(route), Some(version)) => Ok(Some(Lineage { route, version })),
         (None, None) => Ok(None),
@@ -474,8 +458,6 @@ pub(crate) fn load_node(
 
 #[cfg(test)]
 mod tests {
-    use cairn_schema::Group;
-
     use super::*;
 
     #[test]
@@ -504,15 +486,9 @@ mod tests {
 
     #[test]
     fn a_null_flag_loads_as_its_default() {
-        let group = KindColumns::<KeyRefs>::default()
-            .into_payload(NodeKind::Group)
+        let action = KindColumns::<KeyRefs>::default()
+            .into_payload(NodeKind::Action)
             .unwrap();
-        let expected = Payload::Group(Group {
-            opens_at: None,
-            closes_at: None,
-            gates: true,
-            closes: true,
-        });
-        assert_eq!(group, expected);
+        assert_eq!(action, Payload::Action(cairn_schema::Action::default()));
     }
 }

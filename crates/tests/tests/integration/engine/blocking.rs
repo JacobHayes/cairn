@@ -95,12 +95,7 @@ fn the_vendor_evaluation_yields_the_prds_frontier() {
             "n_who_owns"
         ]
     );
-    let setup = blocker(
-        "n_kickoff",
-        DependencyVia::StageOpening {
-            group: key("n_setup"),
-        },
-    );
+    let setup = blocker("n_kickoff", DependencyVia::Explicit);
     assert!(blockers(&created, "n_setup").contains(&setup));
     assert!(
         blockers(&created, "n_access").is_empty(),
@@ -208,13 +203,13 @@ fn a_parent_reaches_the_frontier_only_after_its_children() {
     assert_eq!(frontier(&derived(&plan)), ["n_uses"]);
 }
 
-/// Containment, F4: an empty stage still waits for its opening gate, and what requires the
-/// stage waits with it.
+/// Containment, F4: an empty group still waits for what it requires, and what requires
+/// the group waits with it.
 #[test]
-fn an_empty_group_waits_for_its_opening_gate() {
+fn an_empty_group_waits_for_what_it_requires() {
     let records = support::journey(&add(&[
         "{key: n_opens, id: opens, kind: milestone, title: Opens}",
-        "{key: n_stage, id: stage, kind: group, title: Stage, opens_at: n_opens}",
+        "{key: n_stage, id: stage, kind: group, title: Stage, requires: [n_opens]}",
         "{key: n_next, id: next, kind: action, title: Next, requires: [n_stage]}",
     ]));
     let waiting = derived(&records);
@@ -222,13 +217,8 @@ fn an_empty_group_waits_for_its_opening_gate() {
     assert!(!waiting.blocking().satisfies(&key("n_stage")));
     assert_eq!(
         blockers(&waiting, "n_stage"),
-        BTreeSet::from([blocker(
-            "n_opens",
-            DependencyVia::StageOpening {
-                group: key("n_stage")
-            }
-        )]),
-        "an empty stage waits on its opening alone"
+        BTreeSet::from([blocker("n_opens", DependencyVia::Explicit)]),
+        "an empty group waits on what it requires alone"
     );
     assert_eq!(
         blockers(&waiting, "n_next"),

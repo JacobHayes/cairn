@@ -99,7 +99,7 @@ fn answers(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
             Payload::Deliverable(_)
             | Payload::Action(_)
             | Payload::Milestone(_)
-            | Payload::Group(_) => (
+            | Payload::Group => (
                 ViolationCode::WrongReferenceKind,
                 "only a decision is answered",
             ),

@@ -13,7 +13,7 @@ import { draftOf, nodeFrom, valueOf, type FormField, type NodeDraft } from "../a
 import { useDraftProblems } from "../authoring/form-problems.ts";
 import { NewNodeFields, useNewNodeCheck, type NewNodeValues } from "../authoring/NewNodeFields.tsx";
 import { moveTargets, newNode, nodesByPath, nodesFor, pathOf, rolesForFill, type GraphNode, type Mutation, type NodeField, type ReferenceField, type Role, type Tree } from "../authoring/graph.ts";
-import { BasicsFields, ChecklistEditor, type NewItem, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
+import { BasicsFields, ChecklistEditor, type NewItem, ChoicesEditor, CompletionFields, DecisionFields, WeightFields } from "../authoring/NodeFields.tsx";
 import { CheckFailed, FieldBox, Picker } from "../authoring/parts.tsx";
 import { useDraft } from "../data/drafts.ts";
 import type { Deployment } from "../data/host.ts";
@@ -145,7 +145,6 @@ function AddedNode({ editor, node, onChange, context }: { editor: string; node: 
             <DateRuleEditor which={which} value={draft[which]} onChange={(next) => { change({ [which]: next }); }} tree={context.tree} node={node.key} />
           </FieldBox>
         ))}
-        {has(props, "opens_at") ? <StageFields props={props} /> : null}
       </Section>
       <Section title="Completion needs, weight and estimate" testId="added-weight">
         <CompletionFields props={props} />
@@ -165,8 +164,8 @@ const LINE_FIELDS = ["id", "title"] as const;
 /** Markdown, which keeps its line breaks: a textarea. */
 const MARKDOWN_FIELDS = ["description", "prompt", "help"] as const;
 const NUMBER_FIELDS = ["weight", "estimate"] as const;
-const FLAG_FIELDS = ["placeholder", "requires_artifact", "requires_note", "requires_checklist", "final", "auto_done", "gates", "closes"] as const;
-const MILESTONE_FIELDS = ["opens_at", "closes_at", "feeds_milestone"] as const satisfies readonly ReferenceField[];
+const FLAG_FIELDS = ["placeholder", "requires_artifact", "requires_note", "requires_checklist", "final", "auto_done"] as const;
+const MILESTONE_FIELDS = ["feeds_milestone"] as const satisfies readonly ReferenceField[];
 const includes = <T extends string>(list: readonly T[], field: string): field is T => (list as readonly string[]).includes(field);
 
 /** A field the proposal sets, edited with authoring's controls for that field; a value with a problem is held here, not written. */

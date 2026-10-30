@@ -83,7 +83,7 @@ export function polyline(points: Point[], radius = CORNER_PX): string {
 }
 
 /** The marker's outline at `end`, pointing along `way`: its tip at the end of the route. */
-function markerPath(kind: "arrow" | "diamond" | "bar" | "open", end: Point, way: Point, scale: number): string {
+function markerPath(kind: "arrow" | "diamond" | "open", end: Point, way: Point, scale: number): string {
   const [length, half] = [MARKER_LENGTH_PX * scale, MARKER_HALF_PX * scale];
   const across = { x: -way.y, y: way.x };
   const at = (along: number, side: number) => `${String(end.x - way.x * along + across.x * side)} ${String(end.y - way.y * along + across.y * side)}`;
@@ -92,15 +92,13 @@ function markerPath(kind: "arrow" | "diamond" | "bar" | "open", end: Point, way:
       return `M${at(0, 0)} L${at(length, half)} L${at(length, -half)} Z`;
     case "diamond":
       return `M${at(0, 0)} L${at(length / 2, half)} L${at(length, 0)} L${at(length / 2, -half)} Z`;
-    case "bar":
-      return `M${at(1.5, half + 1)} L${at(1.5, -half - 1)}`;
     case "open":
       return `M${at(length, half)} L${at(0, 0)} L${at(length, -half)}`;
   }
 }
 
 /** How far a marker reaches back from the route's end (px): the line stops there. */
-function reach(kind: "arrow" | "diamond" | "bar" | "open" | "none", scale: number): number {
+function reach(kind: "arrow" | "diamond" | "open" | "none", scale: number): number {
   return kind === "arrow" || kind === "diamond" ? MARKER_LENGTH_PX * scale : 0;
 }
 

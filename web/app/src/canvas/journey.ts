@@ -173,14 +173,12 @@ export function journeyLooks(view: Ready, extras: JourneyExtras): Looks {
   };
 }
 
-/** Whether a blocker's origin is the edge's own: an explicit requirement, the dependent's condition, or the stage's opening. */
+/** Whether a blocker's origin is the edge's own: an explicit requirement or the dependent's condition. */
 function holdsEdge(via: Schema<"Blocker">["via"], edge: Schema<"UnderlyingEdge">): boolean {
   switch (edge.origin) {
     case "explicit":
       return via === "explicit";
     case "condition":
       return typeof via === "object" && "condition" in via && via.condition.condition_on === edge.dependent;
-    case "stage_opening":
-      return typeof via === "object" && "stage_opening" in via && via.stage_opening.group === edge.dependent;
   }
 }

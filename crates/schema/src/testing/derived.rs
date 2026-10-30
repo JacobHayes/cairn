@@ -45,7 +45,6 @@ pub fn arb_dependency_via() -> BoxedStrategy<DependencyVia> {
         Just(DependencyVia::Containment),
         arb_node_key().prop_map(|ancestor| DependencyVia::Inherited { ancestor }),
         arb_node_key().prop_map(|condition_on| DependencyVia::Condition { condition_on }),
-        arb_node_key().prop_map(|group| DependencyVia::StageOpening { group }),
     ]
     .boxed()
 }
@@ -64,7 +63,6 @@ fn arb_constraint_source() -> BoxedStrategy<ConstraintSource> {
         arb_node_key().prop_map(|node| ConstraintSource::Estimate { node }),
         (arb_node_key(), arb_node_key())
             .prop_map(|(parent, child)| ConstraintSource::Containment { parent, child }),
-        arb_node_key().prop_map(|group| ConstraintSource::StageClose { group }),
     ]
     .boxed()
 }
@@ -265,8 +263,6 @@ fn arb_date_link() -> BoxedStrategy<DateLink> {
                 days,
                 answer
             }),
-        Just(DateLinkKind::StageClose),
-        Just(DateLinkKind::StageOpening),
         Just(DateLinkKind::FedDate),
     ];
     (arb_node_key(), arb_node_key(), kind)

@@ -13,7 +13,7 @@ use crate::collections::OneOrMany;
 use crate::field::{NodeField, NodeFieldValue};
 use crate::node::{
     Action, AnswerSpec, Checklist, ChecklistItem, Choice, Choices, DateRule, DateSource, Decision,
-    Deliverable, Direction, Group, Milestone, Node, ParticipationSource, Participations, Payload,
+    Deliverable, Direction, Milestone, Node, ParticipationSource, Participations, Payload,
 };
 
 /// A date rule.
@@ -158,20 +158,7 @@ pub fn arb_payload<R: ArbRefs>() -> impl Strategy<Value = Payload<R>> {
                 auto_done
             }
         )),
-        (
-            prop::option::of(R::arb_node_ref()),
-            prop::option::of(R::arb_node_ref()),
-            any::<bool>(),
-            any::<bool>()
-        )
-            .prop_map(
-                |(opens_at, closes_at, gates, closes)| Payload::Group(Group {
-                    opens_at,
-                    closes_at,
-                    gates,
-                    closes
-                })
-            ),
+        Just(Payload::Group),
     ]
 }
 
@@ -262,10 +249,6 @@ pub fn arb_node_field_value<R: ArbRefs>() -> impl Strategy<Value = NodeFieldValu
         any::<bool>().prop_map(NodeFieldValue::RequiresChecklist),
         any::<bool>().prop_map(NodeFieldValue::Final),
         any::<bool>().prop_map(NodeFieldValue::AutoDone),
-        optional_node().prop_map(NodeFieldValue::OpensAt),
-        optional_node().prop_map(NodeFieldValue::ClosesAt),
-        any::<bool>().prop_map(NodeFieldValue::Gates),
-        any::<bool>().prop_map(NodeFieldValue::Closes),
         arb_markdown().prop_map(NodeFieldValue::Prompt),
         prop::option::of(arb_markdown()).prop_map(NodeFieldValue::Help),
         arb_choices().prop_map(NodeFieldValue::Choices),

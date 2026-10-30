@@ -62,8 +62,10 @@ nodes:
   id: build
   kind: group
   title: Build
-  opens_at: kickoff
-  closes_at: code-freeze
+  requires:
+  - kickoff
+  due_by:
+    before: code-freeze
 - key: n_features
   id: features
   parent: build
@@ -82,8 +84,10 @@ nodes:
   id: beta
   kind: group
   title: Beta
-  opens_at: beta-start
-  closes_at: beta-end
+  requires:
+  - beta-start
+  due_by:
+    before: beta-end
 - key: n_beta_feedback
   id: feedback
   parent: beta

@@ -78,7 +78,8 @@ nodes:
   id: setup
   kind: group
   title: Setup
-  opens_at: kickoff
+  requires:
+  - kickoff
 - key: n_access
   id: access
   parent: setup
@@ -202,8 +203,10 @@ nodes:
   parent: reporting
   kind: group
   title: Final review
-  opens_at: reporting/review-opens
-  closes_at: decision-meeting
+  requires:
+  - reporting/review-opens
+  due_by:
+    before: decision-meeting
 - key: n_final_report
   id: final-report
   parent: reporting/final-review

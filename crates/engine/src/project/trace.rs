@@ -3,7 +3,7 @@
 //! nodes are included and levels do not matter.
 //!
 //! Upstream is every other node whose finish the node's finish waits on, transitively: its
-//! requirements, inherited ones, gating decisions, stage openings, and its children. Downstream
+//! requirements, inherited ones, gating decisions, and its children. Downstream
 //! is every other node with an instant that waits on the node's finish, transitively: its
 //! dependents, its ancestors (each waits on its children), and the nodes whose relevance it
 //! determines (condition gates). Every instant of a node leads to its finish, so a node is
@@ -25,9 +25,7 @@ use std::collections::BTreeSet;
 use cairn_schema::{NodeKey, Trace};
 
 use super::{DerivedJourney, ProjectionError};
-use crate::derive::dependencies::{
-    Dependencies, Edge, EdgeClass, EdgeSet, EdgeSource, Instant, Point,
-};
+use crate::derive::dependencies::{Dependencies, Edge, EdgeSet, EdgeSource, Instant, Point};
 use crate::derive::skips_beneath;
 
 /// Which way a walk follows the edges.
@@ -163,7 +161,7 @@ fn walk(
             Direction::Up => Box::new(dependencies.waits(instant, EdgeSet::Full)),
             Direction::Down => Box::new(dependencies.waited_by(instant, EdgeSet::Full)),
         };
-        for edge in edges.filter(|edge| edge.class == EdgeClass::Gate && holds(edge)) {
+        for edge in edges.filter(|edge| holds(edge)) {
             let next = match direction {
                 Direction::Up => edge.requirement,
                 Direction::Down => edge.dependent,

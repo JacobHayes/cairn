@@ -11,7 +11,7 @@ mod property {
     use std::collections::BTreeSet;
 
     use cairn_engine::derive::EdgeSet;
-    use cairn_engine::derive::dependencies::{EdgeClass, Instant, Point};
+    use cairn_engine::derive::dependencies::{Instant, Point};
     use cairn_engine::testing::derive_inputs;
     use cairn_engine::testing::generated::arb_journey;
     use cairn_engine::{Derived, Graph, derive};
@@ -63,7 +63,7 @@ mod property {
         let mut nodes = BTreeSet::new();
         while let Some(instant) = queue.pop() {
             for edge in dependencies.waited_by(instant, EdgeSet::Pruned) {
-                if edge.class == EdgeClass::Gate && seen.insert(edge.dependent) {
+                if seen.insert(edge.dependent) {
                     nodes.insert(dependencies.key(edge.dependent.node).unwrap().clone());
                     queue.push(edge.dependent);
                 }
@@ -107,7 +107,7 @@ mod property {
                     continue;
                 }
                 for dependency in derived.dependencies().of(key, EdgeSet::Pruned) {
-                    if dependency.class != EdgeClass::Gate || !derived.relevance().in_scope(&dependency.node) {
+                    if !derived.relevance().in_scope(&dependency.node) {
                         continue;
                     }
                     prop_assert!(

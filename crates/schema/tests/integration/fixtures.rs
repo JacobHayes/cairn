@@ -202,9 +202,9 @@ fn decision_mechanisms(route: &RouteFile) -> Mechanisms {
         ),
         (
             "a conditional subset",
-            nodes.iter().any(|node| {
-                matches!(node.payload, Payload::Group(_)) && node.relevant_when.is_some()
-            }),
+            nodes
+                .iter()
+                .any(|node| matches!(node.payload, Payload::Group) && node.relevant_when.is_some()),
         ),
         ("a default owner", route.default_owner.is_some()),
     ]
@@ -213,10 +213,10 @@ fn decision_mechanisms(route: &RouteFile) -> Mechanisms {
 /// The illustrative example's stages, dates, placeholder, and resources.
 fn structure_mechanisms(route: &RouteFile) -> Mechanisms {
     let nodes = route.nodes.as_slice();
-    let group = |pick: &dyn Fn(&cairn_schema::Group<cairn_schema::FileRefs>) -> bool| {
+    let group = |pick: &dyn Fn(&cairn_schema::Node<cairn_schema::FileRefs>) -> bool| {
         nodes
             .iter()
-            .any(|node| matches!(&node.payload, Payload::Group(group) if pick(group)))
+            .any(|node| matches!(node.payload, Payload::Group) && pick(node))
     };
     vec![
         (
@@ -226,12 +226,12 @@ fn structure_mechanisms(route: &RouteFile) -> Mechanisms {
             ),
         ),
         (
-            "a stage opened by a milestone",
-            group(&|group| group.opens_at.is_some()),
+            "a stage that waits for a milestone",
+            group(&|group| !group.requires.is_empty()),
         ),
         (
-            "a stage closed by a milestone",
-            group(&|group| group.closes_at.is_some()),
+            "a stage with a deadline",
+            group(&|group| group.due_by.is_some()),
         ),
         (
             "a rule relative to a milestone",

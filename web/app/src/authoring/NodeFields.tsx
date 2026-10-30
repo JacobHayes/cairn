@@ -12,7 +12,6 @@ import { fieldsOf, type FormField, type NodeDraft } from "./fields.ts";
 import { nodesFor, rolesForFill, type AnswerType, type NodeKind, type Role, type Tree } from "./graph.ts";
 import { slugOf, uniqueId } from "./keys.ts";
 import { FieldBox, Picker, type FieldNotes } from "./parts.tsx";
-import { StageBoundsEditor } from "./DateRuleEditor.tsx";
 
 /** The text of a new checklist item as typed, set as typed, and `add` to change the draft and clear the text in one step. */
 export interface NewItem {
@@ -280,21 +279,5 @@ export function DecisionFields({ props }: { props: FieldsProps }) {
         </FieldBox>
       ) : null}
     </>
-  );
-}
-
-/** F4: a stage's bounds, on a group. */
-export function StageFields({ props }: { props: FieldsProps }) {
-  return (
-    <StageBoundsEditor
-      opensAt={props.draft.opens_at}
-      closesAt={props.draft.closes_at}
-      gates={props.draft.gates}
-      closes={props.draft.closes}
-      tree={props.tree}
-      group={props.nodeKey}
-      notes={{ opens_at: props.notes("opens_at"), closes_at: props.notes("closes_at") }}
-      onChange={(next) => { props.change(next); }}
-    />
   );
 }

@@ -1,5 +1,5 @@
 //! References (PRD Invariants: graph, references resolve and are of the right kind;
-//! conditions; stage bounds; participations and roles; kind-restricted flags). Cost at the
+//! conditions; participations and roles; kind-restricted flags). Cost at the
 //! limits: one pass over nodes, each looking up its at most 64 edges, 16 condition clauses,
 //! 2 x 64 rule sources, and 32 participations by key, O(n log n) overall.
 
@@ -22,7 +22,6 @@ pub(super) fn check(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
         requires(check, node, out);
         condition(check, node, out);
         date_rules(check, node, out);
-        stage_bounds(check, node, out);
         answer_spec(check, node, out);
         participations(check, node, out);
         resources(check, node, out);
@@ -169,10 +168,9 @@ fn condition(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation>)
 fn answer_spec_of(node: &GraphNode) -> Option<&AnswerSpec<KeyRefs>> {
     match &node.payload {
         Payload::Decision(decision) => Some(&decision.answer),
-        Payload::Deliverable(_)
-        | Payload::Action(_)
-        | Payload::Milestone(_)
-        | Payload::Group(_) => None,
+        Payload::Deliverable(_) | Payload::Action(_) | Payload::Milestone(_) | Payload::Group => {
+            None
+        }
     }
 }
 
@@ -274,50 +272,6 @@ fn date_rules(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation>
                 );
                 out.push(related_to(found, Some(field), source));
             }
-        }
-    }
-}
-
-/// F4: stage bounds are milestones outside the stage.
-fn stage_bounds(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation>) {
-    let Payload::Group(group) = &node.payload else {
-        return;
-    };
-    let bounds = [
-        (
-            ReferenceField::OpensAt,
-            NodeField::OpensAt,
-            group.opens_at.as_ref(),
-        ),
-        (
-            ReferenceField::ClosesAt,
-            NodeField::ClosesAt,
-            group.closes_at.as_ref(),
-        ),
-    ];
-    for (takes, field, bound) in bounds {
-        let Some(bound) = bound else {
-            continue;
-        };
-        let Some(target) = resolve(check, node, bound, Some(field), out) else {
-            continue;
-        };
-        let problem = if !takes.takes(target.kind(), None) {
-            Some((
-                ViolationCode::StageBoundNotMilestone,
-                "a stage bound is a milestone",
-            ))
-        } else if check.tree.is_ancestor(&node.key, bound) {
-            Some((
-                ViolationCode::EdgeToAncestorOrDescendant,
-                "a stage bound sits outside the stage",
-            ))
-        } else {
-            None
-        };
-        if let Some((code, message)) = problem {
-            let found = at_node(check.tree, &node.key, code, message);
-            out.push(related_to(found, Some(field), bound));
         }
     }
 }
@@ -507,7 +461,7 @@ fn one_per_graph(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
             Payload::Milestone(_)
             | Payload::Deliverable(_)
             | Payload::Action(_)
-            | Payload::Group(_) => {}
+            | Payload::Group => {}
         }
     }
     let groups = std::iter::once((

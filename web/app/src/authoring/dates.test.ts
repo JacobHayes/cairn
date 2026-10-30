@@ -1,9 +1,8 @@
-// A8 and F4 against the engine: every source a date rule editor offers is one the engine
-// measures from, a rule round-trips through its parts, and a stage's bounds are offered from
-// the milestones outside it.
+// A8 against the engine: every source a date rule editor offers is one the engine measures
+// from, and a rule round-trips through its parts.
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { boundOptions, CREATED_AT, partsOf, ruleOf, sourceOptions } from "./dates.ts";
+import { CREATED_AT, partsOf, ruleOf, sourceOptions } from "./dates.ts";
 import { applyToDraft, seeded, type Fixtures } from "./engine.test-support.ts";
 import { treeOf, type Graph, type GraphNode } from "./graph.ts";
 
@@ -48,20 +47,5 @@ describe("a blank offset", () => {
     expect(partsOf(ruleOf(parts)).offset).not.toBe("0");
     expect(ruleOf(parts).offset).toBeNaN();
     expect(partsOf({ before: "n_kickoff" }).offset).toBe("0");
-  });
-});
-
-describe("stage bounds (F4)", () => {
-  it("offers the milestones outside the stage first, and those inside it marked", () => {
-    const nodes: GraphNode[] = [
-      { key: "n_stage", id: "stage", kind: "group", title: "Stage" },
-      { key: "n_inside", id: "inside", kind: "milestone", title: "Inside", parent: "n_stage" },
-      { key: "n_outside", id: "outside", kind: "milestone", title: "Outside" },
-      { key: "n_work", id: "work", kind: "action", title: "Work" },
-    ];
-    expect(boundOptions(treeOf({ nodes }), "n_stage", "opens_at").map(({ node, inside }) => [node.key, inside])).toEqual([
-      ["n_outside", false],
-      ["n_inside", true],
-    ]);
   });
 });

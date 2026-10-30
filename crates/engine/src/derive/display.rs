@@ -181,8 +181,8 @@ impl Derived {
         }
     }
 
-    /// Its own and inherited gates are satisfied: a container's entries (its requirements,
-    /// opening and conditions), never its children; anything else's start.
+    /// Its own and inherited gates are satisfied: a container's entries (its requirements
+    /// and conditions), never its children; anything else's start.
     fn entered(&self, key: &NodeKey) -> bool {
         let dependencies = &self.dependencies;
         dependencies.node_index(key).is_some_and(|at| {

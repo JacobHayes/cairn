@@ -1,14 +1,12 @@
-//! Cycles among gate edges (PRD Invariants: the dependency graph, including implicit gates,
-//! is acyclic). The strongly connected components of the full set's gate edges, found with
+//! Cycles among the edges (PRD Invariants: the dependency graph, including implicit gates,
+//! is acyclic). The strongly connected components of the full set, found with
 //! Kosaraju's two depth-first passes, each iterative with an explicit stack (PRACTICES, No
-//! recursion): O(instants + edges), about 120,000 steps at the limits. Date-only edges are
-//! left out, so a date-only cycle (a `gates: false` opening whose milestone requires its
-//! group) is legal here and left to the date network (F5). Extra waits (B6's node snoozes, at
+//! recursion): O(instants + edges), about 120,000 steps at the limits. Extra waits (B6's node snoozes, at
 //! most one per node) are indexed by instant both ways, so they add O(snoozes log snoozes).
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::{Dependencies, Edge, EdgeClass, EdgeSet, Instant, NodeIndex, Point};
+use super::{Dependencies, EdgeSet, Instant, NodeIndex, Point};
 
 /// Extra waits laid over the gate edges, indexed both ways: a node snooze makes the snoozed
 /// node's own work wait for its target (B6).
@@ -80,7 +78,6 @@ impl Dependencies {
                 members.insert(next);
                 stack.extend(
                     self.waited_by(next, EdgeSet::Full)
-                        .filter(|edge| is_gate(edge))
                         .map(|edge| edge.dependent),
                 );
                 stack.extend(extra.by(next));
@@ -140,13 +137,8 @@ impl Dependencies {
 
     fn gate_waits(&self, instant: Instant, extra: &Waits) -> Vec<Instant> {
         self.waits(instant, EdgeSet::Full)
-            .filter(|edge| is_gate(edge))
             .map(|edge| edge.requirement)
             .chain(extra.on(instant).iter().copied())
             .collect()
     }
-}
-
-fn is_gate(edge: &Edge) -> bool {
-    edge.class == EdgeClass::Gate
 }

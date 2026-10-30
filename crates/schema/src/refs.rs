@@ -18,8 +18,7 @@ use crate::attachment::{MessageTemplate, Resource, ResourceContent, Segment, Tem
 use crate::field::NodeField;
 use crate::id::{AttachmentKey, KindKey, NodeKey, Path, RoleKey, Slug};
 use crate::node::{
-    AnswerSpec, DateRule, DateSource, Decision, Group, Node, ParticipationSource, Participations,
-    Payload,
+    AnswerSpec, DateRule, DateSource, Decision, Node, ParticipationSource, Participations, Payload,
 };
 
 /// A value one document form uses to refer to something: text in both formats.
@@ -393,17 +392,6 @@ fn map_payload<A: References, B: References>(
         Payload::Deliverable(deliverable) => Payload::Deliverable(deliverable.clone()),
         Payload::Action(action) => Payload::Action(action.clone()),
         Payload::Milestone(milestone) => Payload::Milestone(milestone.clone()),
-        Payload::Group(group) => Payload::Group(Group {
-            opens_at: group
-                .opens_at
-                .as_ref()
-                .and_then(|node| map.node(node, Some(NodeField::OpensAt))),
-            closes_at: group
-                .closes_at
-                .as_ref()
-                .and_then(|node| map.node(node, Some(NodeField::ClosesAt))),
-            gates: group.gates,
-            closes: group.closes,
-        }),
+        Payload::Group => Payload::Group,
     }
 }

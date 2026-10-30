@@ -28,9 +28,9 @@ async function authorRoute(page: Page): Promise<Record<string, string>> {
   await saveForm(page);
   keys["Include training"] = await addNode(page, "decision", "Include training");
   keys["Setup"] = await addNode(page, "group", "Setup");
-  await openForm(page, "dates");
-  await pickByTitle(formField(page, "opens_at").getByLabel("Opens at"), "Kickoff");
-  await saveForm(page);
+  const waits = await section(page, "author-edges");
+  await pickByTitle(waits.getByLabel("Require"), "Kickoff");
+  await waits.getByRole("button", { name: "Add the requirement" }).click();
   keys["Training plan"] = await addNode(page, "deliverable", "Training plan", "Setup");
   await openForm(page, "relevance");
   await formField(page, "relevant_when").getByRole("button", { name: "Add a condition" }).click();

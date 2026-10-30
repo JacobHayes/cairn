@@ -13,7 +13,7 @@
 //!   beneath it satisfies at once;
 //! - any other terminal state (`done`, `decided`);
 //! - a group, which has no performed state: once its relevant or undecided children and its
-//!   own requirements, openings, and conditions are satisfied, so an empty group waits for its
+//!   own requirements and conditions are satisfied, so an empty group waits for its
 //!   gates (PRD Containment);
 //! - a pending, relevant `auto_done` milestone whose dependencies are satisfied and whose
 //!   effective date is today or earlier: it reads as done (F1);
@@ -21,8 +21,8 @@
 //!
 //! Every other instant (a start, a container's entries) is satisfied when each gate edge it
 //! waits on in the pruned set is. A node's `deps_done` is its start: for a container, its
-//! entries and its children; for anything else, its own and inherited requirements, openings,
-//! and conditions. The order is a topological order of the full set's gate edges, which
+//! entries and its children; for anything else, its own and inherited requirements and
+//! conditions. The order is a topological order of the full set's gate edges, which
 //! validation holds acyclic, so kept work beneath a skipped container is decided before the
 //! container even where the pruned set leaves out the containment between them (a
 //! force-included node under a not-relevant container).
@@ -63,7 +63,7 @@ use cairn_schema::{
 };
 
 use super::dates::Dates;
-use super::dependencies::{Dependencies, EdgeClass, EdgeSet, Instant, NodeIndex, Point};
+use super::dependencies::{Dependencies, EdgeSet, Instant, NodeIndex, Point};
 use super::{Early, stored_state, unexpanded};
 use crate::graph::{Graph, Tree};
 
@@ -397,7 +397,6 @@ impl Sweep<'_> {
         self.dependencies()
             .waits(instant, EdgeSet::Pruned)
             .inspect(|_| self.operations.set(self.operations.get() + 1))
-            .filter(|edge| edge.class == EdgeClass::Gate)
             .all(|edge| satisfied.get(edge.requirement.slot()) == Some(&true))
     }
 
@@ -467,7 +466,7 @@ impl Sweep<'_> {
             Payload::Deliverable(_) | Payload::Action(_) | Payload::Decision(_) => {
                 (self.dates.not_before(key)?, false)
             }
-            Payload::Group(_) => return None,
+            Payload::Group => return None,
         };
         (date > self.today).then_some(Scheduled {
             date,
@@ -599,12 +598,7 @@ fn topological_order(dependencies: &Dependencies) -> (Vec<Instant>, u64) {
     let instants: Vec<Instant> = (0..dependencies.node_count())
         .flat_map(|at| Point::ALL.map(|point| Instant::new(NodeIndex::from_position(at), point)))
         .collect();
-    let gate_waits = |instant: Instant| {
-        dependencies
-            .waits(instant, EdgeSet::Full)
-            .filter(|edge| edge.class == EdgeClass::Gate)
-            .count()
-    };
+    let gate_waits = |instant: Instant| dependencies.waits(instant, EdgeSet::Full).count();
     let mut waiting: Vec<usize> = vec![0; slots];
     for instant in &instants {
         if let Some(count) = waiting.get_mut(instant.slot()) {
@@ -620,9 +614,7 @@ fn topological_order(dependencies: &Dependencies) -> (Vec<Instant>, u64) {
     let mut order = Vec::with_capacity(slots);
     while let Some(next) = ready.pop() {
         order.push(next);
-        let dependents = dependencies
-            .waited_by(next, EdgeSet::Full)
-            .filter(|edge| edge.class == EdgeClass::Gate);
+        let dependents = dependencies.waited_by(next, EdgeSet::Full);
         for edge in dependents {
             if let Some(count) = waiting.get_mut(edge.dependent.slot()) {
                 *count -= 1;

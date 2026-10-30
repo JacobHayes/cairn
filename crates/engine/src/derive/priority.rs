@@ -8,9 +8,9 @@
 //! counts once.
 //!
 //! Gravity: a node's downstream set is every node with an instant reachable from its finish
-//! along pruned gate edges: explicit requirements, inherited and condition gates, stage
-//! openings, and containment (a parent waits on each child, so a child's downstream holds its
-//! parent and everything after it). Date-only openings carry no gravity. The set is a union,
+//! along pruned gate edges: explicit requirements, inherited and condition gates, and
+//! containment (a parent waits on each child, so a child's downstream holds its
+//! parent and everything after it). The set is a union,
 //! so a node reached along two paths counts once. Pruning leaves out not-relevant branches;
 //! terminal nodes are traversed (their edges stay) but count nothing, and nor do not-relevant
 //! ones a requirement entry passes through. What a node counts, its own weight included, is
@@ -55,7 +55,7 @@ use cairn_schema::{Contribution, IdentityKey, KindKey, NodeKey, NodeKind, Releva
 
 use super::Early;
 use super::blocking::Blocking;
-use super::dependencies::{EdgeClass, EdgeSet, Instant, NodeIndex, Point};
+use super::dependencies::{EdgeSet, Instant, NodeIndex, Point};
 use super::participation::Participation;
 use crate::graph::{Graph, Tree};
 
@@ -196,9 +196,7 @@ impl Priority {
         let mut reach = BitRows::new(dependencies.node_count() * Point::ALL.len(), self.words);
         let mut operations = 0_u64;
         for &instant in blocking.order().iter().rev() {
-            let dependents = dependencies
-                .waited_by(instant, EdgeSet::Pruned)
-                .filter(|edge| edge.class == EdgeClass::Gate);
+            let dependents = dependencies.waited_by(instant, EdgeSet::Pruned);
             for edge in dependents {
                 assert_ne!(edge.dependent, instant, "gate edges are acyclic");
                 reach.set(instant.slot(), edge.dependent.node.get());

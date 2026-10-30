@@ -124,7 +124,7 @@ describe("C1: lines", () => {
   test.each([
     ["n_option->n_build", "requires", undefined, "arrow", "n_option", "n_build"],
     ["n_choose->n_option", "condition", DOTTED, "diamond", "n_choose", "n_option"],
-    ["n_kick->n_stage", "stage_opening", DOTTED, "bar", "n_kick", "n_stage"],
+    ["n_kick->n_stage", "requires", undefined, "arrow", "n_kick", "n_stage"],
   ])("the edge %s is a %s: dash %s, a %s marker, and its one edge has %s as its requirement and %s as its dependent", (id, kind, dash, marker, requirement, dependent) => {
     const line = whole.lines.find((each) => each.id === id);
     expect(line).toBeDefined();
@@ -187,10 +187,6 @@ describe("C1: what a line waits on and holds", () => {
     // A condition waits only on a condition blocker of this dependent; the same decision blocking as an explicit requirement is another edge.
     const other = changed((each) => { derivedOf(each, "n_option").blocked_by = [{ node: "n_choose", via: { condition: { condition_on: "n_build" } } }]; });
     expect(waits(other, "n_choose->n_option")).toEqual([false]);
-    // A stage opening waits only on a blocker that names that stage.
-    const opening = changed((each) => { derivedOf(each, "n_stage").blocked_by = [{ node: "n_kick", via: { stage_opening: { group: "n_stage" } } }]; });
-    const elsewhere = changed((each) => { derivedOf(each, "n_stage").blocked_by = [{ node: "n_kick", via: { stage_opening: { group: "n_other" } } }]; });
-    expect([waits(opening, "n_kick->n_stage"), waits(elsewhere, "n_kick->n_stage")]).toEqual([[true], [false]]);
   });
 
   test("a line is satisfied exactly when no edge it stands for waits", () => {

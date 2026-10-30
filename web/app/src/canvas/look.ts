@@ -1,5 +1,5 @@
 // How cards and lines look, as data the components apply (C1, C5, C7): requirements solid with
-// an arrowhead, gates dotted with their own end marker, lines in steel and satisfied
+// an arrowhead, condition gates dotted with their own end marker, lines in steel and satisfied
 // ones grey; not-relevant cards hollow and conditional ones ghosted, "I am here" outlined in ink,
 // done work filled green, and an overlay's tags and the one out-of-focus level. Quiet by rule: nothing
 // animates or flashes (C6). Pure, so the unit tests read the same decisions the canvas draws.
@@ -10,11 +10,10 @@ import { standsFor, type CanvasOverlay } from "./overlay.ts";
 export const DOTTED = "2 3";
 export const DATED = "6 4";
 
-/** The marker at a line's target end, by what it stands for: only the end tells a condition from a stage opening. */
-export const MARKERS: Record<LineKind, "arrow" | "diamond" | "bar"> = {
+/** The marker at a line's target end, by what it stands for: only the end tells a condition from a requirement. */
+export const MARKERS: Record<LineKind, "arrow" | "diamond"> = {
   requires: "arrow",
   condition: "diamond",
-  stage_opening: "bar",
 };
 
 /** How a line is drawn. */

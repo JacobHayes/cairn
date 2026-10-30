@@ -707,12 +707,15 @@ pub async fn writes_follow_the_reference_semantics<B: Backend>(backend: &B) {
     assert!(after.nodes.get(&node_key("n_kickoff")).is_none());
     assert!(!after.state.nodes.contains_key(&node_key("n_kickoff")));
     let group = after.nodes.get(&node_key("n_work")).unwrap();
+    let mut original = build::every_content_graph()
+        .nodes
+        .get(&node_key("n_work"))
+        .unwrap()
+        .clone();
+    original.requires = cairn_schema::BoundedSet::default();
     assert_eq!(
-        group,
-        build::every_content_graph()
-            .nodes
-            .get(&node_key("n_work"))
-            .unwrap()
+        group, &original,
+        "removing a node drops the edges that named it"
     );
 
     let clear = journey_patch("p_three", "j_one", 2).event(

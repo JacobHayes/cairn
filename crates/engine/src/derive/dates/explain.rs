@@ -1,6 +1,6 @@
 //! Chains as people read them (F3, F5, F7): constraint positions resolved to their sources,
 //! with a container's internal entries collapsed into the one dependency they carry (an
-//! ancestor's requirement, condition, or stage opening), the dates fixed on the chain, and
+//! ancestor's requirement or condition), the dates fixed on the chain, and
 //! for a short chain the resolution moves as ordinary mutations.
 
 use cairn_schema::limits::OFFSET_DAYS_MAX;
@@ -138,9 +138,6 @@ impl Explain<'_> {
             } => ConstraintSource::NotBefore {
                 node: self.key(node),
             },
-            Origin::StageClose { group } => ConstraintSource::StageClose {
-                group: self.key(group),
-            },
             Origin::Dependency(edge) => {
                 let owner = self.key(edge.dependent.node);
                 let required = self.key(edge.requirement.node);
@@ -160,7 +157,6 @@ impl Explain<'_> {
                     EdgeSource::Condition => DependencyVia::Condition {
                         condition_on: owner,
                     },
-                    EdgeSource::StageOpening => DependencyVia::StageOpening { group: owner },
                 };
                 ConstraintSource::Dependency {
                     node,
@@ -230,7 +226,7 @@ impl Explain<'_> {
 
     /// F5: each move that gives the chain the days it lacks, alone. A pin or answer that
     /// starts the chain moves earlier; one that ends it moves later; a rule's offset or an
-    /// estimate shrinks; an explicit requirement or a stage close is dropped. Actuals and
+    /// estimate shrinks; an explicit requirement is dropped. Actuals and
     /// today never move.
     fn resolutions(&self, found: &Found) -> Vec<Mutation> {
         let days = found.shortfall_days;
@@ -328,10 +324,6 @@ impl Explain<'_> {
         let constraint = self.constraint(at);
         match constraint.origin {
             Origin::Rule { node, rule } => self.rule_move(node, rule, days).into_iter().collect(),
-            Origin::StageClose { group } => vec![Mutation::SetNodeField {
-                node: self.key(group),
-                value: NodeFieldValue::Closes(false),
-            }],
             Origin::Dependency(edge) => match edge.source {
                 EdgeSource::Work => {
                     let node = self.key(edge.dependent.node);
@@ -359,8 +351,7 @@ impl Explain<'_> {
                 EdgeSource::Entry
                 | EdgeSource::Chain
                 | EdgeSource::Containment
-                | EdgeSource::Condition
-                | EdgeSource::StageOpening => Vec::new(),
+                | EdgeSource::Condition => Vec::new(),
             },
         }
     }

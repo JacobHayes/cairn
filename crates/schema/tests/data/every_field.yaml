@@ -32,10 +32,6 @@ nodes:
 - id: work
   kind: group
   title: Work
-  opens_at: kickoff
-  closes_at: wrap-up
-  gates: false
-  closes: false
 - id: scope
   kind: decision
   title: Scope

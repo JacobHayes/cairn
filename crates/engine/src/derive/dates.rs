@@ -1,7 +1,7 @@
 //! Pass 4, the date network (PRD F1 to F7, A8, A9; Invariants: the date line; ARCHITECTURE,
 //! Engine > Date network): one network of instants and difference constraints, "B is at
 //! least k days after A", read in two layers. The plan layer (pins, rules, estimates,
-//! containment, stage bounds, dependencies; no actuals, no today) must hold no contradictory
+//! containment, dependencies; no actuals, no today) must hold no contradictory
 //! chain, which validation enforces. The execution layer adds actuals and today and is what
 //! derive solves into bounds, `overdue`, and `shortfall`, each with its chain.
 //!
@@ -21,53 +21,47 @@
 //! |---|---|---|
 //! | `requires` R on N (A3), inherited by N's descendants through N's entry | N's anchor >= R.finish + 0 | holds N back |
 //! | condition gate: N's condition reads decision D | N's condition anchor >= D + 0 | holds N back |
-//! | stage opening: group G `opens_at` M (`gates: false` too: date-only, still a date) | G's anchor >= M + 0 | holds G's contents back |
-//! | containment, child C of P | C's anchors >= P's entries + 0; P.start >= C.finish + 0; P.start >= P's entries + 0 | holds C back; caps C by P |
+//! //! | containment, child C of P | C's anchors >= P's entries + 0; P.start >= C.finish + 0; P.start >= P's entries + 0 | holds C back; caps C by P |
 //! | estimate e on N (A9) | N.finish >= N.start + e (e is 0 without an estimate, for a group, and for skipped work) | holds N's finish back |
 //! | `due_by {before: S, offset: k}` on N (A8) | S >= N.finish + k | caps N's finish at S - k |
 //! | `due_by {after: S, offset: k}` | S >= N.finish - k | caps N's finish at S + k |
 //! | `not_before {after: S, offset: k}` | N.start >= S + k | holds N back to S + k |
 //! | `not_before {before: S, offset: k}` | N.start >= S - k | holds N back to S - k |
 //! | rule source S | a milestone: its instant; a date decision: its answer; `journey.created_at`: `created_at` | |
-//! | stage close: G `closes_at` M, `closes: true` (F4) | M >= G.finish + 0 | caps G, and through containment its contents |
-//! | pin on N, or a `feeds_milestone` answer in effect (E3) | none: fixes N.finish (a decision's or milestone's one instant) from both sides | both |
+//! //! | pin on N, or a `feeds_milestone` answer in effect (E3), unless N is skipped | none: fixes N.finish (a decision's or milestone's one instant) from both sides | both |
 //! | date answer of D in effect | none: fixes D's answer from both sides | both |
 //! | actual: a recorded start, or the finish of done or decided work (execution only) | none: fixes the instant, never moved | both |
 //! | `created_on` of a journey (execution only) | none: fixes `created_at` | both |
 //! | today (execution only) | none: open decision, unstarted work's start, started work's finish no earlier than today | holds back |
 //! | started work (a recorded start, execution only) | each constraint above that would end at its start ends at its finish instead: dependencies, inherited ones, condition gates, entries, containment, its own `not_before` | holds its finish back |
-//! | stage opening with `gates: false` (execution only) | M.finish >= each node's start, for each node of the stage that is not a container (instead of G's anchor >= M); exempt for work begun or finished | holds unstarted contents back |
-//! | finished work (done or decided, execution only) | every constraint above that ends at the instant holding it is exempt: kept, disabled, read by the node's own date, by no bound and no shortfall, so a recorded finish never holds itself or what it went ahead of short | none |
+//! //! | finished work (done or decided, execution only) | every constraint above that ends at the instant holding it is exempt: kept, disabled, read by the node's own date, by no bound and no shortfall, so a recorded finish never holds itself or what it went ahead of short | none |
 //!
 //! A node's anchor is its requirement entry if it is a container, else its start; its
 //! condition anchor is its condition entry, or its start. Constraints touching a not-relevant
-//! node are dropped (the dependency pass's pruned set, and rules and closes whose node or source is not
+//! node are dropped (the dependency pass's pruned set, and rules whose node or source is not
 //! relevant); those through an undecided node are kept and marked conditional (F2).
-//! Effectively skipped work, and work skipped itself, has zero duration and seeds nothing.
+//! Effectively skipped work, and work skipped itself, has zero duration and seeds nothing: not
+//! its pin, nor the answer that feeds it.
 //!
 //! # Cost at the limits
 //!
 //! At `node_count_max` (2,000 nodes, 64 explicit edges each in plus out, 16 condition clauses
 //! each, two rules of 64 sources each): 5 x 2,000 + 1 = 10,001 instant slots (four per node,
 //! `created_at`, one answer per node). Constraints: the dependency pass's edges, about 110,000 (6 per node of
-//! work, entries, and containment; 64,000 explicit; 32,000 condition gates; 2,000 openings),
-//! plus 256,000 rule constraints and 2,000 stage closes, about 370,000 of 20 bytes each and
+//! work, entries, and containment; 64,000 explicit; 32,000 condition gates),
+//! plus 256,000 rule constraints, about 368,000 of 20 bytes each and
 //! two `u32` adjacency slots each: about 10 MiB. Building is O(constraints log constraints)
 //! for the two adjacency sorts. Each solve (the plan check, earliest, latest) finds the
 //! strongly connected components once, O(instants + constraints), visits components in
 //! topological order, and relaxes each constraint once outside cycles; only a component with
-//! a cycle (gate edges are acyclic, so it needs a rule, a stage close, or a date-only
-//! opening) runs queue-based Bellman-Ford, at most (its instants) rounds of (its
-//! constraints): O(instants x constraints) = 10,001 x 370,000, about 3.7 x 10^9 relaxations,
+//! a cycle (gate edges are acyclic, so it needs a rule) runs queue-based Bellman-Ford, at most (its instants) rounds of (its
+//! constraints): O(instants x constraints) = 10,001 x 368,000, about 3.7 x 10^9 relaxations,
 //! in the worst case of every instant in one cycle. The plan check reruns Bellman-Ford on a
 //! component after each contradictory chain it lists, at most
 //! `chain_count_per_rejection_max` + 1 times. Chains are not stored: each bound keeps the
 //! constraint that set it, and a chain is walked back from it when asked, at most one step
 //! per instant. The cost test (`crates/tests/tests/integration/engine/cost_dates.rs`) counts these operations at
 //! the limits.
-//!
-//! The execution layer adds one thing: a stage opening that does not gate gives one
-//! constraint per node of the stage that is not a container, at most nodes x depth: 32,000.
 
 mod execution;
 mod explain;
@@ -115,7 +109,7 @@ pub(crate) struct Seeds {
 }
 
 impl Seeds {
-    /// The plan's seeds (F5): pins on nodes in scope, the pins `feeds_milestone` answers in
+    /// The plan's seeds (F5): pins on nodes in scope and not skipped, the pins `feeds_milestone` answers in
     /// effect give, and the date answers in effect that rules measure from.
     #[must_use]
     pub(crate) fn plan(
@@ -135,7 +129,7 @@ impl Seeds {
         for (key, date) in &document.state.pins {
             if let Some(at) = dependencies
                 .node_index(key)
-                .filter(|at| scope.in_scope(*at))
+                .filter(|at| scope.in_scope(*at) && !scope.skipped(*at))
             {
                 seeds.set_pin(network.finish(at), day(*date), FixedBy::Pin);
             }
@@ -158,7 +152,7 @@ impl Seeds {
             let fed = feeds_milestone
                 .as_ref()
                 .and_then(|m| dependencies.node_index(m));
-            if let Some(milestone) = fed.filter(|m| scope.in_scope(*m)) {
+            if let Some(milestone) = fed.filter(|m| scope.in_scope(*m) && !scope.skipped(*m)) {
                 seeds.set_pin(network.finish(milestone), day(*answered), FixedBy::Pin);
                 if let Some(feeding) = seeds.feeding.get_mut(milestone.get()) {
                     *feeding = Some(at);

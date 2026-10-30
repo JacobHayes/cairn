@@ -26,7 +26,7 @@ const mutations: Mutation[] = [
   work("n_log", "action", "Write the log", { requires_note: true }),
   decision("n_wait", "Wait for it", { not_before: startingAfter(0) }),
   decision("n_later", "Decide later", { requires: ["n_meet"], not_before: startingAfter(14) }),
-  work("n_stage", "group", "Stage", { opens_at: "n_meet" }),
+  work("n_stage", "group", "Stage", { requires: ["n_meet"] }),
   decision("n_inner", "Inside the stage", { parent: "n_stage" }),
   work("n_done", "action", "Finished"),
   work("n_dropped", "action", "Dropped"),

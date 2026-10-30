@@ -28,12 +28,7 @@ mod cost {
         let canvas = derived
             .dependencies()
             .edges(EdgeSet::Full)
-            .filter(|edge| {
-                matches!(
-                    edge.source,
-                    EdgeSource::Explicit | EdgeSource::Condition | EdgeSource::StageOpening
-                )
-            })
+            .filter(|edge| matches!(edge.source, EdgeSource::Explicit | EdgeSource::Condition))
             .count();
         for hidden in [None, Some(NodeKind::Group), Some(NodeKind::Action)] {
             let shown: BTreeSet<NodeKind> = NodeKind::ALL

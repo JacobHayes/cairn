@@ -56,7 +56,7 @@ export function stressRoute(): string {
     node("when", "decision", WORD, ["prompt: When is the final milestone?", "answer_type: date", "feeds_milestone: final"]),
     node("flag", "decision", LONG, ["prompt: Does the optional stage apply?", "answer_type: boolean"]),
     node("flag_two", "decision", CAPS, ["prompt: Does the other stage apply?", "answer_type: boolean"]),
-    node("stage_a", "group", CAPS, ["opens_at: kickoff"]),
+    node("stage_a", "group", CAPS, ["requires:", "- kickoff"]),
     node("a_box", "deliverable", LONG, ["parent: stage-a", ...due(30)]),
     node("a1", "action", CAPS, ["parent: stage-a/a-box", ...due(30)]),
     node("a2", "action", WORD, ["parent: stage-a/a-box", "requires:", "- stage-a/a-box/a1", ...due(20)]),

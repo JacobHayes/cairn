@@ -1474,7 +1474,7 @@
         "type": "object"
       },
       "ConstraintSource": {
-        "description": "Where a constraint comes from, the kind then the nodes it names, colon-separated: `due_by:n_a`, `not_before:n_a`, `estimate:n_a`, `stage_close:n_stage`, `containment:n_parent:n_child`, or `dependency:n_a:n_b:` then `explicit`, `containment`, `inherited:n_ancestor`, `condition:n_decision` or `opening:n_stage`.",
+        "description": "Where a constraint comes from, the kind then the nodes it names, colon-separated: `due_by:n_a`, `not_before:n_a`, `estimate:n_a`, `containment:n_parent:n_child`, or `dependency:n_a:n_b:` then `explicit`, `containment`, `inherited:n_ancestor`, or `condition:n_decision`.",
         "type": "string"
       },
       "ContentHash": {
@@ -1634,16 +1634,6 @@
             "type": "string"
           },
           {
-            "const": "opens_at",
-            "description": "A stage's opening milestone.",
-            "type": "string"
-          },
-          {
-            "const": "closes_at",
-            "description": "A stage's closing milestone.",
-            "type": "string"
-          },
-          {
             "const": "feeds_milestone",
             "description": "A date decision feeds it.",
             "type": "string"
@@ -1713,32 +1703,6 @@
             "type": "object"
           },
           {
-            "description": "The stage must finish by its closing milestone.",
-            "properties": {
-              "kind": {
-                "const": "stage_close",
-                "type": "string"
-              }
-            },
-            "required": [
-              "kind"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "The stage opens at the milestone for its dates only; nothing waits for it.",
-            "properties": {
-              "kind": {
-                "const": "stage_opening",
-                "type": "string"
-              }
-            },
-            "required": [
-              "kind"
-            ],
-            "type": "object"
-          },
-          {
             "description": "The decision's answer sets the milestone's date.",
             "properties": {
               "kind": {
@@ -1755,11 +1719,11 @@
         "properties": {
           "node": {
             "$ref": "#/components/schemas/NodeKey",
-            "description": "The node whose rule, bound or answer it is: the rule's node, the stage, the decision."
+            "description": "The node whose rule or answer it is: the rule's node, the decision."
           },
           "source": {
             "$ref": "#/components/schemas/NodeKey",
-            "description": "The node it reads: the rule's milestone or date decision, the stage's milestone, the\nmilestone the decision sets."
+            "description": "The node it reads: the rule's milestone or date decision, or the milestone the decision\nsets."
           }
         },
         "required": [
@@ -2143,29 +2107,6 @@
             },
             "required": [
               "condition"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A stage's opening milestone.",
-            "properties": {
-              "stage_opening": {
-                "additionalProperties": false,
-                "properties": {
-                  "group": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The stage."
-                  }
-                },
-                "required": [
-                  "group"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "stage_opening"
             ],
             "type": "object"
           }
@@ -2655,11 +2596,6 @@
           {
             "const": "condition",
             "description": "A condition gate: the dependent's condition reads the decision (Gating).",
-            "type": "string"
-          },
-          {
-            "const": "stage_opening",
-            "description": "A stage's opening milestone.",
             "type": "string"
           }
         ]
@@ -4016,7 +3952,7 @@
         "description": "A dependent that completing a node would not yet free, and what else it waits on (\nPriority: Unlocks): one entry of node detail's `still_waiting`.",
         "properties": {
           "also_waits_on": {
-            "description": "What else it waits on, besides the node: its unsatisfied requirements, condition\ngates, and stage openings, each with how it arose. Never empty.",
+            "description": "What else it waits on, besides the node: its unsatisfied requirements and condition\ngates, each with how it arose. Never empty.",
             "items": {
               "$ref": "#/components/schemas/Blocker"
             },
@@ -6585,12 +6521,8 @@
               "properties": {
                 "auto_done": false,
                 "checklist": false,
-                "closes": false,
-                "closes_at": false,
                 "estimate": false,
                 "final": false,
-                "gates": false,
-                "opens_at": false,
                 "placeholder": false,
                 "requires_artifact": false,
                 "requires_checklist": false,
@@ -6611,14 +6543,10 @@
                 "answer_type": false,
                 "auto_done": false,
                 "choices": false,
-                "closes": false,
-                "closes_at": false,
                 "feeds_milestone": false,
                 "fills_role": false,
                 "final": false,
-                "gates": false,
                 "help": false,
-                "opens_at": false,
                 "prompt": false
               }
             }
@@ -6636,14 +6564,10 @@
                 "answer_type": false,
                 "auto_done": false,
                 "choices": false,
-                "closes": false,
-                "closes_at": false,
                 "feeds_milestone": false,
                 "fills_role": false,
                 "final": false,
-                "gates": false,
                 "help": false,
-                "opens_at": false,
                 "prompt": false,
                 "requires_artifact": false
               }
@@ -6662,14 +6586,10 @@
                 "answer_type": false,
                 "checklist": false,
                 "choices": false,
-                "closes": false,
-                "closes_at": false,
                 "estimate": false,
                 "feeds_milestone": false,
                 "fills_role": false,
-                "gates": false,
                 "help": false,
-                "opens_at": false,
                 "placeholder": false,
                 "prompt": false,
                 "requires_artifact": false,
@@ -6871,13 +6791,6 @@
           "choices": {
             "$ref": "#/components/schemas/Choices"
           },
-          "closes": {
-            "type": "boolean"
-          },
-          "closes_at": {
-            "$ref": "#/components/schemas/NodeKey",
-            "description": "The milestone that closes the stage: it bounds the group's finish and its contents' due\ndates unless `closes` is false. Consecutive stages share one."
-          },
           "description": {
             "anyOf": [
               {
@@ -6921,10 +6834,6 @@
               }
             ]
           },
-          "gates": {
-            "description": "False lets the contents be done before the opening milestone. A stage holds the work done\nduring it; work that can as well be done ahead goes in a stage with this false; prep that\nmust come first sits outside, due before the opening milestone.",
-            "type": "boolean"
-          },
           "help": {
             "$ref": "#/components/schemas/Markdown"
           },
@@ -6947,10 +6856,6 @@
               }
             ],
             "description": "The earliest start: until then the node reads `scheduled` and stays off the next list, yet\ncan be started early. What waits on it is `blocked`, its `waits_on` carrying the date."
-          },
-          "opens_at": {
-            "$ref": "#/components/schemas/NodeKey",
-            "description": "The milestone that opens the stage: the contents wait for it unless `gates` is false."
           },
           "parent": {
             "anyOf": [
@@ -7044,12 +6949,8 @@
               "properties": {
                 "auto_done": false,
                 "checklist": false,
-                "closes": false,
-                "closes_at": false,
                 "estimate": false,
                 "final": false,
-                "gates": false,
-                "opens_at": false,
                 "placeholder": false,
                 "requires_artifact": false,
                 "requires_checklist": false,
@@ -7070,14 +6971,10 @@
                 "answer_type": false,
                 "auto_done": false,
                 "choices": false,
-                "closes": false,
-                "closes_at": false,
                 "feeds_milestone": false,
                 "fills_role": false,
                 "final": false,
-                "gates": false,
                 "help": false,
-                "opens_at": false,
                 "prompt": false
               }
             }
@@ -7095,14 +6992,10 @@
                 "answer_type": false,
                 "auto_done": false,
                 "choices": false,
-                "closes": false,
-                "closes_at": false,
                 "feeds_milestone": false,
                 "fills_role": false,
                 "final": false,
-                "gates": false,
                 "help": false,
-                "opens_at": false,
                 "prompt": false,
                 "requires_artifact": false
               }
@@ -7121,14 +7014,10 @@
                 "answer_type": false,
                 "checklist": false,
                 "choices": false,
-                "closes": false,
-                "closes_at": false,
                 "estimate": false,
                 "feeds_milestone": false,
                 "fills_role": false,
-                "gates": false,
                 "help": false,
-                "opens_at": false,
                 "placeholder": false,
                 "prompt": false,
                 "requires_artifact": false,
@@ -7330,13 +7219,6 @@
           "choices": {
             "$ref": "#/components/schemas/Choices"
           },
-          "closes": {
-            "type": "boolean"
-          },
-          "closes_at": {
-            "$ref": "#/components/schemas/Path",
-            "description": "The milestone that closes the stage: it bounds the group's finish and its contents' due\ndates unless `closes` is false. Consecutive stages share one."
-          },
           "description": {
             "anyOf": [
               {
@@ -7380,10 +7262,6 @@
               }
             ]
           },
-          "gates": {
-            "description": "False lets the contents be done before the opening milestone. A stage holds the work done\nduring it; work that can as well be done ahead goes in a stage with this false; prep that\nmust come first sits outside, due before the opening milestone.",
-            "type": "boolean"
-          },
           "help": {
             "$ref": "#/components/schemas/Markdown"
           },
@@ -7413,10 +7291,6 @@
               }
             ],
             "description": "The earliest start: until then the node reads `scheduled` and stays off the next list, yet\ncan be started early. What waits on it is `blocked`, its `waits_on` carrying the date."
-          },
-          "opens_at": {
-            "$ref": "#/components/schemas/Path",
-            "description": "The milestone that opens the stage: the contents wait for it unless `gates` is false."
           },
           "parent": {
             "anyOf": [
@@ -7608,7 +7482,7 @@
             "description": "A decision's answer while it is in effect (decided and relevant), identities read\nthrough aliases; none for any other node, and for a decision out of scope or undecided."
           },
           "blocked_by": {
-            "description": "What blocks it itself: its own explicit requirements, condition gates, and stage\nopening, and its children, each unsatisfied. What it inherits is listed once, on the\nancestor that holds it (`blocked_through`), never copied onto each descendant. A node\nthat is not blocked lists what its own requirements, conditions, and opening still\nhold back beneath it.",
+            "description": "What blocks it itself: its own explicit requirements and condition gates, and its\nchildren, each unsatisfied. What it inherits is listed once, on the ancestor that holds\nit (`blocked_through`), never copied onto each descendant. A node that is not blocked\nlists what its own requirements and conditions still hold back beneath it.",
             "items": {
               "$ref": "#/components/schemas/Blocker"
             },
@@ -8037,26 +7911,6 @@
             "type": "string"
           },
           {
-            "const": "opens_at",
-            "description": "A group's `opens_at`.",
-            "type": "string"
-          },
-          {
-            "const": "closes_at",
-            "description": "A group's `closes_at`.",
-            "type": "string"
-          },
-          {
-            "const": "gates",
-            "description": "A group's `gates` flag.",
-            "type": "string"
-          },
-          {
-            "const": "closes",
-            "description": "A group's `closes` flag.",
-            "type": "string"
-          },
-          {
             "const": "prompt",
             "description": "A decision's prompt.",
             "type": "string"
@@ -8340,72 +8194,6 @@
             },
             "required": [
               "auto_done"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A new `opens_at`, or none.",
-            "properties": {
-              "opens_at": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/NodeKey"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              }
-            },
-            "required": [
-              "opens_at"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A new `closes_at`, or none.",
-            "properties": {
-              "closes_at": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/NodeKey"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              }
-            },
-            "required": [
-              "closes_at"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "The `gates` flag.",
-            "properties": {
-              "gates": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "gates"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "The `closes` flag.",
-            "properties": {
-              "closes": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "closes"
             ],
             "type": "object"
           },
@@ -11364,16 +11152,6 @@
             "type": "string"
           },
           {
-            "const": "opens_at",
-            "description": "A stage's opening milestone is inside.",
-            "type": "string"
-          },
-          {
-            "const": "closes_at",
-            "description": "A stage's closing milestone is inside.",
-            "type": "string"
-          },
-          {
             "const": "feeds_milestone",
             "description": "A date decision feeds a milestone inside.",
             "type": "string"
@@ -11635,7 +11413,7 @@
             "description": "Where the next page of outside references starts, when there is one."
           },
           "outside_references": {
-            "description": "A page of the conditions, date rules, stage bounds, fed milestones, message drafts,\nand snoozes elsewhere that name a node being removed. Edges into the subtree are\nalready in the removal.",
+            "description": "A page of the conditions, date rules, fed milestones, message drafts,\nand snoozes elsewhere that name a node being removed. Edges into the subtree are\nalready in the removal.",
             "items": {
               "$ref": "#/components/schemas/OutsideReference"
             },
@@ -12809,7 +12587,7 @@
             "description": "The chain."
           },
           "resolutions": {
-            "description": "The resolution moves: each an ordinary mutation that, applied alone, gives\nthis chain the days it lacks (shift, repin, or unpin a pin on it; revise the answer\nbehind a pin; adjust a rule's offset; revise an estimate; drop an explicit\nrequirement or a stage's close). Nothing applies them automatically.",
+            "description": "The resolution moves: each an ordinary mutation that, applied alone, gives\nthis chain the days it lacks (shift, repin, or unpin a pin on it; revise the answer\nbehind a pin; adjust a rule's offset; revise an estimate; drop an explicit\nrequirement). Nothing applies them automatically.",
             "items": {
               "$ref": "#/components/schemas/Mutation"
             },
@@ -13819,7 +13597,7 @@
             "description": "The node traced."
           },
           "upstream": {
-            "description": "Its transitive dependencies (gating decisions, stage openings, its children), in key\norder.",
+            "description": "Its transitive dependencies (gating decisions, its children), in key\norder.",
             "items": {
               "$ref": "#/components/schemas/NodeKey"
             },
@@ -14013,7 +13791,7 @@
         "properties": {
           "dependent": {
             "$ref": "#/components/schemas/NodeKey",
-            "description": "The node whose `requires`, condition, or opening it is."
+            "description": "The node whose `requires` or condition it is."
           },
           "origin": {
             "$ref": "#/components/schemas/EdgeOrigin",
@@ -14243,7 +14021,6 @@
           "contradictory_chain",
           "condition_answer_type_mismatch",
           "condition_on_own_subtree",
-          "stage_bound_not_milestone",
           "undeclared_kind",
           "single_kind_on_multi_role",
           "fills_role_cardinality",

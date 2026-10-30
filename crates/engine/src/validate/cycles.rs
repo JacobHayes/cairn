@@ -1,9 +1,8 @@
 //! Dependency cycles (PRD Invariants: the dependency graph, including implicit gates from
-//! conditions, inherited requirements, containment, and stage openings, is acyclic). The
-//! check reads the gate edges of the full effective dependency graph
+//! conditions, inherited requirements, and containment, is acyclic). The
+//! check reads the edges of the full effective dependency graph
 //! ([`crate::derive::dependencies`]), which is structural, so routes and journeys are held to
-//! it alike and no relevance or override can make a cycle legal. A date-only edge (a stage
-//! opening with `gates: false`) never closes a cycle here.
+//! it alike and no relevance or override can make a cycle legal.
 //!
 //! Each cycle is reported once, naming its nodes, and its message names the source of each
 //! edge on it (PRD Containment: implicit edges name their source in validation messages).
@@ -30,9 +29,7 @@ use cairn_schema::limits::EXPLANATION_ENTRY_COUNT_MAX;
 use cairn_schema::{NodeKey, SnoozeTarget, Subject, Violation, ViolationCode};
 
 use super::GraphCheck;
-use crate::derive::dependencies::{
-    Dependencies, Edge, EdgeClass, EdgeSet, EdgeSource, Instant, Point, Waits,
-};
+use crate::derive::dependencies::{Dependencies, Edge, EdgeSet, EdgeSource, Instant, Point, Waits};
 
 /// Reports each dependency cycle once, naming its nodes and the sources of its edges; then,
 /// when there is none, each node snooze on a wait cycle (B6).
@@ -124,9 +121,7 @@ fn dependency_cycles(check: &GraphCheck<'_>, graph: &Dependencies, out: &mut Vec
             .iter()
             .flat_map(|instant| graph.waits(*instant, EdgeSet::Full))
             .filter(|edge| {
-                edge.class == EdgeClass::Gate
-                    && edge.source == EdgeSource::Explicit
-                    && members.contains(&edge.requirement)
+                edge.source == EdgeSource::Explicit && members.contains(&edge.requirement)
             })
             .find(|edge| graph.key(edge.dependent.node) == Some(first));
         if let Some(requires) = wait.and_then(|edge| graph.key(edge.requirement.node)) {
@@ -144,7 +139,7 @@ fn message(graph: &Dependencies, members: &BTreeSet<Instant>) -> String {
     let edges: Vec<&Edge> = members
         .iter()
         .flat_map(|instant| graph.waits(*instant, EdgeSet::Full))
-        .filter(|edge| edge.class == EdgeClass::Gate && members.contains(&edge.requirement))
+        .filter(|edge| members.contains(&edge.requirement))
         .filter(|edge| edge.dependent.node != edge.requirement.node)
         .collect();
     let mut text = String::from("these nodes wait on each other:");
@@ -168,7 +163,6 @@ fn describe(source: EdgeSource, dependent: &NodeKey, requirement: &NodeKey) -> S
     match source {
         EdgeSource::Explicit => format!("[{dependent} requires {requirement}]"),
         EdgeSource::Condition => format!("[{dependent}'s condition reads {requirement}]"),
-        EdgeSource::StageOpening => format!("[stage {dependent} opens at {requirement}]"),
         EdgeSource::Containment => format!("[{dependent} contains {requirement}]"),
         EdgeSource::Chain => {
             format!("[{dependent} inherits the requirements and conditions of {requirement}]")

@@ -59,7 +59,8 @@ nodes:
   id: shape
   kind: group
   title: Shape the work
-  opens_at: kickoff
+  requires:
+  - kickoff
 - key: n_shape_goals
   id: goals
   parent: shape
@@ -157,9 +158,10 @@ nodes:
   id: plan
   kind: group
   title: Plan
-  closes_at: plan-approved
   requires:
   - shape
+  due_by:
+    before: plan-approved
 - key: n_plan_schedule
   id: schedule
   parent: plan
@@ -204,8 +206,10 @@ nodes:
   id: build
   kind: group
   title: Build
-  opens_at: plan-approved
-  closes_at: build-done
+  requires:
+  - plan-approved
+  due_by:
+    before: build-done
 - key: n_build_part_a
   id: part-a
   parent: build
@@ -329,8 +333,10 @@ nodes:
   id: review
   kind: group
   title: Review
-  opens_at: build-done
-  closes_at: review-passed
+  requires:
+  - build-done
+  due_by:
+    before: review-passed
 - key: n_review_quality
   id: quality
   parent: review
@@ -403,8 +409,10 @@ nodes:
   id: wrap-up
   kind: group
   title: Wrap up
-  opens_at: review-passed
-  closes_at: close
+  requires:
+  - review-passed
+  due_by:
+    before: close
 - key: n_wrap_up_handover
   id: handover
   parent: wrap-up

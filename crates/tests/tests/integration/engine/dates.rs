@@ -147,8 +147,8 @@ fn the_examples_report_is_due_by_its_chain() {
             ConstraintSource::Estimate {
                 node: key("n_final_review")
             },
-            ConstraintSource::StageClose {
-                group: key("n_final_review")
+            ConstraintSource::DueBy {
+                node: key("n_final_review")
             },
         ]
     );
@@ -189,15 +189,13 @@ fn a_child_finishes_before_its_parents_own_work() {
 }
 
 /// F4: a stage with neither end anchored has no deadline, its contents still held back by
-/// today; `closes: false` lifts the close.
+/// today.
 #[test]
 fn an_unanchored_stage_has_no_deadline() {
     let records = support::journey(&add(&[
         MEETING,
         "{key: n_stage, id: stage, kind: group, title: Stage}",
         "{key: n_work, id: work, parent: n_stage, kind: action, title: Work, estimate: 2}",
-        "{key: n_open, id: open, kind: group, title: Open, closes_at: n_meeting, closes: false}",
-        "{key: n_inside, id: inside, parent: n_open, kind: action, title: Inside}",
     ]));
     let records = support::accepted(
         &records,
@@ -212,7 +210,6 @@ fn an_unanchored_stage_has_no_deadline() {
         bound(stage.earliest_start.as_ref()),
         Some(date("2026-10-08"))
     );
-    assert_eq!(dates_of(&records, "n_inside").due, None);
 }
 
 /// F4, F6: started work is judged by its finish: its latest start may pass while its
@@ -463,6 +460,51 @@ fn relevance_and_skip_shape_the_network() {
     assert_eq!(dates_of(&not_relevant, "n_maybe"), NodeDates::default());
 }
 
+/// F1, F3: a skipped milestone's pin, and the date answered for it, stop counting: whatever
+/// is due before it, a group or any other node, has no deadline from it, and gets it back when
+/// the milestone is reopened.
+#[test]
+fn a_skipped_milestones_dates_stop_counting() {
+    let nodes = [
+        "{key: n_stage, id: stage, kind: group, title: Stage, due_by: {before: n_meeting}}",
+        "{key: n_in, id: in, parent: n_stage, kind: action, title: In, estimate: 2}",
+        "{key: n_work, id: work, kind: action, title: Work, estimate: 2, due_by: {before: n_meeting}}",
+    ];
+    let pinned = support::journey(&add(&[&[MEETING], &nodes[..]].concat()));
+    let pinned = support::accepted(
+        &pinned,
+        "- op: set_pin\n  node: n_meeting\n  date: \"2026-11-20\"\n",
+    );
+    let fed = "{key: n_when, id: when, kind: decision, title: When, prompt: When?, answer_type: date, feeds_milestone: n_meeting}";
+    let answered = support::journey(&add(&[&[MEETING, fed], &nodes[..]].concat()));
+    let answered = support::accepted(
+        &answered,
+        "- op: answer\n  decision: n_when\n  value: {date: \"2026-11-25\"}\n",
+    );
+    let due = |records: &Records, node: &str| bound(dates_of(records, node).due.as_ref());
+    for (records, expected) in [(&pinned, "2026-11-20"), (&answered, "2026-11-25")] {
+        assert_eq!(due(records, "n_stage"), Some(date(expected)));
+        assert_eq!(due(records, "n_work"), Some(date(expected)));
+        let skipped = support::accepted(
+            records,
+            "- op: transition\n  node: n_meeting\n  transition: {skip: {reason: Not needed.}}\n",
+        );
+        assert_eq!(
+            due(&skipped, "n_stage"),
+            None,
+            "a skipped milestone sets no deadline"
+        );
+        assert_eq!(due(&skipped, "n_work"), None);
+        assert_eq!(due(&skipped, "n_in"), None);
+        let reopened = support::accepted(
+            &skipped,
+            "- op: transition\n  node: n_meeting\n  transition: reopen\n",
+        );
+        assert_eq!(due(&reopened, "n_stage"), Some(date(expected)));
+        assert_eq!(due(&reopened, "n_work"), Some(date(expected)));
+    }
+}
+
 // Review round 1 regressions.
 
 /// F6: each move a shortfall lists resolves it applied alone, so none moves a pin that today
@@ -552,14 +594,14 @@ fn a_fact_against_its_own_rule_is_never_short() {
     );
 }
 
-/// F4, F5: a stage that closes five days after it opens holds two three-day pieces of work
+/// F4, F5: a stage due five days after it opens holds two three-day pieces of work
 /// side by side, but not one after the other.
 #[test]
 fn a_stage_window_holds_parallel_estimates_but_not_sequential_ones() {
     let records = support::journey(&add(&[
         "{key: n_opens, id: opens, kind: milestone, title: Opens}",
         "{key: n_closes, id: closes, kind: milestone, title: Closes, due_by: {after: n_opens, offset: 5}}",
-        "{key: n_window, id: window, kind: group, title: Window, opens_at: n_opens, closes_at: n_closes}",
+        "{key: n_window, id: window, kind: group, title: Window, requires: [n_opens], due_by: {before: n_closes}}",
         "{key: n_first, id: first, parent: n_window, kind: action, title: First, estimate: 3}",
         "{key: n_second, id: second, parent: n_window, kind: action, title: Second, estimate: 3}",
     ]));

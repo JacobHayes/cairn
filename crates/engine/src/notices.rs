@@ -5,10 +5,9 @@
 //!
 //! A chain follows the date network's constraints, read over the graph's structural scope
 //! (every node relevant, nothing skipped, the full set of dependency edges: explicit
-//! requirements, implicit gates, stage openings, containment) and so its date rules and
-//! stage closes too, each from the instant that must come first to the one that follows.
-//! Every condition counts as relevant: the full set ignores relevance, and no rule or close
-//! is dropped for a not-relevant node, so a conditional branch is checked as if it applied.
+//! requirements, implicit gates, containment) and so its date rules too, each from the
+//! instant that must come first to the one that follows. Every condition counts as relevant:
+//! the full set ignores relevance, and no rule is dropped for a not-relevant node, so a conditional branch is checked as if it applied.
 //! The one link the network does not hold is a `feeds_milestone` pin, which ties the date
 //! decision's answer to the milestone's date both ways. A decision that fills a role is
 //! exempt, since it acts through participations. Notices are computed, never stored, and

@@ -125,7 +125,7 @@ impl Graph {
                 Payload::Deliverable(_)
                 | Payload::Action(_)
                 | Payload::Milestone(_)
-                | Payload::Group(_) => false,
+                | Payload::Group => false,
             })
     }
 

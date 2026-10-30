@@ -125,11 +125,11 @@ export interface CardState {
   current: boolean;
 }
 
-/** How an edge is drawn, strongest first: a requirement, a condition gate, or a stage opening. Every one holds its dependent back; date relationships are not edges (`DateLine`). */
-export type LineKind = "requires" | "condition" | "stage_opening";
+/** How an edge is drawn, strongest first: a requirement or a condition gate. Every one holds its dependent back; date relationships are not edges (`DateLine`). */
+export type LineKind = "requires" | "condition";
 
 /** The kinds of line, strongest first. */
-export const LINE_KINDS: readonly LineKind[] = ["requires", "condition", "stage_opening"];
+export const LINE_KINDS: readonly LineKind[] = ["requires", "condition"];
 
 /**
  * One edge of the graph a line stands for (C1): `dependent` waits on `requirement`. Where the
@@ -214,8 +214,8 @@ function nodesOf(graph: GraphNode[]): Nodes {
   return new Map(graph.map((node) => [node.key, node]));
 }
 
-/** Which line style wins where several edges stand in one line: solid over condition over stage opening. */
-export const STRENGTH: Record<LineKind, number> = { requires: 3, condition: 2, stage_opening: 1 };
+/** Which line style wins where several edges stand in one line: solid over condition. */
+export const STRENGTH: Record<LineKind, number> = { requires: 3, condition: 2 };
 
 function kindOf(edge: Schema<"UnderlyingEdge">): LineKind {
   return edge.origin === "explicit" ? "requires" : edge.origin;

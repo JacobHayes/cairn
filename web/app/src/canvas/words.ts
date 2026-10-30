@@ -89,7 +89,6 @@ export function firstParagraph(markdown: string): string {
 export const LINE_KIND_WORDS: Record<LineKind, { label: string; key: string }> = {
   requires: { label: "Needs", key: "the line ends in an arrow." },
   condition: { label: "Applies only if", key: "the line ends in a hollow diamond." },
-  stage_opening: { label: "Waits for the stage to open", key: "the line ends in a bar." },
 };
 
 /** What the Key says of a date relationship, which is drawn for the selected node only and is not a kind of edge. */
@@ -105,8 +104,6 @@ export function edgeSentence<T>(edge: Pick<LineLink, "kind" | "holds">, dependen
       return edge.holds ? [dependent, " needs ", requirement, ", and so does everything inside it"] : [dependent, " needs ", requirement];
     case "condition":
       return [dependent, " applies only depending on ", requirement, ", and waits for it"];
-    case "stage_opening":
-      return [dependent, " opens at ", requirement, "; it and everything inside it wait for that"];
   }
 }
 

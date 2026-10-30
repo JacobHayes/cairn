@@ -158,7 +158,7 @@ fn a_rejection_past_the_chain_limit_says_so() {
 
 /// F5: the illustrative example's report pinned later than its decision meeting allows is
 /// rejected with its chain, and every move it lists resolves it: moving or dropping the
-/// report's pin, answering the meeting date later, or letting the stage not close.
+/// report's pin, answering the meeting date later, or loosening the stage's deadline rule.
 #[test]
 fn the_examples_later_report_pin_is_rejected_with_its_chain() {
     let records = support::vendor_after(2);
@@ -168,8 +168,8 @@ fn the_examples_later_report_pin_is_rejected_with_its_chain() {
     assert_eq!(short.shortfall_days, 5);
     let sources: Vec<&ConstraintSource> =
         short.chain.constraints.iter().map(|c| &c.source).collect();
-    assert!(sources.contains(&&ConstraintSource::StageClose {
-        group: key("n_final_review")
+    assert!(sources.contains(&&ConstraintSource::DueBy {
+        node: key("n_final_review")
     }));
     assert!(sources.contains(&&ConstraintSource::Containment {
         parent: key("n_final_review"),

@@ -1,15 +1,14 @@
 //! Generated journeys built directly as documents (not through apply), for the derive passes'
-//! property and reference tests: deep containment, explicit edges, conditions, stage
-//! openings, stored states, answers, force includes, keeps, `auto_done` milestones, date
+//! property and reference tests: deep containment, explicit edges, conditions, stages
+//! that require a milestone, stored states, answers, force includes, keeps, `auto_done` milestones, date
 //! snoozes, and weights, all generic.
 //!
 //! Every generated graph is valid by construction. Nodes are created in depth-first
 //! preorder, so each subtree is a contiguous run of indices; a requirement, a condition's
-//! decision, or a gating stage opening is always a node whose whole subtree ends before the
+//! decision, or a stage's milestone is always a node whose whole subtree ends before the
 //! dependent begins. Laying out each container's entries at its preorder index and each
 //! node's start and finish at its subtree's end, deeper nodes first, puts every gate edge
-//! forward in time, so the gate graph is acyclic. A stage opening with `gates: false` may
-//! name any milestone outside its group, so date-only cycles occur too.
+//! forward in time, so the gate graph is acyclic.
 // Test support: an index out of range is a bug in this generator, and the panic shows it.
 #![allow(clippy::indexing_slicing)]
 
@@ -21,10 +20,9 @@ use proptest::prelude::*;
 use cairn_schema::limits::{CONTAINMENT_DEPTH_MAX, EDGE_COUNT_PER_NODE_MAX, NODE_COUNT_MAX};
 use cairn_schema::{
     Action, AnswerSpec, AnswerValue, BoundedSet, Bypass, Clause, Comparison, Condition,
-    ConditionValue, DateRule, DateSource, Days, Decision, Deliverable, Direction, Group,
-    GuardFailure, KeyRefs, KindKey, Milestone, Node, NodeKey, NodeKind, NodeState, OneOrMany,
-    Overrides, ParticipationKind, ParticipationSource, Participations, Payload, Role, State,
-    Weight,
+    ConditionValue, DateRule, DateSource, Days, Decision, Deliverable, Direction, GuardFailure,
+    KeyRefs, KindKey, Milestone, Node, NodeKey, NodeKind, NodeState, OneOrMany, Overrides,
+    ParticipationKind, ParticipationSource, Participations, Payload, Role, State, Weight,
 };
 
 use super::parse;
@@ -41,8 +39,8 @@ pub struct NodeSeed {
     pub requires: Vec<u16>,
     /// A condition: its shape and two decisions, by index among those before this node.
     pub condition: Option<(u8, u16, u16)>,
-    /// A group's opening milestone, by index, and whether it gates.
-    pub opening: Option<(u16, bool)>,
+    /// A group's opening milestone, by index: it requires it.
+    pub opening: Option<u16>,
     /// The stored state, by index among the kind's states.
     pub state: u8,
     /// Force-included.
@@ -52,7 +50,7 @@ pub struct NodeSeed {
     /// A participation: of `owner` (true) or the multi-valued kind, and its source by index
     /// (the kind's role, or one of a few explicit lists, the empty one included).
     pub participation: Option<(bool, u8)>,
-    /// Dates: estimate, rules, a stage close, a pin, recorded dates.
+    /// Dates: estimate, rules, a stage deadline, a pin, recorded dates.
     pub dates: DateSeed,
 }
 
@@ -68,13 +66,24 @@ pub struct DateSeed {
     pub due_by: Option<(u16, bool, u8)>,
     /// `not_before`, the same way.
     pub not_before: Option<(u16, bool, u8)>,
-    /// A group's closing milestone, by index among those outside it.
-    pub closes_at: Option<u16>,
+    /// A group's deadline milestone, by index among those outside it: its `due_by`, unless
+    /// its seed gives it a rule.
+    pub group_deadline: Option<u16>,
     /// A pin, days after 2026-09-20 modulo 60.
     pub pin: Option<u8>,
     /// Recorded dates for started or finished work: the start, days after 2026-09-20
     /// modulo 20, and the finish, days after the start modulo 10.
     pub recorded: (u8, u8),
+}
+
+/// A rule making a node due by a milestone, with no offset.
+fn due_before(milestone: NodeKey) -> DateRule<KeyRefs> {
+    DateRule {
+        direction: Direction::Before,
+        sources: OneOrMany::new(vec![DateSource::Node(milestone)])
+            .unwrap_or_else(|e| panic!("{e}")),
+        offset: Days::try_from(0).unwrap_or_else(|e| panic!("{e}")),
+    }
 }
 
 fn arb_date_seed() -> impl Strategy<Value = DateSeed> {
@@ -88,11 +97,11 @@ fn arb_date_seed() -> impl Strategy<Value = DateSeed> {
         (any::<u8>(), any::<u8>()),
     )
         .prop_map(
-            |(estimate, due_by, not_before, closes_at, pin, recorded)| DateSeed {
+            |(estimate, due_by, not_before, group_deadline, pin, recorded)| DateSeed {
                 estimate,
                 due_by,
                 not_before,
-                closes_at,
+                group_deadline,
                 pin,
                 recorded,
             },
@@ -108,7 +117,7 @@ fn arb_seed() -> impl Strategy<Value = NodeSeed> {
         ),
         prop::collection::vec(any::<u16>(), 0..3),
         prop::option::weighted(0.3, (any::<u8>(), any::<u16>(), any::<u16>())),
-        prop::option::weighted(0.3, (any::<u16>(), any::<bool>())),
+        prop::option::weighted(0.3, any::<u16>()),
         (
             any::<u8>(),
             prop::bool::weighted(0.1),
@@ -196,7 +205,7 @@ fn document(seeds: &[NodeSeed]) -> Document {
 
 /// A graph at the limits (PRACTICES, Explicit limits: costed and tested at the limits):
 /// `node_count_max` nodes with containment at the depth limit, 32 requirements tried per
-/// node, conditions on a third of the nodes, a stage opening on every group, and stored
+/// node, conditions on a third of the nodes, a stage requirement on every group, and stored
 /// states of every kind.
 #[must_use]
 pub fn limit_seeds() -> Vec<NodeSeed> {
@@ -209,7 +218,7 @@ pub fn limit_seeds() -> Vec<NodeSeed> {
                 .map(|j| u16::try_from((i * 131 + j * 977) % 65_536).unwrap_or(0))
                 .collect(),
             condition: (i % 3 == 0).then(|| (u8::try_from(i % 6).unwrap_or(0), 7, 11)),
-            opening: Some((u16::try_from(i).unwrap_or(0), i % 2 == 0)),
+            opening: Some(u16::try_from(i).unwrap_or(0)),
             state: u8::try_from(i % 4).unwrap_or(0),
             force: i % 50 == 0,
             keep: false,
@@ -220,7 +229,7 @@ pub fn limit_seeds() -> Vec<NodeSeed> {
 }
 
 /// A journey of `nodes` nodes (at most `node_count_max`) shaped like a real route rather than
-/// the limits' worst case: the limits' containment, kinds, stored states, and stage openings,
+/// the limits' worst case: the limits' containment, kinds, stored states, and stage requirements,
 /// but three requirements per node, conditions on one node in six, and no date rules. The
 /// wasm build's agreement cases run it at 2,000 nodes.
 ///
@@ -245,7 +254,7 @@ pub fn route_like(nodes: usize) -> Graph {
 
 /// The date network at the limits: [`limit_seeds`]' graph, without conditions so every node
 /// is in scope, with both date rules on every node,
-/// each with `edge_count_per_node_max` milestone sources, a stage close on every group, and
+/// each with `edge_count_per_node_max` milestone sources, and
 /// the same pin on every tenth milestone. Every rule offset is zero and there are no
 /// estimates, so the rules tie most instants into one strongly connected component without
 /// a positive cycle: Bellman-Ford's worst ground, at the constraint limit.
@@ -288,12 +297,6 @@ pub fn date_limits() -> Graph {
         };
         node.due_by = Some(rule(Direction::After));
         node.not_before = Some(rule(Direction::Before));
-        if let Payload::Group(group) = &mut node.payload {
-            group.closes_at = milestones
-                .iter()
-                .find(|milestone| !is_within(&document, milestone, key))
-                .cloned();
-        }
         document.nodes.put(node).unwrap_or_else(|e| panic!("{e}"));
     }
     let pinned: cairn_schema::Date = parse("2026-11-02");
@@ -304,10 +307,9 @@ pub fn date_limits() -> Graph {
         .unwrap_or_else(|violations| panic!("{violations:#?}"))
 }
 
-/// [`date_limits`] with early work at the limits: every other stage opening does not gate,
-/// and every piece of work, decision and milestone that was not skipped is finished, ahead
-/// of what it waits on, so each node of a stage that does not gate is held by the opening
-/// directly and every constraint into finished work is exempt.
+/// [`date_limits`] with early work at the limits: every piece of work, decision and milestone
+/// that was not skipped is finished, ahead of what it waits on, so every constraint into
+/// finished work is exempt.
 ///
 /// # Panics
 ///
@@ -316,7 +318,6 @@ pub fn date_limits() -> Graph {
 pub fn date_limits_early() -> Graph {
     let mut document = date_limits().into_document();
     let keys: Vec<NodeKey> = document.nodes.as_map().keys().cloned().collect();
-    stop_gating_every_other_stage(&mut document, &keys);
     let recorded: cairn_schema::Date = parse("2026-09-25");
     for key in &keys {
         let Some(node) = document.nodes.get(key) else {
@@ -348,27 +349,6 @@ pub fn date_limits_early() -> Graph {
         .unwrap_or_else(|violations| panic!("{violations:#?}"))
 }
 
-/// Makes every other stage opening in the document not gate.
-fn stop_gating_every_other_stage(document: &mut Document, keys: &[NodeKey]) {
-    let mut stages = 0_usize;
-    for key in keys {
-        let Some(mut node) = document.nodes.get(key).cloned() else {
-            continue;
-        };
-        let Payload::Group(group) = &mut node.payload else {
-            continue;
-        };
-        if group.opens_at.is_none() {
-            continue;
-        }
-        stages += 1;
-        if stages.is_multiple_of(2) {
-            group.gates = false;
-            document.nodes.put(node).unwrap_or_else(|e| panic!("{e}"));
-        }
-    }
-}
-
 /// The day this many days after the generators' first day.
 /// A journey revision, for a recorded finish or reopen.
 fn revision(at: u32) -> cairn_schema::Revision {
@@ -380,18 +360,6 @@ fn day(days: u32) -> cairn_schema::Date {
     start
         .checked_add(jiff::Span::new().days(i64::from(days)))
         .unwrap_or_else(|e| panic!("{e}"))
-}
-
-/// True when `key` is `ancestor` or lies beneath it.
-fn is_within(document: &Document, key: &NodeKey, ancestor: &NodeKey) -> bool {
-    let mut current = Some(key);
-    while let Some(at) = current {
-        if at == ancestor {
-            return true;
-        }
-        current = document.nodes.get(at).and_then(|node| node.parent.as_ref());
-    }
-    false
 }
 
 /// The graph of `document`, with the dates of every node on a contradictory chain dropped
@@ -433,7 +401,7 @@ pub fn plan_held(mut document: Document) -> Graph {
     }
 }
 
-/// Drops a node's rules, estimate, stage close, and pin.
+/// Drops a node's rules, estimate, and pin.
 fn undate(document: &mut Document, key: &NodeKey) {
     document.state.pins.remove(key);
     let Some(mut node) = document.nodes.get(key).cloned() else {
@@ -444,8 +412,7 @@ fn undate(document: &mut Document, key: &NodeKey) {
     match &mut node.payload {
         Payload::Deliverable(deliverable) => deliverable.estimate = None,
         Payload::Action(action) => action.estimate = None,
-        Payload::Group(group) => group.closes_at = None,
-        Payload::Decision(_) | Payload::Milestone(_) => {}
+        Payload::Decision(_) | Payload::Milestone(_) | Payload::Group => {}
     }
     document.nodes.put(node).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -540,6 +507,7 @@ impl Shape {
                 edges[other] += 1;
             }
         }
+        let requires = self.with_opening(index, seed, requires, edges);
         Node {
             key: key(index),
             id: parse(&format!("g{index}")),
@@ -547,7 +515,7 @@ impl Shape {
             title: parse(&format!("Generated {index}")),
             description: None,
             weight: weight(seed),
-            requires: BoundedSet::new(requires).unwrap_or_default(),
+            requires,
             relevant_when: condition,
             due_by: None,
             not_before: None,
@@ -572,32 +540,50 @@ impl Shape {
                 auto_done: seed.dates.estimate.is_multiple_of(2),
                 ..Milestone::default()
             }),
-            NodeKind::Group => Payload::Group(self.stage(index, seed)),
+            NodeKind::Group => Payload::Group,
         }
     }
 
-    /// A group's opening: a gating one ends before the group begins; a date-only one is any
-    /// milestone outside the group.
-    fn stage(&self, index: usize, seed: &NodeSeed) -> Group<KeyRefs> {
-        let Some((pick, gates)) = seed.opening else {
-            return Group::default();
-        };
-        let milestones: Vec<usize> = if gates {
-            self.before(index, &[NodeKind::Milestone])
-        } else {
-            (0..self.kinds.len())
-                .filter(|&other| self.kinds[other] == NodeKind::Milestone)
-                .filter(|&other| other < index || other > self.ends[index])
-                .collect()
-        };
-        let opens_at = milestones
-            .get(usize::from(pick) % milestones.len().max(1))
-            .map(|&milestone| key(milestone));
-        Group {
-            opens_at,
-            gates,
-            ..Group::default()
+    /// A group's opening milestone, which ends before the group begins, joins its requirements
+    /// (the edge limit allowing).
+    fn with_opening(
+        &self,
+        index: usize,
+        seed: &NodeSeed,
+        mut requires: BTreeSet<NodeKey>,
+        edges: &mut [u32],
+    ) -> cairn_schema::node::Requires<KeyRefs> {
+        let milestones = self.before(index, &[NodeKind::Milestone]);
+        let opening = seed
+            .opening
+            .filter(|_| self.kinds[index] == NodeKind::Group)
+            .and_then(|pick| milestones.get(usize::from(pick) % milestones.len().max(1)));
+        if let Some(&milestone) = opening {
+            let full = |n: usize| edges[n] + 1 > EDGE_COUNT_PER_NODE_MAX;
+            if !full(index) && !full(milestone) && requires.insert(key(milestone)) {
+                edges[index] += 1;
+                edges[milestone] += 1;
+            }
         }
+        BoundedSet::new(requires).unwrap_or_default()
+    }
+
+    /// A group's deadline, when its seed picks a milestone outside it.
+    fn group_deadline(
+        &self,
+        index: usize,
+        seed: &DateSeed,
+        milestones: &[usize],
+    ) -> Option<DateRule<KeyRefs>> {
+        let outside: Vec<usize> = milestones
+            .iter()
+            .copied()
+            .filter(|&other| other < index || other > self.ends[index])
+            .collect();
+        let pick = usize::from(seed.group_deadline?) % outside.len().max(1);
+        outside
+            .get(pick)
+            .map(|&milestone| due_before(key(milestone)))
     }
 
     /// The node's dates from its seed.
@@ -656,19 +642,13 @@ impl Shape {
         node.due_by = rule(seed.due_by);
         node.not_before = rule(seed.not_before);
         let estimate = Days::try_from(u32::from(seed.estimate % 6)).ok();
-        let outside: Vec<usize> = milestones
-            .iter()
-            .copied()
-            .filter(|&other| other < index || other > self.ends[index])
-            .collect();
         match &mut node.payload {
             Payload::Deliverable(deliverable) => deliverable.estimate = estimate,
             Payload::Action(action) => action.estimate = estimate,
-            Payload::Group(group) => {
-                group.closes_at = seed
-                    .closes_at
-                    .and_then(|pick| outside.get(usize::from(pick) % outside.len().max(1)))
-                    .map(|&milestone| key(milestone));
+            Payload::Group => {
+                if node.due_by.is_none() {
+                    node.due_by = self.group_deadline(index, seed, &milestones);
+                }
             }
             Payload::Decision(_) | Payload::Milestone(_) => {}
         }

@@ -46,43 +46,26 @@ mod property {
     }
 
     /// The plain expansion of the dependency pass's reference test, in the pruned set: a node depends on its
-    /// in-scope children and on every requirement, opening, and (unless force-included)
-    /// condition decision of itself and its ancestors that is in scope; each with whether
-    /// every way it reaches the node is a stage opening that does not gate.
-    fn plain(graph: &Graph, derived: &Derived, key: &NodeKey) -> BTreeMap<NodeKey, bool> {
+    /// in-scope children and on every requirement and (unless force-included) condition
+    /// decision of itself and its ancestors that is in scope.
+    fn plain(graph: &Graph, derived: &Derived, key: &NodeKey) -> BTreeSet<NodeKey> {
         let in_scope = |other: &NodeKey| derived.relevance().in_scope(other);
         let tree = graph.tree();
-        let mut found: BTreeMap<NodeKey, bool> = BTreeMap::new();
-        let mut add = |other: &NodeKey, date_only: bool| {
-            let only = found.entry(other.clone()).or_insert(true);
-            *only &= date_only;
-        };
-        for child in tree.children(key) {
-            add(child, false);
-        }
+        let mut found: BTreeSet<NodeKey> = tree.children(key).iter().cloned().collect();
         let mut conditions_apply = true;
         let mut current = Some(key.clone());
         while let Some(at) = current {
             let overrides = graph.document().state.overrides.get(&at);
             conditions_apply &= overrides.is_none_or(|o| o.force_include.is_none());
             let node = graph.node(&at).unwrap();
-            for required in node.requires.iter() {
-                add(required, false);
-            }
-            if let Payload::Group(group) = &node.payload
-                && let Some(opens_at) = &group.opens_at
-            {
-                add(opens_at, !group.gates);
-            }
+            found.extend(node.requires.iter().cloned());
             if conditions_apply {
                 let reads = node.relevant_when.iter().flat_map(|c| c.decisions());
-                for decision in reads {
-                    add(decision, false);
-                }
+                found.extend(reads.cloned());
             }
             current = tree.parent(&at).cloned();
         }
-        found.retain(|other, _| in_scope(other));
+        found.retain(|other| in_scope(other));
         found
     }
 
@@ -108,8 +91,6 @@ mod property {
     struct Progress {
         /// A recorded start: the node is held at its finish.
         started: bool,
-        /// Active, done or decided.
-        underway: bool,
         /// Done or decided: nothing holds it back any more.
         finished: bool,
     }
@@ -123,19 +104,13 @@ mod property {
         let started = counted
             && matches!(state, Some(State::Active | State::Done))
             && stored.is_some_and(|s| s.started_on.is_some());
-        Progress {
-            started,
-            underway: finished || (counted && state == Some(State::Active)),
-            finished,
-        }
+        Progress { started, finished }
     }
 
     /// Every constraint, written plainly: no entries, each inherited requirement copied.
     /// `execution` gives done work zero duration, as its actual dates replace its estimate,
-    /// holds started work at its finish (starting is never guarded), leaves out the stage
-    /// openings that do not gate for work begun or finished and for a node with children
-    /// (it waits for its contents), and leaves out everything that holds a finished node
-    /// back: its requirements, openings and its own rules.
+    /// holds started work at its finish (starting is never guarded), and leaves out everything
+    /// that holds a finished node back: its requirements and its own rules.
     fn plain_constraints(graph: &Graph, derived: &Derived, execution: bool) -> Vec<Constraint> {
         let in_scope = |key: &NodeKey| derived.relevance().in_scope(key);
         let mut found = Vec::new();
@@ -160,10 +135,8 @@ mod property {
                 let work = if zero { 0 } else { estimate(graph, key) };
                 found.push((start(graph, key), finish(key), work));
             }
-            let has_children = !graph.tree().children(key).is_empty();
-            for (required, date_only) in plain(graph, derived, key) {
-                let waits_for_contents = date_only && (progress.underway || has_children);
-                if execution && (waits_for_contents || progress.finished) {
+            for required in plain(graph, derived, key) {
+                if execution && progress.finished {
                     continue;
                 }
                 found.push((finish(&required), held.clone(), 0));
@@ -196,12 +169,6 @@ mod property {
                     }
                 }
             }
-            if let Payload::Group(group) = &node.payload
-                && let Some(closes_at) = group.closes_at.as_ref().filter(|_| group.closes)
-                && in_scope(closes_at)
-            {
-                found.push((finish(key), finish(closes_at), 0));
-            }
         }
         found.retain(|(before, after, offset)| before != after || *offset > 0);
         found
@@ -212,7 +179,7 @@ mod property {
         let mut seeds: BTreeMap<Slot, (Option<i64>, Option<i64>, bool)> = BTreeMap::new();
         let document = graph.document();
         for (key, date) in &document.state.pins {
-            if derived.relevance().in_scope(key) {
+            if derived.relevance().in_scope(key) && !skipped(graph, derived, key) {
                 seeds.insert(finish(key), (Some(day(*date)), Some(day(*date)), false));
             }
         }

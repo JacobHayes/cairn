@@ -20,7 +20,7 @@ mod property {
     use std::collections::{BTreeMap, BTreeSet};
 
     use cairn_engine::derive::EdgeSet;
-    use cairn_engine::derive::dependencies::{EdgeClass, EdgeSource};
+    use cairn_engine::derive::dependencies::EdgeSource;
     use cairn_engine::derive::pending::{RelevanceClass, classify};
     use cairn_engine::testing::derive_inputs;
     use cairn_engine::testing::generated::arb_journey;
@@ -280,7 +280,6 @@ mod property {
         for edge in dependencies.edges(EdgeSet::Full) {
             let canvas = match edge.source {
                 EdgeSource::Explicit | EdgeSource::Condition => true,
-                EdgeSource::StageOpening => edge.class == EdgeClass::Gate,
                 EdgeSource::Work
                 | EdgeSource::Entry
                 | EdgeSource::Chain
@@ -398,8 +397,7 @@ mod property {
                 );
             }
             for direct in dependencies.of(key, EdgeSet::Full) {
-                if direct.class == EdgeClass::Gate
-                    && direct.node != *key
+                if direct.node != *key
                     && !(skipping(key) && graph.tree().parent(&direct.node) == Some(key))
                 {
                     assert!(

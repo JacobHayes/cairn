@@ -1,12 +1,13 @@
 //! Pass 2, the effective dependency graph (PRD Containment, Gating; ARCHITECTURE, Read path:
 //! derive, pass 2): explicit edges plus the implicit gates (containment, inherited
-//! requirements, condition gates, stage openings), each edge tagged with its source and typed
-//! as a gate or date-only, in a full structural set and a relevance-pruned set.
+//! requirements, condition gates), each edge tagged with its source, in a full structural set
+//! and a relevance-pruned set. Every edge is a gate: blocking, dates, the acyclicity
+//! invariant, trace, and gravity all read it.
 //!
 //! Instants: every node has a start and a finish (a decision or milestone has one instant,
 //! so its finish waits on its start at no distance). A container also has two entries: the
 //! requirement entry, when its work may begin as far as requirements go, and the condition
-//! entry, the same for conditions. A requirement on a node (explicit, or a stage's opening)
+//! entry, the same for conditions. A requirement on a node
 //! waits at its requirement anchor: the requirement entry for a container, the start
 //! otherwise; a condition gate waits at the condition anchor (the condition entry, or the
 //! start). Dependents wait for a node's finish, so reaching a container's entry or start
@@ -21,8 +22,7 @@
 //! it leaves out every edge that waits on a not-relevant node or holds one's own work, and the
 //! condition gates force include drops. A not-relevant container's requirement entry stays,
 //! so a force-included node beneath it still waits on the container's requirements.
-//! Undecided nodes stay in both. Gate edges block (D1); a stage opening with `gates: false`
-//! is date-only: dates read it, blocking and the acyclicity invariant do not.
+//! Undecided nodes stay in both.
 //!
 //! Consuming it: [`Dependencies::waits`] and [`Dependencies::waited_by`] give an
 //! instant's edges in a set, for whole-graph passes in topological order;
@@ -32,7 +32,7 @@
 //! Cost at `node_count_max` (2,000 nodes, 64 explicit edges each in plus out, 16 condition
 //! clauses each): 8,000 instants; edges are at most 6 per node for work, entries, and
 //! containment, plus one per explicit edge (64,000 in all), one per condition decision
-//! (32,000), and one per stage opening, about 110,000 edges of 16 bytes and a pruned flag
+//! (32,000), about 110,000 edges of 16 bytes and a pruned flag
 //! each, under 2 MiB. Building is O(nodes + edges) with one key lookup per reference
 //! (O(log nodes)); sorting the edges into per-instant slices is O(edges log edges); pruning
 //! is O(edges). Listing one node's dependencies walks at most 2 x 16 entry instants and
@@ -46,7 +46,7 @@ pub(crate) use cycles::Waits;
 use std::collections::BTreeMap;
 
 use cairn_schema::limits::NODE_COUNT_MAX;
-use cairn_schema::{DependencyVia, KeyRefs, Node, NodeKey, NodeKind, Payload, Relevance};
+use cairn_schema::{DependencyVia, KeyRefs, Node, NodeKey, NodeKind, Relevance};
 
 use super::forced;
 use super::relevance::Relevances;
@@ -123,17 +123,8 @@ impl Instant {
     }
 }
 
-/// Whether an edge blocks (ARCHITECTURE, Read path: every edge is typed).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum EdgeClass {
-    /// Blocks (D1): blocking, the acyclicity invariant, trace, and gravity read it.
-    Gate,
-    /// Holds dates only: a stage opening with `gates: false` (F4).
-    DateOnly,
-}
-
 /// Why an edge exists. The dependent instant's node is the one the source belongs to: the
-/// node whose `requires`, condition, or opening it is, or the container whose entry it is.
+/// node whose `requires` or condition it is, or the container whose entry it is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EdgeSource {
     /// A node's finish waits for its own start.
@@ -149,8 +140,6 @@ pub enum EdgeSource {
     Explicit,
     /// A condition gate: the node's condition reads the decision (Gating).
     Condition,
-    /// A stage's opening milestone (F4).
-    StageOpening,
 }
 
 /// One edge: `dependent` waits for `requirement`.
@@ -160,8 +149,6 @@ pub struct Edge {
     pub dependent: Instant,
     /// The instant it waits for.
     pub requirement: Instant,
-    /// Gate or date-only.
-    pub class: EdgeClass,
     /// Why it exists.
     pub source: EdgeSource,
 }
@@ -183,8 +170,6 @@ pub struct EffectiveDependency {
     pub node: NodeKey,
     /// How the dependency arose.
     pub via: DependencyVia,
-    /// Gate or date-only.
-    pub class: EdgeClass,
 }
 
 /// The effective dependency graph of one journey (or route).
@@ -207,7 +192,7 @@ impl Dependencies {
     /// The full structural graph of a document, tolerating a candidate that breaks other
     /// invariants: references that do not resolve, or that other stages report (an edge to
     /// self, an ancestor, or a descendant; a condition on the node's own subtree or on a
-    /// non-decision; a stage bound inside the stage or not a milestone), are left out, and
+    /// non-decision), are left out, and
     /// only children a root reaches are linked to their parent, so each cause is reported
     /// once, by its own stage.
     #[must_use]
@@ -235,7 +220,7 @@ impl Dependencies {
     }
 
     /// The edges a node's own structure adds: its work, its entries, its links to its
-    /// parent, and its requirements, opening, and condition gates.
+    /// parent, and its requirements and condition gates.
     fn node_edges(
         &self,
         document: &Document,
@@ -288,14 +273,13 @@ impl Dependencies {
                 links.map(|(dependent, requirement, source)| gate(dependent, requirement, source)),
             );
         }
-        for (requirement, class, source) in references(document, tree, node) {
+        for (requirement, source) in references(document, tree, node) {
             let Some(&required) = self.index.get(requirement) else {
                 continue;
             };
             let dependent = match source {
                 EdgeSource::Condition => self.condition_anchor(at),
                 EdgeSource::Explicit
-                | EdgeSource::StageOpening
                 | EdgeSource::Work
                 | EdgeSource::Entry
                 | EdgeSource::Chain
@@ -304,7 +288,6 @@ impl Dependencies {
             out.push(Edge {
                 dependent,
                 requirement: instant(required, Point::Finish),
-                class,
                 source,
             });
         }
@@ -371,7 +354,6 @@ fn gate(dependent: Instant, requirement: Instant, source: EdgeSource) -> Edge {
     Edge {
         dependent,
         requirement,
-        class: EdgeClass::Gate,
         source,
     }
 }
@@ -394,45 +376,33 @@ fn offsets(slots: usize, sorted: impl Iterator<Item = usize>) -> Vec<usize> {
     counts
 }
 
-/// A node's references that become edges: explicit requirements, a stage's opening, and the
-/// decisions its condition reads, each with its class and source. References another stage
-/// reports are left out (see [`Dependencies::build`]).
+/// A node's references that become edges: explicit requirements and the decisions its
+/// condition reads, each with its source. References another stage reports are left out (see
+/// [`Dependencies::build`]).
 fn references<'d>(
     document: &Document,
     tree: &Tree,
     node: &'d Node<KeyRefs>,
-) -> Vec<(&'d NodeKey, EdgeClass, EdgeSource)> {
+) -> Vec<(&'d NodeKey, EdgeSource)> {
     let related = |other: &NodeKey| {
         *other == node.key
             || tree.is_ancestor(other, &node.key)
             || tree.is_ancestor(&node.key, other)
     };
     let kind_of = |other: &NodeKey| document.nodes.get(other).map(Node::kind);
-    let mut found: Vec<(&NodeKey, EdgeClass, EdgeSource)> = node
+    let mut found: Vec<(&NodeKey, EdgeSource)> = node
         .requires
         .iter()
         .filter(|requirement| !related(requirement))
-        .map(|requirement| (requirement, EdgeClass::Gate, EdgeSource::Explicit))
+        .map(|requirement| (requirement, EdgeSource::Explicit))
         .collect();
-    if let Payload::Group(group) = &node.payload
-        && let Some(opens_at) = &group.opens_at
-        && kind_of(opens_at) == Some(NodeKind::Milestone)
-        && !tree.is_ancestor(&node.key, opens_at)
-    {
-        let class = if group.gates {
-            EdgeClass::Gate
-        } else {
-            EdgeClass::DateOnly
-        };
-        found.push((opens_at, class, EdgeSource::StageOpening));
-    }
     let decisions = node
         .relevant_when
         .iter()
         .flat_map(|condition| condition.decisions());
     for decision in decisions {
         if kind_of(decision) == Some(NodeKind::Decision) && !related(decision) {
-            found.push((decision, EdgeClass::Gate, EdgeSource::Condition));
+            found.push((decision, EdgeSource::Condition));
         }
     }
     found

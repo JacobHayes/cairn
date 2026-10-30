@@ -512,30 +512,6 @@ pub struct Milestone {
     pub auto_done: bool,
 }
 
-/// A group's own fields: its stage bounds (F4).
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Group<R: References> {
-    /// The milestone that opens the stage.
-    pub opens_at: Option<R::Node>,
-    /// The milestone that closes the stage.
-    pub closes_at: Option<R::Node>,
-    /// The stage requires its opening milestone (default true).
-    pub gates: bool,
-    /// The closing milestone bounds the group's finish (default true).
-    pub closes: bool,
-}
-
-impl<R: References> Default for Group<R> {
-    fn default() -> Self {
-        Self {
-            opens_at: None,
-            closes_at: None,
-            gates: flag_default(KindField::Gates),
-            closes: flag_default(KindField::Closes),
-        }
-    }
-}
-
 /// The value of a flag field a node does not write (see [`KindField::default_flag`]).
 fn flag_default(field: KindField) -> bool {
     let Some(flag) = field.default_flag() else {
@@ -556,7 +532,7 @@ pub enum Payload<R: References> {
     /// A milestone.
     Milestone(Milestone),
     /// A group.
-    Group(Group<R>),
+    Group,
 }
 
 impl<R: References> Payload<R> {
@@ -568,7 +544,7 @@ impl<R: References> Payload<R> {
             Payload::Deliverable(_) => NodeKind::Deliverable,
             Payload::Action(_) => NodeKind::Action,
             Payload::Milestone(_) => NodeKind::Milestone,
-            Payload::Group(_) => NodeKind::Group,
+            Payload::Group => NodeKind::Group,
         }
     }
 
@@ -580,7 +556,7 @@ impl<R: References> Payload<R> {
             Payload::Deliverable(_)
             | Payload::Action(_)
             | Payload::Milestone(_)
-            | Payload::Group(_) => None,
+            | Payload::Group => None,
         }
     }
 
@@ -590,7 +566,7 @@ impl<R: References> Payload<R> {
         match self {
             Payload::Deliverable(Deliverable { estimate, .. })
             | Payload::Action(Action { estimate, .. }) => *estimate,
-            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => None,
+            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group => None,
         }
     }
 
@@ -600,7 +576,7 @@ impl<R: References> Payload<R> {
         match self {
             Payload::Deliverable(Deliverable { checklist, .. })
             | Payload::Action(Action { checklist, .. }) => Some(checklist),
-            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => None,
+            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group => None,
         }
     }
 
@@ -614,7 +590,7 @@ impl<R: References> Payload<R> {
             | Payload::Action(Action {
                 requires_checklist, ..
             }) => *requires_checklist,
-            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => false,
+            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group => false,
         }
     }
 
@@ -624,7 +600,7 @@ impl<R: References> Payload<R> {
         match self {
             Payload::Deliverable(Deliverable { placeholder, .. })
             | Payload::Action(Action { placeholder, .. }) => *placeholder,
-            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => false,
+            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group => false,
         }
     }
 }
@@ -995,14 +971,6 @@ pub enum KindField {
     Final,
     /// `auto_done`: milestones.
     AutoDone,
-    /// `opens_at`: groups.
-    OpensAt,
-    /// `closes_at`: groups.
-    ClosesAt,
-    /// `gates`: groups.
-    Gates,
-    /// `closes`: groups.
-    Closes,
     /// `prompt`: decisions (required).
     Prompt,
     /// `help`: decisions.
@@ -1019,7 +987,7 @@ pub enum KindField {
 
 impl KindField {
     /// Every kind-restricted field.
-    pub const ALL: [KindField; 18] = [
+    pub const ALL: [KindField; 14] = [
         KindField::Estimate,
         KindField::RequiresArtifact,
         KindField::RequiresNote,
@@ -1028,10 +996,6 @@ impl KindField {
         KindField::Placeholder,
         KindField::Final,
         KindField::AutoDone,
-        KindField::OpensAt,
-        KindField::ClosesAt,
-        KindField::Gates,
-        KindField::Closes,
         KindField::Prompt,
         KindField::Help,
         KindField::AnswerType,
@@ -1052,10 +1016,6 @@ impl KindField {
             KindField::RequiresChecklist => "requires_checklist",
             KindField::Final => "final",
             KindField::AutoDone => "auto_done",
-            KindField::OpensAt => "opens_at",
-            KindField::ClosesAt => "closes_at",
-            KindField::Gates => "gates",
-            KindField::Closes => "closes",
             KindField::Prompt => "prompt",
             KindField::Help => "help",
             KindField::AnswerType => "answer_type",
@@ -1065,12 +1025,11 @@ impl KindField {
         }
     }
 
-    /// The value a flag field has when a node does not write it: `gates` and `closes` are on,
-    /// every other flag off. `None` for a field that is not a flag.
+    /// The value a flag field has when a node does not write it: off. `None` for a field that
+    /// is not a flag.
     #[must_use]
     pub const fn default_flag(self) -> Option<bool> {
         match self {
-            KindField::Gates | KindField::Closes => Some(true),
             KindField::Placeholder
             | KindField::RequiresArtifact
             | KindField::RequiresNote
@@ -1078,8 +1037,6 @@ impl KindField {
             | KindField::Final
             | KindField::AutoDone => Some(false),
             KindField::Estimate
-            | KindField::OpensAt
-            | KindField::ClosesAt
             | KindField::Prompt
             | KindField::Help
             | KindField::AnswerType
@@ -1104,9 +1061,6 @@ impl KindField {
             }
             KindField::RequiresArtifact => matches!(kind, NodeKind::Deliverable),
             KindField::Final | KindField::AutoDone => matches!(kind, NodeKind::Milestone),
-            KindField::OpensAt | KindField::ClosesAt | KindField::Gates | KindField::Closes => {
-                matches!(kind, NodeKind::Group)
-            }
             KindField::Prompt
             | KindField::Help
             | KindField::AnswerType
@@ -1147,10 +1101,6 @@ impl KindField {
             | KindField::RequiresChecklist
             | KindField::Final
             | KindField::AutoDone
-            | KindField::OpensAt
-            | KindField::ClosesAt
-            | KindField::Gates
-            | KindField::Closes
             | KindField::Prompt
             | KindField::Help
             | KindField::AnswerType => true,
@@ -1344,43 +1294,6 @@ struct NodeWire<R: References> {
     )]
     #[schemars(with = "bool")]
     auto_done: Option<bool>,
-    /// The milestone that opens the stage: the contents wait for it unless `gates` is false.
-    #[schemars(extend("x-sketch" = true))]
-    #[serde(
-        default,
-        deserialize_with = "crate::serde_util::present",
-        skip_serializing_if = "Option::is_none"
-    )]
-    #[schemars(with = "R::Node")]
-    opens_at: Option<R::Node>,
-    /// The milestone that closes the stage: it bounds the group's finish and its contents' due
-    /// dates unless `closes` is false. Consecutive stages share one.
-    #[schemars(extend("x-sketch" = true))]
-    #[serde(
-        default,
-        deserialize_with = "crate::serde_util::present",
-        skip_serializing_if = "Option::is_none"
-    )]
-    #[schemars(with = "R::Node")]
-    closes_at: Option<R::Node>,
-    /// False lets the contents be done before the opening milestone. A stage holds the work done
-    /// during it; work that can as well be done ahead goes in a stage with this false; prep that
-    /// must come first sits outside, due before the opening milestone.
-    #[schemars(extend("x-sketch" = true))]
-    #[serde(
-        default,
-        deserialize_with = "crate::serde_util::present",
-        skip_serializing_if = "Option::is_none"
-    )]
-    #[schemars(with = "bool")]
-    gates: Option<bool>,
-    #[serde(
-        default,
-        deserialize_with = "crate::serde_util::present",
-        skip_serializing_if = "Option::is_none"
-    )]
-    #[schemars(with = "bool")]
-    closes: Option<bool>,
     #[serde(default, skip_serializing_if = "BoundedSet::is_empty")]
     requires: Requires<R>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1433,10 +1346,6 @@ pub struct KindColumns<R: References> {
     pub requires_checklist: Option<bool>,
     pub is_final: Option<bool>,
     pub auto_done: Option<bool>,
-    pub opens_at: Option<R::Node>,
-    pub closes_at: Option<R::Node>,
-    pub gates: Option<bool>,
-    pub closes: Option<bool>,
     pub prompt: Option<Markdown>,
     pub answer_type: Option<AnswerType>,
     pub choices: Option<Choices>,
@@ -1456,10 +1365,6 @@ impl<R: References> Default for KindColumns<R> {
             requires_checklist: None,
             is_final: None,
             auto_done: None,
-            opens_at: None,
-            closes_at: None,
-            gates: None,
-            closes: None,
             prompt: None,
             answer_type: None,
             choices: None,
@@ -1542,18 +1447,7 @@ impl<R: References> KindColumns<R> {
                 auto_done: Some(*auto_done),
                 ..Self::default()
             },
-            Payload::Group(Group {
-                opens_at,
-                closes_at,
-                gates,
-                closes,
-            }) => Self {
-                opens_at: opens_at.clone(),
-                closes_at: closes_at.clone(),
-                gates: Some(*gates),
-                closes: Some(*closes),
-                ..Self::default()
-            },
+            Payload::Group => Self::default(),
         }
     }
 
@@ -1569,8 +1463,6 @@ impl<R: References> KindColumns<R> {
         self.checklist = self.checklist.filter(|checklist| !checklist.is_empty());
         self.is_final = set(self.is_final, false);
         self.auto_done = set(self.auto_done, false);
-        self.gates = set(self.gates, true);
-        self.closes = set(self.closes, true);
         self
     }
 
@@ -1586,10 +1478,6 @@ impl<R: References> KindColumns<R> {
             requires_checklist,
             is_final,
             auto_done,
-            opens_at,
-            closes_at,
-            gates,
-            closes,
             prompt,
             answer_type,
             choices,
@@ -1606,10 +1494,6 @@ impl<R: References> KindColumns<R> {
             (KindField::Placeholder, placeholder.is_some()),
             (KindField::Final, is_final.is_some()),
             (KindField::AutoDone, auto_done.is_some()),
-            (KindField::OpensAt, opens_at.is_some()),
-            (KindField::ClosesAt, closes_at.is_some()),
-            (KindField::Gates, gates.is_some()),
-            (KindField::Closes, closes.is_some()),
             (KindField::Prompt, prompt.is_some()),
             (KindField::Help, help.is_some()),
             (KindField::AnswerType, answer_type.is_some()),
@@ -1715,12 +1599,7 @@ impl<R: References> KindColumns<R> {
                 is_final: self.is_final.unwrap_or(flag_default(KindField::Final)),
                 auto_done: self.auto_done.unwrap_or(flag_default(KindField::AutoDone)),
             }),
-            NodeKind::Group => Payload::Group(Group {
-                opens_at: self.opens_at,
-                closes_at: self.closes_at,
-                gates: self.gates.unwrap_or(flag_default(KindField::Gates)),
-                closes: self.closes.unwrap_or(flag_default(KindField::Closes)),
-            }),
+            NodeKind::Group => Payload::Group,
         })
     }
 }
@@ -1738,10 +1617,6 @@ impl<R: References> TryFrom<NodeWire<R>> for Node<R> {
             requires_checklist: wire.requires_checklist,
             is_final: wire.is_final,
             auto_done: wire.auto_done,
-            opens_at: wire.opens_at,
-            closes_at: wire.closes_at,
-            gates: wire.gates,
-            closes: wire.closes,
             prompt: wire.prompt,
             answer_type: wire.answer_type,
             choices: wire.choices,
@@ -1780,10 +1655,6 @@ impl<R: References> From<Node<R>> for NodeWire<R> {
             requires_checklist,
             is_final,
             auto_done,
-            opens_at,
-            closes_at,
-            gates,
-            closes,
             prompt,
             answer_type,
             choices,
@@ -1813,10 +1684,6 @@ impl<R: References> From<Node<R>> for NodeWire<R> {
             requires_checklist,
             is_final,
             auto_done,
-            opens_at,
-            closes_at,
-            gates,
-            closes,
             requires: node.requires,
             relevant_when: node.relevant_when,
             due_by: node.due_by,
@@ -1904,19 +1771,18 @@ mod tests {
         let group: Node<FileRefs> =
             serde_json::from_value(json!({"id": "g", "kind": "group", "title": "G"})).unwrap();
         assert_eq!(group.effective_weight(), Weight::GROUP_DEFAULT);
-        assert_eq!(group.payload, Payload::Group(Group::default()));
+        assert_eq!(group.payload, Payload::Group);
     }
 
     #[test]
     fn defaults_are_not_written() {
         // Flags at their defaults read back the same and are left out when written, so a
         // canonical file has one spelling per node.
-        let explicit =
-            json!({"id": "g", "kind": "group", "title": "G", "gates": true, "closes": true});
+        let explicit = json!({"id": "a", "kind": "action", "title": "A", "placeholder": false});
         let node: Node<FileRefs> = serde_json::from_value(explicit).unwrap();
         assert_eq!(
             serde_json::to_value(&node).unwrap(),
-            json!({"id": "g", "kind": "group", "title": "G"})
+            json!({"id": "a", "kind": "action", "title": "A"})
         );
         let rule = json!({"id": "a", "kind": "action", "title": "A", "due_by": {"after": "kickoff", "offset": 0}});
         let node: Node<FileRefs> = serde_json::from_value(rule).unwrap();

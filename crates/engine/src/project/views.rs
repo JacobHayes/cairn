@@ -56,7 +56,7 @@ impl DerivedJourney<'_> {
                     Payload::Deliverable(_)
                     | Payload::Action(_)
                     | Payload::Milestone(_)
-                    | Payload::Group(_) => (None, None),
+                    | Payload::Group => (None, None),
                 };
                 DecisionEntry {
                     state: self.state(&key),

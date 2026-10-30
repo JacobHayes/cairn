@@ -106,20 +106,10 @@ fn waiting_shapes() -> Vec<Shape> {
             work("n_x"),
         ),
         (
-            "gating stage opening",
+            "stage requiring a milestone",
             vec![
                 "{key: n_o, id: o, kind: milestone, title: O}",
-                "{key: n_s, id: s, kind: group, title: S, opens_at: n_o}",
-                "{key: n_x, id: x, parent: n_s, kind: action, title: X}",
-            ],
-            pin("n_o", "2026-10-20"),
-            work("n_x"),
-        ),
-        (
-            "stage opening that does not gate",
-            vec![
-                "{key: n_o, id: o, kind: milestone, title: O}",
-                "{key: n_s, id: s, kind: group, title: S, opens_at: n_o, gates: false}",
+                "{key: n_s, id: s, kind: group, title: S, requires: [n_o]}",
                 "{key: n_x, id: x, parent: n_s, kind: action, title: X}",
             ],
             pin("n_o", "2026-10-20"),

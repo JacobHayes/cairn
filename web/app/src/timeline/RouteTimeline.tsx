@@ -1,6 +1,6 @@
 // C13: a route's timeline: the route read as a journey that starts on day 0 and nothing is
-// waiting on, so each node sits at the earliest day its dependencies, estimates, date rules and
-// stage bounds allow. Rows are the nodes the level draws (Depth, Show conditional and the search
+// waiting on, so each node sits at the earliest day its dependencies, estimates, date rules
+// allow. Rows are the nodes the level draws (Depth, Show conditional and the search
 // every view of a route shares), under the containment tree and folded by the ladder; the chart
 // is the journey timeline's (`TimelineChart`) on a relative axis, with a start line at day 0 and
 // the final milestone as the end anchor. The bars are the before and after order; the relations

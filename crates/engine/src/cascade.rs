@@ -157,14 +157,6 @@ fn dangling_on(node: &Node<KeyRefs>, dropping: &mut Dropping, out: &mut Vec<Dang
         let value = NodeFieldValue::NotBefore(kept.not_before);
         push(DanglingKind::NotBefore, field(&node.key, value));
     }
-    if after.opens_at != before.opens_at {
-        let value = NodeFieldValue::OpensAt(after.opens_at);
-        push(DanglingKind::OpensAt, field(&node.key, value));
-    }
-    if after.closes_at != before.closes_at {
-        let value = NodeFieldValue::ClosesAt(after.closes_at);
-        push(DanglingKind::ClosesAt, field(&node.key, value));
-    }
     if after.feeds_milestone != before.feeds_milestone {
         let value = NodeFieldValue::FeedsMilestone(after.feeds_milestone);
         push(DanglingKind::FeedsMilestone, field(&node.key, value));

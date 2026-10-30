@@ -51,7 +51,7 @@ export function Connections({ view, detail }: { view: Ready; detail: NodeDetail 
               <li key={`${held.node}:${JSON.stringify(held.via)}`} data-node={held.node}>
                 <NodeLink view={view} node={held.node} />{" "}
                 <span className="muted small">
-                  {ownerName(view, held.node, viewer) ?? ""} {held.via === "explicit" || (typeof held.via === "object" && "stage_opening" in held.via) ? "" : viaText(held.via, name)}
+                  {ownerName(view, held.node, viewer) ?? ""} {held.via === "explicit" ? "" : viaText(held.via, name)}
                   {held.date === undefined ? null : (
                     <span data-testid="waits-date">
                       {ownerName(view, held.node, viewer) === undefined ? "" : " · "}scheduled for {dateWords(held.date, view.derived.today)}

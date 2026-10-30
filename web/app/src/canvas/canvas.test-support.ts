@@ -1,5 +1,5 @@
 // A small derived journey and its canvas levels for the canvas's unit tests, written as the
-// derive worker answers them: a kickoff milestone (done) opening a build stage, whose build
+// derive worker answers them: a kickoff milestone (done) required by a build stage, whose build
 // deliverable is active while blocked by an optional extra (started ahead of it) and holds a check
 // action; a decision the extra's condition reads, so the extra is undecided; and an old step
 // that is not relevant.
@@ -34,7 +34,7 @@ export function canvasView(): Ready {
         nodes: [
           { key: "n_kick", id: "kick", kind: "milestone", title: "Kickoff" },
           { key: "n_choose", id: "choose", kind: "decision", title: "Approach", prompt: "Which approach do we take?", answer_type: "boolean" },
-          { key: "n_stage", id: "stage", kind: "group", title: "Build stage", opens_at: "n_kick" },
+          { key: "n_stage", id: "stage", kind: "group", title: "Build stage", requires: ["n_kick"] },
           { key: "n_build", id: "build", parent: "n_stage", kind: "deliverable", title: "Build it", requires: ["n_option"] },
           { key: "n_check", id: "check", parent: "n_build", kind: "action", title: "Check the build" },
           { key: "n_option", id: "option", kind: "deliverable", title: "Optional extra", relevant_when: { answered: "n_choose" } },
@@ -109,7 +109,7 @@ const explicit = (requirement: string, dependent: string): LevelEdge => ({
   to: dependent,
   underlying: [{ requirement, dependent, origin: "explicit" }],
 });
-const implicit = (requirement: string, dependent: string, origin: "condition" | "stage_opening"): LevelEdge => ({
+const implicit = (requirement: string, dependent: string, origin: "condition"): LevelEdge => ({
   from: requirement,
   to: dependent,
   implicit: true,
@@ -129,7 +129,7 @@ export function wholeLevel(): Level {
       node("n_option"),
       node("n_old"),
     ],
-    edges: [implicit("n_choose", "n_option", "condition"), implicit("n_kick", "n_stage", "stage_opening"), explicit("n_option", "n_build")],
+    edges: [implicit("n_choose", "n_option", "condition"), explicit("n_kick", "n_stage"), explicit("n_option", "n_build")],
     date_links: [],
   };
 }
@@ -144,7 +144,7 @@ export function actionsAndDecisionsHidden(): Level {
       node("n_build", { parent: "n_stage", rolled_up: ["n_check"], roll_up: { owners: ["who_one"], progress: buildProgress } }),
       node("n_option", { hidden_prerequisites: ["n_choose"] }),
     ],
-    edges: [implicit("n_kick", "n_stage", "stage_opening"), explicit("n_option", "n_build")],
+    edges: [explicit("n_kick", "n_stage"), explicit("n_option", "n_build")],
     date_links: [],
   };
 }

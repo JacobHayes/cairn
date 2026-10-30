@@ -16,7 +16,7 @@ import { changesOf, draftOf, type FormField, type NodeDraft } from "./fields.ts"
 import { useDraftProblems } from "./form-problems.ts";
 import { Section } from "../detail/parts.tsx";
 import type { GraphNode } from "./graph.ts";
-import { BasicsFields, CompletionFields, DecisionFields, StageFields, WeightFields, has, typedItem, type FieldsProps } from "./NodeFields.tsx";
+import { BasicsFields, CompletionFields, DecisionFields, WeightFields, has, typedItem, type FieldsProps } from "./NodeFields.tsx";
 import type { Schema } from "@cairn/client";
 import type { Violation } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
@@ -117,9 +117,8 @@ function Fields({ props }: { props: FieldsProps & { authored: Authored } }) {
       <Section title="Relevance" open={holds(props, ["relevant_when"])} testId="form-relevance">
         <Relevance props={props} />
       </Section>
-      <Section title="Date rules" open={holds(props, ["due_by", "not_before", "opens_at", "closes_at"])} testId="form-dates">
+      <Section title="Date rules" open={holds(props, ["due_by", "not_before"])} testId="form-dates">
         <Rules props={props} />
-        {has(props, "opens_at") ? <StageFields props={props} /> : null}
       </Section>
       {completion.length === 0 ? null : (
         <Section title="Completion needs" open={holds(props, completion)} testId="form-completion">

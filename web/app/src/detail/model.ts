@@ -244,13 +244,13 @@ export interface Holding {
 
 /**
  * Gating, D8: what the node waits on, as the engine derived it: its own unsatisfied requirements,
- * condition gates and stage opening, then those its ancestors hold for it, nearest first, each
+ * and condition gates, then those its ancestors hold for it, nearest first, each
  * once. What it contains does not hold it.
  */
 export function waitsOn(view: Ready, key: string): Holding[] {
   return (view.derived.nodes[key]?.waits_on.entries ?? []).map((blocker) => {
     const via = blocker.via;
-    const holder = typeof via !== "object" ? undefined : "inherited" in via ? via.inherited.ancestor : "condition" in via ? via.condition.condition_on : "stage_opening" in via ? via.stage_opening.group : undefined;
+    const holder = typeof via !== "object" ? undefined : "inherited" in via ? via.inherited.ancestor : "condition" in via ? via.condition.condition_on : undefined;
     return { node: blocker.node, via, holder: holder === key ? undefined : holder, date: blocker.date ?? undefined };
   });
 }

@@ -545,7 +545,7 @@ pub fn every_content_graph() -> cairn_schema::Graph {
              "weight": 10, "final": true,
              "due_by": {"after": "journey.created_at", "offset": 30}},
             {"key": "n_work", "id": "work", "kind": "group", "title": "Work",
-             "opens_at": "n_kickoff", "closes_at": "n_wrap", "gates": false, "closes": false},
+             "requires": ["n_kickoff"], "due_by": {"before": "n_wrap"}},
             {"key": "n_scope", "id": "scope", "kind": "decision", "title": "Scope",
              "description": "How much the work covers.", "prompt": "How wide is the scope?",
              "answer_type": "multi_choice",

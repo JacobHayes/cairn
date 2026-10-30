@@ -51,14 +51,6 @@ pub enum NodeField {
     Final,
     /// A milestone's `auto_done` flag.
     AutoDone,
-    /// A group's `opens_at`.
-    OpensAt,
-    /// A group's `closes_at`.
-    ClosesAt,
-    /// A group's `gates` flag.
-    Gates,
-    /// A group's `closes` flag.
-    Closes,
     /// A decision's prompt.
     Prompt,
     /// A decision's help text.
@@ -92,10 +84,6 @@ impl NodeField {
             NodeField::RequiresChecklist => KindField::RequiresChecklist,
             NodeField::Final => KindField::Final,
             NodeField::AutoDone => KindField::AutoDone,
-            NodeField::OpensAt => KindField::OpensAt,
-            NodeField::ClosesAt => KindField::ClosesAt,
-            NodeField::Gates => KindField::Gates,
-            NodeField::Closes => KindField::Closes,
             NodeField::Prompt => KindField::Prompt,
             NodeField::Help => KindField::Help,
             NodeField::Choices => KindField::Choices,
@@ -112,7 +100,7 @@ impl NodeField {
     }
 
     /// Every field, in declaration order.
-    pub const ALL: [NodeField; 25] = [
+    pub const ALL: [NodeField; 21] = [
         NodeField::Id,
         NodeField::Parent,
         NodeField::Title,
@@ -129,10 +117,6 @@ impl NodeField {
         NodeField::RequiresChecklist,
         NodeField::Final,
         NodeField::AutoDone,
-        NodeField::OpensAt,
-        NodeField::ClosesAt,
-        NodeField::Gates,
-        NodeField::Closes,
         NodeField::Prompt,
         NodeField::Help,
         NodeField::Choices,
@@ -180,14 +164,6 @@ pub enum NodeFieldValue<R: References> {
     Final(bool),
     /// The `auto_done` flag.
     AutoDone(bool),
-    /// A new `opens_at`, or none.
-    OpensAt(Option<R::Node>),
-    /// A new `closes_at`, or none.
-    ClosesAt(Option<R::Node>),
-    /// The `gates` flag.
-    Gates(bool),
-    /// The `closes` flag.
-    Closes(bool),
     /// A new prompt.
     Prompt(Markdown),
     /// New help text, or none.
@@ -221,10 +197,6 @@ impl<R: References> NodeFieldValue<R> {
             NodeFieldValue::RequiresChecklist(_) => NodeField::RequiresChecklist,
             NodeFieldValue::Final(_) => NodeField::Final,
             NodeFieldValue::AutoDone(_) => NodeField::AutoDone,
-            NodeFieldValue::OpensAt(_) => NodeField::OpensAt,
-            NodeFieldValue::ClosesAt(_) => NodeField::ClosesAt,
-            NodeFieldValue::Gates(_) => NodeField::Gates,
-            NodeFieldValue::Closes(_) => NodeField::Closes,
             NodeFieldValue::Prompt(_) => NodeField::Prompt,
             NodeFieldValue::Help(_) => NodeField::Help,
             NodeFieldValue::Choices(_) => NodeField::Choices,
@@ -253,10 +225,6 @@ impl<R: References> NodeFieldValue<R> {
             | NodeField::RequiresChecklist
             | NodeField::Final
             | NodeField::AutoDone
-            | NodeField::OpensAt
-            | NodeField::ClosesAt
-            | NodeField::Gates
-            | NodeField::Closes
             | NodeField::Prompt
             | NodeField::Help
             | NodeField::Choices
@@ -319,16 +287,6 @@ impl<R: References> NodeFieldValue<R> {
             }
             (NodeField::AutoDone, Payload::Milestone(milestone)) => {
                 Some(NodeFieldValue::AutoDone(milestone.auto_done))
-            }
-            (NodeField::OpensAt, Payload::Group(group)) => {
-                Some(NodeFieldValue::OpensAt(group.opens_at.clone()))
-            }
-            (NodeField::ClosesAt, Payload::Group(group)) => {
-                Some(NodeFieldValue::ClosesAt(group.closes_at.clone()))
-            }
-            (NodeField::Gates, Payload::Group(group)) => Some(NodeFieldValue::Gates(group.gates)),
-            (NodeField::Closes, Payload::Group(group)) => {
-                Some(NodeFieldValue::Closes(group.closes))
             }
             (NodeField::Prompt, Payload::Decision(decision)) => {
                 Some(NodeFieldValue::Prompt(decision.prompt.clone()))
@@ -427,10 +385,6 @@ impl<R: References> NodeFieldValue<R> {
             (NodeFieldValue::AutoDone(flag), Payload::Milestone(milestone)) => {
                 milestone.auto_done = flag;
             }
-            (NodeFieldValue::OpensAt(node), Payload::Group(group)) => group.opens_at = node,
-            (NodeFieldValue::ClosesAt(node), Payload::Group(group)) => group.closes_at = node,
-            (NodeFieldValue::Gates(flag), Payload::Group(group)) => group.gates = flag,
-            (NodeFieldValue::Closes(flag), Payload::Group(group)) => group.closes = flag,
             (NodeFieldValue::Prompt(prompt), Payload::Decision(decision)) => {
                 decision.prompt = prompt;
             }

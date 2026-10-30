@@ -1,15 +1,14 @@
 //! The date relationships a graph's authors wrote (PRD C1, C15): a node's due-by and
-//! not-before rules, a stage's close, a stage opening that holds dates only, and a date
-//! decision that sets a milestone. They are not edges: nothing waits on them. The canvas draws
+//! not-before rules and a date decision that sets a milestone. They are not edges: nothing waits on them. The canvas draws
 //! them for the selected node, and the node's dates list them.
 //!
-//! The rules and closes are read from the date network's retained constraints (their origin
-//! and ends; the network already left out whatever relevance ruled out), the openings from the
-//! pruned dependency edges, and the fed dates from the document with both ends in scope. The
+//! The rules are read from the date network's retained constraints (their origin and ends; the
+//! network already left out whatever relevance ruled out), and the fed dates from the document
+//! with both ends in scope. The
 //! rule's direction and days come from the node's own rule, so a zero offset reads as authored.
 //!
 //! Cost: one pass over the retained constraints (bounded by the cost test of the date
-//! network), one over the pruned edges, one over the nodes; the result is sorted once.
+//! network), one over the nodes; the result is sorted once.
 
 use std::collections::BTreeMap;
 
@@ -20,7 +19,7 @@ use cairn_schema::{
 
 use super::Derived;
 use super::dates::network::{Constraint, Origin, Place, Rule};
-use super::dependencies::{EdgeClass, EdgeSet, EdgeSource, NodeIndex};
+use super::dependencies::NodeIndex;
 use crate::graph::Graph;
 
 /// One authored date relationship with its ends: `from` and `to` are the earlier and later end
@@ -53,12 +52,10 @@ impl Derived {
         for constraint in self.dates.network().constraints() {
             let link = match constraint.origin {
                 Origin::Rule { node, rule } => self.rule_link(graph, constraint, node, rule),
-                Origin::StageClose { group } => self.close_link(constraint, group),
                 Origin::Dependency(_) => None,
             };
             found.extend(link);
         }
-        found.extend(self.opening_links());
         found.extend(self.fed_links(graph));
         found
     }
@@ -118,45 +115,6 @@ impl Derived {
             to,
             orders,
         })
-    }
-
-    /// A stage's close: from the stage to the milestone that closes it.
-    fn close_link(&self, constraint: &Constraint, group: NodeIndex) -> Option<Authored<'_>> {
-        let Place::Node(closing) = self.dates.network().place(constraint.after) else {
-            return None;
-        };
-        let stage = self.dependencies.key(group)?;
-        let milestone = self.dependencies.key(closing.node)?;
-        Some(Authored {
-            node: stage,
-            source: milestone,
-            kind: DateLinkKind::StageClose,
-            from: stage,
-            to: milestone,
-            orders: true,
-        })
-    }
-
-    /// The stage openings that gate nothing: from the opening milestone to the stage.
-    fn opening_links(&self) -> impl Iterator<Item = Authored<'_>> {
-        let dependencies = &self.dependencies;
-        dependencies
-            .edges(EdgeSet::Pruned)
-            .filter(|edge| {
-                edge.source == EdgeSource::StageOpening && edge.class == EdgeClass::DateOnly
-            })
-            .filter_map(|edge| {
-                let milestone = dependencies.key(edge.requirement.node)?;
-                let stage = dependencies.key(edge.dependent.node)?;
-                Some(Authored {
-                    node: stage,
-                    source: milestone,
-                    kind: DateLinkKind::StageOpening,
-                    from: milestone,
-                    to: stage,
-                    orders: true,
-                })
-            })
     }
 
     /// The date decisions that set a milestone's date, both ends in scope.

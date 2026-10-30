@@ -147,6 +147,7 @@ export const TILE_GAP_PX = 4;
 export const TILE_BODY_ROW = 1.55;
 /** Average width of a body character, in ems. */
 const BODY_CHAR_EM = 0.52;
+const MONO_CHAR_EM = 0.6;
 const METER_MIN_PX = 20;
 
 /** What a tile has to say, as the card knows it. A missing piece is none. */
@@ -214,6 +215,8 @@ function stepOf(width: number, height: number): number {
 const linesOf = (text: string, room: number, px: number) => wrappedLines(text, room / px, true);
 
 const bodyWidth = (text: string, bodyPx: number) => text.length * bodyPx * BODY_CHAR_EM;
+/** A date line is set in the mono face, wider than the body face per character. */
+const dateWidth = (text: string, bodyPx: number) => text.length * bodyPx * MONO_CHAR_EM;
 
 type Drawn = Pick<TileLayout, "chip" | "chipBelow" | "words" | "meter" | "message" | "date" | "fact">;
 
@@ -227,9 +230,9 @@ function restOf(pieces: TilePieces, drawn: Drawn, bodyPx: number): { height: num
   if (drawn.chip && drawn.chipBelow && pieces.chip !== undefined) {
     rows.push({ height: body, width: chipWidthOf(pieces.chip) });
   }
-  for (const [shown, text] of [[drawn.message, pieces.message], [drawn.date, pieces.date], [drawn.fact, pieces.fact]] as const) {
+  for (const [shown, text, widthOf] of [[drawn.message, pieces.message, bodyWidth], [drawn.date, pieces.date, dateWidth], [drawn.fact, pieces.fact, bodyWidth]] as const) {
     if (shown && text !== undefined) {
-      rows.push({ height: body, width: bodyWidth(text, bodyPx) });
+      rows.push({ height: body, width: widthOf(text, bodyPx) });
     }
   }
   return rows;

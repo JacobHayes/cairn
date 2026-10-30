@@ -5,7 +5,7 @@
 // only what the engine's table says a rule may measure from, so a source of the wrong kind
 // cannot be entered.
 import type { DateRule } from "./fields.ts";
-import { descendantsOf, nodesFor, pathOf, titleIn, type GraphNode, type Tree } from "./graph.ts";
+import { nodesFor, pathOf, titleIn, type GraphNode, type Tree } from "./graph.ts";
 import { plural } from "../ui/words.ts";
 
 /** The journey's creation, a source every graph has (A8). */
@@ -69,15 +69,4 @@ export function ruleFoot(node: GraphNode, tree: Tree): string | undefined {
     return undefined;
   }
   return `${lead} ${ruleWords(rule, (source) => titleIn(tree, source))}`;
-}
-
-/**
- * F4: the nodes a stage may name as its `bound` (the engine's table: milestones), those outside it
- * first. One inside it is offered too, marked: a bound sits outside the stage, and the engine says
- * so at the field (A15) rather than the editor hiding why it is not there.
- */
-export function boundOptions(tree: Tree, group: string, bound: "opens_at" | "closes_at"): { node: GraphNode; inside: boolean }[] {
-  const inside = new Set(descendantsOf(tree, group).map((node) => node.key));
-  const milestones = nodesFor(tree, bound).map((node) => ({ node, inside: inside.has(node.key) }));
-  return [...milestones.filter((each) => !each.inside), ...milestones.filter((each) => each.inside)];
 }

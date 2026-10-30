@@ -35,12 +35,12 @@ until this file is updated with it.
 The PRD's illustrative example, with every mechanism it names. Four up-front decisions
 (purchase or research, who owns the evaluation, who stays informed, and the decision-meeting
 date) fill the `eval_owner` and `stakeholders` roles and pin the decision meeting. Setup is a
-stage opened by the kickoff milestone; the test plan requires environment access and has two
+stage that requires the kickoff milestone; the test plan requires environment access and has two
 child actions; the test workload is a placeholder. Testing holds a gated decision (the
 comparison set requires the plan) whose answer decides whether the baseline is relevant, and a
 partner-led subset relevant only when a partner runs the testing. Reporting holds the findings,
-a late-filled `findings_reviewer`, and a final-review stage that opens 14 days before the
-decision meeting and closes at it, with the final report (weight 5, artifact required) inside.
+a late-filled `findings_reviewer`, and a final-review stage that requires the review-opens milestone (14 days before the
+decision meeting) and is due before the meeting, with the final report (weight 5, artifact required) inside.
 The decision meeting is the final milestone, weight 10. Resources: an access-request message
 draft, a report template, and two example test plans. The scenario answers the up-front
 decisions, completes kickoff, breaks down the workload, answers the comparison set once the plan
@@ -129,7 +129,7 @@ before it, and nothing in this route marks itself done. `fixture_readme.rs` chec
 | 7 (baseline snoozed) | `n_baseline`, `n_decision_meeting`, `n_workload_ingest`, `n_workload_query` | `n_baseline`, `n_decision_meeting` |
 | 8 (testing and findings done) | `n_decision_meeting`, `n_review_opens` | `n_decision_meeting` |
 
-Setup is not actionable until kickoff (steps 1 and 2: its contents wait on the stage's opening);
+Setup is not actionable until kickoff (steps 1 and 2: its contents wait on what the stage requires);
 the plan reaches the frontier only after its two actions, and the comparison set only after the
 plan.
 
@@ -159,7 +159,7 @@ the 14-day horizon, so urgency is 0. `fixture_readme.rs` checks the ranks.
 
 Notices: the route file's own graph, with the decision meeting as its final
 milestone, lists two nodes, each checked by hand to have no chain to or from the meeting. Work
-inside the final-review stage is not listed (the stage closes at the meeting), nor are the
+inside the final-review stage is not listed (the stage is due before the meeting), nor are the
 decisions that fill roles, nor the partner-led subset (it sits inside Testing, which Reporting
 requires, and its condition counts as relevant). `crates/tests/tests/integration/engine/fixture_readme.rs`
 checks the table.
@@ -210,7 +210,7 @@ freeze is due 21 days before it, the beta starts no sooner than two days after t
 marks itself done on its date) and ends ten days after it starts, the documentation is due a week
 before launch, the announcement three days before and no sooner than the beta's end, the
 go/no-go a day before, and the retrospective no sooner than five days after. Build and beta are
-stages bounded by milestones on both ends. The launch materials name the multi-valued `writers`
+stages that require one milestone and are due before another. The launch materials name the multi-valued `writers`
 role through a multi-valued `contributor` kind (owner, being single-valued, cannot take a
 multi-valued role, A7). The scenario pins the launch date, completes kickoff,
 shifts the launch pin a week when feature work slips, and records a code-freeze actual

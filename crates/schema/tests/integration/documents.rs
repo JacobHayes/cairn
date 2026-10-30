@@ -28,7 +28,8 @@ nodes:
 - id: setup
   kind: group
   title: Setup
-  opens_at: kickoff
+  requires:
+  - kickoff
 - id: plan
   parent: setup
   kind: deliverable
@@ -58,10 +59,8 @@ fn field_line(field: KindField) -> String {
         | KindField::RequiresNote
         | KindField::RequiresChecklist
         | KindField::Final
-        | KindField::AutoDone
-        | KindField::Gates
-        | KindField::Closes => "true",
-        KindField::OpensAt | KindField::ClosesAt | KindField::FeedsMilestone => "kickoff",
+        | KindField::AutoDone => "true",
+        KindField::FeedsMilestone => "kickoff",
         KindField::Prompt | KindField::Help => "Some text",
         KindField::AnswerType => "text",
         KindField::Choices => "[one]",

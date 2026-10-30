@@ -51,10 +51,6 @@ export interface NodeDraft {
   choices: Choice[];
   fills_role: string;
   feeds_milestone: string;
-  opens_at: string;
-  closes_at: string;
-  gates: boolean;
-  closes: boolean;
   relevant_when: Condition | null;
   due_by: RuleParts | null;
   not_before: RuleParts | null;
@@ -81,10 +77,6 @@ export function draftOf(node: GraphNode): NodeDraft {
     choices: node.choices ?? [],
     fills_role: node.fills_role ?? "",
     feeds_milestone: node.feeds_milestone ?? "",
-    opens_at: node.opens_at ?? "",
-    closes_at: node.closes_at ?? "",
-    gates: node.gates ?? FLAG_DEFAULTS.gates,
-    closes: node.closes ?? FLAG_DEFAULTS.closes,
     relevant_when: node.relevant_when ?? null,
     due_by: node.due_by == null ? null : partsOf(node.due_by),
     not_before: node.not_before == null ? null : partsOf(node.not_before),
@@ -114,10 +106,6 @@ export function valueOf(field: NodeField, draft: NodeDraft): Schema<"NodeFieldVa
     checklist: draft.checklist,
     final: draft.final,
     auto_done: draft.auto_done,
-    opens_at: key(draft.opens_at),
-    closes_at: key(draft.closes_at),
-    gates: draft.gates,
-    closes: draft.closes,
     prompt: draft.prompt,
     help: text(draft.help),
     choices: draft.choices,

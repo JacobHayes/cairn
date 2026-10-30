@@ -174,15 +174,6 @@ mod open {
         ),
         ("Action", &["nodes.kind"]),
         ("Milestone", &["nodes.is_final", "nodes.auto_done"]),
-        (
-            "Group",
-            &[
-                "nodes.opens_at",
-                "nodes.closes_at",
-                "nodes.gates",
-                "nodes.closes",
-            ],
-        ),
         ("Container, Parent / child", &["nodes.parent_key"]),
         (
             "Answer, Rationale",

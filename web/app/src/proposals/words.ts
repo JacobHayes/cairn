@@ -81,8 +81,6 @@ export function fieldValueWords(field: string, value: unknown, names: Names): st
     case "not_before":
       return ruleWords(value, (source) => names.node(source));
     case "parent":
-    case "opens_at":
-    case "closes_at":
     case "feeds_milestone":
       return typeof value === "string" ? quoted(names.node(value)) : JSON.stringify(value);
     case "fills_role":
@@ -140,9 +138,6 @@ function fieldOf(value: Record<string, unknown>): [string, unknown] {
 /** A node's field set to a value, in words. */
 function fieldSetWords(node: string, set: Record<string, unknown>, names: Names): string {
   const [field, value] = fieldOf(set);
-  if (field === "closes" && value === false) {
-    return `Let the stage ${node} run past its close`;
-  }
   if (field === "estimate" && typeof value === "number") {
     return `Set the estimate of ${node} to ${String(value)} days`;
   }

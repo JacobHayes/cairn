@@ -12,11 +12,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::{
     Action, Annotation, AnnotationBody, AnnotationContent, AnswerSpec, AnswerType, AnswerValue,
     BoundedSet, Bypass, Checklist, Choices, Date, Days, Decision, Deliverable, Domain, Graph,
-    Group, GuardFailure, Identity, JourneyHeader, JourneyState, JourneyStatus, Keyed, Lineage,
-    Milestone, Node, NodeKey, NodeKind, NodeState, Overrides, ParticipationKind,
-    ParticipationSource, Participations, Payload, Proposal, ProposalDraft, ProposalStatus,
-    Reopened, Resource, ResourceContent, RetiredKeys, Revision, Role, RouteHeader, SnoozeTarget,
-    State, Weight, refs::KeyRefs,
+    GuardFailure, Identity, JourneyHeader, JourneyState, JourneyStatus, Keyed, Lineage, Milestone,
+    Node, NodeKey, NodeKind, NodeState, Overrides, ParticipationKind, ParticipationSource,
+    Participations, Payload, Proposal, ProposalDraft, ProposalStatus, Reopened, Resource,
+    ResourceContent, RetiredKeys, Revision, Role, RouteHeader, SnoozeTarget, State, Weight,
+    refs::KeyRefs,
 };
 use serde_json::json;
 
@@ -270,12 +270,7 @@ fn payloads(fill: Fill) -> Vec<Payload<KeyRefs>> {
                 is_final: fill.on(),
                 auto_done: fill.on(),
             })),
-            NodeKind::Group => payloads.push(Payload::Group(Group {
-                opens_at: fill.some(node_key(1)),
-                closes_at: fill.some(node_key(2)),
-                gates: !fill.on(),
-                closes: !fill.on(),
-            })),
+            NodeKind::Group => payloads.push(Payload::Group),
         }
     }
     fill.rotate(payloads)

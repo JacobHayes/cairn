@@ -116,7 +116,6 @@ fn via(how: &DependencyVia) -> String {
         DependencyVia::Containment => "containment".to_owned(),
         DependencyVia::Inherited { ancestor } => format!("inherited {ancestor}"),
         DependencyVia::Condition { condition_on } => format!("condition {condition_on}"),
-        DependencyVia::StageOpening { group } => format!("opening {group}"),
     }
 }
 
@@ -222,10 +221,10 @@ fn a_cascading_group_completion_is_not_still_waiting() {
     );
 }
 
-/// C8: what an ancestor's hold reaches a dependent through is listed as inherited, and a
-/// stage's opening as the opening, both with the node they wait on.
+/// C8: what an ancestor's hold reaches a dependent through is listed as inherited, with the
+/// node they wait on.
 #[test]
-fn inherited_holds_and_stage_openings_are_listed_with_their_source() {
+fn inherited_holds_are_listed_with_their_source() {
     let (records, journey) = fixture("vendor-evaluation", 1);
     let graph = support::journey_graph(&records, &journey);
     let derived = support::derived(&records, &journey);
@@ -234,7 +233,10 @@ fn inherited_holds_and_stage_openings_are_listed_with_their_source() {
         .unwrap();
     assert_eq!(
         held(&waiting),
-        [("n_plan", vec![("n_kickoff", "opening n_setup".to_owned())])]
+        [(
+            "n_plan",
+            vec![("n_kickoff", "inherited n_setup".to_owned())]
+        )]
     );
     let waiting = DerivedJourney::new(&graph, &derived)
         .still_waiting(&key("n_plan_draft"))
@@ -245,7 +247,7 @@ fn inherited_holds_and_stage_openings_are_listed_with_their_source() {
             "n_plan_review",
             vec![
                 ("n_access", "inherited n_plan".to_owned()),
-                ("n_kickoff", "opening n_setup".to_owned()),
+                ("n_kickoff", "inherited n_setup".to_owned()),
             ]
         )]
     );

@@ -1002,13 +1002,6 @@
   fill: var(--color-surface);
 }
 
-.line-stage_opening .line-marker {
-  fill: none;
-  stroke-width: 2px;
-}
-
-
-
 /* A date relationship (C1) is not an edge: drawn for the selected node only, in ink, dashed (the pattern in layout units, divided by the zoom to stay the same on screen), never faded, with an open arrowhead at its later end where the order is fixed. */
 .line-dates .react-flow__edge-path {
   stroke: var(--color-text);

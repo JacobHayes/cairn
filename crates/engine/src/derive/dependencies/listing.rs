@@ -15,8 +15,8 @@ use super::{Dependencies, Edge, EdgeSet, EdgeSource, EffectiveDependency, Instan
 
 impl Dependencies {
     /// The node's effective dependencies in the set, each with how it arose: its own
-    /// explicit edges, its stage opening, and its condition gates; its ancestors' requirements
-    /// (`Inherited`), stage openings, and condition gates, which reach it through the entry
+    /// explicit edges and its condition gates; its ancestors' requirements
+    /// (`Inherited`) and condition gates, which reach it through the entry
     /// chains; and, for a container, its children (`Containment`). A dependency reached two
     /// ways is listed once per way. Sorted.
     ///
@@ -76,14 +76,10 @@ impl Dependencies {
                     EdgeSource::Condition => DependencyVia::Condition {
                         condition_on: owner.clone(),
                     },
-                    EdgeSource::StageOpening => DependencyVia::StageOpening {
-                        group: owner.clone(),
-                    },
                 };
                 found.insert(EffectiveDependency {
                     node: required.clone(),
                     via,
-                    class: edge.class,
                 });
             },
         );
@@ -93,7 +89,7 @@ impl Dependencies {
     /// The one walk of the entry chains: from each instant in `from` (with whether the path
     /// to it is already conditional), follows the entry and chain links up through the
     /// ancestors and calls `visit` for each other edge waiting on the way (a requirement,
-    /// opening, condition gate, or containment link), with whether the path it came by
+    /// condition gate, or containment link), with whether the path it came by
     /// passes through a node `undecided` names, the edge's own two nodes included.
     pub(crate) fn carried(
         &self,
@@ -114,10 +110,9 @@ impl Dependencies {
                 match edge.source {
                     EdgeSource::Work => {}
                     EdgeSource::Entry | EdgeSource::Chain => stack.push((edge.requirement, path)),
-                    EdgeSource::Containment
-                    | EdgeSource::Explicit
-                    | EdgeSource::Condition
-                    | EdgeSource::StageOpening => visit(edge, path),
+                    EdgeSource::Containment | EdgeSource::Explicit | EdgeSource::Condition => {
+                        visit(edge, path);
+                    }
                 }
             }
         }

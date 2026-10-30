@@ -2,12 +2,11 @@
 // sooner than), before or after one or more sources by an offset in days. Sources are
 // offered from what a rule may measure from (milestones, date decisions, and when the journey
 // started), so the wrong kind of source cannot be entered; several sources are several
-// constraints. F4: `StageBoundsEditor` sets a stage's opening and closing milestones, from the
-// milestones outside it, and whether each gates and closes.
+// constraints.
 import { Button, Input } from "../ui/kit.tsx";
-import { boundOptions, ruleOf, ruleWords, sourceOptions, type Direction, type RuleParts } from "./dates.ts";
+import { ruleOf, ruleWords, sourceOptions, type Direction, type RuleParts } from "./dates.ts";
 import type { Tree } from "./graph.ts";
-import { FieldBox, Picker, type FieldNotes } from "./parts.tsx";
+import { Picker } from "./parts.tsx";
 
 export interface DateRuleEditorProps {
   /** `due_by` or `not_before`. */
@@ -94,44 +93,6 @@ export function DateRuleEditor({ which, value, onChange, tree, node }: DateRuleE
         </Button>
       </span>
       <Sources parts={parts} set={set} options={options} />
-    </div>
-  );
-}
-
-export interface StageBoundsEditorProps {
-  opensAt: string;
-  closesAt: string;
-  gates: boolean;
-  closes: boolean;
-  onChange: (next: { opens_at?: string; closes_at?: string; gates?: boolean; closes?: boolean }) => void;
-  tree: Tree;
-  group: string;
-  /** What each bound shows beside it (A15). */
-  notes?: { opens_at?: FieldNotes; closes_at?: FieldNotes };
-}
-
-export function StageBoundsEditor({ opensAt, closesAt, gates, closes, onChange, tree, group, notes = {} }: StageBoundsEditorProps) {
-  const optionsFor = (bound: "opens_at" | "closes_at") => boundOptions(tree, group, bound).map(({ node, inside }) => ({ value: node.key, label: inside ? `${node.title} (inside this stage)` : node.title }));
-  return (
-    <div className="stack" data-testid="stage-bounds">
-      <FieldBox label="Opens at" place="opens_at" notes={notes.opens_at}>
-        <span className="row">
-          <Picker aria-label="Opens at" value={opensAt} none="No opening" options={optionsFor("opens_at")} onChange={(event) => { onChange({ opens_at: event.target.value }); }} />
-          <label className="row">
-            <input type="checkbox" checked={gates} disabled={opensAt === ""} onChange={(event) => { onChange({ gates: event.target.checked }); }} />
-            Its contents wait for it
-          </label>
-        </span>
-      </FieldBox>
-      <FieldBox label="Closes at" place="closes_at" notes={notes.closes_at}>
-        <span className="row">
-          <Picker aria-label="Closes at" value={closesAt} none="No closing" options={optionsFor("closes_at")} onChange={(event) => { onChange({ closes_at: event.target.value }); }} />
-          <label className="row">
-            <input type="checkbox" checked={closes} disabled={closesAt === ""} onChange={(event) => { onChange({ closes: event.target.checked }); }} />
-            It finishes by then
-          </label>
-        </span>
-      </FieldBox>
     </div>
   );
 }

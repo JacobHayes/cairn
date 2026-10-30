@@ -25,7 +25,6 @@ export type ConstraintSource =
   | { due_by: { node: string } }
   | { not_before: { node: string } }
   | { estimate: { node: string } }
-  | { stage_close: { group: string } }
   | { containment: { parent: string; child: string } }
   | { dependency: { node: string; requires: string; via: DependencyVia } };
 
@@ -51,8 +50,6 @@ export function parseSource(text: Schema<"ConstraintSource">): ConstraintSource 
     case "not_before":
     case "estimate":
       return { [kind]: { node: a } } as ConstraintSource;
-    case "stage_close":
-      return { stage_close: { group: a } };
     case "containment":
       return { containment: { parent: a, child: b } };
     case "dependency":
@@ -71,8 +68,6 @@ function parseVia([kind = "", key = ""]: string[]): DependencyVia {
       return { inherited: { ancestor: key } };
     case "condition":
       return { condition: { condition_on: key } };
-    case "opening":
-      return { stage_opening: { group: key } };
     default:
       throw new Error(`not a dependency origin: ${kind}`);
   }
@@ -115,10 +110,7 @@ export function viaText(via: DependencyVia, name: Namer): string {
   if ("inherited" in via) {
     return `a requirement inherited from ${name(via.inherited.ancestor)}`;
   }
-  if ("condition" in via) {
-    return `the condition on ${name(via.condition.condition_on)}`;
-  }
-  return `the opening of the stage ${name(via.stage_opening.group)}`;
+  return `the condition on ${name(via.condition.condition_on)}`;
 }
 
 /** Where a constraint comes from (F2), in words. */
@@ -141,10 +133,7 @@ export function parsedSourceText(source: ConstraintSource, name: Namer): string 
   if ("estimate" in source) {
     return `the estimate of ${name(source.estimate.node)}`;
   }
-  if ("containment" in source) {
-    return `${name(source.containment.parent)} contains ${name(source.containment.child)}`;
-  }
-  return `the close of the stage ${name(source.stage_close.group)}`;
+  return `${name(source.containment.parent)} contains ${name(source.containment.child)}`;
 }
 
 /** One constraint as the chain shows it: `after` at least `offset` days after `before`. */
@@ -166,8 +155,7 @@ export type EditTarget =
   | { edit: "pin"; node: string }
   | { edit: "answer"; decision: string }
   | { edit: "due_by" | "not_before" | "estimate"; node: string }
-  | { edit: "requirement"; node: string; requires: string }
-  | { edit: "stage_close"; group: string };
+  | { edit: "requirement"; node: string; requires: string };
 
 function sourceTarget(text: Schema<"ConstraintSource">, view: Ready): EditTarget | undefined {
   const source = parseSource(text);
@@ -181,9 +169,6 @@ function sourceTarget(text: Schema<"ConstraintSource">, view: Ready): EditTarget
   }
   if ("not_before" in source) {
     return { edit: "not_before", node: source.not_before.node };
-  }
-  if ("stage_close" in source) {
-    return { edit: "stage_close", group: source.stage_close.group };
   }
   if ("dependency" in source) {
     const { node, requires, via } = source.dependency;
@@ -238,8 +223,6 @@ export function targetText(target: EditTarget, name: Namer): string {
       return `the ${fieldWords(target.edit)} of ${name(target.node)}`;
     case "requirement":
       return `${name(target.node)}'s requirement on ${name(target.requires)}`;
-    case "stage_close":
-      return `the close of the stage ${name(target.group)}`;
   }
 }
 
