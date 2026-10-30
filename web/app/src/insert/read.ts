@@ -2,8 +2,11 @@
 // unretired ones from the route index, and one version with its route's header (what a local preview of the insertion reads).
 import { useMemo } from "react";
 
-import type { Host, Route, RouteVersion } from "../data/host.ts";
-import { HOST_READ, valueOf, type ReadSource } from "../data/keyed-read.ts";
+import type { Schema } from "@cairn/client";
+
+import type { Graph } from "../authoring/graph.ts";
+import type { Deriver, Host, Route, RouteVersion } from "../data/host.ts";
+import { DERIVE, HOST_READ, valueOf, type ReadSource } from "../data/keyed-read.ts";
 import { routeIndex } from "../data/reads.ts";
 import { useKeyedRead, useLive, useSession } from "../data/react.ts";
 
@@ -50,6 +53,30 @@ export function useRouteCopy(route: string | undefined, version: number | undefi
   const { host } = useSession();
   const key = route === undefined || version === undefined ? undefined : { of: [route, version], freshness: [], args: { host, route, version } };
   return valueOf(useKeyedRead(ROUTE_COPY, key).view);
+}
+
+interface PlanArgs {
+  deriver: Deriver;
+  host: Graph;
+  route: Graph;
+  ask: Schema<"InsertionAsk">;
+}
+
+const INSERTION_PLAN: ReadSource<PlanArgs, Schema<"InsertionPlan">> = {
+  policy: DERIVE,
+  read: ({ deriver, host, route, ask }) => deriver.insertionPlan(host, route, ask),
+};
+
+/**
+ * B13, C19: the engine's plan for inserting `route` into `host` given the people choices: where each role and kind lands,
+ * which nodes are left out and which roots are placed. The last answer stays for display while a new one is worked out, and `current` says when it is no longer the last.
+ */
+export function useInsertionPlan(host: Graph, route: Graph | undefined, ask: Schema<"InsertionAsk">): { plan: Schema<"InsertionPlan">; current: boolean } | undefined {
+  const { deriver } = useSession();
+  const key = route === undefined ? undefined : { of: ["insertion"], freshness: [JSON.stringify(host), JSON.stringify(route), JSON.stringify(ask)], args: { deriver, host, route, ask } };
+  const { view } = useKeyedRead(INSERTION_PLAN, key);
+  const plan = valueOf(view);
+  return plan === undefined ? undefined : { plan, current: view.status === "current" };
 }
 
 /** A route's name by route id, from the route index; the id for one not listed. */

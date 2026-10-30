@@ -37,5 +37,5 @@ test("C19, C14: a route inserted from a container, reviewed, applied, and shown 
   await openJourney(page, JOURNEY);
   await page.getByTestId("node-card").filter({ hasText: "Security review" }).first().getByTestId("card-open").click();
   await page.getByTestId("details").locator("summary").click();
-  await expect(page.getByTestId("origin-route").first()).toHaveText("Security review, version 1");
+  await expect(page.getByTestId("origin-route").first()).toHaveText("From route Security review, version 1");
 });

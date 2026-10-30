@@ -94,8 +94,9 @@ pub use node::{
 pub use notice::{Notice, NoticeCode};
 pub use number::{Days, NumberError, Revision, SignedDays, VersionNumber, Weight};
 pub use patch::{
-    ChangeClass, DraftSource, EdgeEnd, InsertedEdge, KindChoice, Mutation, Mutations, Override,
-    ParticipationRef, Patch, PatchTarget, RecordedEnd, Removal, RoleChoice, Transition,
+    ChangeClass, DraftSource, EdgeEnd, InsertedEdge, InsertionAsk, InsertionFilled, InsertionPlan,
+    InsertionRow, KindChoice, Mutation, Mutations, Override, ParticipationRef, Patch, PatchTarget,
+    RecordedEnd, Removal, RoleChoice, Transition,
 };
 pub use projection::{
     AffectedNodes, AgentRow, AnswerEffects, ChoiceEffect, Cursor, Dangling, DanglingKind, DateLink,

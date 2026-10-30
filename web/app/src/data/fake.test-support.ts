@@ -341,6 +341,10 @@ export class FakeDeriver implements Deriver {
     return Promise.reject(new Error("no removal plans in the fake"));
   }
 
+  insertionPlan(): Promise<never> {
+    return Promise.reject(new Error("no insertion plans in the fake"));
+  }
+
   draftWritten(): Promise<never> {
     return Promise.reject(new Error("no draft text in the fake"));
   }

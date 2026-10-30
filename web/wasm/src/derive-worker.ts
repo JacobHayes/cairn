@@ -213,6 +213,11 @@ export class DeriveWorker {
     return parsed<Schema<"RemovalPlan"> | null>(await this.#ask({ op: "removal_plan", graph, target })) ?? undefined;
   }
 
+  /** B13, C19: where the roles and kinds of `route` land when inserted into `host`, which nodes are left out and which roots are placed. */
+  async insertionPlan(host: Schema<"Graph">, route: Schema<"Graph">, ask: Schema<"InsertionAsk">): Promise<Schema<"InsertionPlan">> {
+    return parsed<Schema<"InsertionPlan">>(await this.#ask({ op: "insertion_plan", host, route, ask }));
+  }
+
   /** A10: a stored message draft as an author reads it: roles by id, decisions by path. */
   async draftWritten(graph: Schema<"Graph">, stored: string): Promise<string> {
     return parsed<string>(await this.#ask({ op: "draft_written", graph, stored }));

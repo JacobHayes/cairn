@@ -7,7 +7,7 @@
 mod annotations;
 mod deployment;
 mod graph_parts;
-mod insertion;
+pub(crate) mod insertion;
 mod journey;
 mod lifecycle;
 mod proposal;

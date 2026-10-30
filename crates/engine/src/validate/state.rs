@@ -135,32 +135,32 @@ fn answers(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     }
 }
 
+/// The role a decision fills, if it fills one (E3).
+#[must_use]
+pub(crate) fn role_filled_by(node: &cairn_schema::Node<cairn_schema::KeyRefs>) -> Option<&RoleKey> {
+    match &node.payload {
+        Payload::Decision(decision) => match &decision.answer {
+            AnswerSpec::Identity { fills_role } | AnswerSpec::IdentityList { fills_role } => {
+                fills_role.as_ref()
+            }
+            AnswerSpec::Boolean
+            | AnswerSpec::SingleChoice(_)
+            | AnswerSpec::MultiChoice(_)
+            | AnswerSpec::Text
+            | AnswerSpec::Date { .. } => None,
+        },
+        _ => None,
+    }
+}
+
 /// The decision that fills each role (E3).
 #[must_use]
 pub(crate) fn filling_decisions(document: &cairn_schema::Graph) -> BTreeMap<&RoleKey, &NodeKey> {
-    let mut fillers = BTreeMap::new();
-    for node in document.nodes.values() {
-        if let Payload::Decision(decision) = &node.payload {
-            match &decision.answer {
-                AnswerSpec::Identity {
-                    fills_role: Some(role),
-                }
-                | AnswerSpec::IdentityList {
-                    fills_role: Some(role),
-                } => {
-                    fillers.insert(role, &node.key);
-                }
-                AnswerSpec::Identity { fills_role: None }
-                | AnswerSpec::IdentityList { fills_role: None }
-                | AnswerSpec::Boolean
-                | AnswerSpec::SingleChoice(_)
-                | AnswerSpec::MultiChoice(_)
-                | AnswerSpec::Text
-                | AnswerSpec::Date { .. } => {}
-            }
-        }
-    }
-    fillers
+    document
+        .nodes
+        .values()
+        .filter_map(|node| role_filled_by(node).map(|role| (role, &node.key)))
+        .collect()
 }
 
 /// The decision that feeds each milestone (E3).

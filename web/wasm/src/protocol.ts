@@ -33,6 +33,7 @@ export type WorkerRequest =
   | { op: "node_form_problems"; values: NodeFormValues }
   | { op: "value_problems"; checks: ValueCheck[] }
   | { op: "removal_plan"; graph: Schema<"Graph">; target: Schema<"RemovalTarget"> }
+  | { op: "insertion_plan"; host: Schema<"Graph">; route: Schema<"Graph">; ask: Schema<"InsertionAsk"> }
   | { op: "draft_written"; graph: Schema<"Graph">; stored: string }
   | { op: "draft_stored"; graph: Schema<"Graph">; written: string }
   | { op: "memory" };

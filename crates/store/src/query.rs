@@ -172,8 +172,16 @@ pub struct RouteDetail {
     pub revision: Revision,
     /// Its versions, oldest first.
     pub versions: Vec<VersionJourneys>,
+}
+
+impl RouteDetail {
     /// A19: whether a journey follows one of its versions. A route in use cannot be deleted.
-    pub in_use: bool,
+    #[must_use]
+    pub fn in_use(&self) -> bool {
+        self.versions
+            .iter()
+            .any(|version| !version.journeys.is_empty())
+    }
 }
 
 /// One published version and the journeys on it.

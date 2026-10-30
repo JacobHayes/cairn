@@ -24,7 +24,7 @@ use cairn_schema::{
 
 use super::Session;
 use crate::graph::Tree;
-use crate::insertion::{Refusal, Remap, mint};
+use crate::insertion::{Refusal, Remap, default_kind, default_role, mint};
 
 /// Applies an `insert_route` mutation.
 pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write> {
@@ -340,7 +340,7 @@ fn admit_route<'a>(
 }
 
 /// Every route node left out: the omitted ones and everything under them.
-fn excluded_nodes(tree: &Tree, omit: &BTreeSet<NodeKey>) -> BTreeSet<NodeKey> {
+pub(crate) fn excluded_nodes(tree: &Tree, omit: &BTreeSet<NodeKey>) -> BTreeSet<NodeKey> {
     let mut excluded = omit.clone();
     for key in omit {
         excluded.extend(tree.descendants(key));
@@ -440,11 +440,7 @@ fn map_roles(
         let existing = match request.roles.get(&role.key) {
             Some(RoleChoice::Existing(key)) => host.roles.get(key).map(Some),
             Some(RoleChoice::Add) => Some(None),
-            None => Some(
-                host.roles
-                    .values()
-                    .find(|held| held.id == role.id && held.multi == role.multi),
-            ),
+            None => Some(default_role(host, role)),
         };
         match existing {
             Some(Some(held)) if held.multi != role.multi => {
@@ -508,11 +504,7 @@ fn map_kinds(
         let existing = match request.kinds.get(&kind.key) {
             Some(KindChoice::Existing(key)) => host.participation_kinds.get(key).map(Some),
             Some(KindChoice::Add) => Some(None),
-            None => Some(
-                host.participation_kinds
-                    .values()
-                    .find(|held| held.id == kind.id && held.multi == kind.multi),
-            ),
+            None => Some(default_kind(host, kind)),
         };
         match existing {
             Some(Some(held)) if held.multi != kind.multi => {

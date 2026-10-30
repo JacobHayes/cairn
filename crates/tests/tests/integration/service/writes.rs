@@ -1202,7 +1202,7 @@ async fn a_route_a_journey_follows_on_an_old_version_is_deleted_only_with_it(
     );
     let id = "vendor-evaluation".parse().unwrap();
     let detail = service.route_detail(&id).await.unwrap().unwrap();
-    assert!(detail.in_use);
+    assert!(detail.in_use());
     let journey = service
         .journey(&journey_id("j_vendor_eval"))
         .await

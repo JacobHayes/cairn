@@ -186,6 +186,8 @@ export interface Deriver {
   valueProblems(checks: ValueCheck[]): Promise<ValueProblem[]>;
   /** A18: what removing a node, role or kind from a graph takes and leaves dangling, with the rewrites to send first; none when the node is not in it. */
   removalPlan(graph: Schema<"Graph">, target: Schema<"RemovalTarget">): Promise<Schema<"RemovalPlan"> | undefined>;
+  /** B13, C19: where the roles and kinds of a route version land when inserted into a graph, which nodes are left out and which roots are placed. */
+  insertionPlan(host: Schema<"Graph">, route: Schema<"Graph">, ask: Schema<"InsertionAsk">): Promise<Schema<"InsertionPlan">>;
   /** A10: a stored message draft as an author reads it. */
   draftWritten(graph: Schema<"Graph">, stored: string): Promise<string>;
   /** A10: a written message draft stored with keys, or why it cannot be. */

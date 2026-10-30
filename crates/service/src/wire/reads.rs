@@ -160,11 +160,11 @@ pub struct VersionJourneys {
 
 impl From<cairn_store::RouteDetail> for RouteDetail {
     fn from(detail: cairn_store::RouteDetail) -> Self {
+        let in_use = detail.in_use();
         let cairn_store::RouteDetail {
             header,
             revision,
             versions,
-            in_use,
         } = detail;
         let versions = versions.into_iter().map(|version| {
             let cairn_store::VersionJourneys {

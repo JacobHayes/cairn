@@ -1,11 +1,9 @@
-// B13, C19: what inserting a route asks of a person and what it sends, worked out from the
-// graph it goes into and the route version it copies. Everything here is pure: the stepper
-// draws it and the engine does the insertion (every mapping mistake is a violation of the
-// graph the patch produces; this only chooses sensible defaults and the `omit` that the
-// two-filling-decisions case needs, so the usual insertion needs no repair).
+// B13, C19: what inserting a route sends, put together from the engine's plan for the graph it
+// goes into and the route version it copies (where each role and kind lands, what is left out,
+// which roots are placed) and the person's choices. The rules are the engine's; this names
+// things and wires the chosen nodes to the roots.
 import type { Schema } from "@cairn/client";
 
-import { decisionsIn } from "../authoring/condition.ts";
 import type { Graph, GraphNode, Kind, Mutation, Role } from "../authoring/graph.ts";
 import { type DiffMark } from "../proposals/model.ts";
 
@@ -31,22 +29,6 @@ export interface Choices {
 
 export const NO_CHOICES: Choices = { parent: undefined, title: "", after: [], before: [], roles: {}, kinds: {} };
 
-/** The route's top-level nodes: what an insertion places. */
-export function rootsOf(route: Graph): GraphNode[] {
-  return (route.nodes ?? []).filter((node) => node.parent == null);
-}
-
-/** What fills a role in the graph: a decision whose answer does (E3), or a direct fill kept in a journey's state. */
-export type Filling = { by: GraphNode } | "direct";
-
-export function fillingOf(host: Graph, role: string): Filling | undefined {
-  const by = (host.nodes ?? []).find((node) => node.fills_role === role);
-  if (by !== undefined) {
-    return { by };
-  }
-  return (host.state?.role_fills?.[role] ?? []).length > 0 ? "direct" : undefined;
-}
-
 /** One row of the People step: a route role or kind, what it can become, and what that means for the route's own filling decision. */
 export interface PeopleRow {
   type: "role" | "kind";
@@ -71,73 +53,49 @@ export interface Plan {
 type Named = Role | Kind;
 
 const titleOf = (item: Named) => item.title ?? item.id;
-const same = (left: Named, right: Named) => (left.multi ?? false) === (right.multi ?? false);
+const titleIn = (items: readonly Named[], key: string) => {
+  const found = items.find((item) => item.key === key);
+  return found === undefined ? key : titleOf(found);
+};
+const mappingOf = (existing: string | undefined | null): Mapping => (existing == null ? "add" : { existing });
 
-/** The mapping an untouched row takes: the graph's role or kind with the same id and cardinality, else a new one. */
-function defaultMapping(item: Named, candidates: readonly Named[]): Mapping {
-  const match = candidates.find((each) => each.id === item.id && same(each, item));
-  return match === undefined ? "add" : { existing: match.key };
-}
-
-/** Whether a node of the route reads `decision` in a condition, so leaving the decision out would dangle. */
-function readInCondition(route: Graph, decision: string): boolean {
-  return (route.nodes ?? []).some((node) => node.relevant_when != null && decisionsIn(node.relevant_when).includes(decision));
-}
-
-/**
- * C19: the People step's rows and the `omit` they imply. A role mapped onto one the graph
- * already fills leaves out the route's own filling decisions, unless a route condition
- * reads one, in which case an untouched row defaults to a new role; a row the person
- * points at such a role anyway keeps the decision, and the engine says so in its preview.
- */
-export function peopleRows(host: Graph, route: Graph, choices: Pick<Choices, "roles" | "kinds">): PeopleRow[] {
-  const roles = (route.roles ?? []).map((role): PeopleRow => {
-    const candidates = (host.roles ?? []).filter((each) => same(each, role));
-    const deciders = (route.nodes ?? []).filter((node) => node.fills_role === role.key);
-    const blocked = deciders.some((node) => readInCondition(route, node.key));
-    const typical = defaultMapping(role, host.roles ?? []);
-    const filledByDefault = typical !== "add" && fillingOf(host, typical.existing) !== undefined;
-    const mapping = choices.roles[role.key] ?? (filledByDefault && blocked ? "add" : typical);
-    const filling = mapping === "add" ? undefined : fillingOf(host, mapping.existing);
-    const leaving = filling === undefined || blocked ? [] : deciders;
-    return {
-      type: "role",
-      key: role.key,
-      title: titleOf(role),
-      mapping,
-      options: candidates.map((each) => ({ key: each.key, title: titleOf(each) })),
-      filled: filling === undefined || leaving.length === 0 ? undefined : { by: filling === "direct" ? undefined : filling.by.title, leftOut: leaving },
-    };
+/** The People step's rows: the engine's plan (where each role and kind lands, and what that leaves out) with the titles to say it in. */
+function peopleRows(host: Graph, route: Graph, plan: Schema<"InsertionPlan">): PeopleRow[] {
+  const nodes = new Map((route.nodes ?? []).map((node) => [node.key, node] as const));
+  const hostNodes = new Map((host.nodes ?? []).map((node) => [node.key, node] as const));
+  const row = (type: PeopleRow["type"], held: readonly Named[], ours: readonly Named[]) => (each: Schema<"InsertionRow">): PeopleRow => ({
+    type,
+    key: each.key,
+    title: titleIn(ours, each.key),
+    mapping: mappingOf(each.existing),
+    options: (each.options ?? []).map((key) => ({ key, title: titleIn(held, key) })),
+    filled:
+      each.filled == null
+        ? undefined
+        : {
+            by: each.filled.by == null ? undefined : (hostNodes.get(each.filled.by)?.title ?? each.filled.by),
+            leftOut: each.filled.left_out.flatMap((key) => nodes.get(key) ?? []),
+          },
   });
-  const kinds = (route.participation_kinds ?? []).map(
-    (kind): PeopleRow => ({
-      type: "kind",
-      key: kind.key,
-      title: titleOf(kind),
-      mapping: choices.kinds[kind.key] ?? defaultMapping(kind, host.participation_kinds ?? []),
-      options: (host.participation_kinds ?? []).filter((each) => same(each, kind)).map((each) => ({ key: each.key, title: titleOf(each) })),
-      filled: undefined,
-    }),
-  );
-  return [...roles, ...kinds];
+  return [
+    ...(plan.roles ?? []).map(row("role", host.roles ?? [], route.roles ?? [])),
+    ...(plan.kinds ?? []).map(row("kind", host.participation_kinds ?? [], route.participation_kinds ?? [])),
+  ];
 }
 
 /**
- * C19, B13: the `insert_route` mutation for `choices`: the roots' wiring as edges (the root
- * requires each Starts after node; each Comes before node requires the root), every role and
- * kind mapped explicitly, and the route's filling decisions left out where the graph's own
- * fills the role. `host` is the graph it goes into.
+ * C19, B13: the `insert_route` mutation for `choices`, from the engine's plan: the roots'
+ * wiring as edges (the root requires each Starts after node; each Comes before node requires
+ * the root), every role and kind mapped explicitly, and the nodes the plan leaves out. `host`
+ * is the graph it goes into.
  */
-export function planInsertion(host: Graph, route: Graph, lineage: Lineage, insertion: string, choices: Choices): Plan {
-  const rows = peopleRows(host, route, choices);
-  const omit = rows.flatMap((row) => (row.filled === undefined ? [] : row.filled.leftOut.map((node) => node.key)));
-  // The roots that are placed: a root left out is not wired, and a name is the root's to choose when one is placed.
-  const roots = rootsOf(route).filter((root) => !omit.includes(root.key));
-  const only = roots.length === 1 ? roots[0] : undefined;
+export function planInsertion(host: Graph, route: Graph, plan: Schema<"InsertionPlan">, lineage: Lineage, insertion: string, choices: Choices): Plan {
+  const rows = peopleRows(host, route, plan);
+  const roots = plan.roots ?? [];
+  const only = roots.length === 1 ? (route.nodes ?? []).find((node) => node.key === roots[0]) : undefined;
   const named = only !== undefined && choices.title.trim() !== "";
   const rootTitle = named ? choices.title.trim() : (only?.title ?? "");
-  const mappings = (type: PeopleRow["type"]) =>
-    Object.fromEntries(rows.filter((row) => row.type === type).map((row) => [row.key, row.mapping === "add" ? ("add" as const) : { existing: row.mapping.existing }]));
+  const mappings = (type: PeopleRow["type"]) => Object.fromEntries(rows.filter((row) => row.type === type).map((row) => [row.key, row.mapping]));
   const mutation: Plan["mutation"] = {
     op: "insert_route",
     insertion,
@@ -146,10 +104,10 @@ export function planInsertion(host: Graph, route: Graph, lineage: Lineage, inser
     ...(named ? { root_title: rootTitle } : {}),
     roles: mappings("role"),
     kinds: mappings("kind"),
-    omit,
+    omit: plan.omit ?? [],
     edges: roots.flatMap((root) => [
-      ...choices.after.map((host) => ({ node: { route: root.key }, requires: { host } })),
-      ...choices.before.map((host) => ({ node: { host }, requires: { route: root.key } })),
+      ...choices.after.map((host) => ({ node: { route: root }, requires: { host } })),
+      ...choices.before.map((host) => ({ node: { host }, requires: { route: root } })),
     ]),
   };
   return { mutation, rows, root: only === undefined ? undefined : { title: rootTitle } };

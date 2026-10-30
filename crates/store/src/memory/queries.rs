@@ -149,7 +149,6 @@ impl State {
             header: header.clone(),
             revision: *revision,
             versions,
-            in_use: !self.domains.graphs_using(route).is_empty(),
         })
     }
 

@@ -123,6 +123,18 @@ export function draftStored(graph: string, written: string): string;
 export function draftWritten(graph: string, stored: string): string;
 
 /**
+ * B13, C19: the JSON of an `InsertionPlan`: where the roles and kinds of `route` (a `Graph`,
+ * a published version's) land when inserted into `host` (a `Graph`, with its state for a
+ * journey), given what `ask` (an `InsertionAsk`) has chosen, which nodes are left out and
+ * which roots are placed.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`] when an input does not read.
+ */
+export function insertionPlan(host: string, route: string, ask: string): string;
+
+/**
  * A1a, A4, A9, G5: the JSON of the problems with a node form's values (the JSON of
  * [`NodeFormValues`]), one per field that cannot be sent, each `{"field", "message"}` with the
  * message in words for the person filling in the form; `[]` when all can be sent. The rules
@@ -220,6 +232,7 @@ export interface InitOutput {
     readonly derivation_renderDraft: (a: number, b: number, c: number, d: number) => void;
     readonly draftStored: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly draftWritten: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly insertionPlan: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
     readonly nodeFormProblems: (a: number, b: number, c: number) => void;
     readonly preview: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly readRouteFile: (a: number, b: number, c: number) => void;

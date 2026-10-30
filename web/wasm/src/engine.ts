@@ -14,6 +14,7 @@ import init, {
   draftWritten,
   preview,
   readRouteFile,
+  insertionPlan,
   removalPlan,
   routeFileText,
   routeNotices,
@@ -194,6 +195,11 @@ export class Engine {
   /** A18: what removing `target` from `graph` takes and leaves dangling, as the module wrote it (`null` when a node asked for is not there). */
   removalPlanText(graph: Schema<"Graph">, target: Schema<"RemovalTarget">): string {
     return hosted(() => removalPlan(JSON.stringify(graph), JSON.stringify(target)));
+  }
+
+  /** B13, C19: where the roles and kinds of `route` land when inserted into `host`, which nodes are left out and which roots are placed, as the module wrote it. */
+  insertionPlanText(host: Schema<"Graph">, route: Schema<"Graph">, ask: Schema<"InsertionAsk">): string {
+    return hosted(() => insertionPlan(JSON.stringify(host), JSON.stringify(route), JSON.stringify(ask)));
   }
 
   /** A10: a stored message draft as an author reads it, as the module wrote it (a JSON string). */

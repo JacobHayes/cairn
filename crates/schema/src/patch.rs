@@ -211,6 +211,68 @@ pub enum KindChoice {
     Add,
 }
 
+// PRD: B13, C19.
+/// What the person has chosen to map: the route's roles and kinds they pointed at a graph key
+/// or at a new one. A role or kind not named takes its default.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InsertionAsk {
+    /// Per route role key.
+    #[serde(default)]
+    pub roles: BTreeMap<RoleKey, RoleChoice>,
+    /// Per route kind key.
+    #[serde(default)]
+    pub kinds: BTreeMap<KindKey, KindChoice>,
+}
+
+// PRD: B13, C19.
+/// What inserting a route version into a graph asks and does by default: where each role and
+/// kind of the route lands, which nodes are left out, and which roots are placed.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InsertionPlan {
+    /// One row per role of the route.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roles: Vec<InsertionRow>,
+    /// One row per participation kind of the route.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub kinds: Vec<InsertionRow>,
+    /// The route nodes left out: its decisions that fill a role the graph already fills.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub omit: Vec<NodeKey>,
+    /// The route's top-level nodes that are placed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roots: Vec<NodeKey>,
+}
+
+/// One role or kind of the route and where it lands.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InsertionRow {
+    /// The route's key for it.
+    pub key: String,
+    /// The graph key it becomes; none for a new one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub existing: Option<String>,
+    /// The graph keys it may be mapped onto: those of the same cardinality.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<String>,
+    /// Roles only: the graph already fills the role the row lands on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filled: Option<InsertionFilled>,
+}
+
+/// A role the graph already fills, and the route's decisions that fill it which are left out.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InsertionFilled {
+    /// The graph's decision that fills it; none when it is filled directly in a journey.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<NodeKey>,
+    /// The route's decisions that fill it, left out.
+    pub left_out: Vec<NodeKey>,
+}
+
 /// One end of an edge an insertion adds: a node of the route, or of the graph.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,

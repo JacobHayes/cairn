@@ -14,6 +14,7 @@ export const derivation_project: (a: number, b: number, c: number, d: number) =>
 export const derivation_renderDraft: (a: number, b: number, c: number, d: number) => void;
 export const draftStored: (a: number, b: number, c: number, d: number, e: number) => void;
 export const draftWritten: (a: number, b: number, c: number, d: number, e: number) => void;
+export const insertionPlan: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
 export const nodeFormProblems: (a: number, b: number, c: number) => void;
 export const preview: (a: number, b: number, c: number, d: number, e: number) => void;
 export const readRouteFile: (a: number, b: number, c: number) => void;

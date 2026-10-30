@@ -17,9 +17,9 @@ use crate::wire::{
 };
 use cairn_schema::{
     AgentId, DecisionView, Deployment, Derived, DomainDocument, ExplainedField, ExplanationPage,
-    IdentityKey, Journey, JourneyId, Level, ListPage, Next, NodeKey, Proposal, ProposalId,
-    Rejection, RemovalPlan, RemovalRead, RemovalTarget, Route, RouteFile, RouteId, RouteVersion,
-    Snapshot, StatusSummary, Timeline, Trace, VersionNumber,
+    IdentityKey, InsertionAsk, InsertionPlan, Journey, JourneyId, Level, ListPage, Next, NodeKey,
+    Proposal, ProposalId, Rejection, RemovalPlan, RemovalRead, RemovalTarget, Route, RouteFile,
+    RouteId, RouteVersion, Snapshot, StatusSummary, Timeline, Trace, VersionNumber,
 };
 use cairn_service::wire::{
     Caller, Capabilities, EventPage, Health, History, IdentityReferences, JourneyPage, Mine,
@@ -619,6 +619,8 @@ pub fn document() -> Value {
     // Types only the browser's engine answers, so no endpoint names them: the app's types.
     generator.subschema_for::<RemovalTarget>();
     generator.subschema_for::<RemovalPlan>();
+    generator.subschema_for::<InsertionAsk>();
+    generator.subschema_for::<InsertionPlan>();
     let mut paths = Map::new();
     for operation in operations() {
         let rendered = render(&operation, &mut generator, &problem, &rejection, &tick);

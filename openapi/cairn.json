@@ -4109,12 +4109,143 @@
         ],
         "type": "object"
       },
+      "InsertionAsk": {
+        "additionalProperties": false,
+        "description": "What the person has chosen to map: the route's roles and kinds they pointed at a graph key\nor at a new one. A role or kind not named takes its default.",
+        "properties": {
+          "kinds": {
+            "additionalProperties": false,
+            "default": {},
+            "description": "Per route kind key.",
+            "patternProperties": {
+              "^k_[a-z0-9][a-z0-9_-]*$": {
+                "$ref": "#/components/schemas/KindChoice"
+              }
+            },
+            "type": "object"
+          },
+          "roles": {
+            "additionalProperties": false,
+            "default": {},
+            "description": "Per route role key.",
+            "patternProperties": {
+              "^r_[a-z0-9][a-z0-9_-]*$": {
+                "$ref": "#/components/schemas/RoleChoice"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "InsertionFilled": {
+        "additionalProperties": false,
+        "description": "A role the graph already fills, and the route's decisions that fill it which are left out.",
+        "properties": {
+          "by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The graph's decision that fills it; none when it is filled directly in a journey."
+          },
+          "left_out": {
+            "description": "The route's decisions that fill it, left out.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "left_out"
+        ],
+        "type": "object"
+      },
       "InsertionKey": {
         "description": "Starts with \"i_\"; at most id_bytes_max (64) bytes.",
         "maxLength": 64,
         "minLength": 1,
         "pattern": "^i_[a-z0-9][a-z0-9_-]*$",
         "type": "string"
+      },
+      "InsertionPlan": {
+        "additionalProperties": false,
+        "description": "What inserting a route version into a graph asks and does by default: where each role and\nkind of the route lands, which nodes are left out, and which roots are placed.",
+        "properties": {
+          "kinds": {
+            "description": "One row per participation kind of the route.",
+            "items": {
+              "$ref": "#/components/schemas/InsertionRow"
+            },
+            "type": "array"
+          },
+          "omit": {
+            "description": "The route nodes left out: its decisions that fill a role the graph already fills.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          },
+          "roles": {
+            "description": "One row per role of the route.",
+            "items": {
+              "$ref": "#/components/schemas/InsertionRow"
+            },
+            "type": "array"
+          },
+          "roots": {
+            "description": "The route's top-level nodes that are placed.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "InsertionRow": {
+        "additionalProperties": false,
+        "description": "One role or kind of the route and where it lands.",
+        "properties": {
+          "existing": {
+            "description": "The graph key it becomes; none for a new one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "filled": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InsertionFilled"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Roles only: the graph already fills the role the row lands on."
+          },
+          "key": {
+            "description": "The route's key for it.",
+            "type": "string"
+          },
+          "options": {
+            "description": "The graph keys it may be mapped onto: those of the same cardinality.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
       },
       "Instant": {
         "description": "A point in time: `n_x.start` or `n_x.finish` for a node's start or finish, `n_x.answer` for a date decision's answered date, `created` for the journey's creation.",

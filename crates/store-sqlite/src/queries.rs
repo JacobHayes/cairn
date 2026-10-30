@@ -125,7 +125,6 @@ pub(crate) fn route_detail(
         header,
         revision,
         versions,
-        in_use: !using(connection, route)?.is_empty(),
     }))
 }
 

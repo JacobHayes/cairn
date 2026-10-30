@@ -20,7 +20,7 @@ import { stepperDraftKey } from "./entry.ts";
 import { heldOf, insertion, stepOf } from "./insertion.ts";
 import { insertionMembers, planInsertion, type Choices, type Mapping, type PeopleRow, type Plan } from "./model.ts";
 import { useCandidate, type Candidate } from "./preview.ts";
-import { useRouteNames, useRouteOffers, useRouteCopy, type RouteOffer, type RouteCopy } from "./read.ts";
+import { useInsertionPlan, useRouteNames, useRouteOffers, useRouteCopy, type RouteOffer, type RouteCopy } from "./read.ts";
 
 /** What the canvas draws while a route is being placed: the graph before and after, and how its new insertion is named. */
 export interface InsertPreview {
@@ -172,9 +172,10 @@ function useInsertion(authored: Authored, parent: string | undefined, onPreview:
   const { picked, choices, insertion: key } = useSelector(flow, (snapshot) => snapshot.context);
   const loaded = useRouteCopy(picked?.id, picked?.version);
   const nameOf = useRouteNames();
+  const engine = useInsertionPlan(authored.graph, loaded?.version.graph, { roles: choices.roles, kinds: choices.kinds });
   const plan = useMemo(
-    () => (picked === undefined || loaded === undefined ? undefined : planInsertion(authored.graph, loaded.version.graph, { route: picked.id, version: picked.version }, key, choices)),
-    [authored, picked, loaded, key, choices],
+    () => (picked === undefined || loaded === undefined || engine === undefined ? undefined : planInsertion(authored.graph, loaded.version.graph, engine.plan, { route: picked.id, version: picked.version }, key, choices)),
+    [authored, picked, loaded, engine?.plan, key, choices],
   );
   // Whether the route has people to map is known once its plan is: a people step restored from a reload waits for that.
   const people = plan !== undefined && plan.rows.length > 0;
@@ -197,6 +198,7 @@ function useInsertion(authored: Authored, parent: string | undefined, onPreview:
     step,
     loaded,
     plan,
+    settled: engine?.current === true,
     people,
     candidate,
     choices,
@@ -208,7 +210,7 @@ function useInsertion(authored: Authored, parent: string | undefined, onPreview:
 }
 
 export function InsertStepper({ authored, parent, onClose, onPreview }: InsertStepperProps) {
-  const { step, loaded, plan, people, candidate, choices, next, back, change, choose } = useInsertion(authored, parent, onPreview);
+  const { step, loaded, plan, settled, people, candidate, choices, next, back, change, choose } = useInsertion(authored, parent, onPreview);
   const { write, start } = useDraftAndOpen(`insert:${domainOf(authored)}`);
   const review = (copy: RouteCopy, mutation: Plan["mutation"]) => {
     const draft = { title: `Insert ${copy.route.header.name}`, destination_revision: authored.revision, mutations: [mutation] };
@@ -249,11 +251,11 @@ export function InsertStepper({ authored, parent, onClose, onPreview }: InsertSt
           Cancel
         </Button>
         {step === 1 ? null : last ? (
-          <Button primary disabled={write.disabled || loaded === undefined || plan === undefined || candidate.status !== "placed"} onClick={() => { if (loaded !== undefined && plan !== undefined) { review(loaded, plan.mutation); } }} data-testid="insert-review">
+          <Button primary disabled={write.disabled || !settled || loaded === undefined || plan === undefined || candidate.status !== "placed"} onClick={() => { if (loaded !== undefined && plan !== undefined) { review(loaded, plan.mutation); } }} data-testid="insert-review">
             Review
           </Button>
         ) : (
-          <Button primary disabled={plan === undefined} onClick={next} data-testid="insert-next">
+          <Button primary disabled={plan === undefined || !settled} onClick={next} data-testid="insert-next">
             Next
           </Button>
         )}

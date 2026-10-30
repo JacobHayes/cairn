@@ -15,8 +15,9 @@ use cairn_engine::{ApplyInputs, Graph as EngineGraph, Records, consequences, der
 use cairn_schema::condition::ConditionError;
 use cairn_schema::{
     Actor, Clause, Condition, Consequences, Date, Deployment, Domain, DomainDocument, Graph,
-    KeyRefs, Limit, Lineage, Markdown, NodeFormValues, Patch, PatchTarget, Proposal, RemovalTarget,
-    Route, RouteId, RouteVersion, Timestamp, ValueCheck, node_form_problems, value_problems,
+    InsertionAsk, KeyRefs, Limit, Lineage, Markdown, NodeFormValues, Patch, PatchTarget, Proposal,
+    RemovalTarget, Route, RouteId, RouteVersion, Timestamp, ValueCheck, node_form_problems,
+    value_problems,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -430,6 +431,22 @@ pub fn removal_plan(graph: &str, target: &str) -> Result<String, String> {
     let graph: Graph = read("graph", graph)?;
     let target: RemovalTarget = read("removal target", target)?;
     Ok(json(&cairn_engine::plan_removal(&graph, &target)))
+}
+
+/// B13, C19: the JSON of an `InsertionPlan`: where the roles and kinds of `route` (a `Graph`,
+/// a published version's) land when inserted into `host` (a `Graph`, with its state for a
+/// journey), given what `ask` (an `InsertionAsk`) has chosen, which nodes are left out and
+/// which roots are placed.
+///
+/// # Errors
+///
+/// The JSON of a [`HostError`] when an input does not read.
+#[wasm_bindgen(js_name = insertionPlan)]
+pub fn insertion_plan(host: &str, route: &str, ask: &str) -> Result<String, String> {
+    let host: Graph = read("graph", host)?;
+    let route: Graph = read("graph", route)?;
+    let ask: InsertionAsk = read("insertion choices", ask)?;
+    Ok(json(&cairn_engine::plan_insertion(&host, &route, &ask)))
 }
 
 /// A10: a stored message draft as an author reads it (roles by id, decisions by path), as

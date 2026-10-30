@@ -1478,7 +1478,7 @@ pub async fn a_route_delete_is_stale_when_something_started_using_it<B: Backend>
             .await
             .unwrap()
             .unwrap()
-            .in_use
+            .in_use()
     );
     let before = snapshot(&store).await;
     let (conflicts, _) = stale_parts(failed(&store, delete()).await);

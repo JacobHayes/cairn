@@ -211,6 +211,8 @@ async function answer(request: WorkerRequest): Promise<string> {
       return ready().valueProblemsText(request.checks);
     case "removal_plan":
       return ready().removalPlanText(request.graph, request.target);
+    case "insertion_plan":
+      return ready().insertionPlanText(request.host, request.route, request.ask);
     case "draft_written":
       return ready().draftWrittenText(request.graph, request.stored);
     case "draft_stored":

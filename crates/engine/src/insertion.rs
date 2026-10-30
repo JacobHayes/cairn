@@ -7,8 +7,8 @@
 
 use cairn_schema::id::fnv1a_body;
 use cairn_schema::{
-    AttachmentKey, InsertionKey, KeyRefs, KindKey, MapReferences, Node, NodeField, NodeKey,
-    Prefixed, RoleKey,
+    AttachmentKey, Graph, InsertionKey, KeyRefs, KindKey, MapReferences, Node, NodeField, NodeKey,
+    ParticipationKind, Prefixed, Role, RoleKey,
 };
 
 /// B13: the key of type `K` an insertion mints for the object that has `segment_key` in the
@@ -33,6 +33,24 @@ pub(crate) fn mint<K: Prefixed>(insertion: &InsertionKey, segment_key: &str) -> 
         Ok(key) => key,
         Err(error) => unreachable!("a minted body is a slug: {error}"),
     }
+}
+
+/// B13: the graph's role an untouched route role maps onto: the one with the same id and
+/// cardinality.
+pub(crate) fn default_role<'a>(host: &'a Graph, role: &Role<KeyRefs>) -> Option<&'a Role<KeyRefs>> {
+    host.roles
+        .values()
+        .find(|held| held.id == role.id && held.multi == role.multi)
+}
+
+/// B13: the graph's participation kind an untouched route kind maps onto, as for roles.
+pub(crate) fn default_kind<'a>(
+    host: &'a Graph,
+    kind: &ParticipationKind<KeyRefs>,
+) -> Option<&'a ParticipationKind<KeyRefs>> {
+    host.participation_kinds
+        .values()
+        .find(|held| held.id == kind.id && held.multi == kind.multi)
 }
 
 /// The graph's key for each key a segment node refers to.

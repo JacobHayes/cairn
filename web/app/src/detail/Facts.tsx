@@ -42,11 +42,14 @@ export function Origin({ detail }: { detail: NodeDetail }) {
   return (
     <span className="stack" data-testid="provenance">
       {found === "gone" ? (
-        <span data-testid="origin-route">A route since deleted, version {from.version}</span>
+        <span data-testid="origin-route">From a route since deleted, version {from.version}</span>
       ) : (
-        <Link to={routePath(from.route, { version: from.version })} data-testid="origin-route">
-          {found.name}, version {from.version}
-        </Link>
+        <span data-testid="origin-route">
+          From route{" "}
+          <Link to={routePath(from.route, { version: from.version })}>
+            {found.name}, version {from.version}
+          </Link>
+        </span>
       )}
     </span>
   );

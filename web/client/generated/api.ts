@@ -2265,8 +2265,60 @@ export interface components {
             /** @description What it requires. */
             requires: components["schemas"]["EdgeEnd"];
         };
+        /**
+         * @description What the person has chosen to map: the route's roles and kinds they pointed at a graph key
+         *     or at a new one. A role or kind not named takes its default.
+         */
+        InsertionAsk: {
+            /**
+             * @description Per route kind key.
+             * @default {}
+             */
+            kinds: {
+                [key: string]: components["schemas"]["KindChoice"];
+            };
+            /**
+             * @description Per route role key.
+             * @default {}
+             */
+            roles: {
+                [key: string]: components["schemas"]["RoleChoice"];
+            };
+        };
+        /** @description A role the graph already fills, and the route's decisions that fill it which are left out. */
+        InsertionFilled: {
+            /** @description The graph's decision that fills it; none when it is filled directly in a journey. */
+            by?: components["schemas"]["NodeKey"] | null;
+            /** @description The route's decisions that fill it, left out. */
+            left_out: components["schemas"]["NodeKey"][];
+        };
         /** @description Starts with "i_"; at most id_bytes_max (64) bytes. */
         InsertionKey: string;
+        /**
+         * @description What inserting a route version into a graph asks and does by default: where each role and
+         *     kind of the route lands, which nodes are left out, and which roots are placed.
+         */
+        InsertionPlan: {
+            /** @description One row per participation kind of the route. */
+            kinds?: components["schemas"]["InsertionRow"][];
+            /** @description The route nodes left out: its decisions that fill a role the graph already fills. */
+            omit?: components["schemas"]["NodeKey"][];
+            /** @description One row per role of the route. */
+            roles?: components["schemas"]["InsertionRow"][];
+            /** @description The route's top-level nodes that are placed. */
+            roots?: components["schemas"]["NodeKey"][];
+        };
+        /** @description One role or kind of the route and where it lands. */
+        InsertionRow: {
+            /** @description The graph key it becomes; none for a new one. */
+            existing?: string | null;
+            /** @description Roles only: the graph already fills the role the row lands on. */
+            filled?: components["schemas"]["InsertionFilled"] | null;
+            /** @description The route's key for it. */
+            key: string;
+            /** @description The graph keys it may be mapped onto: those of the same cardinality. */
+            options?: string[];
+        };
         /** @description A point in time: `n_x.start` or `n_x.finish` for a node's start or finish, `n_x.answer` for a date decision's answered date, `created` for the journey's creation. */
         Instant: string;
         /** @description A journey domain: its fields, revision, and graph with state. */
