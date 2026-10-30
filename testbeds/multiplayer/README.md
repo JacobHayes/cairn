@@ -60,13 +60,8 @@ Coverage oracles (`sometimes!`, plus the `reachable!` sites in `cairn_service`'s
 which the campaign also requires): a stale conflict surfaced, a resubmission answered from its receipt
 (client and service), a coalesced tick, a deployment tick after the merge, a stale patch
 completed with what intervened, a stale patch whose original committed meanwhile, a patch that lost at commit, and a resubmission that raced its
-original to commit. Some of `cairn_service`'s sites are out of this testbed's reach and
-listed in `sim.sh` (`out_of_reach`): the announce fallback when the deployment's revision
-cannot be read back after an identity create riding in a journey patch (the testbed rides none
-and fails no read); the derived-read memo (the views refetch the journey document, never a derived read); the
-proposal and route-import paths (the testbed drafts no proposal and imports no route); and
-the assistant's tool loop, turn limits, and write wrapper (the testbed never drives the
-assistant).
+original to commit. The sites out of this testbed's reach, and why, are `out_of_reach` in
+`sim.sh`.
 
 Arguments: `--clients N`, `--actions N`. Exit
 codes: 0 pass, 1 violation, 3 abort (runtime, store, or listener), 4 liveness (a client gave
@@ -84,13 +79,7 @@ cargo patina run target/patina/cairn-multiplayer --seed 1 [FAULT FLAGS]
 mise run sim          # every leg of sim.sh, from the repository root
 ```
 
-`sim.sh` (about 3 minutes): code (fmt, clippy, unit tests); build, and a clean audit; determinism (a seed
-recorded twice is byte-identical, its replay reports the same verdict); the smoke campaign
-(16 generations, `--buggify --sched-pct`, every oracle in reach fired, every generation
-passing); the
-faulted sweep (8 seeds of dropped, delayed, refused, and reset
-connections, every run passing and resending, some patch answered from its receipt, no inert
-knob).
+`sim.sh` (about 3 minutes) runs the legs; its comments say what each checks.
 The open patina limitation below is not checked: it exercises the pinned patina, not Cairn
 (`decisions/2026-10-17-simulation-runs-no-known-gap-checks.md`).
 

@@ -1,9 +1,0 @@
-# The full check fails on an open RustSec advisory
-
-- Question: a security review found the outbound sign-in client built on `rustls-webpki` and `webpki-roots` releases with open RustSec advisories (distrusted CA intermediates accepted), and nothing in the ladder would have said so. Where should advisories be checked, and with what? This came from that review, not a brief.
-- Call: a new step, `advisories`, in the full check only: `cargo deny check advisories` over every lock file in the repository, found with `find` rather than listed (today the workspace's and each testbed's, since each testbed is its own workspace and ships its own lock). Any open advisory fails it, a crate found unsound or unmaintained included; `deny.toml` lists the ones accepted, each with why, and starts with one: the `rsa` timing attack, since Cairn holds no RSA private key. It runs with `--locked`, so it checks the committed lock files and never re-resolves them. It runs side by side with the slow steps and in CI's `lint` part, which builds nothing. cargo-deny is pinned in `mise.toml` as a prebuilt binary. The full check runs before every push and nightly, so an advisory published while nothing changes still fails within a day.
-- Alternatives:
-  - `cargo audit`. Equivalent for advisories; cargo-deny installs as a prebuilt binary through mise's registry, where cargo-audit would build from source.
-  - In `check:fast` too. Rejected: it needs the network to fetch the database, and a new advisory would fail the inner loop on a change that has nothing to do with it. The push gate is where shipping a vulnerable crate is decided.
-  - cargo-deny's licence, ban and source checks as well. Not now: nothing asked for them, and each needs policy in `deny.toml`.
-- What would change it: advisories that need fixing faster than a day (a scheduled run more often than nightly), or a wish to vet licences or duplicate crates in the same step.

@@ -89,7 +89,7 @@ export function nodeClasses(card: Card, options: { overlay?: CanvasOverlay | und
 }
 
 /**
- * DESIGN, Opacity: the cards out of focus for Depth's Fade (`faded`, the nodes it dims: its own
+ * DESIGN, One status language: the cards out of focus for Depth's Fade (`faded`, the nodes it dims: its own
  * rule already clears a container holding a card in its focus) or for Frontier (`emphasis`, the
  * nodes it lights): a card out of either is dimmed, once. A card stands for the nodes folded into
  * it, so it is in Frontier's focus when any of them is, and so is every container above it. None

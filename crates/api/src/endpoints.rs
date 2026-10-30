@@ -1,8 +1,7 @@
 //! Every endpoint the API serves, by method and path (ARCHITECTURE, HTTP API). The router,
 //! the OpenAPI document, and the Rust client all read these, so a path is spelled once.
 //! Paths use axum's and OpenAPI's `{name}` placeholders. Every endpoint but the health check
-//! sits under [`PREFIX`], so the rest of the origin is the web app's
-//! (decisions/2026-10-08-the-api-is-served-under-api-and-the-app-owns-the-rest.md).
+//! sits under [`PREFIX`], so the rest of the origin is the web app's.
 
 use axum::http::Method;
 

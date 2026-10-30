@@ -231,7 +231,7 @@ fn node_reads() -> Vec<Operation> {
 
 /// `info.version`: the document describes the API at the commit it is generated from, which has
 /// no version of its own; releases are named by tags
-/// (decisions/2026-10-16-the-openapi-document-is-unversioned.md).
+/// (decisions/2026-10-16-releases-take-their-version-from-the-git-tag.md).
 const DOCUMENT_VERSION: &str = "unversioned";
 
 /// The health check: public, so a proxy's anonymous probe can ask it.

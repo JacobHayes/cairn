@@ -779,8 +779,7 @@ fn sibling(key: &str, slug: &str) -> cairn_schema::Node<cairn_schema::refs::KeyR
 }
 
 /// PRD Login and references: sibling ids are unique in the graph a commit produces, and
-/// a commit may swap two of them on the way, checked at the commit's end
-/// (decisions/2026-10-06-uniqueness-a-patch-may-pass-through-is-checked-at-the-end.md).
+/// a commit may swap two of them on the way, checked at the commit's end.
 pub async fn sibling_ids_may_swap_within_a_commit_but_not_end_duplicated<B: Backend>(backend: &B) {
     let store = open(backend).await;
     let create = create_journey(

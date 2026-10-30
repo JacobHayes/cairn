@@ -16,8 +16,7 @@ use url::Url;
 use crate::limits::PROVIDER_CALL_DURATION_MAX;
 
 /// The bytes of one login-provider response: discovery documents, key sets, and token
-/// responses are a few kilobytes, and the body limit is the nearest named limit
-/// (decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
+/// responses are a few kilobytes, and the body limit is the nearest named limit.
 fn response_bytes_max() -> usize {
     usize::try_from(Limit::BodyBytes.max()).unwrap_or(usize::MAX)
 }

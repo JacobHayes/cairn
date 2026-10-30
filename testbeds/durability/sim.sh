@@ -19,7 +19,7 @@
 # The known patina gaps (README, Findings) are not checked here: they exercise that pinned
 # dependency, not Cairn, and are recorded in decisions/
 # (decisions/2026-10-17-simulation-runs-no-known-gap-checks.md). No check here depends on
-# one seed's outcome (decisions/2026-10-16-simulation-checks-pin-no-seed.md).
+# one seed's outcome.
 set -euo pipefail
 cd "$(dirname "$0")"
 

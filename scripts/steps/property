@@ -5,8 +5,7 @@
 # patina-dst-proptest from a fixed seed. They are modules of their crate's one integration
 # test binary, selected by module path. One suite per property test file, counted from the
 # test names (`<file>::property::<test>`). The cost tests are the cost step's. The case count is
-# bounded locally and larger in CI: 256 on push and 4096 nightly
-# (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
+# bounded locally and larger in CI: 256 on push and 4096 nightly.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_STEP=property

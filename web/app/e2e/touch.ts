@@ -1,4 +1,4 @@
-// The touch-target invariant (DESIGN, Sizing): on a touch screen every control a person taps has a
+// The touch-target invariant (DESIGN, Tokens): on a touch screen every control a person taps has a
 // hit area at least `--touch-target` in each direction. The hit area is measured the way a finger
 // meets it: the points around the control where a tap lands on it (or on the label it belongs
 // to), so a padded or extended hit area counts and a neighbour that covers part of it does not.

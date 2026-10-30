@@ -1,6 +1,6 @@
 // C1: the date relationships on the canvas, as data. The engine's level lists them between
-// stand-ins (a due-by or not-before rule, a stage's close, an opening that holds dates only, a
-// date decision that sets a milestone, each marked when it fixes an order); this puts them
+// stand-ins (a due-by or not-before rule, or a date decision that sets a milestone, each
+// marked when it fixes an order); this puts them
 // between cards, merged per pair, with the words a hover and the inspector say. They are not
 // lines: nothing waits on them, and the canvas draws them only for the selected node.
 //

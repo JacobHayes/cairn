@@ -5,7 +5,7 @@ import js from "@eslint/js";
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 
-// The browser tests wait on events, never on time (PRACTICES, Shell: conformance and integration).
+// The browser tests wait on events, never on time (PRACTICES, Testing).
 // A read that does not retry (a Locator's or a Page's `count`, `getAttribute`, `boundingBox`...)
 // gives the page's state at one moment, which may be about to change; it is allowed only where
 // the page has settled first (`whenSettled` in e2e/shell.ts) or where it is retried (`expect.poll`,

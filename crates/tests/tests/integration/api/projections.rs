@@ -1,5 +1,5 @@
-//! The derived reads over HTTP, in process against the memory store (PRACTICES, Shell: API
-//! tests): every projection answers what the service derives for the caller (I1, I3, C8),
+//! The derived reads over HTTP, in process against the memory store (PRACTICES, Testing:
+//! API tests): every projection answers what the service derives for the caller (I1, I3, C8),
 //! the node list pages through every node once (C9), node detail carries its
 //! explanation lists cut to the response limit with their totals and the rest page through
 //! (ARCHITECTURE, HTTP API: Size budgets), and each malformed read answers its problem.

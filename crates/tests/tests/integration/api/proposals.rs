@@ -1,4 +1,4 @@
-//! Proposals over HTTP, in process against the memory store (PRACTICES, Shell: API tests):
+//! Proposals over HTTP, in process against the memory store (PRACTICES, Testing):
 //! created by an agent under its own id and fetched rather than duplicated when resubmitted,
 //! edited against their editing revision without moving the journey, previewed, and applied
 //! by a reviewer recorded as confirming them (I6, H2, H5, C14); an apply against a moved

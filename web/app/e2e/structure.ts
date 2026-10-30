@@ -1,4 +1,4 @@
-// The structural rules (DESIGN, Typography and the rest): plain functions over the page as Chrome
+// The structural rules (DESIGN, Typography): plain functions over the page as Chrome
 // laid it out (e2e/snapshot.ts), each returning one line per problem. Every browser test is
 // checked after it ends (e2e/test.ts) and a picture before it is taken (e2e/invariants.ts), so a
 // screen never opts in. `observe` reads the page once and runs every rule over it; the result also

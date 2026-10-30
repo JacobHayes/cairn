@@ -17,7 +17,7 @@ if [ -z "${CAIRN_LANDING:-}" ]; then
 fi
 unset CAIRN_LANDING CAIRN_LOCK_FILE
 
-# CI's run on main is the gate (decisions/2026-10-21-ci-on-main-is-the-gate.md): while the newest
+# CI's run on main is the gate (PRACTICES, The validation ladder): while the newest
 # finished run on main failed, only the fix lands (--fix), so nothing stacks on a broken main. When
 # no finished run can be found, the landing goes ahead with a warning; CI still checks what is pushed.
 fix=0

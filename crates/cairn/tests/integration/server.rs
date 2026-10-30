@@ -248,8 +248,7 @@ mod in_process {
         Missing,
     }
 
-    /// The route map
-    /// (decisions/2026-10-08-the-api-is-served-under-api-and-the-app-owns-the-rest.md): the
+    /// The route map: the
     /// server keeps `/api/`, `/.well-known/`, and `/healthz`, and answers every other path
     /// with the app's page, so a screen's address loads; a path the server keeps that no
     /// endpoint serves is no endpoint, never the page.
@@ -619,7 +618,7 @@ mod in_process {
     /// after the window closes, which the bound allows for. The listener is given a one-second
     /// user timeout rather than the write stall the binary sets (`listener::tests` checks that
     /// one), so the test waits a second, not the stall
-    /// (decisions/2026-10-08-the-write-stall-test-runs-at-a-one-second-user-timeout.md); the
+    /// (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md); the
     /// API's own stall cannot free the slot that soon, so the socket option is what freed it.
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

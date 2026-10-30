@@ -1,8 +1,8 @@
 //! The `Host` allowlist in front of the whole router: DNS-rebinding protection belongs to the
 //! listener (decisions/2026-10-06-dns-rebinding-protection-is-a-host-allowlist-in-front.md).
 //! A page whose name an attacker rebinds to the server's address makes the browser send that
-//! name as the request's `Host`, so the dev provider without a token and Tailscale in direct
-//! mode, which trust the peer, would otherwise answer it as their user. Every request whose
+//! name as the request's `Host`, so the dev provider without a token, which trusts the peer,
+//! would otherwise answer it as its user. Every request whose
 //! host is not the public URL's, or, when the listener is bound to loopback, a loopback name,
 //! is refused before the auth layer, on the API, `/api/mcp`, auth's own routes, the UI, and
 //! `/api/metrics` alike.

@@ -180,7 +180,7 @@ export function depthFaded(state: ViewState, nodes: readonly GraphNode[], depth:
   return faded;
 }
 
-/** DESIGN, Opacity: whether a node is out of focus for Frontier (`lit`, none when Frontier is off) or for Depth (`faded`). Dimmed once, however many say so. */
+/** DESIGN, One status language: whether a node is out of focus for Frontier (`lit`, none when Frontier is off) or for Depth (`faded`). Dimmed once, however many say so. */
 export function outOfFocus(lit: ReadonlySet<string> | undefined, faded: ReadonlySet<string>): (key: string) => boolean {
   return (key) => faded.has(key) || (lit !== undefined && !lit.has(key));
 }

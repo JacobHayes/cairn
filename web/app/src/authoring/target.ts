@@ -1,14 +1,9 @@
 // What every structure editor works on: one graph and where its patches go, a route's draft
-// or a journey alike (PRD, How the pieces fit: one graph structure; A12: the canvas and node
-// detail author both). A journey's carries its lineage, so its route-copied fields can be
-// reset to the version it follows (B4).
-import type { Schema } from "@cairn/client";
-
+// or a journey alike (PRD, Core concepts; A12: the canvas and node
+// detail author both).
 import type { Deployment, Route } from "../data/host.ts";
 import type { Ready } from "../detail/model.ts";
 import { treeOf, type Graph, type Tree } from "./graph.ts";
-
-export type Lineage = Schema<"Lineage">;
 
 /** A graph being authored and where its patches go. */
 export interface Authored {
@@ -23,8 +18,6 @@ export interface Authored {
   deployment: Deployment;
   /** The deployment's today. */
   today: string;
-  /** A journey's lineage, for its route-copied nodes (B4); none for a route or an empty journey. */
-  lineage: Lineage | undefined;
   /** A route as read, which its local applies start from. */
   route: Route | undefined;
 }
@@ -40,7 +33,6 @@ export function journeyAuthored(ready: Ready): Authored {
     deploymentRevision: ready.key.deployment_revision,
     deployment: ready.inputs.deployment,
     today: ready.key.today,
-    lineage: ready.journey.header.lineage ?? undefined,
     route: undefined,
   };
 }
@@ -59,7 +51,6 @@ export function routeAuthored(route: Route, deployment: Deployment, today: strin
     deploymentRevision: deployment.revision,
     deployment,
     today,
-    lineage: undefined,
     route,
   };
 }

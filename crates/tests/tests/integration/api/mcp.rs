@@ -1,4 +1,4 @@
-//! The MCP endpoint in process (PRACTICES, Shell: API and MCP tests; I2, I3, I4, I6, I7,
+//! The MCP endpoint in process (PRACTICES, Testing; I2, I3, I4, I6, I7,
 //! A12): an MCP client (rmcp's own) drives `/api/mcp` through the API as served, auth layer and
 //! limits included, over the memory store. Every tool is called at least once and every
 //! output checked against its listed schema; the instructions are served; the endpoint

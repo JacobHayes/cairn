@@ -1,5 +1,5 @@
 //! The reads, the caller, and agent tokens over HTTP, in process against the memory store
-//! (PRACTICES, Shell: API tests): each answers what the service or auth holds (C16, C17, I2,
+//! (PRACTICES, Testing): each answers what the service or auth holds (C16, C17, I2,
 //! E6, H2, H3, J5), the domain document derives as the server would, and each malformed
 //! read is answered with its problem.
 #![cfg(test)]

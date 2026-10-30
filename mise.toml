@@ -15,7 +15,7 @@ rust = { version = "1.99.1", profile = "minimal", components = "clippy,rustfmt",
 # The wasm optimizer: `mise run build:wasm` runs it over the optimized (wasm profile) module
 # to shrink it (decisions/2026-10-21-a-tabs-memory-is-cut-only-where-it-costs-no-time.md).
 "github:WebAssembly/binaryen" = "version_133"
-# The simulation track's runner (PRACTICES, Simulation with patina: Tooling), built from
+# The simulation track's runner (PRACTICES, Simulation with patina), built from
 # source once at the same revision as the SDK git dependencies in Cargo.toml. Only
 # `mise run sim` uses it; the check ladder never does.
 "cargo:https://github.com/JacobHayes/patina" = { version = "rev:1dee57b448d57c390af26a9d5af5f2d3a8820cc8", crate = "cargo-patina", locked = true }

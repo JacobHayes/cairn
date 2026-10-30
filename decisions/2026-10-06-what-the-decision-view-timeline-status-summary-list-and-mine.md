@@ -1,6 +1,14 @@
-# What the decision view, timeline, status summary, list, and "mine" show
+# What the decision view, timeline, status summary, list search, and "mine" show
 
-- Question: C12's "which nodes each answer affected", C13's "derived due dates", C18's counts, C9's search, and E4's "filterable by kind" each admit more than one reading.
-- Call: the decision view is the level with only decisions shown (its edges and markers by C2's rules), each decision with its answer while in effect (E3), its owners, the nodes whose relevance its answer can change (a condition on the node or an ancestor reads it, up to the nearest force include, which drops them, or reads a decision it affects in turn, since a condition reads a decision that is not relevant as unanswered), the milestone it pins, and the role it fills. The timeline holds each in-scope milestone at its effective date (actual, pin, or due), each other pinned node at its pin, and each other open in-scope node with a due date at it; done work has no due to show, and milestones with no date are listed as undated; the `final` milestone is the end anchor. The status summary counts in-scope nodes by stored state and lists what remains open, overdue, short, and stale, the milestones not yet reached with a date, and open decisions (stored open and not closed, so not under a skipped container) with owners in rank order; answers in the decision view and the snapshot name entities through aliases (E6). The list's text search is a substring of the title, description, notes and links on the node, and resources (labels and content as written), ignoring ASCII case like the store's cross-journey search. E4's kind is the participation kind (owner, reviewer, and the graph's own), and "mine" in the list and next list is any participation.
-- Alternatives: decision-to-decision edges through hidden work (paths through non-decisions, quadratic at the limits); due dates of done work on the timeline; Unicode case folding (in-journey and cross-journey search would disagree); E4's kind as node kind (C9 and C10 already filter by node kind).
-- What would change it: the screens (5.3, 5.4) asking for a different cut, which changes only these functions.
+Question: several views admit more than one reading: which nodes an answer affects, which dates the timeline shows, what the status summary lists, what list search matches, and what "mine" filters by.
+
+Call:
+- The decision view lists each decision with its answer while in effect, its owners, the milestone it pins, the role it fills, and the nodes whose relevance its answer can change: a condition on the node or an ancestor reads it, up to the nearest force include, directly or through a decision it affects in turn.
+- The timeline shows each milestone at its effective date, each other pinned node at its pin, and open work at its due date. Done work shows no due date; undated milestones are listed as undated.
+- The status summary counts in-scope nodes by display state beside stored state and lists the open decisions not under a skipped container, in rank order.
+- List search is a substring match over a node's title, description, notes, links, and resources, ignoring ASCII case only, as cross-journey search does.
+- "Mine" means any participation kind; it never filters by node kind.
+
+Alternatives: decision-to-decision edges through hidden work (quadratic at the limits); due dates on done work; Unicode case folding (in-journey and cross-journey search would disagree); "mine" by node kind (the views already filter by kind).
+
+What would change it: a view asking for a different cut, which changes only these projections.

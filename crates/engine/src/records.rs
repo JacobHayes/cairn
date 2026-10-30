@@ -266,8 +266,7 @@ impl Records {
         }
     }
 
-    /// Advances the revisions one patch's events move (A17, H5;
-    /// decisions/2026-10-06-the-revisions-a-commit-moves-besides-its-targets.md): the patch's
+    /// Advances the revisions one patch's events move (A17, H5): the patch's
     /// domain advances by one, unless the patch only edits a proposal, whose record carries
     /// its own revision; a patch to another domain that writes deployment records (an identity
     /// create) also advances the deployment by one.

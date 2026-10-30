@@ -43,8 +43,7 @@ pub const TURN_SAVE_RESERVE: Duration = cairn_schema::limits::REQUEST_DURATION_M
 pub const TURN_IN_FLIGHT_COUNT_MAX: u32 = 32;
 
 /// Messages a conversation keeps, the newest: the page limit every list that grows is held
-/// to
-/// (decisions/2026-10-06-conversations-are-one-per-target-per-user-keep-their-newest.md).
+/// to.
 /// Each message is a Markdown body, so a whole conversation stays inside the size the
 /// store keeps one in.
 pub const CONVERSATION_MESSAGE_COUNT_MAX: u32 = cairn_schema::limits::PAGE_ITEM_COUNT_MAX;

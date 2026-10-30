@@ -9,8 +9,7 @@
 --
 -- Uniqueness a patch may pass through on its way to a valid graph (sibling ids, emails) is
 -- checked at the end of the commit rather than by a unique index: SQLite has no deferred
--- unique constraint
--- (decisions/2026-10-06-uniqueness-a-patch-may-pass-through-is-checked-at-the-end.md).
+-- unique constraint.
 --
 -- This is the schema migrations 1 to 13 of the Turso store left, as one file: a database
 -- converted from a release on that store is at migration 13 or later already, and a new

@@ -1,13 +1,15 @@
-# The editors read the engine's rule tables, and the preview refuses what they used to
+# The web app asks the engine for every rule, and the preview refuses
 
-Question: the authoring editors re-implemented engine rules (which fields a kind has, which operators an answer type takes, which nodes a reference may name, which roles fit a slot, the id and key formats, the condition size limit). Where do those rules live, and how does an editor ask?
+Question: the web app's pickers and forms depend on engine rules (which fields a kind has, which operators an answer type takes, which moves a node accepts, what a removal leaves dangling, which stages are current, what a form value may be). Where do those rules live, and how does a screen ask?
 
-Call: each rule has one owner in the engine or schema, and an editor asks in one of three ways. A fact a picker needs is a table `mise run gen` writes to `web/client/generated/rules.ts` (fields per kind and answer type, flag defaults, leaf kinds, condition operators per answer type, reference targets per field, which roles a slot or a decision takes, the id slug pattern, key prefixes, journey fields, the SSE timings). A question about a value the user is building (is this condition too large) is a derive-worker call (`condition_problem`). A structural refusal (an edge to an ancestor, a condition on the node's own subtree) is not checked by the editor at all: the preview already runs the engine and shows its violation at the field. The pickers offer what the table allows and no more.
+Call: each rule has one owner in the engine or schema, and a screen asks in one of three ways.
 
-Two things stay in the app on purpose, as the shape of a picker rather than a rule: a picker leaves out the node being edited, and `moveTargets` leaves out the node and its descendants (a tree has no such position to choose). A decision inside the node's own subtree is still listed, last and marked, and the engine refuses it.
+- A fact a picker needs is a table `mise run gen` writes to `web/client/generated/rules.ts`. Pickers offer what the table allows and no more.
+- A question about the graph or a value being built is a derived value or an engine call through the derive worker: a node's `moves` (what a patch of just that move would be accepted for), current stages, the final milestone, when a snooze lifts, a removal's plan and its rewrites, the placeholders in a message draft, and every form's pre-send checks. These calls are asynchronous, so nothing is asked per keystroke on the main thread.
+- A structural refusal is not checked by the editor at all: the preview runs the engine and shows its violation at the field.
 
-Behaviour that changed where an editor had disagreed with the engine: a condition of 16 comparisons is accepted (the old count included combinators); an empty "is one of" is no longer refused by the editor; the proposal editor offers only roles that fit a decision's answer type for the role it fills.
+The web keeps only facts about its own screen: what to leave out of a picker (the node being edited, its descendants as move targets), which of the accepted moves are worth offering, and the address-to-page mapping.
 
-Alternatives: keep the copies and test them against the engine (a parity test per copy, which is what existed and kept drifting); serve every table through the OpenAPI document (it is not a type, so the generated table file is the better home).
+Alternatives: keeping the copies with a parity test each (copies drift from the engine); serving the tables through the OpenAPI document (a table is not a type).
 
-What would change it: a rule an editor needs that depends on the whole graph and so cannot be a table or a small derive call would make a preview-only answer the pattern for it.
+What would change it: a rule that needs the whole graph and so cannot be a table or a small engine call, which would make a preview-only answer the pattern for it.

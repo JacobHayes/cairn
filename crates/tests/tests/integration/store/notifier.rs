@@ -1,8 +1,7 @@
 //! The in-process notifier (H6; ARCHITECTURE, Concurrency and notification): initial
 //! revisions at once, nothing missed between a fetch and a subscription, per-domain
 //! coalescing within the interval, and the subscriber limit. The clock is an input, so each
-//! interleaving is spelled out rather than swept
-//! (decisions/2026-10-06-notifier-point-tests-are-plain-tests-with-the-clock-passed.md).
+//! interleaving is spelled out rather than swept.
 
 #[cfg(test)]
 mod notifier {

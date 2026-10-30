@@ -1,4 +1,4 @@
-//! Journey state (PRD, How the pieces fit; D1, B4 to B6, E3, F1, G1): what has happened in
+//! Journey state (PRD, Core concepts; D1, B4 to B6, E3, F1, G1): what has happened in
 //! a journey, attached to nodes by key and to the journey as a whole. Nothing here is
 //! derived (D3, D6): relevance, blocking, dates, and rank are computed on read.
 

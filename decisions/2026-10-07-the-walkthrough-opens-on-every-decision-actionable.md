@@ -1,6 +1,9 @@
 # The walkthrough opens on every decision actionable at the start, and names what an answer surfaces beyond decisions
 
-- Question: the brief's acceptance has the walkthrough open "on the four up-front decisions" and has answering the partner decision surface "the partner-led nodes in the same pass". The vendor evaluation starts with five decisions actionable (the fixture README's four up-front decisions and whether a partner runs the testing), and the partner-led nodes are actions, which a decisions-only mode never shows as cards.
-- Call: the walkthrough is C11's decisions-only filter over the acting frontier, so it opens on every decision actionable at that moment: five here, the partner decision first by gravity. A triage pass remembers the acting frontier, every kind, as it was when the pass began; whatever has reached it since is named above the card ("new to act on since this pass began"), in the walkthrough too, and triage of every kind holds it as a card in rank order within the same pass. The brief's acceptance now says "the up-front decisions".
-- Alternatives: showing surfaced work as cards in the walkthrough (it would stop being decisions-only); naming nothing (an answer's effect on work stays invisible until the person switches mode).
-- What would change it: a fixture whose up-front decisions are exactly four, or a wish to walk newly unblocked work inside the walkthrough itself.
+Question: the walkthrough shows only decisions, so an answer that frees work would seem to do nothing there.
+
+Call: the walkthrough is triage filtered to decisions, opening on every decision actionable at that moment, in rank order. A triage pass remembers the acting frontier, every kind, as it was when the pass began, and names whatever has reached it since above the card, in the walkthrough too; triage of every kind takes it as a card within the same pass.
+
+Alternatives: surfaced work as cards in the walkthrough (it would stop being decisions-only); naming nothing (an answer's effect on work stays invisible until the person switches mode).
+
+What would change it: a wish to walk newly freed work inside the walkthrough itself.

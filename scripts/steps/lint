@@ -244,8 +244,7 @@ if [ "$rust" = 1 ]; then
   # Each testbed is a workspace of its own with its own lock file and target directory, which
   # nothing above reads. Formatting and clippy over them (--locked also fails a lock file that
   # no longer matches the crates it depends on) is what keeps a service API change from
-  # breaking them unseen until the nightly `mise run sim`
-  # (decisions/2026-10-18-the-ladder-lints-the-testbeds.md).
+  # breaking them unseen until the nightly `mise run sim`.
   testbeds=0
   for manifest in testbeds/*/Cargo.toml; do
     testbed=$(dirname "$manifest")

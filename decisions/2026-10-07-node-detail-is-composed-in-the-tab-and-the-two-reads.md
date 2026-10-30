@@ -1,6 +1,9 @@
-# Node detail is composed in the tab, and the two reads it lacked join the browser host
+# Node detail is composed in the tab from the derived journey
 
-- Question: C8's node detail exists on the server (`GET /journeys/{id}/nodes/{key}`, its explanation lists capped), but ARCHITECTURE's data flow has the browser derive every document and hold every explanation in full. Two things the panel shows had no browser path: a message draft rendered with journey context (A10, G3: `render_draft` is an engine projection no host exposed) and a node's history (J4: events are not in the domain document, and the in-browser root had no history read).
-- Call: the panel composes the detail from the document and its derive in the tab (`web/app/src/detail/model.ts` mirrors the service's `detail` field for field), so it has every explanation uncapped and follows the journey live with nothing to fetch. `crates/wasm` gains `Derivation::render_draft` (a node, a message-draft resource, and the page's link to the journey for `{{journey.url}}`), reached through the derive worker's `render_draft` op, and `BrowserRoot::history`, answering the API's `History` JSON for `GET /journeys/{id}/history`, so both hosts read history through `Host.history`. The server keeps no draft-rendering endpoint: a draft is rendered where the document is derived.
-- Alternatives: fetching `GET /nodes/{key}` per open panel (capped lists, one more request per node and per tick, and none on the in-browser host); a `render_draft` HTTP endpoint (a server round trip for what the tab already derives; agents may still want one, which 4.4's tools can add); history in the domain document (unbounded growth of every fetch).
-- What would change it: an agent or API client needing a rendered draft (add the endpoint over the same engine call), or documents too large to hold a derive per open journey.
+Question: the server has a node-detail read with capped explanation lists, while the browser already derives the whole journey.
+
+Call: the panel composes a node's detail from the document and its derive in the tab, so every explanation is uncapped and the panel follows the journey live with nothing to fetch. A message draft is rendered by the engine in the tab, where the document is derived; the server has no draft-rendering endpoint. History, which is not in the document, is read from the server.
+
+Alternatives: fetching node detail per open panel (capped lists, a request per node per change); a draft-rendering endpoint (a round trip for what the tab derives); history in the domain document (unbounded growth of every fetch).
+
+What would change it: an agent needing a rendered draft (add the endpoint over the same engine call), or documents too large to derive per open journey.

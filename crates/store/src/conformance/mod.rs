@@ -1,4 +1,4 @@
-//! The store conformance suite (PRACTICES, Testing > Shell: conformance and integration):
+//! The store conformance suite (PRACTICES, Testing):
 //! one function per case over a [`Backend`] that opens fresh stores, so every backend runs
 //! the same cases. A backend's test file expands [`conformance_suite!`](crate::conformance_suite)
 //! with its backend and an executor, giving one test per case:

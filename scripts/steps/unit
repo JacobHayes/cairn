@@ -43,7 +43,7 @@ done <<<"$crates"
 # Each testbed is a workspace of its own, which lint formats and lints; its unit tests run here
 # too, so a change that breaks what a testbed does at run time (a patch it writes that no
 # longer parses), not only what it compiles against, fails the ladder instead of the nightly
-# `mise run sim` (decisions/2026-10-21-the-ladder-runs-the-testbeds-unit-tests.md).
+# `mise run sim`.
 for manifest in testbeds/*/Cargo.toml; do
   testbed=$(dirname "$manifest")
   out=dist/ladder/unit-$(basename "$testbed").out

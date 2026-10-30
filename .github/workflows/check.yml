@@ -31,8 +31,7 @@ env:
   MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
 
 jobs:
-  # The ladder's parts, which the next job runs one runner each
-  # (decisions/2026-10-16-ci-runs-the-ladder-in-parts-on-separate-runners.md): a step added to the
+  # The ladder's parts, which the next job runs one runner each: a step added to the
   # ladder runs in CI with no edit here, and the ladder refuses a step that belongs to no part.
   parts:
     runs-on: ubuntu-latest
@@ -63,7 +62,7 @@ jobs:
       # Only `mise run sim` uses cargo-patina, and it builds from source; the ladder skips it.
       MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
       # The property tests at more cases than a local run's 64, and at a larger count in the
-      # nightly run (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
+      # nightly run.
       PROPTEST_CASES: ${{ github.event_name == 'schedule' && 4096 || 256 }}
       # The engine's module as it ships, optimized: its bindings are the ones the generated
       # step checks, and the browser step tests it (a local check builds the faster wasm-dev profile;

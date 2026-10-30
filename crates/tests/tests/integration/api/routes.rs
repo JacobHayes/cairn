@@ -1,5 +1,5 @@
 //! Route files and the drafting flows over HTTP, in process against the memory store
-//! (PRACTICES, Shell: API tests): a version exported and imported back as a new draft (A13);
+//! (PRACTICES, Testing): a version exported and imported back as a new draft (A13);
 //! save as route drafted as a proposal (B8); and each request that cannot be drafted answers
 //! its problem.
 #![cfg(test)]

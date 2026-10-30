@@ -1,4 +1,4 @@
-//! A node's individually editable fields (PRD glossary: Touched set, by key and field). A
+//! A node's individually editable fields (PRD H5, by key and field). A
 //! field edit names one of these, so two edits to different fields of one node do not
 //! overlap. Changing a node's kind or a decision's answer type replaces the whole node.
 

@@ -131,7 +131,7 @@ pub async fn serve(
 
 /// [`serve`] with `TCP_USER_TIMEOUT` at `unacknowledged` instead of the limit, so a test
 /// watches the kernel close a stalled connection without waiting out the write stall
-/// (decisions/2026-10-08-the-write-stall-test-runs-at-a-one-second-user-timeout.md). The
+/// (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md). The
 /// binary serves through [`serve`] only.
 ///
 /// # Errors

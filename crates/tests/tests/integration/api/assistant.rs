@@ -1,4 +1,4 @@
-//! The assistant's endpoints in process (PRACTICES, Shell: API and MCP tests; I5, A12):
+//! The assistant's endpoints in process (PRACTICES, Testing; I5, A12):
 //! mounted only by a root that assembled the assistant, which the capabilities document
 //! says; a turn answers its writes as the OpenAPI document describes, runs past the API's
 //! request duration under its own limits, and is refused to an agent token.

@@ -96,7 +96,7 @@ export class People {
         const current = batch.filter((user) => this.#latest.get(user) === read);
         const error = classify(thrown);
         if (error !== "gone" && error.kind === "transient") {
-          // A passing failure is read again after the shared backoff (ARCHITECTURE, Reads).
+          // A passing failure is read again after the shared backoff (ARCHITECTURE, Web UI).
           current.forEach((user) => this.#wanted.add(user));
           setTimeout(() => {
             this.#schedule();

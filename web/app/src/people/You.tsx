@@ -92,7 +92,7 @@ function TourControl() {
   );
 }
 
-/** What the app is built with that asks to be credited (the canvas's library: decisions/2026-10-09-the-canvas-attribution-is-hidden-and-xyflow-credited.md). */
+/** What the app is built with that asks to be credited (the canvas's library). */
 function Licenses() {
   return (
     <details className="stack" data-testid="licenses">

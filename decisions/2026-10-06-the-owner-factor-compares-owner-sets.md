@@ -1,6 +1,9 @@
 # The owner factor compares owner sets
 
-- Question: an owner resolves to a set of entities (a role may have several members), and the PRD's `owner_factor` (2 "when d's owner differs from n's owner, or d is owned by no one and n is owned") does not say what "differs" means for sets, or the case of an owned target and an unowned node.
-- Call: the factor is 1 when the target's owners and the acting entities share an entity, or both are empty, and 2 otherwise: a target no one owns differs from an owned node, and an owned target from an unowned node. The acting entities are the node's own owners.
-- Alternatives: set equality (a role-owned node and a work item owned by one of its members would count as others' work); factor 1 for an owned target behind an unowned node (finishing unowned work would never count as freeing anyone).
-- What would change it: role-level ownership becoming a distinct notion from its members.
+Question: work ranks higher for what it frees for other people, but an owner resolves to a set of identities (a role may have several members), so "someone else's work" needs a meaning for sets.
+
+Call: a target counts as someone else's unless its owners and the node's owners share an identity, or both are empty. A target no one owns differs from an owned node, and an owned target from an unowned node.
+
+Alternatives: set equality (a role-owned node and work owned by one of its members would count as each other's); an owned target behind an unowned node counting as the same owner (finishing unowned work would never free anyone).
+
+What would change it: role-level ownership becoming distinct from its members.

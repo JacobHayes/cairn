@@ -366,8 +366,7 @@ impl Service {
 
     /// J4: a page of the journey's history, or of the events naming `node`, from the store's
     /// log position `after`, grouped by patch. The store finds a node's events by every record
-    /// they wrote, including the nodes whose requirement a removal takes
-    /// (decisions/2026-10-06-history-pages-events-it-is-given-and-finds-a-nodes.md).
+    /// they wrote, including the nodes whose requirement a removal takes.
     ///
     /// # Errors
     ///

@@ -21,7 +21,7 @@ export type Kind = Schema<"ParticipationKindResolved">;
 export type Resource = Schema<"Resource">;
 export type Edge = Schema<"Edge">;
 
-/** A kind as a picker offers it: its name in sentence case (DESIGN, Type), the kind as its value. */
+/** A kind as a picker offers it: its name in sentence case (DESIGN, Typography), the kind as its value. */
 export function kindOption(kind: NodeKind): { value: NodeKind; label: string } {
   return { value: kind, label: `${kind.charAt(0).toUpperCase()}${kind.slice(1)}` };
 }

@@ -1,5 +1,5 @@
 // PRD: C20. A phone's screens: every control a finger taps has a hit area of at least the touch
-// target in each direction (DESIGN, Sizing), on Home, the graph with the inspector's sheet, the
+// target in each direction (DESIGN, Tokens), on Home, the graph with the inspector's sheet, the
 // list, the inspector's forms, an open menu and the tour's step. On cairn demo.
 import type { Locator } from "@playwright/test";
 

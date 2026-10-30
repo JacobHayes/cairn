@@ -6,8 +6,7 @@
 //! Stateless: every request is a POST answered with one JSON response, no session is kept
 //! between requests, and no stream stays open, so each call is held to the API's request
 //! limits like any other request: its duration, its body (the same `request_bytes_max`), and
-//! the requests in flight
-//! (decisions/2026-10-06-the-mcp-endpoint-is-stateless-json-inside-the-apis-router.md).
+//! the requests in flight.
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -39,8 +38,7 @@ pub const MCP_PATH: &str = "/api/mcp";
 pub fn router(tools: ToolSet, version: &'static str) -> Router {
     // Host and Origin checks guard a server nothing else authenticates; this one sits
     // behind the auth layer, and its public host is the deployment's, which the listener
-    // owns
-    // (decisions/2026-10-06-the-mcp-endpoint-is-stateless-json-inside-the-apis-router.md).
+    // owns.
     let config = StreamableHttpServerConfig::default()
         .with_legacy_session_mode(false)
         .with_json_response(true)

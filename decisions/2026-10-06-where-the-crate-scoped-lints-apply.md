@@ -1,6 +1,9 @@
-# Where the crate-scoped lints apply
+# Crate-scoped lints are raised by package name in the lint step
 
-- Question: PRACTICES (Code conventions) denies some lints only in some crates (`indexing_slicing` and `HashMap` in the engine, `missing_docs` on public engine items, `panic` in shell handlers), but Cargo's `[workspace.lints]` is one table for every crate, and a crate that inherits it cannot add to it.
-- Call: the workspace lints carry the crate-wide set (`unsafe_code` forbidden, `pedantic` warned, `unwrap_used`, `expect_used`, `too_many_lines` at 70 denied). Rung 1 raises the scoped lints on top, by package name, from the moment the crate joins the workspace: `cairn-engine` gets `clippy::indexing_slicing`, `clippy::disallowed_types` (`HashMap` and `HashSet`, listed in `clippy.toml`), and `missing_docs`; `cairn-api` and `cairn-mcp`, the crates whose functions are handlers, get `clippy::panic`. Test code (`#[test]`, `#[cfg(test)]`) may unwrap, expect, index, and panic, through `clippy.toml`'s `allow-*-in-tests`. Rung 1 denies warnings locally as CI does, so `check` means the same everywhere.
-- Alternatives: `#![deny(...)]` attributes in each crate's root, which depend on the brief that creates the crate remembering them; a `clippy.toml` per crate, which cannot set lint levels.
-- What would change it: handlers living in another crate; wanting `unwrap` denied in tests too; a rust-analyzer user wanting the scoped lints in the editor (then also add the attributes).
+Question: some lints apply only to some crates (indexing and hash collections in the engine, missing docs on its public items, panics in handler crates), but Cargo's workspace lint table is one table every crate inherits and cannot extend.
+
+Call: the workspace table holds the lints every crate shares. The lint step raises the scoped ones on top, by package name, from the moment a crate joins the workspace. Test code may unwrap, expect, index, and panic through `clippy.toml`'s test allowances. The local lint denies warnings as CI does.
+
+Alternatives: `#![deny]` attributes in each crate root (they depend on whoever creates the crate remembering them); a `clippy.toml` per crate (it cannot set lint levels).
+
+What would change it: wanting the scoped lints in the editor (then add the attributes as well), or handlers moving to another crate.

@@ -10,26 +10,27 @@ use std::time::Duration;
 
 /// Nodes per graph: 10x headroom over a large journey.
 pub const NODE_COUNT_MAX: u32 = 2_000;
-/// Containment depth, which is also the most segments a path has.
+/// Containment depth, which is also the most segments a path has: far past readable.
 pub const CONTAINMENT_DEPTH_MAX: u32 = 16;
 /// Explicit edges per node, in plus out. A node's own `requires` list is held to it at
-/// deserialization; the in-plus-out total is a graph-level check.
+/// deserialization; the in-plus-out total is a graph-level check. Past this, restructure.
 pub const EDGE_COUNT_PER_NODE_MAX: u32 = 64;
 /// Mutations per patch: an import of a full graph is roughly four mutations per node.
 pub const MUTATION_COUNT_PER_PATCH_MAX: u32 = 8_000;
-/// Roles per graph.
+/// Roles per graph. One participation per kind per node, so this and the kind limit bound
+/// participations too.
 pub const ROLE_COUNT_MAX: u32 = 32;
 /// Participation kinds a graph declares; the built-in `owner` is not one of them.
 pub const KIND_COUNT_MAX: u32 = 32;
-/// Choices per decision.
+/// Choices per decision: more is a text or identity answer.
 pub const CHOICE_COUNT_PER_DECISION_MAX: u32 = 32;
 /// Checklist items per node: a list someone ticks through in one sitting.
 pub const CHECKLIST_ITEM_COUNT_PER_NODE_MAX: u32 = 50;
-/// Identities per role fill or identity-list answer.
+/// Identities per role fill or identity-list answer: a stakeholder list, not a team.
 pub const IDENTITY_COUNT_PER_FILL_MAX: u32 = 100;
-/// Condition tree depth: a lone clause is depth 1.
+/// Condition tree depth, a lone clause being depth 1: what fits a form editor.
 pub const CONDITION_DEPTH_MAX: u32 = 8;
-/// Clauses (leaf predicates) per condition tree.
+/// Clauses (leaf predicates) per condition tree: what fits a form editor.
 pub const CONDITION_CLAUSE_COUNT_MAX: u32 = 16;
 /// Bytes in an id slug, and in a key (keys share the id limit: both are short references).
 pub const ID_BYTES_MAX: u32 = 64;
@@ -58,12 +59,14 @@ pub const JOURNEY_COUNT_PER_MERGE_MAX: u32 = 1_000;
 pub const RESOURCE_COUNT_PER_NODE_MAX: u32 = 16;
 /// Notes on one node, or on the journey itself: a running log of a long piece of work.
 pub const NOTE_COUNT_PER_NODE_MAX: u32 = 100;
-/// Links (artifacts, references, conversations) on one node, or on the journey itself.
+/// Links (artifacts, references, conversations) on one node, or on the journey itself: more
+/// belongs in a folder behind one link.
 pub const LINK_COUNT_PER_NODE_MAX: u32 = 32;
-/// Days in a date offset or an estimate.
+/// Days in a date offset or an estimate: longer is a modeling error.
 pub const OFFSET_DAYS_MAX: u32 = 365;
-/// A node's weight.
+/// A node's weight, small enough that a sum over every node fits a `u32`.
 pub const WEIGHT_MAX: u32 = 1_000;
+const _: () = assert!(NODE_COUNT_MAX.checked_mul(WEIGHT_MAX).is_some());
 /// Bytes in one graph serialized with its state. Validation checks the graph a patch
 /// produces against it; a parse cannot, since an envelope around a graph at its cap is larger.
 pub const GRAPH_BYTES_MAX: u32 = 16 * 1024 * 1024;

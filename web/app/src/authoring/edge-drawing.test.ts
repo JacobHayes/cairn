@@ -37,7 +37,6 @@ const authored: Authored = {
   deploymentRevision: 1,
   deployment: { revision: 1 },
   today: "2026-10-06",
-  lineage: undefined,
   route: undefined,
 };
 

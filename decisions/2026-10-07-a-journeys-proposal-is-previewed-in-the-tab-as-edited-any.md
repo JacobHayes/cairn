@@ -1,6 +1,9 @@
-# A journey's proposal is previewed in the tab as edited; any other's by its host as saved; the in-browser host serves proposals
+# A journey's proposal is previewed in the tab as edited; any other by the server as saved
 
-- Question: ARCHITECTURE (Web UI: Previews) has the browser apply a proposal to its in-memory graph and show the diff and the frontier after before anything is sent. The wasm `preview` reads a journey's domain document, so it cannot preview a route's proposal (a save as route), the deployment's, or a journey the proposal creates at revision 0. The in-browser host had no proposal calls, so review could not run without a server.
-- Call: a proposal to an existing journey is previewed by the derive worker over the reviewer's edits as they type, with the route versions an upgrade or re-link reads; any other is shown with its host's preview of the proposal as saved, and edits to it are previewed once saved (the screen says so). The in-browser root gains the API's proposal calls (get, create, edit, preview, apply, discard, refresh, upgrade, save as route, re-link) through the same service calls, answering the API's JSON, so proposal review, its browser tests, and the demo site run without a server. The canvas draws the graph after with every removed node put back where it was, stateless, through the route canvas's level; the frontier after is listed beside it.
-- Alternatives: a wasm preview for routes and new journeys (new engine glue in `crates/wasm` for a case the host already answers); proposal review on the server host only (the in-browser host is the one the e2e and demo use).
-- What would change it: proposals to routes becoming common enough to want typing-speed previews, which would add a route preview beside `apply_route`.
+Question: a proposal is reviewed with the graph and frontier after it. The browser's engine can preview a proposal to an existing journey, but not one to a route, to the deployment, or one that creates a journey.
+
+Call: a proposal to an existing journey is previewed by the engine in the tab, over the reviewer's edits as they type, with the route versions it reads. Any other is shown with the server's preview of the proposal as saved, and edits to it are previewed once saved; the screen says so. The canvas draws the graph after with every removed node put back where it was.
+
+Alternatives: a browser preview for routes and new journeys (new engine glue for a case the server already answers).
+
+What would change it: proposals to routes becoming common enough to want previews at typing speed.

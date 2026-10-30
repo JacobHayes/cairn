@@ -97,8 +97,7 @@ mod commands {
     }
 
     /// A database that does not open stops `serve` and `migrate` with a nonzero exit
-    /// naming it; the process never retries the open, and a supervisor restarts it
-    /// (decisions/2026-10-07-a-database-that-does-not-open-stops-the-binary-it-never.md).
+    /// naming it; the process never retries the open, and a supervisor restarts it.
     #[test]
     fn a_database_that_does_not_open_stops_the_process() {
         let directory = directory("unopenable");

@@ -1,5 +1,5 @@
-//! Domain patches over HTTP, in process against the memory store (PRACTICES, Shell: API
-//! tests): every rejection shape once, and the auth layer, request limits, and
+//! Domain patches over HTTP, in process against the memory store (PRACTICES, Testing:
+//! API tests): every rejection shape once, and the auth layer, request limits, and
 //! observability every handler carries (A15, A17, H5).
 #![cfg(test)]
 

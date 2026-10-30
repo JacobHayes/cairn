@@ -1,6 +1,9 @@
-# "mine" across journeys is each active journey's own "mine", found through the host's referencing filter
+# "Mine" across journeys is the union of each active journey's own "mine"
 
-- Question: C16 asks for a "mine" filter on the journey index and a cross-journey "mine" list that is "the unranked union of per-journey mine"; B11 has a completed journey leave "mine" and cross-journey lists. The host's index has no "mine" filter: it filters journeys by the entities they refer to (`referencing`, E6), which counts answers, role fills, participations, and condition values, a superset of where the caller holds a participation (E4).
-- Call: both ask the host for the active journeys referring to the caller's entities (every entity their verified emails name, H3), then derive each in the tab and keep those whose own `mine` projection is not empty; the list shows each journey's nodes with the kinds held, unranked. The index's "mine" filter with a status other than active (or any) shows nothing, since a completed or archived journey holds nothing of anyone's "mine".
-- Alternatives: the host's `referencing` alone (it would list a journey where the caller is only named in a condition, or is an answer that fills no role); a `mine` filter on `GET /journeys` (the server would derive every journey per index read, which the browser already does for the journeys it shows).
-- What would change it: deployments where many journeys refer to a person without giving them anything, which would make a server-side `mine` filter worth its derive cost.
+Question: the journey index's "mine" filter and the cross-journey "mine" list need the journeys where the caller holds something. The server can find journeys that refer to an identity, but that is a superset: a journey may name someone only in a condition or an answer.
+
+Call: each active journey's own "mine" is projected in the tab, and a journey counts when it holds something of the caller's or the caller owns it. The cross-journey list is the unranked union. A completed or archived journey holds nothing of anyone's "mine".
+
+Alternatives: the server's referencing filter alone (it lists journeys that give the caller nothing); a server-side "mine" filter on the index (the server would derive every journey on every index read, which the tab already does for the journeys it shows).
+
+What would change it: deployments where many journeys refer to a person without giving them anything, making a server-side filter worth its derive cost.

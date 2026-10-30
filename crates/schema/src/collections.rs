@@ -60,8 +60,7 @@ limit_markers! {
     /// (a journey's notes and links, by holder), one the engine builds from other bounded
     /// values (an explanation, a rejection, a proposal's review items), or a fixture's steps.
     /// The serialized graph cap (`graph_bytes_max`) and, for any document, the request cap
-    /// (`request_bytes_max`), which every parse checks first, are the backstop
-    /// (decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
+    /// (`request_bytes_max`), which every parse checks first, are the backstop.
     ByDocumentSize => GraphBytes,
     /// `chain_count_per_rejection_max`.
     ChainCountPerRejection => ChainCountPerRejection,

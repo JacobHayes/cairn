@@ -1,4 +1,4 @@
-//! Property-test strategies for the engine (PRACTICES, Property tests): generated journeys
+//! Property-test strategies for the engine (PRACTICES, Testing): generated journeys
 //! within the limits and generated operation sequences, with generic content only. An
 //! [`Op`] carries indices, resolved against the records as they are when it applies, so a
 //! generated sequence stays meaningful as the graph changes (nodes added and removed).

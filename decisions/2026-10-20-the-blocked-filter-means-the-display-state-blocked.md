@@ -1,9 +1,9 @@
-# The blocked filter means the display state blocked
+# Blocked always means the display state blocked
 
-**Question.** The `blocked` list filter returned groups whose display state was ready, because it read the D3 `blocked` flag, which is true for a group that cannot finish until its children do. Which meaning does the filter have? (From the derived-values work, raised while reading the list code.)
+**Question.** The engine's internal blocking flag is true for a container that cannot finish until its children do, while the display state never calls a container blocked by its own children. Which meaning do filters, counts and served fields use?
 
-**Call.** The filter matches the display state `blocked` (D8), the one every screen shows: a gate the node waits on is unsatisfied, and a container is never blocked by its own children. The D3 `blocked` flag and `blocked_by` are unchanged: `blocked_by` still lists a container's unfinished children, because that is what "not done yet" is made of.
+**Call.** Everything a person or an agent reads says the display state: the `blocked` list filter, snapshot counts (`by_display_state`), a row's `display_state`, and a container's `all_blocked` (every relevant open child shows blocked). The blocking flag stays internal, feeding readiness, dependents' gates and the hidden-prerequisites marker; `blocked_by` lists a container's unfinished children, because that is what its unfinished state is made of. No served field duplicates another's meaning under a second name.
 
-**Alternatives.** Leave the flag meaning and rename the filter: the person asking for blocked work means the word on the screen. Remove the group case from the D3 flag: it feeds readiness of the container's own finish and the dependents' gates.
+**Alternatives.** Serving the flag beside the display state (two counts of blocked work that disagree); removing the container case from the flag (it feeds the container's own finish and its dependents' gates).
 
-**What would change it.** A request for "waiting on its parts" as its own filter.
+**What would change it.** A client that needs "cannot finish until its children do", which would get its own clearly named field.

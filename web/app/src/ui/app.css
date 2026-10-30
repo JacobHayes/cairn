@@ -1271,7 +1271,7 @@ body {
 .identities-table .cell-first {
   align-items: center;
 }
-/* DESIGN, Identities: a row is one line, 8px 12px of padding. */
+/* A row is one line, 8px 12px of padding. */
 .identities-table table.data td {
   padding: var(--space-2) var(--space-3);
 }

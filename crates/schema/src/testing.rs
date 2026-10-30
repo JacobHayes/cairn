@@ -1,4 +1,4 @@
-//! Property-test strategies for every schema type (PRACTICES, Property tests), generating
+//! Property-test strategies for every schema type (PRACTICES, Testing), generating
 //! within the limits and with generic content only. Behind the `testing` feature so the
 //! crates that build on these types can generate them too. A strategy that produces a value
 //! its type rejects is a bug in the strategy, so the helpers panic rather than filter.

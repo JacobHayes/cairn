@@ -73,8 +73,6 @@ You need [mise](https://mise.jdx.dev), which installs the rest. From a clone:
 mise install   # the pinned Rust, Node, and build tools
 ```
 
-The build tasks install the web app's packages (`npm ci`) themselves when the lockfile changes.
-
 **The demo.** No setup and no account: Cairn starts with a few sample journeys (a vendor
 evaluation, a hiring loop, a product launch), signed in as a development user. Nothing is
 saved, so stopping it ends the demo.
@@ -113,29 +111,17 @@ covers configuration, sign-in, proxies, upgrades, and backups.
 
 ## Develop
 
-Tools are pinned in `mise.toml`; tasks live in `mise-tasks/`.
+Tools are pinned in `mise.toml`; tasks live in `mise-tasks/` (`mise tasks` lists them).
 
 ```sh
-mise run check        # the whole validation: lint, tests, generated files, browser
 mise run check:fast   # the inner loop: lint and the tests the change touches
-mise run check:fast dates   # only the Rust tests, Vitest files and Playwright spec matching a filter
+mise run check        # everything; CI runs it on every push
 mise run gen          # regenerate the generated files
-mise run sim          # simulation campaigns under patina; not part of check
-mise run build        # the release binary, with the web build embedded
-CAIRN_VERSION=v0.4.0 mise run build:release   # that binary versioned by a tag, copied to dist/release/ with its checksum
-mise run serve        # a local deployment from cairn.dev.toml
-mise run demo         # the sample journeys in memory, nothing to configure
-mise run proof DIR    # screenshots and video from the Playwright specs in DIR (kept outside the repository)
-mise run screenshots  # a picture of every screen state, desktop and phone, light and dark, to dist/screenshots/
-mise run workspace name   # a jj workspace in ../cairn-ws/name with this checkout's build outputs copied in
+mise run screenshots  # a picture of every screen state, to dist/screenshots/
 ```
 
-CI runs `mise run check` on every push and nightly, split into parts that run side by side
-(`scripts/ladder --parts`), and `mise run sim` nightly. To release,
-run `gh workflow run release.yml -f bump=minor` (`major`, `minor` or `patch`; or the Actions
-tab) on main. It bumps that part of the highest `vX.Y.Z` tag, refuses unless main's head passed
-CI, then builds the Linux binaries, tags that commit and publishes the GitHub release. No file
-changes per release.
+To release, run `gh workflow run release.yml -f bump=minor` (or `major`, `patch`) on main. It
+refuses unless main's head passed CI, then tags it and publishes the Linux binaries.
 
 More reading:
 

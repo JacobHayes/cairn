@@ -1,6 +1,6 @@
 //! Values that fill every optional field and hold every variant of each persisted type, and
 //! their cleared counterparts, for the conformance cases that compare what each backend
-//! loads with them (PRACTICES, Shell: conformance and integration).
+//! loads with them (PRACTICES, Testing).
 //!
 //! Each value is built field by field with no `..`, so a field added to a persisted type
 //! does not compile here until it has a value. Each enum's variants come from the schema's

@@ -2,13 +2,13 @@
 
 Graticule is the design language for dense, keyboard-driven tools read closely. It looks like a measurement workspace: opaque cool-white paper rows, cards and panels on a plain ground, each bordered and pinned by four corner ticks, with a faint 24px ruling only on the canvases people gesture on (graph, timeline). Light and dark are both native, chrome included. Type, borders and opaque surfaces carry hierarchy; colour is kept for state.
 
-Token values live in `design/tokens.css`, base styles and shared components in `design/base.css`, fonts in `design/fonts/`; `design/example.html` shows the components. On a rule, this document wins over them.
+Token values live in `design/tokens.css`, base styles and shared components in `design/base.css`, fonts in `design/fonts/`; `design/example.html` shows the components. On a rule, this document wins over them. Screens are judged by their screenshots against these rules; this document holds the shared language, not each screen's layout.
 
 ## Principles
 
 - **Structure before polish.** A screen holds what its job needs and no more: remove or merge before restyling.
-- **One concept, one form.** A thing looks and behaves the same everywhere; sibling views of the same data share controls and meaning.
-- **Structure over colour.** Hierarchy comes from type (uppercase grotesk titles, mono labels, tabular numbers) and hairlines. A screen that needs colour to be readable needs better structure.
+- **One concept, one form.** A thing looks and behaves the same everywhere; sibling views of the same data share controls and meaning. A reused component is placed by its new container, never carrying an old one's layout.
+- **Structure over colour.** Hierarchy comes from type (grotesk titles, mono labels, tabular numbers) and hairlines. A screen that needs colour to be readable needs better structure.
 - **Keep structure visible.** Every item is an opaque surface with a border visible against its ground in both themes.
 - **Accent means state.** The electric blue marks selected, focused or flagged, rarely. Never decoration, a wash, a category, or ordinary links and buttons.
 - **Measured and dependable.** Square corners, crisp 1px lines, mono metadata, tabular figures.
@@ -16,170 +16,98 @@ Token values live in `design/tokens.css`, base styles and shared components in `
 
 Avoid: rounded cards, pastel fills, gradients, illustrations, decorative motion; rows of floating cards with coloured edges; removing borders or corner ticks; ruling anything but a canvas; chrome that ignores the theme; status by colour alone.
 
-## Approachable by default: density and progressive disclosure
+## Approachable by default
 
 Every screen is calm at first sight and denser only on request. This section wins over any denser default elsewhere.
 
-- **Show less by default.** A row or card shows its title, its status and at most one secondary fact; the rest is a hover, click or fold away. Leave a count where something is hidden (the Filter's badge; "4" beside "Show not relevant").
-- **More air.** A two-line row is about 64px; inspector sections pad 20px; groups sit `--space-5` apart. Separate with space before hairlines; small space steps inside a module, large ones between modules.
-- **Fewer shouting labels.** Mono uppercase only for small labels and status chips; buttons, menus, toolbar text, tabs, inspector headings and helper text are sentence case. At most one chip per row or card.
-- **Plain words over codes.** "Due in 3 days", "3 days late", "Unlocks 2"; never a bare number or abbreviation.
-- **Quieter chrome.**
-  - A route's header is one line: name; version selector (a menu: "Draft" or "Version 2", each with published date and journey count); a Retired chip when retired; the View picker (Graph, List, Timeline); the primary (Publish on a draft, Open a draft on a version); `⋯` (export, import into the draft, open proposals, discard the draft, retire, and delete while nothing uses the route, confirmed once under the header).
-  - A journey's header is one line: title; a status chip only when not active (its moves are under `⋯`, Status); the View picker ("View: Graph ▾": Summary, Graph, List, Timeline, Walkthrough); `⋯` (plus Print the summary on the Summary). What the journey is (owners, progress, next milestone, route and version) appears only on the inspector's journey card and the Summary's lead.
-  - Edit is one state entered from `⋯`: one band with the structure tools and the name, description and owners editor; Done leaves it.
-  - The Assistant is an inspector-column tab, not a header button or rail item.
-  - A view's toolbar holds only the shared view controls (Charts and graphs, The view controls).
-  - No status strip; transient bars are one short line.
-- **Detail on demand.** The inspector leads with its header, one plain sentence, and the primary action or form. Below, folded rows show a name and, where useful, a count ("Notes 3", never "0"), never a key-value summary. Origin and history share the last fold, "Details": the origin as a sentence, then one line per patch naming the person and what they did ("Ana snoozed it until Oct 31"). A folded row is one line (about 44px), the whole row its toggle.
-- **A journey opens as the stock view, and a view is the journey's until it is left.** A bare journey address opens the Summary; an address naming a node, an edge or a proposal opens the graph. The graph opens at Actions depth, Frontier and Fade off, conditional shown, not relevant hidden, fitted to the whole graph; nothing from an earlier visit is remembered. Switching views keeps Depth with Fade, Frontier, Filter and search; each view's own settings (expanded containers, Signal, sort, columns, timeline range) open at stock. Only what a control changes resets (checked rows on a new query; the canvas fit when depth, Filter or search changes what is drawn). Never remount a screen to refresh it.
-- **Graph cards** at reading zoom show kind and status chip, title, and one foot line: the date, and at its right the owner only when it is the viewer or missing ("You", "No owner", never shrinking, so the date ellipsises). A body line only for: a decided decision's answer; a container's progress ("1 of 3 done"); or, on work holding no nodes, its checklist ("7 of 11 ticked", same meter).
-- **The graph zoomed out shows its structure, not its cards.** Below reading zoom a stage or group is a tile in place (title, state, progress, due date) and opens in place once its contents would be readable. Zoom alone decides; panning never does, and nothing moves.
+- **Show less by default.** A row or card shows its title, its status and at most one secondary fact; the rest is a hover, click or fold away. A row's primary action and owner stay on the row: only facts go behind a hover, never a control. Leave a count where something is hidden.
+- **More air.** Separate with space before hairlines: small steps inside a module, large ones between modules.
+- **Fewer shouting labels.** Uppercase only where Typography says; at most one chip per row or card.
+- **Plain words over codes.** "Due in 3 days", "3 days late", "Unlocks 2"; never a bare number or abbreviation. An empty section is absent, a missing value is said in words, never a dash, and a screen never claims what Cairn does not know (no "All clear").
+- **Quiet chrome.** A header is one line; secondary actions live under one `⋯` menu; no status strip.
+- **Detail on demand.** The inspector leads with one plain sentence and the primary action; below, folded rows show a name and a count, never a key-value summary. History is sentences naming people ("Ana snoozed it until Oct 31").
+- **A control that cannot act is absent**, unless the person needs to learn why it is held: then it is shown held, with its reason.
+- **Stock views.** A journey opens at its stock view and remembers nothing from an earlier visit. Switching views keeps what is drawn (Depth, Frontier, Filter, search) and resets only each view's own settings. Never remount a screen to refresh it.
 
 ## Tokens
 
-Screen code uses tokens only: no raw hex, no radius above `--radius-lg`, no own durations. A theme-dependent token is one `light-dark(light, dark)` declaration.
+Screen code uses tokens only: no raw hex, no radius above `--radius-lg`, no own durations or sizes. A theme-dependent token is one `light-dark(light, dark)` declaration.
 
-- **Dark theme.** Follows the OS, forced by `data-theme="dark"` or `"light"` on the root. Same ramp, darker steps: muted graphite rather than navy, borders lightened to keep contrast.
-
-- **Neutrals** are steps of one cool ramp, `--n-0` to `--n-15`. A role takes a step, never a hex of its own; a new neutral picks a step. Light: paper (`--color-surface`) lightest, then sunken, ground, band, chrome deepest. Dark: chrome deepest, then ground, sunken, paper (raised), band. Chrome is two steps off the ground in both themes.
-- **Status colours** (`--color-error`, `--color-success`, `--color-warning`) are set as text. `--chrome-brand` is quiet identity (brand mark, active nav marker), never state. The accent is the same in both themes.
-- **Contrast floors**, both themes, enforced by `web/app/src/ui/tokens.test.ts`: 4.5:1 for text and muted on surface and band, muted on ground, chrome ink, muted and brand on chrome, status colours on surface and band, error on chrome, and text, muted and status colours over the diff fills; 3:1 for `--color-frame` on ground and sunken; 2:1 for `--color-edge` on ground and surface; 1.08:1 for surface on ground.
-- **Ordered values** use `--ramp-1..4`; binary or ordinal attributes use shape, a ring or a label, not saturation.
-- **Shape.** Panels and cards are square; `--radius-md` for buttons and inputs; `--radius-full` for status dots only.
-- **Borders** are 1px. 2px only for a selected item's accent line, the active nav marker, and the proposal layer's change edge.
-- **Shadows.** `--shadow-sm` panels, `--shadow-md` floating layers, `--shadow-lg` modals.
-- **Controls** in a row share `--control-h`.
-- **Touch targets.** On a coarse pointer every tappable control has a hit area of at least `--touch-target` each way, applied once to the shared controls; a one-off control joins a shared one. In a dense row grow the hit area, not the drawing. Controls in running text and canvas cards are covered by alternatives (the sentence's link, the zoom buttons). Compact sizing applies only under `@media not (pointer: coarse)`. Browser tests enforce it.
-- **Motion** is small additions only (a drawer slides, a highlight fades, a toast rises), off under `prefers-reduced-motion`.
+- **Dark theme.** Follows the OS, forced by `data-theme` on the root. The same ramp in darker steps, borders lightened to keep contrast.
+- **Neutrals** are steps of one cool ramp. A role takes a step, never a hex of its own.
+- **Status colours** are set as text. The brand colour is quiet identity, never state.
+- **Contrast floors** in both themes are enforced by `web/app/src/ui/tokens.test.ts`.
+- **Ordered values** use the ramp; binary or ordinal attributes use shape, a ring or a label, not saturation.
+- **Shape.** Panels and cards are square; buttons and inputs slightly rounded; only status dots are round.
+- **Borders** are 1px; 2px only for marks of selection and the current place (accent line, active nav marker, active segment, current menu item) and the proposal layer's change edge.
+- **Touch targets.** On a coarse pointer every tappable control has a hit area of at least `--touch-target`, applied once to the shared controls. Grow the hit area, not the drawing. Links in running text and everything drawn inside the canvas are exempt: zooming is how a card grows.
+- **Motion** is small additions only (a drawer slides, a highlight fades, a toast rises), off under reduced motion.
 
 ## Typography
 
-| Role | Face | Size / weight | Notes |
-| --- | --- | --- | --- |
-| Page title (h1) | Space Grotesk | 1.563rem / 700 | uppercase |
-| Section title (h2) | Space Grotesk | 1.25rem / 700 | uppercase |
-| Label: h3, module label, column header, key, status chip | IBM Plex Mono | 12px / 500 | uppercase, steel |
-| Prose and card text | IBM Plex Sans | 17px | |
-| Rows, body, inspector and control text | IBM Plex Sans | 15px | sentence case; inspector headings 600; inspector meta lines 13px mono |
-| Node title in the inspector | Space Grotesk | 1.25rem / 700 | sentence case (author's prose) |
-| Graph card | Plex Sans title, Mono kind and dates | title 15px / 600, at most 2 lines; dates 12.5px | |
-| Numbers, ids, paths, emails, code | IBM Plex Mono | 12.5-13px | tabular figures; keep their case |
-| Big figure (stat) | IBM Plex Mono | 1.563rem / 600 | tabular |
+| Role | Face | Notes |
+| --- | --- | --- |
+| Titles | Space Grotesk 700 | page and section titles uppercase; inspector headings and a node's title (as authored) sentence case |
+| Labels: module label, column header, key, status chip | IBM Plex Mono 12px / 500 | uppercase, steel |
+| Prose | IBM Plex Sans 17px | |
+| Rows, body, controls, buttons, menus, tabs, helper text | IBM Plex Sans 15px | sentence case |
+| Numbers, ids, paths, emails, code | IBM Plex Mono | tabular figures; keep their case |
 
-12px is the floor: no drawn text is smaller (picture and test checks fail on any). Titles are sized for a tool. Fonts are self-hosted, never from a CDN.
+12px is the floor: no drawn text is smaller. Fonts are self-hosted.
 
 ## Layout
 
-- **Shell.** Three zones, nothing along the bottom: a fixed rail on the left (brand with the sync dot at its row's right; nav ending with the You line; Connect an agent below it); the workspace, edge to edge, on `--color-ground`; an optional inspector for the selection. Rail and inspector are chrome.
-- **One scroller per region.** From 720px the frame fills the viewport and the document never scrolls; only the rail, workspace body, inspector body, sheet, popover and modal bodies scroll, each once. A gesture surface (graph or timeline canvas) never sits inside a scroller.
-- **Inspector.**
-  - One control hides it, the head's `›|` "Hide inspector" (key `]`); no close button (deselect is a background click or Esc). Hidden, it folds to a 32px right rail with `|‹` "Show inspector" and vertical INSPECTOR, ASSISTANT (where offered) and PROPOSALS (while a proposal is open) tabs. Selecting a node brings it back.
-  - The Proposals tab lists the open proposals of the page's journey, route or Identities as Proposals panel rows, its count on the tab and the rail. While the proposal layer is on, the Inspector tab holds the review rail.
-  - A node's dates are one Dates section (the authored rules are a separate Date rules section): due date; linked dates (each naming the other node and the relationship, count in the summary); earliest start, latest start and slack; the shortfall explanation.
-  - The journey card (nothing selected) has a folded Stages section where there are stages: one bordered row per stage, each one target, its title and state chip, then a meter with "N of M done" and its due date in the card foot's words. A route's card lists its stages with the days each spans, in start order.
-- **The walkthrough is one centered column**, 560px, holding the card and its notes (introduction, position and Pass line, end-of-pass and stalled notes), view controls above. No link back to the graph.
+- **Shell.** A rail on the left, the workspace edge to edge, and an optional inspector for the selection. Rail and inspector are chrome.
+- **One scroller per region.** From 720px the document never scrolls; each region's body scrolls once. A gesture surface (graph or timeline) never sits inside a scroller.
+- **Responsive**, from about 390px to 2560px. Below 1100px the inspector is a bottom sheet; below 720px everything else stacks into one column. A phone drops no fact a desktop shows: rows stack instead.
 - **Grid.** Modules sit on repeating `minmax(0, 1fr)` columns.
-- **Responsive.** Supported from about 390px to 2560px.
-  - Below 1100px the inspector is a bottom sheet over the workspace, snapping to peek (grip, tabs and the pane's top, about 160px), half (40%) and full (up to 85%). Its top row is the "Resize the inspector" handle (drag, tap, arrow keys). The 44px hide button and Esc close it; closed, it is one "Inspector" pill at bottom centre, no bar or blank strip.
-  - Picking a node opens the sheet at the peek on a phone or a window under 600px tall, and elsewhere at the height it was closed at. At the peek the pane is inert: a tap on it, or a tab, opens the sheet to half. The workspace ends above the sheet; canvas controls and fits clear it; a picked node moves into the room left by the least move. The sheet respects safe-area insets.
-  - Below 720px everything else stacks into one scrolling column. The rail is a one-row top bar: the four screens as tabs (15px, 44px targets) and the sync dot; You and Connect an agent move into the sync popover; no brand or keys hint. A journey header is one row: name clamped to three lines (tap reads it whole), View picker (the view only), menu. The view controls are one Controls button. The graph is drawn live in the page at the window height less the bars and the peek, so a swipe on it pans; no preview or full-screen map. Under the proposal layer the band is one line with Apply in the first viewport and the name one line.
-- **The Summary is the journey's front page.** The workspace's scroller, at most 1280px, DOM order its reading order.
-  - A lead panel (no band header): the Big figure of what is left with "of N in scope", a 4px graphite meter (never accent), counts by display state as text, the final (else next) milestone as a sentence, nearness first ("in 18 days (Nov 23)") with any shortfall after in error ink, and the as-of date at the right in 13px mono steel.
-  - A full-width Needs attention panel only when something is wrong, each reason in plain words linking to its chain.
-  - From 960px summary width (a container query) action panels sit in a main column beside context panels, 3:2 with `--space-5` gaps; narrower, one column in the same order, at most 760px, owners on their own line under the title.
-  - Every list is the shared node list; a node appears in one action panel only; five rows then a ghost "Show all N"; owners and actions always on the row, never waiting for hover.
-  - Every panel has the Panel frame, headed by the Section title with its count in 13px mono. An empty section is absent; nothing unknown is claimed ("Clear", "on track" are never written).
-  - Printed: lists whole, headings kept with their first row, as-of date shown, black on white.
-- **Placement.** A reused component is placed by its container, never carrying an old container's layout.
 
 ## Components
 
-- **Panel / card.** Opaque paper, four corner ticks (L-shaped 1px, 8px long, inset 3px), 1px border, `--shadow-sm`, square, never ruled. A panel's first label becomes its header band (`--color-band`, bottom hairline, mono steel label); a card may end in an action row with a top hairline. Never colour one edge. Exceptions: an inspector section is a sentence-case heading row, folded by default; a Home group's heading is the journey's name linking to it.
-- **Label.** The 12px mono uppercase steel label, letter-spacing .08em: module titles, field labels above controls, keys.
-- **Proposals panels.** Home's "Proposals to review N" is one folded line after the journey groups, paged when opened. The Journeys and Routes indexes show a bounded "Proposed" panel only while a proposal would create one. A row's second line says what it changes ("Adds 1 node"), naming the destination first where the list spans several, then "Needs a refresh" in warning ink; no proposer, no OPEN chip.
-- **Proposal layer.** Reviewing a proposal is the destination's own page with a layer on, never a separate screen or View picker entry; views draw the destination as it would be after, removed things in place and ghosted.
-  - The band, one line under the header: `Reviewing "<title>"` (ellipsised), Apply (primary), Close; a proposal that creates its destination says so there.
-  - Changes are marked by what scales with the card: a fill (`--color-add`, `--color-change`, `--color-del`); a 2px on-screen edge in the change's ink at any zoom, replacing the card's border, styled as the non-colour cue (solid added, dotted changed, dashed removed; removed is also struck and ghosted); an accent outline outside an item that needs a choice; and the change word ("Added", "Changed", "Removed") leading the kind line, the kind ellipsising first. Changed cards stay full ink however finished. A container takes the fill on its head band and the edge on its outline. Lists and the timeline fill the row and lead with the word (a narrow Change column, on a phone too).
-  - The graph opens framed on the changed cards in the room the inspector leaves, never below the 75% zoom titles read at: the first change in the rail's order as large as fits up to 100%, with each later change that still fits; the rail's rows move to the others. No change drawn, or the Fit button: the whole graph.
-  - The rail (the Inspector tab) holds the title, the notes that hold Apply or qualify the preview (before the attribution, so a peeked sheet says what to do), who proposed it, one sentence of what it changes, folds (Needs a choice, open when non-empty; Changes, headed by the key), and Discard at the foot. Picking a card or row opens its item editor there.
-  - A held Apply is `aria-disabled`, says why in its tooltip, and pressing it focuses the rail's hold line.
-  - Under the layer the page offers no live write (node actions, authoring, header write items, the graph's menu); Walkthrough and Summary stay in the View picker disabled with their reason, their keys off the key sheet.
-  - An archived journey offers no write beyond un-archiving and deleting under `⋯`, Status. A control that cannot act is absent, not disabled.
-- **Table.** The one row component for every list of nodes.
-  - Paper rows with a `--color-edge` hairline under each, in a bordered panel; a status chip column and an owner column. Below 810px list width, the owner and other yielding columns drop so the title keeps room for its buttons; on a phone a tree stops indenting after two levels.
-  - A one-line row pads 8px 12px; rows in a panel that also holds text take the panel's 16px inset and 15px size, sharing one left edge. Vertical column hairlines only in data tables opened in full.
-  - The header is a sticky band: uppercase mono in a data table, sentence case in the Plan list, where a sortable column is a button. Numbers right-aligned mono; secondary cell parts steel. Hover is a neutral tint.
-  - A tree draws, for each ancestor with more children below, a continuous 1px `--color-border` line through the full row height centred on that ancestor's chevron, and a `├` or last-child `└` joining the row's chevron or bullet. A container's fold is a 24px icon button; a leaf has a bullet in the same slot, so titles align per 24px level. A container row is a `--color-band` row with a 600 title and its progress. A tree keeps opened and folded levels when the row set changes.
-  - A primary table is its region's scroller (so its sticky header works); secondary tables never scroll and end in "Show all".
-  - A journey or route index row has a second context line (a journey's: origin and owners); an absent figure is said in words, not a dash. At phone width a row stacks: name, context, then one attention line with every remaining fact, so a phone drops nothing.
-- **Selection.** A selected row, card or item: a 2px accent line on its left edge plus `--color-tint`. A selected container: a 2px accent frame and tint over its whole body; only the selected node is tinted, others keep their trace marks. Focus is a 2px accent outline on every interactive element.
-- **Status.** A 12px mono uppercase word in a hairline chip with a 6px dot: success (done, approved), error (failed, rejected), warning (deferred, attention), steel (pending), hollow (superseded), ink filled (actionable now), ink ring (in progress). The word is always there. No two states share a dot shape: blocked is a square; skipped is hollow and struck through. Done and decided show a success-coloured check, as tall as the capitals and as heavy as the text. A done card's chip is hollow, in success colour. Where the word cannot fit, hover gives it.
+- **Panel / card.** Opaque paper, four corner ticks, 1px border, small shadow, square, never ruled. A panel's first label becomes its header band. Never colour one edge.
+- **Label.** The 12px mono uppercase steel label: module titles, field labels above controls, keys.
+- **Table.** The one row component for every list of nodes: paper rows with a hairline under each, a status chip column, sticky header. A tree shows its levels with continuous guide lines; a container row is banded with its progress. A primary table is its region's scroller; a secondary one never scrolls and ends in "Show all".
+- **Selection.** A 2px accent line on the left edge plus the tint; a selected container, a 2px accent frame. Focus is a 2px accent outline on every interactive element.
+- **Status.** A mono uppercase word in a hairline chip with a dot. The word is always there, and no two states share a dot shape (blocked is a square; skipped is hollow and struck). Done and decided show a check.
 - **One status language: fill says state, opacity says focus, and the lowest opacity wins.**
-  - Levels for cards, containers and rows: 1 open and in focus; 0.7 snoozed (`--opacity-snoozed`); 0.5 done or decided; 0.3 out of focus (outside a trace, unlit by Frontier, below the depth under Fade). Never multiplied; a trace never lifts a fade. An out-of-focus row fades its content cells and lifts under keyboard focus.
-  - Snoozed dims title and owner only; chip, kind label and "Until" date stay full (0.7 keeps its ink about 7.4:1). A snoozed node sorts by when it returns: in plan order by the later of its date and its holds lifting, and after the unsnoozed when sorted by a signal.
-  - Blocked and scheduled work is never dimmed (a scheduled row says its date under its title).
-  - Done keeps the neutral fill with muted text: faded, not filled. A done row fades content cells only, not the checkbox or the fill, so hover, selection and focus stay full. A container fades only its own head and frame, and not while it holds a node in focus.
-  - Skipped and not relevant are hollow, not relevant also muted; open work is paper; a ruled-out row is muted.
-  - Exception: lists read for finished work (the Summary's Recently finished, finished nodes under Needs attention) keep done rows at 1, since 0.5 breaks the 4.5:1 floor.
-  - No state takes space from titles at zoom-out.
-- **Buttons.** Hairline box, paper fill, text size, `--radius-md`, steel border on hover. Primary is `--ink-fill`, never blue; ghost is transparent. Disabled buttons, chips and checks are 45% opacity and keep their value.
-- **Inputs and selects.** Hairline box at `--control-h`; steel on hover, accent on focus. One select style: square with a drawn steel chevron. Checkboxes, radios and ranges use `accent-color: var(--color-text)`. Number, date and textarea inputs are mono.
-- **Multi-value input.** A list field is one growing box of chips then the input. A chip is a hairline mono 13px label on the band with a × "Remove <value>". A value that fails or repeats stays in the input, the box turns `--color-error`, and the reason shows under it ("Not added", then why); submit waits for an empty input. 16px input on a phone (no browser zoom). This is the one chip: an active filter under the toolbar is the same chip, its × turning the setting off. Fields carry a Label above, never a placeholder alone; actions on a line below.
-- **Links.** Text colour with a 1px `--color-secondary` underline, `currentColor` on hover; never blue.
-- **Keyboard hints.** A `kbd` chip: chrome ink on chrome, hairline border. `?` opens a modal key sheet for the current screen listing only keys that act there (canvas keys under a Graph heading). The rail's `?` (a glyph on the You line) opens it, previews it on hover and focus, and appears only where the page binds keys.
-- **Modal.** A native modal `<dialog>`: panel fill, `--shadow-lg`, ground-colour backdrop at 60%, `min(28rem, 92vw)`, its body the scroller, Esc closes. Two: the key sheet, and the name prompt ("What should we call you?", on load when the signed-in identity has no name; Name, Save, and Later, which defers to the next load).
-- **Toast.** A chrome chip at the workspace's bottom right, 12px up (above an open sheet), mono 13px, `--shadow-md`; rises in, leaves after 2.5s, pauses on hover, no close button, a new one replaces it. Saves never toast; the sync dot reports them.
-- **Sync dot.** One 10px mark button at the right of the rail's brand row (the phone's top bar), never a text label; its sentence is its accessible name. Hover or focus shows a popover below it (revision, what needs you, recent saves, and the server's release at the right of its head); a click pins it. Colour says what it asks: green nothing, steel working, amber safe to wait, red your change will not land until you act; each tone also has its own shape (disc, ring, diamond, square, "!" for a conflict, dotted ring for sample data).
-- **Identities.** The Index head over a data table: checkbox, Name (the viewer's row has one "You" chip), Emails (plain mono 13px steel, never chips); one-line rows (8px 12px), stacked on a phone. Rows select into Multi-select's set (a plain click opens one at `/identities/<key>`). Every write (Add at `/identities/new`, Edit, Merge with an Option list "Keep this identity", Delete) is in the inspector. Delete is on only once the references read found nothing, re-reading on click, and otherwise says why in words (checking, failed with Try again, or how many things name it and to merge instead). Under a proposal's layer rows take the fill and change word ("Merged", "Into <name>"), the count reads "10 identities now, 8 after", and every action is off.
-- **Deleting for good.** Deleting asks once, in a callout naming what goes and the count ("Delete 2 journeys for good?"), delete primary and Cancel, other writes stepping aside until answered; no typed name. The Journeys index picks rows as Identities does (a plain click still opens the journey); Delete in the inspector stays off, with the reason in words, until every picked journey is archived.
-- **Index head.** Journeys, Routes and Identities share one head: title with the primary action (New journey, New route, Add) at its row's right; under it one left-aligned, wrapping toolbar of filters and tools. A type or status filter is a select there, not a segmented control or column.
-- **Connect an agent.** One 880px column: a Segmented control per client showing that client's command and only what this deployment's sign-in needs, rarer ways behind one disclosure; Allowed agents where tokens are accepted. A value to copy is mono 13px on the band with Copy beside it. A new token's one-time warning is in warning ink.
-- **Segmented control.** Hairline segments at `--control-h`, text size, sentence case. The active one has the band fill and a 2px ink underline, not the accent; so does a pressed toggle (Signal on, Filter off its stock settings). A journey's and route's views are the View picker menu, not segments.
-- **Popover and menu.** Paper, 1px `--color-frame` border, `--shadow-md`, anchored to its control (a context menu at the pointer); its body scrolls (capped at `min(60dvh, 480px)`) with a soft shadow at an edge with more; Esc closes and returns focus. Items: sentence case, text size, 4px 12px, neutral hover, optional right-aligned mono key. In a menu of places (the View picker) the current item is banded, 600, with a 2px ink left line. A submenu (Status in `⋯`) opens in place one step in, its row showing the current value and a chevron. Items group by frequency, hairlines between groups.
-- **Option list.** A few answers as a bordered stack with hairlines; the chosen one banded with an inset 1px ink ring; what picking does right-aligned in mono steel.
-- **Group frame.** A container around its members, who sit 20px in from the head rule, bottom and sides. 1px `--color-frame` border, translucent paper body, a head of: kind label (with CURRENT), status chip and fold control; title; progress meter with "0 of 8 done" and warnings ("needs breakdown") right; a date line when it has one. A group marked done shows instead that it was marked done and how many items it skipped, or that kept work inside is pending. A full-width rule in the frame's stroke ends the head, with "Waits on N hidden prerequisites" just below. No owner on a container. Below the near zoom the head is only its title (left, vertically centred) and a stage's state chip at the far right; double-click zooms in; the rule stays.
-- **Tooltip.** One component, never the browser's `title`: a chrome chip with a `--color-frame` border, `--radius-md`, `--shadow-md`, at most 320px, text size, words only, a key as `kbd` at its right. Below its thing (above if roomier), 8px inside the window; on a graph line, at the pointer.
-  - A tip says only what the screen does not: what pressing does, its key, what a badge counts; why a held control (`aria-disabled`, focusable) cannot act; the fact behind a chip, count or date; cut text whole, only while cut. Never a tip that repeats adjacent words; a long list belongs in the inspector.
-  - A fact whose only place is a tip is a toggletip: focusable, shown on Enter or tap, its words dotted-underlined in `--color-secondary`. A held control also explains on tap. Every other tip's fact is said elsewhere.
-  - Screen readers get a tip as its thing's description, unless it repeats the name. The key-sheet preview is the one tooltip drawn as a popover.
-- **Guidance.** Appears when needed, dismissible, never returns once seen; the tour is the guided first run. It spotlights the whole action area, puts its words beside it (or wherever the action stays visible), and after the action explains what changed.
-- **Bottom sheet.** Chrome, a 24px drag handle (short hairline bar), its body the scroller.
-- **Multi-select.** Selection is one set shared by the graph and the list; one member is inspected and traced, several are listed and acted on in the inspector. No select mode, no selection bar. A route's canvas selects one node.
-  - Graph: a click selects alone; Shift-, Cmd- or Ctrl-click toggles; Shift-drag on background adds boxed cards; background click or Esc clears; on touch, the card menu's "Add to selection". List: checkboxes and Shift- or Cmd-click edit the set; a plain row click opens one node.
-  - With several: the inspector shows "N selected", Clear, the members, then the actions every member can take (Status, Assign owner, Snooze), an action some member cannot take visible but disabled with its reason; the graph tints members and draws no trace. A card in the selection has the selection's menu; one outside keeps its own.
-- **Rank tag.** A small square off a card's top-left corner: `--ink-fill` with `--color-surface` mono figures.
-- **Hanging tag.** A small mono label off a card's top-right or bottom-right for transient or lens information (trace role, signal value). Each slot has one owner. A control's count badge (Depth, Filter) hangs off its top-right the same way.
-- **Nothing spills out of its box.** Every box holds its content; no text is cut without an ellipsis or clamp mark. Only hanging and rank tags, count badges, connection handles, popovers, menus and tooltips overhang, each with `data-overhang`. Text yields before controls: head and foot rows are flex with `min-width: 0`, controls and chips never shrink, labels ellipsise or drop their lowest-priority part (a card head drops CURRENT, then ellipsises the kind). Unbreakable words break (`overflow-wrap: anywhere`) rather than widen a box; a select never outgrows its box. Clamped text with no other one-tap route to its full words (the journey name) opens in place on tap or click. Browser tests enforce it on every test and screen; the stress journey holds the worst content the limits allow.
-- **Names, not keys.** No screen, tooltip or error prints an internal key (any id, a digest, a revision number) where a name belongs. What is gone is said in words ("an item that was removed", "someone no longer here"). Browser tests enforce it.
-- **Dates.** Words first: `Decide by Oct 14`, `Due in 3 days`, `3 days late`. `Oct 14` in the current year, `Oct 14, 2027` otherwise; ISO only in tooltips. Source words: `pinned`, `recorded`, `worked out`; past its date a node is flagged `overdue`. Soon in warning ink, overdue in error ink, always with words. A time of day follows its date in 24-hour mono (`Oct 14, 08:15`), only where the date has one. In columns and on axes, mono tabular.
-- **Diff and log blocks.** Mono, hairline border, `--color-add` and `--color-del` lines, steel hunk headers.
+  - Levels: 1 in focus; 0.7 snoozed; 0.5 done or decided; 0.3 out of focus (outside a trace, unlit by Frontier, faded by depth). Never multiplied.
+  - Blocked and scheduled work is never dimmed.
+  - Fading touches content, never selection, hover, focus, or controls.
+  - Lists read for finished work keep done rows at full opacity.
+- **Buttons.** Hairline box on paper; primary is ink-filled, never blue. Disabled is 45% opacity and keeps its value.
+- **Inputs and selects.** Hairline box at `--control-h`; accent on focus. Fields carry a label above, never a placeholder alone. On a phone a text field is 16px, so the browser never zooms into it.
+- **Multi-value input.** One growing box of chips then the input. A value that fails stays in the input with the reason under it. This is the one chip: an active filter is the same chip.
+- **Links.** Text colour with an underline; never blue.
+- **Segmented control.** The active segment has the band fill and an ink underline, not the accent; so does a pressed toggle.
+- **Popover and menu.** Paper, framed, anchored to its control; its body scrolls; Esc closes and returns focus. Items are sentence case, grouped by frequency.
+- **Modal.** A native `<dialog>`, its body the scroller, Esc closes. Used rarely.
+- **Toast.** A chrome chip at the bottom right that leaves on its own; a new one replaces it. Saves never toast: the sync dot reports them.
+- **Sync dot.** One mark whose colour and shape say what it asks of you: nothing, working, safe to wait, or act or your change will not land. Its popover says the rest.
+- **Tooltip.** One component, never the browser's `title`. A tip says only what the screen does not: what pressing does, its key, what a count counts, why a held control cannot act, cut text whole. Never a tip that repeats adjacent words. A fact whose only place is a tip is a toggletip, reachable by keyboard and tap.
+- **Guidance** appears when needed, is dismissible, and never returns once seen; the tour is the guided first run.
+- **Multi-select.** Selection is one set shared by the graph and the list; one member is inspected and traced, several are listed and acted on together in the inspector. No select mode.
+- **Deleting for good** asks once, naming what goes and how many; no typed name.
+- **Proposal layer.** Reviewing a proposal is the destination's own page with a layer on, never a separate screen. Changes are marked by fill, a styled edge (solid added, dotted changed, dashed removed), and a leading word, so colour is never the only cue. Under the layer the page offers no live write.
+- **Rank tag and hanging tag.** Small labels off a card's corners for rank and transient lens information; each slot has one owner.
+- **Nothing spills out of its box.** Every box holds its content; text is never cut without an ellipsis or clamp mark. Only tags, badges, handles, popovers, menus and tooltips overhang, each marked `data-overhang`. Text yields before controls: controls and chips never shrink. Browser tests enforce it on every screen, and the stress journey holds the worst content the limits allow.
+- **Names, not keys.** No screen, tooltip or error prints an internal key, digest, or revision number where a name belongs. What is gone is said in words ("someone no longer here"). Browser tests enforce it.
+- **Dates.** Words first: `Decide by Oct 14`, `Due in 3 days`, `3 days late`. The year only when it is not this year; ISO only in tooltips. Source words: `pinned`, `recorded`, `worked out`. Soon in warning ink, overdue in error ink, always with words. A time of day follows its date in 24-hour mono, only where the date has one.
 
 ## Charts and graphs
 
-- **The ruling lives on canvases.** `--ruling` on `--color-ground`, with corner ticks, only on the graph canvas and the timeline.
-- Scaffold: 1px `--chart-grid` gridlines, steel axis, axis text at the label size. A relative axis (a route's timeline) labels whole days from the start ("Day 7"), its start line where a journey's has today, never a calendar date.
-- Marks `--chart-ink`, second series `--chart-steel`, lines 1.5px. A selected or anomalous mark is accent; a threshold is a dashed accent line (1.5px, dash 4 3). Heat scales run steel to blue; categorical colour needs a palette with no hue near the accent. An ordinal signal on nodes is one labelled chip tinted on the neutral ramp, never border weight or opacity.
-- **Graph cards and tiles.** Cards have a `--color-edge` border and ticks, always drawn whole and scaled by zoom.
-  - Below reading zoom (60%) a container is a tile unless all it holds are containers at least 120 x 40px on screen. A tile is a stack: an opaque sheet with the card shadow and a second sheet's edge 4px behind (none under 40px), ticks from 100px. It shows title with state chip, progress, due date in the card foot's words, its exceptional message, and one fact (what is selected inside, or search matches), title at 13, 16, 20 or 24 on-screen px by size. Short of room it drops the fact, date, chip, progress words, meter, in that order, down to a bare sheet. Its title is always its tooltip and accessible name; it hangs a card's tags.
-  - Below the near zoom a container head counter-scales its title: 13px on screen, smaller only when its room needs it, never larger than fits the head; it breaks only between words and shrinks before ellipsising. A stage chip beside it is about 10.5px, dropped when it would shrink or wrap the title.
-- **Selecting on the graph.** Clicking a card selects and traces it (on a route's canvas too: trace, fade and Reveal are one behaviour). Clicking a line selects it and opens its card in the inspector (not under a proposal's layer, nor a line drawn only for the current selection, such as a date line); clicking it again brings a hidden inspector back. Empty canvas click or Esc deselects and the inspector shows the journey's or route's card. A pan is never a click.
-- **The line card.** The line's kind with the Key's glyph, the two cards as heading, one plain sentence. A line standing for several links lists each, strongest first, both ends as links; on a journey each says whether it still waits. Go to opens either card. A long list offers the rest; a line no longer drawn says so and still offers its ends.
-- **The Signal button.** At a journey canvas's top right (a route's has a Key button there): `Signal: Off` or `Signal: Rank`, pressed when on, tooltip "Which priority signal each card shows: rank". Menu: Off, Rank, hairline, "Key to the lines". No separate chip.
-- **Controls floating on the canvas** sit on `--color-surface` with a `--color-edge` border and `--shadow-sm`, and take the pointer only on their own boxes.
-- **Fits clear the controls.** View controls top left, Signal top right, zoom buttons a vertical stack bottom left, Reveal bottom right. A fit pads for them (56 top, 72 left, 24 right, 56 bottom, more under a sheet) and always shows the whole drawn graph.
-- **The view controls.** One row on every view: Depth (Stages, Decisions, Deliverables, Actions; a menu with "Fade the rest instead of hiding it", off by default), Frontier, Filter, Search. A route's row has no Frontier or Only mine. On the graph it floats top left; elsewhere it tops the pane; on a phone it is one Controls menu (with the list's count and Columns beside it). The Summary has none.
-  - Depth, Filter and search choose what every view draws through the engine's one level (hidden nodes roll up, edges re-target); Frontier, and Depth with Fade, only emphasise. With Fade every card keeps the Actions layout and those below the depth dim, so nothing moves; the walkthrough's Depth has no Fade. Neither touches folds or camera.
-  - What a view cannot honour stays set but disabled, its reason in the tooltip or a muted line under it in a popover.
-  - Nothing drawn: the view says so and offers Reset the view (Actions, stock filter, no search; Frontier and Fade stay).
-  - A control never grows text for its state. The Filter's badge counts nodes its settings hide (Only mine, Owner, flags, Show conditional; never ruled-out nodes or classes the view cannot draw), also on the phone's Controls button. The open Filter shows each setting's hidden count in neutral type (none when zero or undrawable; no flag, owner or badge counts on the walkthrough). Depth has a badge when Frontier lights cards its level hides, explained in its tooltip.
-- **Reveal.** A floating box at bottom right, only while the selected node's trace has nodes without their own card: "Reveal 5 linked nodes", then "Hide revealed nodes".
-- **Edges.** 1px steel at every zoom, done or not. Kind is line style (solid, dotted) and end marker (arrowhead or hollow diamond), never a label; hover gives the sentence and draws the edge and ends in ink. Resting lines stay readable on the ruling.
-- **Tracing.** Selecting a node draws what it needs in ink and what it unblocks in accent, emphasised whatever their dash or state; a requirement into or out of a container counts when the container holds a needed or unblocked node. Traced nodes carry NEEDS or UNBLOCKS tags; a card adding to the selection's gravity carries a filled dot on its UNBLOCKS tag. Everything else goes out of focus, lines at one subordinate level. A line whose end is hidden (tile, folded container, detail step, roll-up) is drawn to what stands for it, along one member's route's outer part; date lines route around tiles. No line to itself or an enclosing card; parallel lines merge; no line ends where no card is.
-- **Date lines.** A date relationship is not an edge: drawn only for the one selected node while its inspector shows the Dates section open (folding it, hiding the inspector, another tab or a peeked sheet removes them; scrolling does not). 1.5px dashed ink, an open arrowhead at the later end when the order is fixed; the far card stays in focus; opens no card. Pointing at a linked-date row keeps its lines in ink and fades the rest. Lines meeting a card's side are spaced evenly, off its middle, so arrowheads never stack; they run through gutters, never through a card, and through a frame holding neither end only where no gutter exists. The Key lists it after the edge kinds.
+- **The ruling lives on canvases**: only the graph and the timeline.
+- Marks are ink, a second series steel; a selected or anomalous mark is accent. An ordinal signal on nodes is a labelled chip, never border weight or opacity. A relative axis labels days from the start ("Day 7"), never a calendar date.
+- **Graph cards** show kind, status, title, and one foot line with the date and, only when it is the viewer or missing, the owner. A body line only for a decided answer, a container's progress, or a leaf's checklist.
+- **The graph zoomed out shows its structure, not its cards.** Below reading zoom a container is a tile showing its title, state, and progress, dropping detail as it shrinks. Zoom alone decides; nothing moves.
+- **Group frame.** A group draws as a frame around its members, with a head showing its title, state and progress.
+- **Edges** are 1px steel at every zoom; kind is line style and end marker, never a label. A line to a hidden node is drawn to what stands for it.
+- **Tracing.** Selecting a node draws what it needs in ink and what it unblocks in accent; everything else goes out of focus.
+- **Date lines** are not edges: dashed, drawn only for the selected node while its dates are open.
+- **The view controls** are one row on every drawn view (Depth, Frontier, Filter, Search); the Summary has none, and a route has no Frontier. What a view cannot honour stays set, disabled with its reason. A count badge says what the settings hide. When nothing is drawn, the view says so and offers to reset.
+- **Fits clear the controls** and always show the whole drawn graph.
+- A pan is never a click.
 
 ## Accessibility
 
-- Text meets WCAG AA, 4.5:1, including muted on the band; prose is at least 17px, other text 15px.
-- Every interactive element shows a 2px focus ring.
-- Content shown on hover or focus is dismissable with Esc, hoverable, and persists until dismissed or no longer applicable.
+- Text meets WCAG AA, 4.5:1.
+- Content shown on hover or focus is dismissable with Esc, hoverable, and persists until dismissed.

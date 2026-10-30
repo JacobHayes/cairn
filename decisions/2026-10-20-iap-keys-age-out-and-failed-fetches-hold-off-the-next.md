@@ -1,13 +1,12 @@
 # IAP keys age out, failed fetches hold off the next, and assertions last at most IAP's lifetime
 
-- Question: a security review of the `gcp_iap` provider found three gaps. A key Cairn had fetched was trusted for as long as the process ran, even after Google withdrew it, because the set was fetched again only for an unknown key id. A failed fetch did not count against the refetch interval, and the fetch ran while holding the lock every verification takes, so during an outage at Google each request could fetch again and wait out the 10 s outbound limit in turn, behind the others, even when its key was already kept. And an assertion was checked for expiry and future issue but not for how long it lasts, so a correctly signed one valid for a year passed. Not part of any brief: this came from the review.
-- Call:
-  - The kept set is trusted for at most an hour (`IAP_KEY_SET_AGE_MAX`). Past that the next request fetches it again and the fetched set replaces the kept one, so a withdrawn key stops verifying. If that fetch fails, requests are refused as unavailable rather than verified against the aged set: an outage at Google longer than the hour is an outage of sign-in.
-  - Every try at a fetch, failed or not, is recorded before the call and holds off the next for the existing 60 s interval. One fetch runs at a time, on its own task, which keeps what it gets, so a request dropped mid-fetch cannot use up the try and keep nothing. Requests that need it wait for it and then use what it got, so a request waits at most one outbound call. The kept set sits behind its own short lock, never held across the call, so a request whose key is kept, while the set is within its age, never waits on a fetch. A time recorded ahead of now (the clock stepped back) counts as long ago, so a step back neither holds off fetches nor keeps a set trusted for as long as the step.
-  - An assertion may last at most ten minutes from issue to expiry, plus the 30 s skew at either end (Google's verification guidance: "the maximum lifetime of a token is 10 minutes + 2 * skew"). One that expires before it was issued is refused too.
-- This reverses one alternative rejected in `decisions/2026-10-08-behind-iap-cairn-verifies-the-signed-assertion.md` (a periodic key-set refresh): that record accepted a retired key staying usable until the next unknown key id, and the review showed that can be forever.
-- Alternatives:
-  - Keep verifying against the aged set while a refresh fails. Rejected: it fails open exactly when a withdrawn key matters, and an hour of Google's key endpoint being down is rare.
-  - Honour the key set response's `Cache-Control`. Rejected for now: one fixed age is simpler and needs no parsing, and Google documents no rotation period.
-  - A shorter age (minutes). Rejected: each refresh is a request that waits on Google, and an hour already bounds a withdrawn key well inside a working day.
-- What would change it: Google documenting a shorter withdrawal window or a lifetime other than ten minutes, or a deployment that needs sign-in to survive a longer outage at Google's key endpoint.
+**Question.** How long does Cairn trust Google's IAP signing keys and an assertion, and what happens while Google's key endpoint is down?
+
+**Call.**
+- The kept key set is trusted only up to a fixed age. Past that the next request fetches it again; if that fetch fails, requests are refused as unavailable rather than verified against the aged set, so a withdrawn key stops verifying.
+- Every fetch, failed or not, holds off the next for the refetch interval. One fetch runs at a time on its own task, and a request whose key is kept never waits on it. A clock stepped back counts as long ago.
+- An assertion's lifetime from issue to expiry is held to Google's guidance, plus the skew at each end.
+
+**Alternatives.** Keep verifying against the aged set while a refresh fails (fails open exactly when a withdrawn key matters); honour the response's `Cache-Control` (parsing for no documented rotation period); refetch only on an unknown key id (a withdrawn key stays trusted forever).
+
+**What would change it.** Google documenting a shorter withdrawal window or another lifetime, or a deployment that must sign in through a longer outage at Google's key endpoint.

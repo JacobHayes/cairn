@@ -5,7 +5,7 @@
 //! so a web change does not recompile the crate. Each file is
 //! served at its own path, and `index.html` at `/` and at every other path the server does
 //! not keep, since the UI routes by path: a screen's address loads the page, which shows
-//! that screen (decisions/2026-10-08-the-api-is-served-under-api-and-the-app-owns-the-rest.md).
+//! that screen.
 //!
 //! The web build holds each compressible file twice more, as `<file>.br` and `<file>.gz`,
 //! compressed once when the app is built (web/app/vite.config.ts), and a request is

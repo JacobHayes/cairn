@@ -167,8 +167,8 @@ export interface Line {
 }
 
 /**
- * C1: the date relationships between two cards (a due-by or not-before rule, a stage's close,
- * an opening that holds dates only, a date decision that sets a milestone), kept for the
+ * C1: the date relationships between two cards (a due-by or not-before rule, or a date
+ * decision that sets a milestone), kept for the
  * selected node to draw. Not an edge: nothing waits on it.
  */
 export interface DateLine {

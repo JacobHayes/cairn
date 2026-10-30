@@ -68,8 +68,8 @@ function Actuals({ view, detail }: { view: Ready; detail: NodeDetail }) {
 }
 
 /**
- * C1, C8: the node's date relationships in both directions (its due-by and not-before rules, its
- * stage's close, an opening that holds dates only, a decision that sets a milestone's date), each
+ * C1, C8: the node's date relationships in both directions (its due-by and not-before rules, and
+ * a decision that sets a milestone's date), each
  * as the sentence the canvas says on hover, with the other node as a link. These are the date lines
  * the canvas draws for the node while this section is open, read and followed here with the keyboard
  * or by touch; pointing at a row draws its lines in ink.

@@ -1,7 +1,5 @@
 //! The binary's limits (PRACTICES, Explicit limits). It names none of its own: each bound
-//! it enforces is one the table already names, borrowed where the table does not name the
-//! value
-//! (decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
+//! it enforces is one another crate already names.
 
 use std::time::Duration;
 

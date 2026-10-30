@@ -70,8 +70,7 @@ mise run sim     # every leg of sim.sh, from the repository root
    (the store finding below), and a run whose store fails closed ends without an audit.
 The patina limitations in Findings are not checked here: they exercise pinned patina, not Cairn (`decisions/2026-10-17-simulation-runs-no-known-gap-checks.md`).
 
-No check here depends on one seed's outcome: a seed reproduces a run on one binary only
-(`decisions/2026-10-16-simulation-checks-pin-no-seed.md`).
+No check here depends on one seed's outcome: a seed reproduces a run on one binary only.
 
 ## Findings
 
