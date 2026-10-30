@@ -2,7 +2,7 @@
 // after that, late once it has passed, and one reading of where a date comes from.
 import { describe, expect, it } from "vitest";
 
-import { dateWords, daysUntil, dueWords, lateWords, momentIn, NEAR_DAYS, originWord, relativeDays, timeOf, whenWords } from "./when.ts";
+import { dateParts, dateWords, daysUntil, dueWords, lateWords, momentIn, NEAR_DAYS, originWord, relativeDays, timeOf, whenWords } from "./when.ts";
 
 const today = "2026-10-06";
 
@@ -79,5 +79,19 @@ describe("a time of day", () => {
   it("reads a repeated wall time as its first and a skipped one as the time on", () => {
     expect(momentIn("Europe/London", "2026-10-25", "01:30")).toBe("2026-10-25T01:30+01:00");
     expect(momentIn("Europe/London", "2026-03-29", "01:30")).toBe("2026-03-29T02:30+01:00");
+  });
+});
+
+describe("the dates and times in words", () => {
+  it("are cut out of what dateWords, dueWords and whenWords say, and nothing else is", () => {
+    const said = [dateWords("2026-10-06", "2026-10-01"), dateWords("2027-10-06", "2026-10-01"), dateWords("2026-10-06T08:15+00:00", "2026-10-01")];
+    for (const words of said) {
+      expect(dateParts(words)).toEqual([{ text: words, date: true }]);
+    }
+    const due = dueWords("2026-10-02T08:15+00:00", "2026-10-01", false, undefined);
+    expect(dateParts(due)).toEqual([{ text: "Due tomorrow at ", date: false }, { text: "08:15", date: true }]);
+    const when = whenWords("2026-10-20", undefined, "2026-10-01", undefined);
+    expect(dateParts(when).filter((part) => part.date).map((part) => part.text)).toEqual([dateWords("2026-10-20", "2026-10-01")]);
+    expect(dateParts(lateWords(3))).toEqual([{ text: lateWords(3), date: false }]);
   });
 });

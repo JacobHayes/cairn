@@ -74,7 +74,7 @@ use std::collections::BTreeSet;
 use jiff::SignedDuration;
 
 use cairn_schema::{
-    AnswerSpec, AnswerValue, Bound, BoundedVec, ChainList, Date, DateOrigin, Deployment,
+    AnswerSpec, AnswerValue, Bound, BoundedVec, ChainList, Date, DateOrigin, Deployment, DueBound,
     EffectiveDate, FixedBy, NodeDates, NodeKey, NodeKind, Payload, ShortChain, State, Subject,
     Timestamp, Violation, ViolationCode, When,
 };
@@ -779,7 +779,7 @@ impl Dates {
         let (start, finish) = (self.network.start(at), self.network.finish(at));
         let bound = |day: Option<i32>, found: Found| {
             day.map(|day| Bound {
-                date: When::Day(date(day)),
+                date: date(day),
                 chain: explain.chain(&found),
             })
         };
@@ -798,9 +798,9 @@ impl Dates {
                 self.solved.latest(finish),
                 self.solved.latest_chain(&self.network, finish),
             )
-            .map(|due| Bound {
-                date: self.due_when(key).unwrap_or(due.date),
-                ..due
+            .map(|due| DueBound {
+                date: self.due_when(key).unwrap_or(When::Day(due.date)),
+                chain: due.chain,
             }),
             slack_days: self.slack_days(key),
             overdue_days: self.overdue_days(key),

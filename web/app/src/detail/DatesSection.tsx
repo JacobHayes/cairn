@@ -13,6 +13,7 @@ import { parseInstant, type Bound } from "./explain.ts";
 import { nodeOf, titleOf, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { LinkedDateRow, NodeLink, Section } from "./parts.tsx";
 import { ShortfallView } from "./ShortfallView.tsx";
+import { Words } from "../ui/Words.tsx";
 
 /** F7: where a bound comes from. */
 export type BoundOrigin = "pin" | "actual" | "derived";
@@ -34,22 +35,28 @@ export function boundOrigin(bound: Bound, node: string): BoundOrigin {
   return fixed.fixed_by === "actual" ? "actual" : fixed.fixed_by === "today" ? "derived" : "pin";
 }
 
-function BoundRow({ view, node, label, bound }: { view: Ready; node: string; label: string; bound: Bound | null | undefined }) {
+/** A bound's date and where it comes from. */
+function BoundFact({ view, node, bound }: { view: Ready; node: string; bound: Bound }) {
+  return (
+    <>
+      <strong><Words text={dateWords(bound.date, view.derived.today)} /></strong> <span className="muted small">{originWord(boundOrigin(bound, node))}</span>
+    </>
+  );
+}
+
+/** A bound's chain under its label, as the one disclosure holds it; the date is said with it unless the page says it above (`said`). */
+function BoundWhy({ view, node, label, bound, said = false }: { view: Ready; node: string; label: string; bound: Bound | null | undefined; said?: boolean }) {
   if (bound == null) {
-    return (
-      <div className="date-row" data-testid="date" data-label={label} data-origin="none">
+    return said ? null : (
+      <div className="date-row" data-testid="date-why" data-label={label} data-origin="none">
         <span className="date-label">{label}</span> <span className="muted small">no date reaches it</span>
       </div>
     );
   }
-  const origin = boundOrigin(bound, node);
   return (
-    <div className="date-row" data-testid="date" data-label={label} data-origin={origin}>
-      <span className="date-label">{label}</span> <strong>{dateWords(bound.date, view.derived.today)}</strong> <span className="muted small">{originWord(origin)}</span>
-      <details>
-        <summary className="muted small">Why this date</summary>
-        <ChainView view={view} chain={bound.chain} />
-      </details>
+    <div className="date-row" data-testid="date-why" data-label={label} data-origin={boundOrigin(bound, node)}>
+      <span className="date-label">{label}</span> {said ? null : <BoundFact view={view} node={node} bound={bound} />}
+      <ChainView view={view} chain={bound.chain} />
     </div>
   );
 }
@@ -61,8 +68,8 @@ function Actuals({ view, detail }: { view: Ready; detail: NodeDetail }) {
   }
   return (
     <div className="row" data-testid="actuals">
-      {started == null ? null : <span>Started <strong>{dateWords(started, view.derived.today)}</strong></span>}
-      {finished == null ? null : <span>Finished <strong>{dateWords(finished, view.derived.today)}</strong></span>}
+      {started == null ? null : <span>Started <strong><Words text={dateWords(started, view.derived.today)} /></strong></span>}
+      {finished == null ? null : <span>Finished <strong><Words text={dateWords(finished, view.derived.today)} /></strong></span>}
     </div>
   );
 }
@@ -114,17 +121,26 @@ export function DatesSection({
   const key = detail.node.key;
   return (
     <Section title="Dates" summary={dates.links === undefined || dates.links.length === 0 ? undefined : `${String(dates.links.length)} linked`} open={open} {...(fold === undefined ? {} : { fold })} testId="dates">
-      <BoundRow view={view} node={key} label="Due" bound={dates.due} />
+      {dates.due == null ? (
+        <div className="date-row" data-testid="date" data-label="Due" data-origin="none">
+          <span className="date-label">Due</span> <span className="muted small">no date reaches it</span>
+        </div>
+      ) : (
+        <div className="date-row" data-testid="date" data-label="Due" data-origin={boundOrigin(dates.due, key)}>
+          <span className="date-label">Due</span> <BoundFact view={view} node={key} bound={dates.due} />
+        </div>
+      )}
       <Actuals view={view} detail={detail} />
       <LinkedDates view={view} detail={detail} />
       <details className="date-more" data-testid="more-dates">
-        <summary className="muted small">Earliest start, latest start and slack</summary>
+        <summary className="muted small">How these dates are worked out</summary>
         <div className="stack">
-          <BoundRow view={view} node={key} label="Earliest start" bound={dates.earliest_start} />
-          <BoundRow view={view} node={key} label="Latest start" bound={dates.latest_start} />
+          <BoundWhy view={view} node={key} label="Due" bound={dates.due} said />
+          <BoundWhy view={view} node={key} label="Earliest start" bound={dates.earliest_start} />
+          <BoundWhy view={view} node={key} label="Latest start" bound={dates.latest_start} />
           {dates.effective_date == null ? null : (
             <span data-testid="effective-date">
-              <span className="date-label">Effective date</span> <strong>{dateWords(dates.effective_date.date, view.derived.today)}</strong>{" "}
+              <span className="date-label">Effective date</span> <strong><Words text={dateWords(dates.effective_date.date, view.derived.today)} /></strong>{" "}
               <span className="muted small">{originWord(dates.effective_date.origin)}</span>
             </span>
           )}

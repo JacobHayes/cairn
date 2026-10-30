@@ -444,11 +444,22 @@ pub struct Contribution {
 }
 
 // PRD: F3, F7.
-/// A derived date bound and the chain that produced it.
+/// A derived start date and the chain that produced it: a day.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Bound {
-    /// The date; a due date carries its time when the node's own pin sets one on that day.
+    /// The day.
+    pub date: Date,
+    /// The chain from a pin, actual, or today that produced it.
+    pub chain: Chain,
+}
+
+// PRD: F3, F7, A9.
+/// A derived due date and the chain that produced it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DueBound {
+    /// The date: a day, or a moment when the node's own pin sets a time on that day.
     pub date: When,
     /// The chain from a pin, actual, or today that produced it.
     pub chain: Chain,
@@ -463,13 +474,16 @@ impl NodeDates {
     pub fn for_response(mut self) -> Self {
         let cut = |bound: Option<Bound>| {
             bound.map(|bound| Bound {
-                date: bound.date,
                 chain: bound.chain.for_response(),
+                ..bound
             })
         };
         self.earliest_start = cut(self.earliest_start);
         self.latest_start = cut(self.latest_start);
-        self.due = cut(self.due);
+        self.due = self.due.map(|due| DueBound {
+            chain: due.chain.for_response(),
+            ..due
+        });
         self.shortfall = self.shortfall.map(|short| ShortChain {
             chain: short.chain.for_response(),
             ..short
@@ -521,7 +535,7 @@ pub struct NodeDates {
     pub latest_start: Option<Bound>,
     /// The latest it can finish.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub due: Option<Bound>,
+    pub due: Option<DueBound>,
     /// Latest start minus today; null is "no deadline".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slack_days: Option<i32>,

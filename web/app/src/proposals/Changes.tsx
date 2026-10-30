@@ -239,7 +239,7 @@ function MutationEditor({ editor, mutation, onChange, context }: { editor: strin
     case "set_node_field":
       return <FieldValue editor={editor} mutation={mutation} onChange={onChange} context={context} />;
     case "set_pin":
-      return <WhenInput label="Pinned date" value={mutation.date} zone={context.ready?.inputs.timezone ?? "UTC"} onChange={(date) => { onChange({ ...mutation, date }); }} />;
+      return <WhenInput label="Pinned date" today={context.ready?.derived.today ?? new Date().toISOString().slice(0, 10)} value={mutation.date} zone={context.ready?.inputs.timezone ?? "UTC"} onChange={(date) => { onChange({ ...mutation, date }); }} />;
     case "answer": {
       const decision = context.tree.byKey.get(mutation.decision);
       return context.ready === undefined || decision === undefined ? null : (

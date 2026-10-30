@@ -12,6 +12,7 @@ import { SNOOZE_NODE_TAIL, snoozeEndWords } from "../status/snooze.ts";
 import { dateInk, dateWords, inkClass, whenWords } from "../status/when.ts";
 import { Button } from "../ui/kit.tsx";
 import { NodeLink } from "../detail/parts.tsx";
+import { Words } from "../ui/Words.tsx";
 
 /** Where a node's title leads when it is not the screen's own detail link. */
 interface Reach {
@@ -39,7 +40,7 @@ function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrit
         <span>
           <span className="stall-snoozed">{title(node)}</span>{" "}
           <span className="muted">
-            · snoozed until {"date" in until ? <span className={inkOf(until.date)}>{snoozeEndWords(view, until)}</span> : <>{title(until.node)}{SNOOZE_NODE_TAIL}</>}
+            · snoozed until {"date" in until ? <span className={inkOf(until.date)}><Words text={snoozeEndWords(view, until)} /></span> : <>{title(until.node)}{SNOOZE_NODE_TAIL}</>}
           </span>
         </span>
         {!write.writable ? null : (
@@ -62,7 +63,7 @@ function ScheduledLine({ view, write, cause, title, inkOf }: { view: Ready; writ
   const when = kind === "milestone" ? `${marks === true ? "marks itself done " : ""}${whenWords(date, undefined, today, undefined)}` : `not before ${dateWords(date, today)}`;
   return (
     <li className="stall-cause" data-testid="stall-cause" data-status="scheduled" data-node={node}>
-      <span>{title(node)} <span className={inkOf(date) ?? "muted"}>· {when}</span></span>
+      <span>{title(node)} <span className={inkOf(date) ?? "muted"}>· <Words text={when} /></span></span>
       {!write.writable || act === undefined ? null : (
         <Button disabled={write.disabled} onClick={() => void write.run([transition(node, act === "done" ? "complete" : "start")])}>
           {ACT_LABELS[act]}
@@ -90,7 +91,7 @@ export function StalledPanel({ view, nodeTo }: { view: Ready; nodeTo?: (node: st
         <strong>Nothing is ready yet. Waiting on:</strong>
       </p>
       {stalled.all_blocked === true ? <span>Every remaining node is blocked.</span> : null}
-      {stalled.sleeps_past == null ? null : <span>Every snooze runs past the final milestone ({dateWords(stalled.sleeps_past, view.derived.today)}), so the journey cannot reach it as things stand.</span>}
+      {stalled.sleeps_past == null ? null : <span>Every snooze runs past the final milestone (<Words text={dateWords(stalled.sleeps_past, view.derived.today)} />), so the journey cannot reach it as things stand.</span>}
       <ul className="stall-causes">
         {stalled.waiting_on.map((cause) => (
           <CauseLine key={JSON.stringify(cause)} view={view} write={write} cause={cause} reach={{ nodeTo }} />

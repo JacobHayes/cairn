@@ -36,7 +36,11 @@ fn dates_of(records: &Records, node: &str) -> NodeDates {
 }
 
 fn bound(found: Option<&cairn_schema::Bound>) -> Option<Date> {
-    found.map(|bound| bound.date.day())
+    found.map(|bound| bound.date)
+}
+
+fn due_day(found: Option<&cairn_schema::DueBound>) -> Option<Date> {
+    found.map(|due| due.date.day())
 }
 
 /// What fixes a chain's ends.
@@ -63,7 +67,7 @@ fn a_rule_bounds_both_of_its_ends() {
         "- op: set_pin\n  node: n_meeting\n  date: \"2026-11-20\"\n",
     );
     let report = dates_of(&pinned, "n_report");
-    assert_eq!(bound(report.due.as_ref()), Some(date("2026-11-06")));
+    assert_eq!(due_day(report.due.as_ref()), Some(date("2026-11-06")));
     assert_eq!(
         bound(report.latest_start.as_ref()),
         Some(date("2026-11-03"))
@@ -102,7 +106,7 @@ fn rules_measure_from_milestones_and_created_at() {
 - op: set_pin\n  node: n_kickoff\n  date: \"2026-11-01\"\n",
     );
     assert_eq!(
-        bound(dates_of(&records, "n_both").due.as_ref()),
+        due_day(dates_of(&records, "n_both").due.as_ref()),
         Some(date("2026-11-01"))
     );
     let after = dates_of(&records, "n_after");
@@ -111,7 +115,7 @@ fn rules_measure_from_milestones_and_created_at() {
         Some(date("2026-11-04"))
     );
     let soon = dates_of(&records, "n_soon");
-    assert_eq!(bound(soon.due.as_ref()), Some(date("2026-10-09")));
+    assert_eq!(due_day(soon.due.as_ref()), Some(date("2026-10-09")));
     let fixed = &soon.due.unwrap().chain.fixed;
     assert_eq!(fixed[0].instant, Instant::CreatedAt);
     assert_eq!(fixed[0].fixed_by, FixedBy::Actual, "created_at is a fact");
@@ -125,9 +129,9 @@ fn the_examples_report_is_due_by_its_chain() {
     let derived = support::derived(&records, "j_vendor_eval");
     let graph = support::journey_graph(&records, "j_vendor_eval");
     let report = derived.dates().node(&graph, &key("n_final_report"));
-    assert_eq!(bound(report.due.as_ref()), Some(date("2026-11-20")));
+    assert_eq!(due_day(report.due.as_ref()), Some(date("2026-11-20")));
     let latest = report.latest_start.unwrap();
-    assert_eq!(latest.date.day(), date("2026-11-17"));
+    assert_eq!(latest.date, date("2026-11-17"));
     let sources: Vec<_> = latest
         .chain
         .constraints
@@ -178,7 +182,7 @@ fn a_child_finishes_before_its_parents_own_work() {
         "- op: set_pin\n  node: n_parent\n  date: \"2026-11-10\"\n",
     );
     let child = dates_of(&records, "n_child");
-    assert_eq!(bound(child.due.as_ref()), Some(date("2026-11-06")));
+    assert_eq!(due_day(child.due.as_ref()), Some(date("2026-11-06")));
     assert_eq!(bound(child.latest_start.as_ref()), Some(date("2026-11-04")));
     let parent = dates_of(&records, "n_parent");
     assert_eq!(
@@ -287,7 +291,7 @@ fn a_negative_cycle_gets_bounds() {
         bound(second.earliest_start.as_ref()),
         Some(date("2026-11-09"))
     );
-    assert_eq!(bound(second.due.as_ref()), Some(date("2026-11-11")));
+    assert_eq!(due_day(second.due.as_ref()), Some(date("2026-11-11")));
 }
 
 /// F6: an actual that breaks a rule of work still to do is that work's shortfall, with the
@@ -369,7 +373,7 @@ fn a_deadline_follows_its_milestones_actual() {
         "- op: set_pin\n  node: n_kickoff\n  date: \"2026-10-01\"\n",
     );
     assert_eq!(
-        bound(dates_of(&pinned, "n_work").due.as_ref()),
+        due_day(dates_of(&pinned, "n_work").due.as_ref()),
         Some(date("2026-10-04"))
     );
     let finished = support::accepted(
@@ -377,7 +381,7 @@ fn a_deadline_follows_its_milestones_actual() {
         "- op: transition\n  node: n_kickoff\n  transition: complete\n",
     );
     let work = dates_of(&finished, "n_work");
-    assert_eq!(bound(work.due.as_ref()), Some(date("2026-10-09")));
+    assert_eq!(due_day(work.due.as_ref()), Some(date("2026-10-09")));
     let kickoff = dates_of(&finished, "n_kickoff").effective_date.unwrap();
     assert_eq!(
         (kickoff.date, kickoff.origin),
@@ -481,7 +485,7 @@ fn a_skipped_milestones_dates_stop_counting() {
         &answered,
         "- op: answer\n  decision: n_when\n  value: {date: \"2026-11-25\"}\n",
     );
-    let due = |records: &Records, node: &str| bound(dates_of(records, node).due.as_ref());
+    let due = |records: &Records, node: &str| due_day(dates_of(records, node).due.as_ref());
     for (records, expected) in [(&pinned, "2026-11-20"), (&answered, "2026-11-25")] {
         assert_eq!(due(records, "n_stage"), Some(date(expected)));
         assert_eq!(due(records, "n_work"), Some(date(expected)));
@@ -623,7 +627,7 @@ fn a_stage_window_holds_parallel_estimates_but_not_sequential_ones() {
         "- op: set_pin\n  node: n_opens\n  date: \"2026-11-02\"\n",
     );
     assert_eq!(
-        bound(dates_of(&pinned, "n_second").due.as_ref()),
+        due_day(dates_of(&pinned, "n_second").due.as_ref()),
         Some(date("2026-11-07")),
         "parallel work fits the window"
     );

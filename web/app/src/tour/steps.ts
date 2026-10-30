@@ -214,7 +214,7 @@ const STEPS: Record<StepId, Step> = {
     frontier: false,
     pane: true,
     area: () => [`${panelOf(summary)} [data-testid="dates"]`],
-    opens: [`${panelOf(summary)} [data-testid="dates"]`, `${panelOf(summary)} [data-testid="date"][data-label="Due"] details`],
+    opens: [`${panelOf(summary)} [data-testid="dates"]`, `${panelOf(summary)} [data-testid="more-dates"]`],
     side: "top",
     reveal: "none",
     instruction: (facts) => `${said(facts, meeting)} is pinned. ${said(facts, summary)} is due the day before it, worked out from that pin and its rule. Dates shows why.`,

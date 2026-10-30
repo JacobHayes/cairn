@@ -18,6 +18,7 @@ import { RowActions } from "./RowActions.tsx";
 import { WAITING_SHOWN_MAX, waitingDecisions, type Unblocker } from "./waiting.ts";
 import type { NodeRow } from "./why.ts";
 import { NodeLink } from "../detail/parts.tsx";
+import { Words } from "../ui/Words.tsx";
 
 function UnblockerLine({ view, unblocker, row, yours }: { view: Ready; unblocker: Unblocker; row: NodeRow | undefined; yours: boolean }) {
   const addresses = useNodeAddresses();
@@ -65,8 +66,8 @@ export function WaitingDecisions({ view, onContinue }: { view: Ready; onContinue
             <span>
               <NodeLink view={view} node={each.decision} />
               <span className="muted small">
-                {each.earliest === undefined ? "" : `, can start ${dateWords(each.earliest, view.derived.today)}`}
-                {each.snoozedUntil === undefined ? "" : `, snoozed until ${snoozeEndWords(view, { date: each.snoozedUntil })}`}
+                {each.earliest === undefined ? null : <>, can start <Words text={dateWords(each.earliest, view.derived.today)} /></>}
+                {each.snoozedUntil === undefined ? null : <>, snoozed until <Words text={snoozeEndWords(view, { date: each.snoozedUntil })} /></>}
               </span>
             </span>
             <ul className="detail-list stack">

@@ -92,7 +92,7 @@ export function Input({ view, node, value, onChange }: { view: Ready; node: Grap
     return <Checks options={identities} chosen={value.identity_list} onChange={(next) => { onChange({ identity_list: next }); }} />;
   }
   if ("date" in value) {
-    return <WhenInput label="Answer" value={value.date} zone={view.inputs.timezone} onChange={(next) => { onChange({ date: next }); }} />;
+    return <WhenInput label="Answer" today={view.derived.today} value={value.date} zone={view.inputs.timezone} onChange={(next) => { onChange({ date: next }); }} />;
   }
   return <TextInput aria-label="Answer" value={value.text} onChange={(event) => { onChange({ text: event.target.value }); }} />;
 }
@@ -263,7 +263,7 @@ function AnswerInput(props: InputProps) {
     case "multi_choice":
       return <MultiInput {...props} />;
     case "date":
-      return <WhenInput label="Answer" testid="answer" value={value !== undefined && "date" in value ? value.date : ""} zone={props.view.inputs.timezone} onChange={(date) => { pick({ date }); }} />;
+      return <WhenInput label="Answer" today={props.view.derived.today} testid="answer" value={value !== undefined && "date" in value ? value.date : ""} zone={props.view.inputs.timezone} onChange={(date) => { pick({ date }); }} />;
     case "identity":
       return <IdentityInput {...props} />;
     case "identity_list":

@@ -54,10 +54,10 @@ pub use collections::{BoundedSet, BoundedVec, CollectionError, HasKey, Keyed, On
 pub use condition::{Clause, Comparison, Condition, ConditionValue, Membership};
 pub use derived::{
     Blocker, Bound, ChecklistCount, Consequences, Contribution, DateOrigin, DeriveInputs, Derived,
-    DisplayState, DomainDocument, EffectiveDate, EffectiveParticipation, Explained, HeldDependent,
-    NodeDates, NodeDerived, NodeMove, ParticipationOrigin, Progress, Real, Relevance,
-    RelevanceExplanation, Score, ShortfallConsequence, StaleConsequence, StallCause, Stalled,
-    StillWaiting, TimeZoneName, UndecidedConsequence,
+    DisplayState, DomainDocument, DueBound, EffectiveDate, EffectiveParticipation, Explained,
+    HeldDependent, NodeDates, NodeDerived, NodeMove, ParticipationOrigin, Progress, Real,
+    Relevance, RelevanceExplanation, Score, ShortfallConsequence, StaleConsequence, StallCause,
+    Stalled, StillWaiting, TimeZoneName, UndecidedConsequence,
 };
 pub use document::{
     ParseError, WriteError, from_json, from_yaml, to_json, to_json_pretty, to_yaml,

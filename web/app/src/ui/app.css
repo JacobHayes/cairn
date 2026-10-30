@@ -43,6 +43,10 @@
 .row-end {
   align-items: flex-end;
 }
+/* The zone a date and time are read in, centred on the controls beside it, not on their labels. */
+.when-zone {
+  line-height: var(--control-h);
+}
 /* A labelled field in a row gives way to the row's width (a select is as wide as its longest option) instead of pushing past it. */
 .row > label {
   min-width: 0;

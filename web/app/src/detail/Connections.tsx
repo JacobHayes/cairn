@@ -10,6 +10,7 @@ import { waitsMore, waitsOn, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink, Section } from "./parts.tsx";
 import { appliesIf, ownerName } from "./sentence.ts";
 import { dateWords } from "../status/when.ts";
+import { Words } from "../ui/Words.tsx";
 
 /** Gating: why the node is, or is not, in scope, in words; nothing when nothing conditions it. */
 function relevanceWords(view: Ready, detail: NodeDetail): React.ReactNode {
@@ -54,7 +55,7 @@ export function Connections({ view, detail }: { view: Ready; detail: NodeDetail 
                   {ownerName(view, held.node, viewer) ?? ""} {held.via === "explicit" ? "" : viaText(held.via, name)}
                   {held.date === undefined ? null : (
                     <span data-testid="waits-date">
-                      {ownerName(view, held.node, viewer) === undefined ? "" : " · "}scheduled for {dateWords(held.date, view.derived.today)}
+                      {ownerName(view, held.node, viewer) === undefined ? "" : " · "}scheduled for <Words text={dateWords(held.date, view.derived.today)} />
                     </span>
                   )}
                 </span>

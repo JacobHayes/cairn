@@ -49,6 +49,7 @@ import "./summary.css";
 import { Failed } from "../ui/Failed.tsx";
 import { ownersOf } from "../detail/sections.tsx";
 import { Tip } from "../ui/Tip.tsx";
+import { Words } from "../ui/Words.tsx";
 
 /** The date of a milestone line in words, where it comes from on hover, and its own shortfall as a sentence of its own. */
 function MilestoneWhen({ ready, line }: { ready: Ready; line: MilestoneLine }) {
@@ -74,7 +75,7 @@ function MilestoneWhen({ ready, line }: { ready: Ready; line: MilestoneLine }) {
   return (
     <>
       <Tip tip={origin === undefined ? undefined : `This date is ${origin}`} tap>
-        <span className={ink}>{whenWords(line.date, done ? "actual" : line.origin, today, line.late)}</span>
+        <span className={ink}><Words text={whenWords(line.date, done ? "actual" : line.origin, today, line.late)} /></span>
       </Tip>
       .
       {line.shortfallDays === undefined ? null : <span className="ink-bad">{` ${shortfallWords(line.shortfallDays)}.`}</span>}
@@ -103,7 +104,7 @@ function Lead({ ready, model, note }: { ready: Ready; model: SummaryModel; note:
             <span className="summary-figure">{model.remaining}</span> {active ? "left" : "unfinished"} of {inScope} in scope
           </span>
         )}
-        <span className="summary-asof">As of {dateWords(ready.derived.today, ready.derived.today)}</span>
+        <span className="summary-asof">As of <Words text={dateWords(ready.derived.today, ready.derived.today)} /></span>
       </div>
       {inScope === 0 ? null : (
         <Meter done={done} of={inScope} label={`${String(done)} of ${String(inScope)} in scope finished or skipped`} data-testid="summary-meter" data-done={done} />
@@ -156,7 +157,7 @@ function Dates({ ready, model, skip }: { ready: Ready; model: SummaryModel; skip
               {each.title}
             </Link>
             <Tip tip={`This date is ${originWord(each.origin)}`} tap>
-              <span className={`summary-date-when ${inkClass(dateInk(each.date, today, each.late)) ?? "muted"}`}>{whenWords(each.date, each.origin, today, each.late)}</span>
+              <span className={`summary-date-when ${inkClass(dateInk(each.date, today, each.late)) ?? "muted"}`}><Words text={whenWords(each.date, each.origin, today, each.late)} /></span>
             </Tip>
             {short === undefined ? null : <span className="ink-bad summary-date-short">{shortfallWords(short)}</span>}
           </li>

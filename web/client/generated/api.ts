@@ -1168,12 +1168,15 @@ export interface components {
             /** @description How the dependency arose. */
             via: components["schemas"]["DependencyVia"];
         };
-        /** @description A derived date bound and the chain that produced it. */
+        /** @description A derived start date and the chain that produced it: a day. */
         Bound: {
             /** @description The chain from a pin, actual, or today that produced it. */
             chain: components["schemas"]["Chain"];
-            /** @description The date; a due date carries its time when the node's own pin sets one on that day. */
-            date: components["schemas"]["When"];
+            /**
+             * Format: date
+             * @description The day.
+             */
+            date: string;
         };
         /**
          * @description A guard bypass as stored, written by a completion that went ahead anyway: why when a
@@ -1786,6 +1789,13 @@ export interface components {
                 /** @description The journey saved. */
                 journey: components["schemas"]["JourneyId"];
             };
+        };
+        /** @description A derived due date and the chain that produced it. */
+        DueBound: {
+            /** @description The chain from a pin, actual, or today that produced it. */
+            chain: components["schemas"]["Chain"];
+            /** @description The date: a day, or a moment when the node's own pin sets a time on that day. */
+            date: components["schemas"]["When"];
         };
         /**
          * @description An explicit `requires` edge, identified by its two ends: `node` requires `requires`.
@@ -3201,7 +3211,7 @@ export interface components {
         /** @description A node's derived dates. Every bound is null when nothing reaches it. */
         NodeDates: {
             /** @description The latest it can finish. */
-            due?: components["schemas"]["Bound"] | null;
+            due?: components["schemas"]["DueBound"] | null;
             /** @description The earliest it can start. */
             earliest_start?: components["schemas"]["Bound"] | null;
             /** @description A milestone's effective date; none for other kinds, or when nothing gives one. */

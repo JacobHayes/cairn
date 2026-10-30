@@ -24,6 +24,7 @@ import { plural } from "../ui/words.ts";
 import { NodeLink } from "../detail/parts.tsx";
 import type { CSSProperties } from "react";
 import { Tip } from "../ui/Tip.tsx";
+import { Words } from "../ui/Words.tsx";
 
 export interface CellContext {
   view: Ready;
@@ -70,7 +71,7 @@ function Scheduled({ view, line }: { view: Ready; line: Line }) {
   const date = scheduledDate(view, line.key);
   return date === undefined ? null : (
     <span className="muted small" data-testid="list-scheduled">
-      {nodeOf(view, line.key)?.kind === "milestone" ? "On" : "Not before"} {dateWords(date, view.derived.today)}
+      {nodeOf(view, line.key)?.kind === "milestone" ? "On" : "Not before"} <Words text={dateWords(date, view.derived.today)} />
     </span>
   );
 }
@@ -96,7 +97,7 @@ export function PhoneDue({ view, line, fact }: { view: Ready; line: Line; fact: 
     return null;
   }
   // The fact under the title already says it when it is the due words ("14 days late").
-  return said.words === fact ? null : <span className={`list-due-phone small ${said.ink ?? "muted"}`}>{said.words}</span>;
+  return said.words === fact ? null : <span className={`list-due-phone small ${said.ink ?? "muted"}`}><Words text={said.words} /></span>;
 }
 
 /** How far a container is, and the one thing beneath it that needs attention. */
@@ -122,7 +123,7 @@ function Fact({ line, context }: { line: Line; context: CellContext }) {
   const saidByColumn = fact !== undefined && due != null && fact.words === dueWords(due, view.derived.today, line.row?.kind === "decision", lateOf(view, line.key));
   return fact === undefined ? null : (
     <span className={`${fact.tone === undefined ? "muted small" : `small ink-${fact.tone}`}${saidByColumn ? " list-fact-due" : ""}`} data-testid="fact">
-      {fact.words}
+      <Words text={fact.words} />
     </span>
   );
 }
@@ -212,7 +213,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
     case "due":
     {
       const said = row.due == null || !open ? undefined : dueSaid(view, line.key, node.kind, row.due);
-      return said === undefined ? null : <span className={said.ink} data-testid="list-due">{said.words}</span>;
+      return said === undefined ? null : <span className={said.ink} data-testid="list-due"><Words text={said.words} /></span>;
     }
     case "rank": {
       const place = context.ranks.get(line.key);
@@ -220,7 +221,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
     }
     case "start_by": {
       const date = derived.dates.latest_start?.date;
-      return date === undefined || !open ? null : dateWords(date, today);
+      return date === undefined || !open ? null : <Words text={dateWords(date, today)} />;
     }
     case "slack":
       return row.slack_days == null || !open ? null : row.slack_days >= 0 ? daysWords(row.slack_days) : `${daysWords(-row.slack_days)} behind`;

@@ -27,7 +27,7 @@ fn own_date(graph: &Graph, nodes: &BTreeMap<NodeKey, NodeDerived>, key: &NodeKey
         .dates
         .earliest_start
         .as_ref()
-        .map(|bound| bound.date);
+        .map(|bound| When::Day(bound.date));
     let current = [start, due, finished]
         .into_iter()
         .flatten()

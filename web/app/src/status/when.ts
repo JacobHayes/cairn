@@ -33,6 +33,23 @@ export function dateWords(date: string, today?: string): string {
   return time === undefined ? day : `${day}, ${time}`;
 }
 
+/** A date as `dateWords` says it (`Oct 6`, `Oct 6, 2027`, with a time `Oct 6, 08:15`), or a time of day (`08:15`). */
+const DATE_OR_TIME = new RegExp(`\\b(?:${MONTHS.join("|")}) \\d{1,2}(?:, \\d{4})?(?:, \\d{2}:\\d{2})?|\\b\\d{2}:\\d{2}\\b`, "g");
+
+/** `words` cut into its plain stretches and the dates and times in it (`date`), so a screen sets only those in mono (DESIGN, Dates). */
+export function dateParts(words: string): { text: string; date: boolean }[] {
+  const parts: { text: string; date: boolean }[] = [];
+  let at = 0;
+  for (const found of words.matchAll(DATE_OR_TIME)) {
+    if (found.index > at) {
+      parts.push({ text: words.slice(at, found.index), date: false });
+    }
+    parts.push({ text: found[0], date: true });
+    at = found.index + found[0].length;
+  }
+  return at < words.length ? [...parts, { text: words.slice(at), date: false }] : parts;
+}
+
 /**
  * A moment's day and time of day in `zone` as the engine stores it: the wall time and the zone's UTC offset then
  * (`2026-10-10T08:15+01:00`). A wall time that happens twice (the clocks go back) reads as its first time, and one that

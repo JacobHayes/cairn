@@ -26,6 +26,7 @@ import { plural } from "../ui/words.ts";
 import { ownerWords } from "../detail/sections.tsx";
 import { useCaller } from "../data/react.ts";
 import { Tip } from "../ui/Tip.tsx";
+import { Words } from "../ui/Words.tsx";
 
 /** The most items "next up" lists on the card; the Summary lists the whole frontier. */
 const NEXT_UP_SHOWN = 3;
@@ -96,7 +97,7 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
           <NodeLink view={ready} node={next.key} />
         </div>
         <Tip tip={`This date is ${originWord(next.origin)}`} tap>
-          <span className={inkClass(dateInk(next.date, ready.derived.today, next.late)) ?? "muted"}>{whenWords(next.date, next.origin, ready.derived.today, next.late)}</span>
+          <span className={inkClass(dateInk(next.date, ready.derived.today, next.late)) ?? "muted"}><Words text={whenWords(next.date, next.origin, ready.derived.today, next.late)} /></span>
         </Tip>
       </div>
     </section>

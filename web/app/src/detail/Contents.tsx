@@ -10,6 +10,7 @@ import { NodeLink, Section } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { ownerName } from "./sentence.ts";
 import { useNodeWrite, type NodeWrite } from "./write.ts";
+import { Words } from "../ui/Words.tsx";
 
 export function ContentsRow({ view, child, write, viewer }: { view: Ready; child: Child; write: NodeWrite; viewer: readonly string[] | undefined }) {
   const done = child.state === "done";
@@ -30,7 +31,7 @@ export function ContentsRow({ view, child, write, viewer }: { view: Ready; child
         ) : null}
       </span>
       <NodeLink view={view} node={child.key} /> <Badge tone={statusTone(child.displayState)}>{statusWord(child.displayState, child.kind)}</Badge>
-      {fact === undefined ? null : <span className="muted small contents-fact">{fact}</span>}
+      {fact === undefined ? null : <span className="muted small contents-fact">{due === undefined ? fact : <Words text={due} />}</span>}
     </li>
   );
 }

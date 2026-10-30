@@ -448,10 +448,11 @@ mod property {
                 if let Some(bound) = &dates.earliest_start {
                     prop_assert!(ends_fixed(&bound.chain, &point(false), true), "{} earliest: {:#?}", key, bound);
                 }
-                for (bound, finish) in [(&dates.latest_start, false), (&dates.due, true)] {
-                    if let Some(bound) = bound {
-                        prop_assert!(ends_fixed(&bound.chain, &point(finish), false), "{} latest: {:#?}", key, bound);
-                    }
+                if let Some(bound) = &dates.latest_start {
+                    prop_assert!(ends_fixed(&bound.chain, &point(false), false), "{} latest: {:#?}", key, bound);
+                }
+                if let Some(due) = &dates.due {
+                    prop_assert!(ends_fixed(&due.chain, &point(true), false), "{} due: {:#?}", key, due);
                 }
                 if let Some(short) = &dates.shortfall {
                     prop_assert!(short.shortfall_days > 0);

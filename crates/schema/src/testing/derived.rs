@@ -15,9 +15,9 @@ use crate::chain::{
 };
 use crate::derived::{
     Blocker, Bound, ChecklistCount, Consequences, Contribution, DateOrigin, DeriveInputs, Derived,
-    DisplayState, DomainDocument, EffectiveDate, EffectiveParticipation, Explained, NodeDates,
-    NodeDerived, NodeMove, ParticipationOrigin, Progress, Real, Relevance, RelevanceExplanation,
-    Score, StaleConsequence, StallCause, Stalled,
+    DisplayState, DomainDocument, DueBound, EffectiveDate, EffectiveParticipation, Explained,
+    NodeDates, NodeDerived, NodeMove, ParticipationOrigin, Progress, Real, Relevance,
+    RelevanceExplanation, Score, StaleConsequence, StallCause, Stalled,
 };
 use crate::limits::Limit;
 use crate::node::Direction;
@@ -272,12 +272,17 @@ fn arb_date_link() -> BoxedStrategy<DateLink> {
 
 fn arb_node_dates() -> BoxedStrategy<NodeDates> {
     let bound = || {
-        prop::option::of((arb_when(), arb_chain()).prop_map(|(date, chain)| Bound { date, chain }))
+        prop::option::of((arb_date(), arb_chain()).prop_map(|(date, chain)| Bound { date, chain }))
+    };
+    let due = || {
+        prop::option::of(
+            (arb_when(), arb_chain()).prop_map(|(date, chain)| DueBound { date, chain }),
+        )
     };
     (
         bound(),
         bound(),
-        bound(),
+        due(),
         (prop::option::of(-60i32..60), prop::option::of(1u32..60)),
         prop::option::of(arb_short_chain()),
         (

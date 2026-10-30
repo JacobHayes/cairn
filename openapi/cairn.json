@@ -514,15 +514,16 @@
       },
       "Bound": {
         "additionalProperties": false,
-        "description": "A derived date bound and the chain that produced it.",
+        "description": "A derived start date and the chain that produced it: a day.",
         "properties": {
           "chain": {
             "$ref": "#/components/schemas/Chain",
             "description": "The chain from a pin, actual, or today that produced it."
           },
           "date": {
-            "$ref": "#/components/schemas/When",
-            "description": "The date; a due date carries its time when the node's own pin sets one on that day."
+            "description": "The day.",
+            "format": "date",
+            "type": "string"
           }
         },
         "required": [
@@ -2562,6 +2563,25 @@
             "type": "object"
           }
         ]
+      },
+      "DueBound": {
+        "additionalProperties": false,
+        "description": "A derived due date and the chain that produced it.",
+        "properties": {
+          "chain": {
+            "$ref": "#/components/schemas/Chain",
+            "description": "The chain from a pin, actual, or today that produced it."
+          },
+          "date": {
+            "$ref": "#/components/schemas/When",
+            "description": "The date: a day, or a moment when the node's own pin sets a time on that day."
+          }
+        },
+        "required": [
+          "date",
+          "chain"
+        ],
+        "type": "object"
       },
       "Edge": {
         "additionalProperties": false,
@@ -7557,7 +7577,7 @@
           "due": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Bound"
+                "$ref": "#/components/schemas/DueBound"
               },
               {
                 "type": "null"

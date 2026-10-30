@@ -7,12 +7,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     AgentRow, Annotation, AnswerEffects, AnswerValue, Blocker, Bound, Chain, ChecklistCount,
-    Constraint, ConstraintSource, Contribution, Cursor, Date, DisplayState, EffectiveDate,
-    EffectiveParticipation, Explained, ExplainedField, ExplanationPage, Guard, Instant,
-    InstantPoint, JourneyId, KeyRefs, KindKey, Level, LevelDateLink, LevelDisplay, LevelNode,
-    LevelQuery, ListFlag, ListQuery, Markdown, Node, NodeDerived, NodeKey, NodeKind, NodeMove,
-    NodeState, Overrides, Progress, Real, Relevance, RelevanceExplanation, RemovalRead, Score,
-    ShortChain, Snapshot, SnoozeTarget, SortBy, StaleReason, StillWaiting, When,
+    Constraint, ConstraintSource, Contribution, Cursor, Date, DisplayState, DueBound,
+    EffectiveDate, EffectiveParticipation, Explained, ExplainedField, ExplanationPage, Guard,
+    Instant, InstantPoint, JourneyId, KeyRefs, KindKey, Level, LevelDateLink, LevelDisplay,
+    LevelNode, LevelQuery, ListFlag, ListQuery, Markdown, Node, NodeDerived, NodeKey, NodeKind,
+    NodeMove, NodeState, Overrides, Progress, Real, Relevance, RelevanceExplanation, RemovalRead,
+    Score, ShortChain, Snapshot, SnoozeTarget, SortBy, StaleReason, StillWaiting, When,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -416,7 +416,7 @@ pub(crate) struct LeanDates {
     #[serde(skip_serializing_if = "Option::is_none")]
     latest_start: Option<LatestStart>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    due: Option<Bound>,
+    due: Option<DueBound>,
     #[serde(skip_serializing_if = "Option::is_none")]
     slack_days: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -432,8 +432,8 @@ pub(crate) struct LeanDates {
 /// The latest start: its date, and its chain unless that is the due chain.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct LatestStart {
-    /// The date.
-    date: When,
+    /// The day.
+    date: Date,
     /// The chain that produced it, when it differs from the due chain.
     #[serde(skip_serializing_if = "Option::is_none")]
     chain: Option<Chain>,

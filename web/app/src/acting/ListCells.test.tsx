@@ -31,7 +31,7 @@ function viewWith(each: NodeRow) {
 function dueLine(each: NodeRow): string {
   const view = viewWith(each);
   const line: Line = { key: each.key, depth: 0, row: each, container: false, foldable: false, open: false, guides: [] };
-  return renderToStaticMarkup(<PhoneDue view={view} line={line} fact={factOf(view, each, "rank")?.words} />);
+  return renderToStaticMarkup(<PhoneDue view={view} line={line} fact={factOf(view, each, "rank")?.words} />).replace(/<[^>]*>/g, "");
 }
 
 describe("a phone's due line under a row's title", () => {
