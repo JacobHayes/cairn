@@ -2,7 +2,7 @@
 // the workspace (the screen the router shows, its one scroller `.ws-body`), the inspector
 // column on the right (INSPECTOR | ASSISTANT; a bottom sheet below 1100px; a rail when hidden). The sync dot sits
 // beside the brand at the top of the rail. The frame is one `100dvh` grid with one scroller per
-// region (app.css); below 720px it is one scrolling column.
+// region (app.css); below 720px the rail is a bar across the top.
 import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 

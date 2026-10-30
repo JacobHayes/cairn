@@ -228,10 +228,3 @@
     break-inside: auto;
   }
 }
-
-/* The lead's milestone sentence ends in a tap-for-the-source date: a block of its own on the line, so its padding is room and not an overlap of the line above. */
-@media (pointer: coarse) {
-  .summary-milestone [data-tip-tap] {
-    display: inline-block;
-  }
-}

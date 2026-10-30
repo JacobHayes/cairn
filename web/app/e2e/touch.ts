@@ -237,7 +237,8 @@ export async function touchReport(page: Page, snapshot: Snapshot): Promise<Touch
   if (!(minimum > 0)) {
     return { problems: ["the --touch-target token is not defined 0x0"], sizes: [] };
   }
-  const popovers = snapshot.nodes.filter((part) => "data-popover" in part.attr && part.box !== undefined);
+  // The tour's callout floats over the page as a popover does, also while the page under it is live.
+  const popovers = snapshot.nodes.filter((part) => ("data-popover" in part.attr || part.attr["data-testid"] === "tour-callout") && part.box !== undefined);
   const { width: windowWidth, height: windowHeight } = snapshot.viewport;
   const [sizes, doubtful] = [new Array<Offender>(), new Array<Control>()];
   for (const control of controlsOf(snapshot)) {
@@ -245,7 +246,7 @@ export async function touchReport(page: Page, snapshot: Snapshot): Promise<Touch
     if (rect === undefined || rect.width === 0 || rect.height === 0) {
       continue;
     }
-    // An open popover covers part of the page beneath it: a control it overlaps is under it, not tapped, so it is measured inside the popover only.
+    // An open popover (or the tour's callout) covers part of the page beneath it: a control it overlaps is under it, not tapped, so it is measured inside the popover only.
     const covered = popovers.some((each) => each.box !== undefined && !([...upFrom(control.part)].includes(each)) && each.box.x < rect.x + rect.width && each.box.x + each.box.width > rect.x && each.box.y < rect.y + rect.height && each.box.y + each.box.height > rect.y);
     if (covered) {
       continue;

@@ -20,13 +20,6 @@
   border-width: 1px 0 0;
 }
 
-/* A phone's graph is in the page and fills what the bars leave of the window (app.css gives the page's chain of boxes the room), above the sheet's peek while it is open, so at the peek no graph is under the sheet and a swipe on it pans it, and under no sheet once it is closed. */
-@media (max-width: 719px) {
-  .ws-canvas > .canvas {
-    min-height: 320px;
-  }
-}
-
 .canvas-root {
   position: relative;
   width: 100%;
@@ -77,8 +70,8 @@
     gap: var(--space-2);
   }
 
-  /* A raised sheet leaves the canvas too little height for the zoom stack under the Controls button: Fit stays, and a pinch zooms. */
-  .frame:is([data-sheet="half"], [data-sheet="full"]):not([data-inspector="off"]) .canvas .react-flow__controls-button:not(.react-flow__controls-fitview) {
+  /* A sheet at half leaves the canvas too little height for the zoom stack under the Controls button: Fit stays, and a pinch zooms. */
+  .frame[data-sheet="half"][data-inspector="on"] .canvas .react-flow__controls-button:not(.react-flow__controls-fitview) {
     display: none;
   }
 }
@@ -162,24 +155,32 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* Where the inspector is a sheet over the canvas's lower part (a tablet) the bottom controls ride above it (`--lift`). */
+/* Where the inspector is a sheet over the canvas's lower part (a tablet, a phone) the bottom controls ride above it, or above its pill (`--lift`). */
 .canvas .react-flow__panel:is(.react-flow__controls, .canvas-reveal) {
   margin-bottom: calc(var(--lift, 0px) + var(--space-3));
 }
 
-@media (min-width: 720px) and (max-width: 1099px) {
+@media (max-width: 1099px) {
   .frame:not([data-inspector="off"]) .canvas {
     --lift: var(--sheet-covers);
   }
+
+  /* A full sheet, or one at half on a short window, leaves the canvas a sliver: what floats on it waits until the sheet comes down. */
+  .frame[data-sheet="full"][data-inspector="on"] .canvas :is(.react-flow__panel, .canvas-held) {
+    visibility: hidden;
+  }
 }
 
-/* A phone's graph ends above an open sheet's peek, so its bottom controls ride above what the sheet covers beyond the peek (nothing at the peek, live as it is dragged), and above the pill of a closed one. */
-@media (max-width: 719px) {
-  .frame[data-inspector="on"] .canvas {
-    --lift: max(0px, calc(var(--sheet-covers) - var(--sheet-peek)));
+/* A short window (a phone turned) has no height for the zoom stack under the view's row: Fit stays, and a pinch zooms. */
+@media (max-height: 479px) {
+  .canvas .react-flow__controls-button:not(.react-flow__controls-fitview) {
+    display: none;
   }
-  .frame[data-inspector="folded"] .canvas {
-    --lift: var(--sheet-pill);
+}
+
+@media (max-width: 1099px) and (max-height: 479px) {
+  .frame[data-sheet="half"][data-inspector="on"] .canvas :is(.react-flow__panel, .canvas-held) {
+    visibility: hidden;
   }
 }
 

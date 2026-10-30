@@ -1,16 +1,14 @@
-// The page against its window (DESIGN, Layout): from 720px wide the document never scrolls
-// down, and nothing is drawn past the window's side edges. Plain functions over Chrome's layout
-// snapshot (e2e/snapshot.ts); a pane that scrolls or clips inside the window is excused for what it holds,
+// The page against its window (DESIGN, Layout): the document never scrolls down, and nothing
+// is drawn past the window's side edges. Plain functions over Chrome's layout snapshot
+// (e2e/snapshot.ts); a pane that scrolls or clips inside the window is excused for what it holds,
 // but is itself held to the window, and the frame that clips at the window's edge excuses nothing.
-import { DESKTOP_MIN } from "../src/shell/breakpoints.ts";
 import { nameOf, seen } from "./containment.ts";
 import { classesOf, upFrom, type Part, type Snapshot } from "./snapshot.ts";
 
-
-/** The document scrolling down at a desktop width: its content is taller than its window. */
+/** The document scrolling down: its content is taller than its window. */
 export function pageHeightProblems(snapshot: Snapshot): string[] {
   const box = snapshot.nodes.find((part) => part.tag === "html" && part.box !== undefined)?.box;
-  if (box === undefined || snapshot.viewport.width < DESKTOP_MIN) {
+  if (box === undefined) {
     return [];
   }
   return box.scroll.height > box.client.height ? [`the page scrolls down: ${String(box.scroll.height)}px of content in a ${String(box.client.height)}px window, at ${String(snapshot.viewport.width)}px wide`] : [];

@@ -1,22 +1,17 @@
 // What each view draws on the journey's page: the graph, the list, the timeline and the walk
 // through, each from the journey's one view state (journeys/view.ts) and its own settings.
-// The graph's stalled surface and, in edit mode, the structure's tools are the head's
-// (CanvasBars).
 import { lazy, Suspense, useMemo } from "react";
 import { useLocation } from "react-router";
 
-import { StalledPanel } from "../acting/Stalled.tsx";
 import { listSettingsFrom } from "../acting/address.ts";
 import { ListBody } from "../acting/ListScreen.tsx";
 import { TriageBody } from "../acting/TriageScreen.tsx";
-import { JourneyAuthoringBar } from "../authoring/JourneyAuthoring.tsx";
 import type { EdgeDrawing } from "../authoring/connect.tsx";
 import type { Authored } from "../authoring/target.ts";
-import { graphPath, type GraphView } from "../canvas/settings.ts";
+import type { GraphView } from "../canvas/settings.ts";
 import type { Selection } from "../canvas/selection.ts";
 import type { Ready } from "../detail/model.ts";
 import type { Screen } from "../journeys/address.ts";
-import { useReviewing } from "../proposals/layer.ts";
 import { useViewState } from "../journeys/view.ts";
 import { ProjectedTimeline } from "../timeline/TimelineView.tsx";
 import { Pending } from "../ui/Pending.tsx";
@@ -38,19 +33,6 @@ export interface ProjectionProps {
   drawing: EdgeDrawing;
   /** The walk reports the card it is on (none when it has none), so the frame can leave the node it names to the card. */
   onCard: (key: string | undefined) => void;
-}
-
-/** The canvas's own bars, which stay with the head: the structure's tools (edit mode) and the stalled surface. */
-export function CanvasBars({ ready, view, authored, drawing }: Pick<ProjectionProps, "ready" | "view" | "authored" | "drawing">) {
-  const { search } = useLocation();
-  // The stalled panel describes the journey with actions that would act on the present: not under a proposal's layer.
-  const reviewing = useReviewing() !== undefined;
-  return (
-    <>
-      {authored === undefined ? null : <JourneyAuthoringBar ready={ready} authored={authored} view={view} drawing={drawing} />}
-      {reviewing ? null : <StalledPanel view={ready} nodeTo={(node) => graphPath(ready.journey.header.id, view, { node }, search)} />}
-    </>
-  );
 }
 
 export function ProjectionBody({ ready, view, screen, selected, edge, authored, drawing, selection, onCard }: ProjectionProps) {

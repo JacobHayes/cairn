@@ -50,7 +50,7 @@ import { RouteStages } from "../routes/RouteStages.tsx";
 import { InsertionCanvas } from "../insert/Preview.tsx";
 import { useInserting } from "../insert/entry.ts";
 import { InsertStepper } from "../insert/Stepper.tsx";
-import { COLUMN, Inspector, PHONE_WIDTH, useFrameActions, useFrameState, useMedia, usePageKeys } from "../shell/frame.tsx";
+import { Inspector, useFrameActions, useFrameState, usePageKeys } from "../shell/frame.tsx";
 import { useEscapeTo } from "../shell/useEscapeTo.ts";
 import { treeOf } from "../authoring/graph.ts";
 import { RouteTimeline } from "../timeline/RouteTimeline.tsx";
@@ -116,17 +116,6 @@ function ResultOf({ result, setResult, hrefOf }: { result: Result | undefined; s
         setResult(undefined);
       }}
     />
-  );
-}
-
-/** Where the inspector's draft card has no column (a tablet or phone graph), what it would say in a line, and where to read it. */
-function DraftSummary({ violations, notices, list }: { violations: number; notices: number; list: string }) {
-  return violations + notices === 0 ? null : (
-    <p className="muted small" data-testid="draft-summary">
-      {violations === 0 ? "" : `${String(violations)} to fix before publishing. `}
-      {notices === 0 ? "" : `${String(notices)} advisory. `}
-      <Link to={list}>See them in the List</Link>
-    </p>
   );
 }
 
@@ -199,10 +188,9 @@ function useShowUnsaved(unsaved: readonly UnsavedForm[], selected: string | unde
     if (form.menu !== undefined) {
       openMenu(form.menu);
     } else if (form.node !== undefined) {
-      // A sheet at its peek is inert: it comes up to half before the field can take the focus.
+      // A sheet at its peek shows no pane: showing it brings it up before the field can take the focus.
       if (!showing) {
         frame?.show("inspector");
-        frame?.snap("half");
       }
       if (form.node !== selected) {
         void navigate(here(form.node));
@@ -225,8 +213,6 @@ function DraftFrame({ shown, derived, schedule, authored, selected, edge, write,
   const { notices } = useRouteNotices(authored.graph);
   const violations = useDraftViolations(authored);
   const unsaved = useUnsavedForms(authored);
-  const wide = useMedia(COLUMN);
-  const phone = useMedia(PHONE_WIDTH);
   const unanchored = useMemo(() => new Set(notices.map((notice) => notice.node)), [notices]);
   const here = (node: string | undefined) => routePath(id, { screen, node }, search);
   const hrefOf = (key: string) => here(key);
@@ -240,37 +226,31 @@ function DraftFrame({ shown, derived, schedule, authored, selected, edge, write,
       void navigate(here(undefined));
     });
   const discard = () => void write.run({ target, baseRevision: shown.route.revision, mutations: [{ op: "discard_draft" }] }, () => { void navigate(here(undefined)); });
-  const card = <DraftCard route={id} violations={violations} notices={notices} hrefOf={hrefOf} write={write} blocked={blocked} unsaved={unsaved} onShow={show} titleOf={titleOf} onPublish={publish} onDiscard={discard} stages={<RouteStages shown={valueOf(derived)} schedule={schedule} framing={screen === "graph"} />} />;
+  const card = <DraftCard route={id} violations={violations} notices={notices} hrefOf={hrefOf} write={write} blocked={blocked} unsaved={unsaved} onShow={show} titleOf={titleOf} onPublish={publish} onDiscard={discard} stages={<RouteStages shown={valueOf(derived)} schedule={schedule} />} />;
   const close = here(undefined);
   // The line's card is the inspector's only while no node is open and no route is being placed.
   const line = selected === undefined && inserting.at === undefined ? edge : undefined;
   useEscapeTo(selected === undefined && line === undefined ? undefined : close);
   const fills = screen === "graph" || inserting.preview !== undefined;
-  const columned = wide || phone;
   const head = (
     <>
       <RouteHeader route={shown.route} of="draft" screen={screen} node={selected} write={write} blocked={blocked} onBlocked={onBlocked} onPublish={publish} imports={imports} />
       <ResultOf result={result} setResult={setResult} hrefOf={hrefOf} />
-      {wide || screen !== "graph" ? null : <DraftSummary violations={violations.length} notices={notices.length} list={routeSwitched(id, search, "list", undefined)} />}
       <div className="row route-tools">
         <StructureTools authored={authored} container={undefined} onAdded={(node) => void navigate(here(node.key))} onInsert={() => { inserting.start(undefined); }} />
       </div>
       <DrawingBanner drawing={drawing} />
     </>
   );
-  const body = (
-    <>
-      {inserting.preview === undefined ? (
-        <RouteBody derived={derived} schedule={schedule} screen={screen} selected={selected} edge={line} unanchored={unanchored} onPick={drawing.pick} />
-      ) : (
-        <InsertionCanvas preview={inserting.preview} domain={id} />
-      )}
-      {columned || fills || selected !== undefined ? null : card}
-    </>
-  );
+  const body =
+    inserting.preview === undefined ? (
+      <RouteBody derived={derived} schedule={schedule} screen={screen} selected={selected} edge={line} unanchored={unanchored} onPick={drawing.pick} />
+    ) : (
+      <InsertionCanvas preview={inserting.preview} domain={id} />
+    );
   return (
     <ConnectContext value={drawing}>
-      <Workspace head={head} body={body} fills={fills} inspector={<DraftInspector authored={authored} held={valueOf(derived)} selected={selected} card={columned && line === undefined ? card : undefined} close={close} inserting={inserting} />} />
+      <Workspace head={head} body={body} fills={fills} inspector={<DraftInspector authored={authored} held={valueOf(derived)} selected={selected} card={line === undefined ? card : undefined} close={close} inserting={inserting} />} />
     </ConnectContext>
   );
 }
@@ -280,33 +260,26 @@ function VersionFrame({ shown, derived, schedule, selected, edge, write, result,
   const { screen } = useScreen();
   const id = shown.route.header.id;
   const read = useRouteRead(id);
-  const wide = useMedia(COLUMN);
-  const phone = useMedia(PHONE_WIDTH);
   const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
   const version = shown.of === "draft" ? 0 : shown.of;
   const fills = screen === "graph";
   // The same address the canvas's background goes to: a bare address stays bare, a named version stays named.
   const close = useNodeAddresses().close();
   useEscapeTo(selected === undefined && edge === undefined ? undefined : close);
-  const card = read === undefined ? null : <VersionCard read={read} version={version} stages={<RouteStages shown={valueOf(derived)} schedule={schedule} framing={screen === "graph"} />} />;
+  const card = read === undefined ? null : <VersionCard read={read} version={version} stages={<RouteStages shown={valueOf(derived)} schedule={schedule} />} />;
   const head = (
     <>
       <RouteHeader route={shown.route} of={shown.of} screen={screen} node={selected} write={write} blocked={undefined} onPublish={undefined} imports={imports} />
       <ResultOf result={result} setResult={setResult} hrefOf={undefined} />
     </>
   );
-  const body = (
-    <>
-      <RouteBody derived={derived} schedule={schedule} screen={screen} selected={selected} edge={edge} unanchored={NONE} onPick={undefined} />
-      {wide || phone || fills || selected !== undefined ? null : card}
-    </>
-  );
+  const body = <RouteBody derived={derived} schedule={schedule} screen={screen} selected={selected} edge={edge} unanchored={NONE} onPick={undefined} />;
   const inspector =
     selected !== undefined ? (
       <Inspector focus={`${id}:${selected}`}>
         <RouteNodePanel tree={tree} held={valueOf(derived)} authored={undefined} nodeKey={selected} close={close} onRemoved={() => undefined} />
       </Inspector>
-    ) : edge === undefined && (wide || phone) && card !== null ? (
+    ) : edge === undefined && card !== null ? (
       <Inspector focus={`${id}:v${String(version)}`} reveal={false}>
         {card}
       </Inspector>

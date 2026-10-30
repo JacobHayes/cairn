@@ -146,7 +146,7 @@ function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready:
   );
 }
 
-/** Whether `name`, in the button `ref`, is cut by its line clamp now (or was, while it is open): what the cue is for. */
+/** Whether `name`, in the button `ref`, is cut to its one line now (or was, while it is open): what the cue is for. */
 function useClamped(ref: React.RefObject<HTMLElement | null>, name: string, open: boolean): boolean {
   const [clamped, setClamped] = useState(false);
   useLayoutEffect(() => {
@@ -155,12 +155,10 @@ function useClamped(ref: React.RefObject<HTMLElement | null>, name: string, open
       return undefined;
     }
     const measure = () => {
-      // Open, the name is whole: it was cut if it runs past the clamp's lines.
+      // Open, the name is whole: it was cut if it runs past one line. Closed, the ellipsis cuts it across.
       const style = getComputedStyle(element);
-      const lines = Number(style.getPropertyValue("--name-lines")) || 1;
-      // Closed, one line cuts the name across (an ellipsis), several cut it down.
-      const cut = element.scrollHeight > element.clientHeight + 1 || element.scrollWidth > element.clientWidth + 1;
-      setClamped(open ? element.scrollHeight > lines * Number.parseFloat(style.lineHeight) + 1 : cut);
+      const text = element.scrollHeight - Number.parseFloat(style.paddingTop) - Number.parseFloat(style.paddingBottom);
+      setClamped(open ? text > Number.parseFloat(style.lineHeight) + 1 : element.scrollWidth > element.clientWidth + 1);
     };
     measure();
     // The face arriving re-flows the name without resizing its box.
@@ -194,7 +192,7 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
       <div className="row">
         <div className="journey-header-title">
           <h1 data-testid="journey-name" data-expanded={nameOpen} data-diff={renamed ? "changed" : undefined}>
-            {/* A long name is clamped to one line (three on a phone); a tap or click reads it whole, where a tooltip cannot be reached. */}
+            {/* A long name is cut to one line; a tap or click reads it whole, where a tooltip cannot be reached. */}
             <Tip tip={renamed ? `Was: ${was.name}` : undefined}>
               <button ref={nameButton} type="button" className="journey-name-toggle" aria-expanded={nameOpen} onClick={() => { setNameOpen(!nameOpen); }}>
                 {header.name}

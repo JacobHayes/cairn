@@ -21,7 +21,7 @@ import { JOURNEY_OFFERS, ROUTE_OFFERS } from "../src/journeys/view.ts";
 import { openJourneyCard } from "./around.ts";
 import { draftBreakdown, reviewOpen } from "./proposals.ts";
 import { section } from "./detail.ts";
-import { holdToday, menuItem, nodeCard, nodePanel, open, openAt, reachCard, settled, whenSettled } from "./shell.ts";
+import { holdToday, menuItem, nodeCard, nodePanel, open, openAt, openSheet, reachCard, settled, whenSettled } from "./shell.ts";
 
 /** What the walk reaches states of: the journey and the route it opens, a node and an edge both have, an identity, and the proposals `seedProposals` made. */
 export interface Subject {
@@ -276,7 +276,7 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
   journey: [
     ...nonEmpty(viewsOf(JOURNEY_OFFERS.screens, async (page, on, view) => { await journeyAt(page, on.journey, view); if (view === "graph") { await fitGraph(page); } }, viewReady)),
     ...POPOVERS,
-    { name: "stages-open", reach: async (page, on) => { await journeyAt(page, on.journey, "list"); await page.getByTestId("card-stages").locator("summary").click(); }, ready: (page) => page.getByTestId("stage-row").first(), only: "desktop" },
+    { name: "stages-open", reach: async (page, on) => { await journeyAt(page, on.journey, "list"); await openSheet(page); await page.getByTestId("card-stages").locator("summary").click(); }, ready: (page) => page.getByTestId("stage-row").first(), only: "desktop" },
     { name: "frontier", reach: (page, on) => journeyAt(page, on.journey, "list?frontier=1"), ready: (page) => page.getByTestId("list") },
     { name: "timeline-timed", reach: (page, on) => journeyAt(page, on.journey, "timeline", TIMED.pin), ready: (page) => page.getByTestId("timeline"), timed: true },
     { name: "card-menu", reach: async (page, on) => { await journeyAt(page, on.journey, "graph"); await fitGraph(page); await openCardMenu(page, "n_kickoff"); }, ready: (page) => page.getByTestId("context-menu"), only: "desktop" },
@@ -300,7 +300,7 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
   routeNew: [{ name: "form", reach: (page) => indexAt(page, "/routes/new"), ready: (page) => page.getByTestId("new-route") }],
   route: [
     ...nonEmpty(viewsOf(ROUTE_OFFERS.screens, async (page, on, view) => { await routeAt(page, on.route, view); if (view === "graph") { await fitGraph(page); } }, routeReady)),
-    { name: "stages-open", reach: async (page, on) => { await routeAt(page, on.route, "list"); await page.getByTestId("card-stages").locator("summary").click(); }, ready: (page) => page.getByTestId("stage-row").first(), only: "desktop" },
+    { name: "stages-open", reach: async (page, on) => { await routeAt(page, on.route, "list"); await openSheet(page); await page.getByTestId("card-stages").locator("summary").click(); }, ready: (page) => page.getByTestId("stage-row").first(), only: "desktop" },
   ],
   routeNode: [{ name: "list", reach: (page, on) => routeAt(page, on.route, "list", `/nodes/${on.node}`), ready: (page) => page.getByTestId("route-node") }],
   routeEdge: [{ name: "edge-card", reach: async (page, on) => { await routeAt(page, on.route, "graph", `/edges/${on.edge}`); await fitGraph(page); }, ready: (page) => page.getByTestId("edge-card") }],

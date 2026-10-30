@@ -131,7 +131,7 @@ async function widths(walk: Walk, sizes: number[]): Promise<void> {
       }
     }
     const name = page.getByTestId("journey-name");
-    const clamped = await whenSettled(page, () => name.getByRole("button").evaluate((toggle) => toggle.scrollHeight > toggle.clientHeight));
+    const clamped = await whenSettled(page, () => name.getByRole("button").evaluate((toggle) => toggle.scrollWidth > toggle.clientWidth));
     expect(clamped || width > 390, "the stress name is long enough to be clamped on a phone").toBe(true);
     // A name cut by its clamp wears a mark, and a tap opens the name and leaves the mark.
     if (width === 390) {
@@ -171,8 +171,9 @@ test.describe("on a phone", () => {
     const walk = walkOf(page, await publishStressJourney(page));
     await widths(walk, [390]);
     expect(walk.found).toEqual([]);
-    // A name that fits whole wears no mark.
-    await journeyAt(page, "j_launch", "list");
+    // A name that fits whole on the line wears no mark.
+    await page.setViewportSize({ width: 719, height: 844 });
+    await journeyAt(page, "j_bakeoff", "list");
     await expect(page.getByTestId("journey-name-cue")).toHaveCount(0);
   });
 });

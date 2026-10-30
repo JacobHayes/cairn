@@ -221,13 +221,12 @@ function RowEnd({ list, decisionColumns, total }: { list: ListSettings; decision
 function FrontierPanels({ view, drawn }: { view: Ready; drawn: ReadonlySet<string> | undefined }) {
   const addresses = useNodeAddresses();
   const mine = useMineOf(view.journey.header.id);
-  // The stalled panel already says what the journey waits on, so the line that says the same is left out.
+  // The stalled panel above the rows already says what the journey waits on, so the line that says the same is left out.
   const stalled = view.derived.stalled != null;
   const entries = mine.status === "ready" ? mine.entries.filter((entry) => drawn?.has(entry.node) === true) : [];
   return (
     <>
       {!stalled ? <NextForYou view={view} entries={entries} /> : null}
-      {stalled ? <StalledPanel view={view} /> : null}
       <Folds view={view} drawn={drawn} toOf={(key) => addresses.open(key)} />
     </>
   );
@@ -291,6 +290,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
     <section className="stack list" aria-label="List" data-testid="list">
       <ViewBar subject={journeySubject(view)} screen="list" badges={badges} end={<RowEnd list={list} decisionColumns={decisionColumns} total={kept?.length} />} />
       {error === undefined ? null : <p className="callout callout-bad"><Failed what="The list" error={error} /></p>}
+      {view.derived.stalled != null && layer === undefined ? <StalledPanel view={view} /> : null}
       <div className="node-panel list-panel" data-empty={lines.length === 0 ? true : undefined} data-testid="list-panel">
         <Table list={list} lines={lines} columns={columns} context={context} selection={selection} selected={selected} everyLine={everyLine} outOfFocus={dimmed} marks={layer?.mode === "reviewing" ? layer.model?.marks ?? {} : undefined} />
         {kept !== undefined && level !== undefined && lines.length === 0 ? (

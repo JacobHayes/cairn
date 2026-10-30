@@ -58,8 +58,8 @@ Screen code uses tokens only: no raw hex, no radius above `--radius-lg`, no own 
 ## Layout
 
 - **Shell.** A rail on the left, the workspace edge to edge, and an optional inspector for the selection. Rail and inspector are chrome.
-- **One scroller per region.** From 720px the document never scrolls; each region's body scrolls once. A gesture surface (graph or timeline) never sits inside a scroller.
-- **Responsive**, from about 390px to 2560px. Below 1100px the inspector is a bottom sheet; below 720px everything else stacks into one column. A phone drops no fact a desktop shows: rows stack instead.
+- **One scroller per region.** The document never scrolls; each region's body scrolls once. A gesture surface (graph or timeline) never sits inside a scroller.
+- **Responsive**, from about 390px to 2560px. Below 1100px the inspector is a bottom sheet whose smallest height is its tabs alone; below 720px the rail is a bar across the top and everything else stacks into one column. A phone drops no fact a desktop shows: rows stack instead.
 - **Grid.** Modules sit on repeating `minmax(0, 1fr)` columns.
 
 ## Components

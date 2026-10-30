@@ -6,7 +6,6 @@ import type { Locator } from "@playwright/test";
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
 
-import { openJourneyCard } from "./around.ts";
 import { reviewOpen } from "./proposals.ts";
 import { nodePanel, open, openAt, openFromCanvas, openSheet, whenSettled } from "./shell.ts";
 
@@ -75,8 +74,6 @@ test("every control on a phone's main screens has a touch-sized hit area", async
   expect(wrapped, "chips that wrap or are cut").toEqual([]);
 
   await openAt(page, "j_launch", "list", { node: "n_go_no_go" });
-  await checkpoint(page, "the inspector's peek");
-  await openSheet(page);
   await expect(nodePanel(page, "n_go_no_go")).toBeVisible();
   await checkpoint(page, "the inspector");
   await page.getByTestId("more-actions").click();
@@ -84,8 +81,6 @@ test("every control on a phone's main screens has a touch-sized hit area", async
   await page.keyboard.press("Escape");
 
   await openAt(page, "j_launch", "graph", { node: "n_go_no_go" });
-  await checkpoint(page, "the graph with the sheet at its peek");
-  await openSheet(page);
   await checkpoint(page, "the graph with the sheet raised");
 });
 
@@ -104,7 +99,7 @@ test("every control on the tour's step has a touch-sized hit area", async ({ pag
 });
 
 test("the proposal band's Apply and Close are whole on a phone", async ({ page }) => {
-  await openJourneyCard(page, "j_vendor_eval");
+  await open(page, "/journeys/j_vendor_eval?view=graph");
   await page.getByTestId("journey-menu").click();
   await page.getByTestId("menu-save").click();
   await page.getByTestId("save-as-route-flow").getByRole("button", { name: "Propose saving it as a route" }).click();

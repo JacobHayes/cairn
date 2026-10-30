@@ -23,11 +23,9 @@ export const SHEET = "(max-width: 1099px)";
 
 /** The widths that give the inspector a column of its own; narrower, it is a sheet. */
 export const COLUMN = "(min-width: 1100px)";
-/** A phone's width: the top bar replaces the rail and the sheet opens at its peek. */
+/** A phone's width: the top bar replaces the rail. */
 export const PHONE_WIDTH = `(max-width: ${String(DESKTOP_MIN - 1)}px)`;
 
-/** Windows where the sheet opens at its peek: a phone's width, or any window too short to give up half its height to it. */
-export const PEEK_FIRST = `${PHONE_WIDTH}, (max-height: 599px)`;
 /** A window too short for the tour's guidance to sit above or below a card and leave the card room: it sits beside it. */
 export const SHORT = "(max-height: 479px)";
 

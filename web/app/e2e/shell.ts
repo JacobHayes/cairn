@@ -346,8 +346,14 @@ export function countDocumentFetches(page: Page, journey: string): () => number 
   return () => count;
 }
 
-/** On a phone the inspector opens at its peek, which shows its tabs and not its forms: opens it to full first, where it is a sheet at its peek. */
+/** Below the column width the inspector is a sheet that may be hidden or at its peek, which shows its tabs and not its panes: shows it, and opens a peek to full. */
 export async function openSheet(page: Page): Promise<void> {
+  const show = page.getByRole("button", { name: "Show inspector" });
+  // eslint-disable-next-line e2e/settled-reads
+  if (await show.isVisible()) {
+    await show.click();
+    await expect(page.locator(".frame")).not.toHaveAttribute("data-inspector", "folded");
+  }
   const handle = page.getByRole("button", { name: "Resize the inspector" });
   // The frame's own layout, drawn with what the caller waited for, not data: a test holding a read open opens the sheet too.
   // eslint-disable-next-line e2e/settled-reads

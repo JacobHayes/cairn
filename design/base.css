@@ -1246,6 +1246,10 @@ svg.chart .datum-line {
   [data-tip-tap] {
     padding-block: max(0px, calc((var(--touch-target) - 1lh) / 2));
   }
+  /* A tap-for-the-source fact keeps that padding as room on its line, not an overlap of the line above. */
+  :is(span, time, small)[data-tip-tap]:not(.badge, .chip) {
+    display: inline-block;
+  }
   /* A link in an index row (its name, what it offers) is as tall as a finger needs, its words centred in it. */
   .index-table table.data td a {
     display: inline-flex;

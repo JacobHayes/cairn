@@ -2,7 +2,6 @@
 import { usePointRow } from "../canvas/pointed.tsx";
 import { progressWords } from "../canvas/words.ts";
 import { NodeLink, Section } from "../detail/parts.tsx";
-import { useFrameActions } from "../shell/frame.tsx";
 import type { DisplayState } from "../status/words.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge, Meter } from "../ui/kit.tsx";
@@ -21,7 +20,7 @@ export interface StageRowData {
 }
 
 /** One stage as a row, the whole row a target: choosing it selects the stage and frames it on the canvas; pointing at it outlines the stage there. */
-function StageRow({ stage, lower }: { stage: StageRowData; lower: () => void }) {
+function StageRow({ stage }: { stage: StageRowData }) {
   const pointing = usePointRow({ kind: "node", id: stage.key });
   const { displayState, done, total } = stage;
   const progressed = done !== undefined && total !== undefined;
@@ -29,7 +28,7 @@ function StageRow({ stage, lower }: { stage: StageRowData; lower: () => void }) 
   return (
     <li className="stage-row" data-testid="stage-row" data-node={stage.key} data-state={displayState} {...pointing}>
       <span className="stage-row-head">
-        <NodeLink title={stage.title} node={stage.key} state={{ reveal: { key: stage.key, how: "frame" } }} onClick={lower} />
+        <NodeLink title={stage.title} node={stage.key} state={{ reveal: { key: stage.key, how: "frame" } }} />
         {displayState === undefined ? null : <Badge tone={statusTone(displayState)}>{statusWord(displayState, "group")}</Badge>}
         {/* With no progress to show, the one fact shares the title's line. */}
         {progressed ? null : due}
@@ -45,11 +44,8 @@ function StageRow({ stage, lower }: { stage: StageRowData; lower: () => void }) 
   );
 }
 
-/** The folded Stages section; nothing for a graph without stages. `note`: a line that says what a row's fact counts. `framing`: the view is the graph, where choosing a stage frames it. */
-export function StagesSection({ stages, framing, note }: { stages: readonly StageRowData[]; framing: boolean; note?: string }) {
-  const actions = useFrameActions();
-  // Where the stage is framed on a canvas under a sheet, it would be framed in no room at all: the sheet drops to its peek, where a card picked on the canvas opens it too.
-  const lower = () => { if (framing) { actions?.snap("peek"); } };
+/** The folded Stages section; nothing for a graph without stages. `note`: a line that says what a row's fact counts. */
+export function StagesSection({ stages, note }: { stages: readonly StageRowData[]; note?: string }) {
   if (stages.length === 0) {
     return null;
   }
@@ -58,7 +54,7 @@ export function StagesSection({ stages, framing, note }: { stages: readonly Stag
       {note === undefined ? null : <p className="muted small">{note}</p>}
       <ul className="plain-list stage-rows">
         {stages.map((stage) => (
-          <StageRow key={stage.key} stage={stage} lower={lower} />
+          <StageRow key={stage.key} stage={stage} />
         ))}
       </ul>
     </Section>

@@ -104,7 +104,7 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
   );
 }
 
-function Folds({ ready, model, selected, framing }: { ready: Ready; model: SummaryModel; selected: string | undefined; framing: boolean }) {
+function Folds({ ready, model }: { ready: Ready; model: SummaryModel }) {
   const { header } = ready.journey;
   const { caller } = useCaller();
   const annotations = (ready.journey.graph.state?.annotations ?? []).filter((annotation) => annotation.body.node == null);
@@ -114,7 +114,7 @@ function Folds({ ready, model, selected, framing }: { ready: Ready; model: Summa
         <Section title="Open decisions" summary={String(model.openDecisions.length)} testId="card-open-decisions">
           <ul className="detail-list">
             {model.openDecisions.map((each) => (
-              <li key={each.key} data-node={each.key} data-selected={each.key === selected}>
+              <li key={each.key} data-node={each.key}>
                 <NodeLink view={ready} node={each.key} />{" "}
                 <span className="muted">{ownerWords(ready, each.owners, caller?.identities)}</span>
               </li>
@@ -122,7 +122,7 @@ function Folds({ ready, model, selected, framing }: { ready: Ready; model: Summa
           </ul>
         </Section>
       )}
-      <StagesSection stages={stagesOf(ready)} framing={framing} />
+      <StagesSection stages={stagesOf(ready)} />
       <Section title="Description" testId="card-description">
         {header.description == null ? <span className="muted">No description.</span> : <Markdown text={header.description} data-testid="overview-description" />}
       </Section>
@@ -135,8 +135,7 @@ function Folds({ ready, model, selected, framing }: { ready: Ready; model: Summa
 }
 
 /** The journey card: the inspector's empty state on every view but the Summary, which is the journey's front page. */
-/** `framing`: the view is the graph, where choosing a stage frames it. */
-export function JourneyCard({ ready, selected, framing = false }: { ready: Ready; selected?: string | undefined; framing?: boolean }) {
+export function JourneyCard({ ready }: { ready: Ready }) {
   const summaryRead = useProjected(ready, { projection: "status_summary" });
   const summary = valueOf(summaryRead);
   const summaryError = errorWords(summaryRead);
@@ -165,7 +164,7 @@ export function JourneyCard({ ready, selected, framing = false }: { ready: Ready
           <Flags ready={ready} model={model} />
           <NextUp ready={ready} />
           <NextMilestone ready={ready} model={model} />
-          <Folds ready={ready} model={model} selected={selected} framing={framing} />
+          <Folds ready={ready} model={model} />
         </>
       )}
     </section>

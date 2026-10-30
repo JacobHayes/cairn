@@ -1,12 +1,12 @@
 // The frame's state: which of the inspector column's panes have something in them, which tab
 // is in view, whether the viewer hid the column (`]`), and where Esc takes the sheet.
 // The screens report through `FrameActions` (frame.tsx); the shell reads the result.
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useNavigate } from "react-router";
 
 import type { SheetSnap } from "./InspectorColumn.tsx";
 import { overlayOpen, typing } from "../ui/typing.ts";
-import { COLUMN, PEEK_FIRST, SHEET, useMedia, type AssistantDock, type FrameActions, type FrameState, type InspectorTab, type PageKeys } from "./frame.tsx";
+import { COLUMN, SHEET, useMedia, type AssistantDock, type FrameActions, type FrameState, type InspectorTab, type PageKeys } from "./frame.tsx";
 
 export interface Frame {
   state: FrameState;
@@ -28,6 +28,11 @@ export interface Frame {
   setProposals: (element: HTMLElement | null) => void;
   /** The tabs on offer, in order. */
   tabs: InspectorTab[];
+}
+
+/** A sheet brought back comes up from its peek to half: the peek shows no pane. */
+function raised(snap: SheetSnap): SheetSnap {
+  return snap === "peek" ? "half" : snap;
 }
 
 /** The assistant's opener for screens: opens it, and brings it into view when already open but hidden or behind the other tab. */
@@ -88,8 +93,8 @@ interface Counts {
 interface Setters {
   setCounts: Dispatch<SetStateAction<Counts>>;
   setTab: (tab: InspectorTab) => void;
-  /** Shows the column (a phone's sheet opens at its peek) or hides it. */
-  setHidden: (hidden: boolean) => void;
+  /** Shows the column, a sheet at half. */
+  reveal: () => void;
   setDock: Dispatch<SetStateAction<AssistantDock | undefined>>;
   setKeys: Dispatch<SetStateAction<PageKeys | undefined>>;
   setProposalsCount: (count: number | undefined) => void;
@@ -98,7 +103,7 @@ interface Setters {
 }
 
 /** What screens tell the shell: stable for the shell's life, so effects keyed on it run once. */
-function useActions({ setCounts, setTab, setHidden, setDock, setKeys, setProposalsCount, setCloseTo, setSnap }: Setters): FrameActions {
+function useActions({ setCounts, setTab, reveal, setDock, setKeys, setProposalsCount, setCloseTo, setSnap }: Setters): FrameActions {
   return useMemo<FrameActions>(
     () => ({
       mount: (slot) => {
@@ -109,7 +114,7 @@ function useActions({ setCounts, setTab, setHidden, setDock, setKeys, setProposa
       },
       show: (next) => {
         setTab(next);
-        setHidden(false);
+        reveal();
       },
       dock: (next) => {
         setDock(next);
@@ -132,7 +137,7 @@ function useActions({ setCounts, setTab, setHidden, setDock, setKeys, setProposa
       closeTo: setCloseTo,
       snap: setSnap,
     }),
-    [setCounts, setTab, setHidden, setDock, setKeys, setProposalsCount, setCloseTo, setSnap],
+    [setCounts, setTab, reveal, setDock, setKeys, setProposalsCount, setCloseTo, setSnap],
   );
 }
 
@@ -145,33 +150,27 @@ export function useFrame(): Frame {
   const [tab, setTab] = useState<InspectorTab>("inspector");
   const [dock, setDock] = useState<AssistantDock | undefined>(undefined);
   const [keys, setKeys] = useState<PageKeys | undefined>(undefined);
-  const [sheet, setSheet] = useState<{ hidden: boolean; snap: SheetSnap }>(() => ({ hidden: false, snap: globalThis.matchMedia(PEEK_FIRST).matches ? "peek" : "half" }));
+  // The sheet starts at its peek, its tabs alone. A screen showing a pane (a node opened) sets it at half, its detail
+  // below and the card framed above; the pill and `]` bring it back at the height it had, half at least.
+  const [sheet, setSheet] = useState<{ hidden: boolean; snap: SheetSnap }>({ hidden: false, snap: "peek" });
   const { hidden, snap } = sheet;
   const setSnap = useCallback((next: SheetSnap) => {
     setSheet((now) => ({ ...now, snap: next }));
   }, []);
-  // A phone's (or a short window's) sheet opens at its peek, whatever height it was closed at: picking a node shows its tabs and leaves the graph usable.
-  const setHidden = useCallback((next: boolean) => {
-    setSheet((now) => (now.hidden === next ? now : { hidden: next, snap: !next && globalThis.matchMedia(PEEK_FIRST).matches ? "peek" : now.snap }));
+  const reveal = useCallback(() => {
+    setSheet({ hidden: false, snap: "half" });
   }, []);
-  // Widening to a column and narrowing back to a sheet (a resize, a rotation) starts the sheet over at its peek; its heights are CSS's, so they follow the window by themselves.
+  // The snap holds across a resize or a rotation; its heights are CSS's, so they follow the window by themselves.
   const wide = useMedia(COLUMN);
-  const wasWide = useRef(wide);
-  useEffect(() => {
-    if (wasWide.current && !wide) {
-      setSnap("peek");
-    }
-    wasWide.current = wide;
-  }, [wide, setSnap]);
   const [closeTo, setCloseTo] = useState<string | undefined>(undefined);
-  const actions = useActions({ setCounts, setTab, setHidden, setDock, setKeys, setProposalsCount, setCloseTo, setSnap });
+  const actions = useActions({ setCounts, setTab, reveal, setDock, setKeys, setProposalsCount, setCloseTo, setSnap });
   // A pane with nothing in it cannot be the tab in view.
   const order: InspectorTab[] = [tab, "inspector", "assistant", "proposals"];
   const shown: InspectorTab = order.find((each) => counts[each] > 0) ?? "inspector";
   // An offered assistant keeps the column, and so its tabs, on screen: they are its only way in.
   const present = counts.inspector > 0 || counts.assistant > 0 || counts.proposals > 0 || dock !== undefined;
   const toggleFolded = useCallback(() => {
-    setSheet((now) => ({ hidden: !now.hidden, snap: now.hidden && globalThis.matchMedia(PEEK_FIRST).matches ? "peek" : now.snap }));
+    setSheet((now) => (now.hidden ? { hidden: false, snap: raised(now.snap) } : { ...now, hidden: true }));
   }, []);
   useFrameKeys({ tab: shown, dock, closeTo, open: present && !hidden }, toggleFolded);
   const openAssistant = useOpenAssistant(dock, actions);

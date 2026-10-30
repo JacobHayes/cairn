@@ -143,9 +143,9 @@ test("C18, A19: an archived journey's Summary is read-only: its notes are shown,
   await expect(page.getByRole("button", { name: "Unsnooze" })).toHaveCount(0);
 });
 
-test("D5: the graph's stalled panel offers the same actions, and an unsnooze acts in place", async ({ page }) => {
+test("D5: the list's stalled panel offers the same actions, and an unsnooze acts in place", async ({ page }) => {
   await stall(page, "j_bakeoff", ["n_trial_a", "n_trial_b", "n_wrap_up"]);
-  await goTo(page, "graph");
+  await goTo(page, "list");
   const causes = page.getByTestId("stall-cause");
   await expect(causes.first()).toBeVisible();
   // Each cause is one row: its action sits beside the title, not under it.

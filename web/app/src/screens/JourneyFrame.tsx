@@ -12,6 +12,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 
 import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
 import { AuthoringPanel } from "../authoring/AuthoringPanel.tsx";
+import { JourneyAuthoringBar } from "../authoring/JourneyAuthoring.tsx";
 import { domainOf, journeyAuthored } from "../authoring/target.ts";
 import { stepsFor } from "../canvas/ladder.ts";
 import { useSelection, type Selection } from "../canvas/selection.ts";
@@ -30,7 +31,7 @@ import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
 import { JourneyLayerHost } from "../proposals/Hosts.tsx";
 import { useLayer, useReviewing } from "../proposals/layer.ts";
 import { Rail } from "../proposals/Rail.tsx";
-import { COLUMN, Inspector, PHONE_WIDTH, useMedia, usePageKeys } from "../shell/frame.tsx";
+import { Inspector, usePageKeys } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../insert/entry.ts";
 import { InsertStepper, type InsertPreview } from "../insert/Stepper.tsx";
 import { JourneyHeader } from "./JourneyHeader.tsx";
@@ -38,7 +39,7 @@ import { KeySheet } from "./KeySheet.tsx";
 import { keyBindingsFor, useJourneyKeys } from "./keys.ts";
 import { useViewStateValue } from "./useViewStateValue.ts";
 import { useWritable } from "./writable.ts";
-import { CanvasBars, ProjectionBody, type ProjectionProps } from "./Projections.tsx";
+import { ProjectionBody, type ProjectionProps } from "./Projections.tsx";
 import "./screens.css";
 import { Failed } from "../ui/Failed.tsx";
 import { Pending } from "../ui/Pending.tsx";
@@ -150,7 +151,7 @@ function InspectorSlot({
   }
   return !card || screen === "summary" ? null : (
     <Inspector focus={journey} reveal={false}>
-      <JourneyCard ready={ready} selected={selected} framing={screen === "graph"} />
+      <JourneyCard ready={ready} />
     </Inspector>
   );
 }
@@ -213,12 +214,8 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(addresses.close())} />;
   // The graph is a gesture surface that fills the workspace under the head; the rest scroll.
   const fills = planned || inserting.preview !== undefined;
-  // The journey card is the inspector's empty state where the inspector has a column of its own,
-  // and on a phone, whose column stacks right under the projection, so its tabs follow the graph. On a tablet it follows the
-  // projection, and a graph that fills the page has no room for it: a sheet would cover the canvas unasked.
-  const wide = useMedia(COLUMN);
-  const phone = useMedia(PHONE_WIDTH);
-  const card = reviewing || selected !== undefined || edge !== undefined || screen === "summary" || screen === "walk" ? "none" : wide || phone ? "column" : fills ? "none" : "inline";
+  // The journey card is the inspector's empty state (a sheet's, at its peek, shows only its tabs).
+  const card = !(reviewing || selected !== undefined || edge !== undefined || screen === "summary" || screen === "walk");
   return (
     <ViewStateContext value={viewState}>
     <ConnectContext value={authored === undefined ? undefined : drawing}>
@@ -227,16 +224,15 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
         <div className="ws-head stack journey-head">
           <JourneyHeader ready={ready} view={authored === undefined ? { ...view, edit: false } : view} screen={screen} selected={selected} />
           <Band />
-          {planned ? <CanvasBars ready={ready} view={view} authored={authored} drawing={drawing} /> : null}
+          {authored === undefined ? null : <JourneyAuthoringBar ready={ready} authored={authored} view={view} drawing={drawing} />}
         </div>
         <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>
           <Workspace ready={ready} view={view} screen={screen} selected={selected} edge={line} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} onCard={setWalkCard} />
-          {card === "inline" ? <JourneyCard ready={ready} selected={selected} framing={screen === "graph"} /> : null}
         </div>
         {sheetOpen ? <KeySheet bindings={bindings} onClose={() => { setSheetOpen(false); }} /> : null}
       </div>
       {/* After the head: a node opened from the assistant brings its detail forward last. */}
-      <InspectorSlot ready={ready} screen={screen} selected={selected} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} walkCard={walkCard} />
+      <InspectorSlot ready={ready} screen={screen} selected={selected} structure={structure} card={card} inserting={inserting} selection={selection} authored={authored} walkCard={walkCard} />
       </InsertEntryContext>
     </ConnectContext>
     </ViewStateContext>

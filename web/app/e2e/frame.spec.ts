@@ -1,6 +1,6 @@
 // The app frame: one scroller per region, so a node's Details (its History) are reachable in the
-// inspector (or the tablet's sheet) at each width, the page itself never scrolls from it; a
-// phone's graph is in the page, with the inspector a bottom sheet over it. On cairn demo.
+// inspector (or the sheet) at each width and the page itself never scrolls; below 1100px the
+// inspector is a bottom sheet over the workspace. On cairn demo.
 import type { Page } from "@playwright/test";
 
 import { checkpoint } from "./invariants.ts";
@@ -118,8 +118,6 @@ const sheet = (page: Page) => page.locator(".inspector");
 const snapOf = (page: Page) => whenSettled(page, () => page.locator(".frame").getAttribute("data-sheet"));
 const heightOf = async (page: Page) => (await whenSettled(page, () => sheet(page).boundingBox()))?.height ?? 0;
 const handle = (page: Page) => page.getByRole("button", { name: "Resize the inspector" });
-/** The canvas's pan and zoom, as React Flow writes it. */
-const transform = (page: Page) => whenSettled(page, () => page.locator('[data-testid="canvas"] .react-flow__viewport').evaluate((element) => (element as HTMLElement).style.transform));
 
 /** Drags the handle by `dy` with a mouse pointer, in steps like a hand. */
 async function dragHandle(page: Page, dy: number): Promise<void> {
@@ -148,43 +146,65 @@ async function expectCardsInside(page: Page): Promise<void> {
   }
 }
 
+/** Snoozes `nodes` of `journey` past its end through the API, one patch each, so nothing in it can move and its head has the most to say. */
+async function stallThroughApi(page: Page, journey: string, nodes: readonly string[]): Promise<void> {
+  for (const node of nodes) {
+    const { revision } = (await (await page.request.get(`/api/journeys/${journey}/derived`)).json()) as { revision: number };
+    const response = await page.request.post(`/api/journeys/${journey}/patches`, {
+      data: { patch: { id: `p_stall_${node}`, target: { journey }, base_revision: revision, mutations: [{ op: "snooze", node, until: { date: "2026-12-31" } }] } },
+    });
+    expect(response.ok(), await response.text()).toBe(true);
+  }
+}
+
+/** The on-screen box round every drawn card. */
+const cardsBox = (page: Page) =>
+  whenSettled(page, () =>
+    page.getByTestId("node-card").evaluateAll((all) => {
+      const boxes = all.map((each) => each.getBoundingClientRect());
+      return { left: Math.min(...boxes.map((box) => box.left)), right: Math.max(...boxes.map((box) => box.right)), top: Math.min(...boxes.map((box) => box.top)), bottom: Math.max(...boxes.map((box) => box.bottom)) };
+    }),
+  );
+
 async function phoneGraphFills(page: Page): Promise<void> {
-  await openJourney(page, "j_vendor_eval");
+  // A stalled journey: what a phone showed blank, its graph pushed down the page under the sheet and fitted to nothing.
+  await stallThroughApi(page, "j_bakeoff", ["n_trial_a", "n_trial_b", "n_wrap_up"]);
+  await openJourney(page, "j_bakeoff", "");
   await expect(sheet(page)).toBeVisible();
   expect(await snapOf(page)).toBe("peek");
   const peek = await whenSettled(page, () => sheet(page).boundingBox());
   expect((peek?.y ?? 0) + (peek?.height ?? 0)).toBeCloseTo(844, 0);
-  await expect(page.locator(".inspector-head")).toBeInViewport();
-  // The graph has the room the bars leave, with the inspector's head peeking under it; nothing of it lies under the peek, so the whole canvas is a gesture surface.
+  // The graph has the window the bars leave, to its foot, with the sheet's head over its lower edge.
   const canvas = await whenSettled(page, () => page.getByTestId("canvas").boundingBox());
-  expect(canvas?.height).toBeGreaterThan(400);
-  expect((canvas?.y ?? 0) + (canvas?.height ?? 0)).toBeLessThanOrEqual(peek?.y ?? 0);
-  expect(await scrolled(page)).toBe(0);
-  const before = await transform(page);
-  // From empty pane: a finger that lands on a routed edge selects it and does not pan.
-  await swipe(page, { x: 195, y: (canvas?.y ?? 0) + 40 }, { dx: -80, dy: -120 });
-  await expect.poll(() => transform(page)).not.toBe(before);
-  expect(await scrolled(page)).toBe(0);
-  // The graph fills the window, so there is nothing below it for the page to scroll to.
-  await page.mouse.move(195, 40);
-  await page.mouse.wheel(0, 200);
-  expect(await scrolled(page)).toBe(0);
+  expect((canvas?.y ?? 0) + (canvas?.height ?? 0)).toBeCloseTo(844, 0);
+  expect(canvas?.height).toBeGreaterThan(600);
+  // The opening fit draws the whole graph in what the sheet leaves, across most of the canvas's width.
+  const fitted = await cardsBox(page);
+  expect(fitted.top).toBeGreaterThanOrEqual(canvas?.y ?? 0);
+  expect(fitted.bottom).toBeLessThanOrEqual(peek?.y ?? 0);
+  expect(fitted.right - fitted.left).toBeGreaterThan((canvas?.width ?? 0) / 2);
+  // A finger drawn across the empty pane moves the cards with it.
+  await swipe(page, { x: 195, y: (canvas?.y ?? 0) + 80 }, { dx: -80, dy: 120 });
+  await expect.poll(async () => (await cardsBox(page)).top - fitted.top).toBeGreaterThan(60);
   await checkpoint(page);
-  // On the list, the page's last row can be reached above the sheet.
+  // On the list, the region scrolls to its last row, which ends above the sheet.
   await openAt(page, "j_vendor_eval", "list");
-  await page.evaluate(() => {
-    window.scrollTo(0, document.documentElement.scrollHeight);
+  await page.locator(".ws-body").evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
   });
-  const shown = await whenSettled(page, () => page.locator(".ws-body").boundingBox());
   const top = (await whenSettled(page, () => sheet(page).boundingBox()))?.y ?? 0;
-  expect((shown?.y ?? 0) + (shown?.height ?? 0)).toBeGreaterThan(top);
   const last = await whenSettled(page, () => page.locator(".ws-body *:visible").last().boundingBox());
   expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(top + 1);
+  expect(await scrolled(page)).toBe(0);
 }
 
 async function phoneSheetSnaps(page: Page): Promise<void> {
   await openAt(page, "j_hiring", "graph?depth=decisions");
   await expectCardsInside(page);
+  // With nothing open the sheet is at its peek, which is its row of tabs and no more.
+  expect(await snapOf(page)).toBe("peek");
+  const peek = await heightOf(page);
+  expect(peek).toBeLessThan(64);
   const zoom = page.locator(".canvas .react-flow__controls");
   // The graph's bottom controls clear the sheet at every height it leaves room at.
   const expectControlsClear = async () => {
@@ -195,9 +215,9 @@ async function phoneSheetSnaps(page: Page): Promise<void> {
   const panel = nodePanel(page, "n_make_offer");
   await expect(panel).toBeAttached();
   await expectAddress(page, "/journeys/j_hiring/nodes/n_make_offer?depth=decisions");
-  expect(await snapOf(page)).toBe("peek");
-  const peek = await heightOf(page);
-  // Picking a node keeps the cards in view above the peek.
+  // Picking a node raises the sheet to half, its detail in view, and frames the picked card above it.
+  await expect.poll(() => snapOf(page)).toBe("half");
+  await expect(panel).toBeVisible();
   await expectCardsInside(page);
   const picked = await whenSettled(page, () => nodeCard(page, "n_make_offer").boundingBox());
   expect((picked?.y ?? 0) + (picked?.height ?? 0)).toBeLessThanOrEqual((await whenSettled(page, () => sheet(page).boundingBox()))?.y ?? 0);
@@ -208,7 +228,7 @@ async function phoneSheetSnaps(page: Page): Promise<void> {
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-popover]")).toHaveCount(0);
   await expect(page.locator(".frame")).toHaveAttribute("data-inspector", "on");
-  expect(await snapOf(page)).toBe("peek");
+  expect(await snapOf(page)).toBe("half");
   await checkpoint(page);
 
   // A finger's drag up opens it to full, and a drag from there down settles on half.
@@ -247,29 +267,28 @@ async function phoneSheetFoldsAndReturns(page: Page): Promise<void> {
   // Under no sheet the graph fills the window to its foot: no blank strip where the sheet was.
   const canvas = await whenSettled(page, () => page.getByTestId("canvas").boundingBox());
   expect((canvas?.y ?? 0) + (canvas?.height ?? 0)).toBeGreaterThan(844 - 24);
-  expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1))).toBe(true);
   await checkpoint(page);
-  // The pill brings it back at the peek.
+  // The pill brings it back up to half, where its pane shows.
   await pill.click();
-  expect(await snapOf(page)).toBe("peek");
+  expect(await snapOf(page)).toBe("half");
   await expect(handle(page)).toBeVisible();
 
-  // Hide inspector closes it for real, and the keyboard lands on the control that opens it, which opens it at the peek whatever height it was closed at.
+  // Hide inspector closes it for real, and the keyboard lands on the control that opens it, which opens it at the height it was closed at.
   await handle(page).tap();
   await expect.poll(() => snapOf(page)).toBe("full");
   await page.getByRole("button", { name: "Hide inspector" }).click();
   await expect(page.locator(".frame")).toHaveAttribute("data-inspector", "folded");
   await expect(pill).toBeFocused();
   await pill.click();
-  expect(await snapOf(page)).toBe("peek");
-  // Esc takes the open node back to the graph; a second Esc closes the sheet; picking a node opens it again at the peek.
+  expect(await snapOf(page)).toBe("full");
+  // Esc takes the open node back to the graph; a second Esc closes the sheet; picking a node opens it again at half.
   await page.keyboard.press("Escape");
   await expectAddress(page, "/journeys/j_hiring?depth=decisions&view=graph");
   await page.keyboard.press("Escape");
   await expect(page.locator(".frame")).toHaveAttribute("data-inspector", "folded");
   await hiringNode(page).getByTestId("card-open").click();
   await expect(page.locator(".frame")).toHaveAttribute("data-inspector", "on");
-  expect(await snapOf(page)).toBe("peek");
+  expect(await snapOf(page)).toBe("half");
 }
 
 
@@ -283,41 +302,39 @@ const graphShare = async (page: Page, height: number) => {
 async function phoneTurns(page: Page): Promise<void> {
   await openAt(page, "j_hiring", "graph?depth=decisions");
   await hiringNode(page).getByTestId("card-open").click();
-  // A landscape phone's peek is a small share of a short window, so the graph keeps most of it.
-  await page.setViewportSize({ width: 844, height: 390 });
-  await expect(page.locator(".frame")).toHaveAttribute("data-inspector", "on");
-  expect(await snapOf(page)).toBe("peek");
-  expect((await sheetBox(page)).height).toBeLessThan(390 * 0.3);
-  await expect.poll(() => graphShare(page, 390)).toBeGreaterThan(0.5);
-  await expect(page.locator(".inspector-head")).toBeInViewport();
-  await page.setViewportSize({ width: 390, height: 844 });
-  // A picked node keeps the sheet on screen at tablet widths too.
-  await handle(page).focus();
-  await page.keyboard.press("ArrowUp");
   await expect.poll(() => snapOf(page)).toBe("half");
   expect((await sheetBox(page)).height).toBeCloseTo(844 * 0.4, 0);
+  // Turned, the sheet keeps its snap and takes the new window's height.
   await page.setViewportSize({ width: 844, height: 390 });
   await expect.poll(async () => (await sheetBox(page)).height).toBeCloseTo(390 * 0.4, 0);
   expect(await snapOf(page)).toBe("half");
   await expect.poll(() => graphShare(page, 390)).toBeGreaterThan(0.25);
+  // A landscape phone's peek is a small share of a short window, so the graph keeps most of it.
+  await handle(page).focus();
+  await page.keyboard.press("ArrowDown");
+  await expect.poll(() => snapOf(page)).toBe("peek");
+  expect((await sheetBox(page)).height).toBeLessThan(390 * 0.3);
+  await expect.poll(() => graphShare(page, 390)).toBeGreaterThan(0.5);
+  await expect(page.locator(".inspector-head")).toBeInViewport();
+  await page.keyboard.press("ArrowUp");
   await page.setViewportSize({ width: 390, height: 844 });
   await expect.poll(async () => (await sheetBox(page)).height).toBeCloseTo(844 * 0.4, 0);
-  // A desktop width is a column beside the workspace; narrowing again opens the sheet at its peek.
+  // A desktop width is a column beside the workspace; narrowing again keeps the sheet's snap.
   await page.setViewportSize({ width: 1440, height: 800 });
   await expect.poll(async () => (await sheet(page).boundingBox())?.width ?? 0).toBeLessThan(500);
   expect((await sheetBox(page)).height).toBeGreaterThan(600);
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect.poll(() => snapOf(page)).toBe("peek");
+  await expect.poll(async () => (await sheetBox(page)).height).toBeCloseTo(844 * 0.4, 0);
 }
 
 test.describe("a phone", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test("the graph is in the page and fills it, the inspector sits over it at its peek, a swipe on the graph pans, and the page's last row can be reached above the sheet", async ({ page }) => {
+  test("the graph fills the window under the bars with the sheet's head over its foot, its opening fit is in view, a swipe on it pans, and the list's last row can be reached above the sheet", async ({ page }) => {
     await phoneGraphFills(page);
   });
 
-  test("a node opens the sheet at its peek with every card in view above it; the handle drags it between peek, half and full and closes it, Esc closes a menu and not the sheet, and Hide inspector and Esc close it for real", async ({ page }) => {
+  test("the sheet rests at its row of tabs and a node raises it to half with the card in view above it; the handle drags it between peek, half and full and closes it, Esc closes a menu and not the sheet, and Hide inspector and Esc close it for real", async ({ page }) => {
     await phoneSheetSnaps(page);
     await phoneSheetFoldsAndReturns(page);
   });

@@ -19,7 +19,8 @@ export function ContentsRow({ view, child, write, viewer }: { view: Ready; child
   const fact = due ?? ownerName(view, child.key, viewer);
   return (
     <li data-testid="child" data-node={child.key} data-state={child.displayState}>
-      <span className="contents-mark">
+      {/* The mark's cell is its label, so a finger has the cell's whole height and width to tap. */}
+      <label className="contents-mark">
         {write.writable && isWork(child) && accepts(view.derived.nodes[child.key], done ? "reopen" : "complete") ? (
           <input
             type="checkbox"
@@ -29,7 +30,7 @@ export function ContentsRow({ view, child, write, viewer }: { view: Ready; child
             onChange={() => void write.run([transition(child.key, done ? "reopen" : "complete")])}
           />
         ) : null}
-      </span>
+      </label>
       <NodeLink view={view} node={child.key} /> <Badge tone={statusTone(child.displayState)}>{statusWord(child.displayState, child.kind)}</Badge>
       {fact === undefined ? null : <span className="muted small contents-fact">{due === undefined ? fact : <Words text={due} />}</span>}
     </li>

@@ -27,13 +27,9 @@ test("H3: emails are chips taken from the keyboard, refused with a reason, repla
   await expect(chips(page)).toHaveText(["ann@example.org", "bob@example.org", "cy@example.org"]);
   // The chips wrap at a phone's width and nothing runs past the window.
   await page.setViewportSize({ width: 390, height: 844 });
-  // Narrowing starts the sheet over at its peek, once the app has read the new width; opening it before then finds it not yet peeking.
-  await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "peek");
   await openSheet(page);
   await checkpoint(page);
   await page.setViewportSize({ width: 1280, height: 800 });
-  // The sheet's pane is inert until the app has read the wider window (the stylesheet changes a frame sooner), and typing into an inert field goes nowhere.
-  await expect(page.locator(".inspector-body[data-pane='inspector']")).not.toHaveAttribute("inert");
   await expect(chips(page)).toHaveCount(3);
 
   await field(page).fill("not-an-email");

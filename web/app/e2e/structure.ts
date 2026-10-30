@@ -107,7 +107,7 @@ export async function observe(page: Page): Promise<Observed> {
       "a native tooltip": titleProblems(snapshot),
       "controls under the touch target": touch.problems,
       "the page scrolling sideways": pageScrollProblems(snapshot),
-      "the page scrolling down at a desktop width": pageHeightProblems(snapshot),
+      "the page scrolling down": pageHeightProblems(snapshot),
       "content past the window's edge": edgeProblems(snapshot),
       "text under the contrast floor": contrast.problems,
       "text under the type floor": textUnderFloor(snapshot, floor),

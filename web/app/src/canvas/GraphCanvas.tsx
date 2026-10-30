@@ -5,7 +5,7 @@
 // every revision, so a live edit never jumps the viewport. It opens fitted to the whole drawn
 // graph, as `f` and the Fit button do, unless it is given nodes to open on (`firstFit`).
 //
-// Input, 720px and wider: two-finger scroll pans freely, the wheel alone never zooms, a
+// Input: a drag or two-finger scroll pans freely, the wheel alone never zooms, a
 // pinch or Ctrl/Cmd+wheel zooms at the pointer, a double-click zooms into a container. Zoom only
 // simplifies a container's head below a zoom (`data-lod` on the root, CSS only); a card never changes size.
 // Below the reading zoom a container is drawn as a tile (tiles.ts) and what it holds is hidden;
@@ -295,7 +295,7 @@ function isSheet(column: HTMLElement | null | undefined): column is HTMLElement 
   return column !== null && column !== undefined && getComputedStyle(column).position === "fixed";
 }
 
-/** The height (px) the inspector's sheet or its pill lies over the canvas's lower part: none where the canvas ends above it (a phone's, at the peek). */
+/** The height (px) the inspector's sheet or its pill lies over the canvas's lower part: none where the canvas ends above it. */
 function coveredBy(column: HTMLElement | null | undefined, canvas: HTMLElement | null | undefined): number {
   if (!isSheet(column) || canvas === null || canvas === undefined) {
     return 0;

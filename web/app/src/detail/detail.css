@@ -362,6 +362,25 @@ dl.kv dd {
   width: 20px;
 }
 
+/* On a touch screen a contents row's box and its title each take the touch target. */
+@media (pointer: coarse) {
+  /* The box's cell is the touch target wide, as a picked table's is. */
+  .contents li {
+    grid-template-columns: var(--touch-target) minmax(0, 1fr) auto auto;
+  }
+  .contents-mark {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    width: auto;
+  }
+  .contents li > a {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+}
+
 .contents-fact {
   margin-left: auto;
   text-align: right;

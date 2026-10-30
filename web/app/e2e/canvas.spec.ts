@@ -580,7 +580,7 @@ test("A route's Stages list: choosing a stage scrolls its row into view in the L
   await expect(page.locator('[data-testid="route-row"][aria-current="true"]')).toBeInViewport();
 });
 
-test("The Stages list on a phone: choosing a stage from the sheet lowers the sheet and frames the stage above it", async ({ page }) => {
+test("The Stages list on a phone: choosing a stage from the sheet opens it at half and frames the stage above the sheet", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await visit(page, "/journeys/j_launch?view=graph&depth=actions");
   await expect(nodeCard(page, "n_beta")).toBeVisible();
@@ -588,7 +588,7 @@ test("The Stages list on a phone: choosing a stage from the sheet lowers the she
   const stages = page.getByTestId("card-stages");
   await stages.locator("summary").click();
   await stages.locator('li[data-node="n_beta"]').click({ position: { x: 4, y: 4 } });
-  await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "peek");
+  await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "half");
   await expect
     .poll(() =>
       whenSettled(page, async () => {
