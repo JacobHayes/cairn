@@ -3,7 +3,7 @@
 // machine). The server answers over HTTP (`/api/{domain}/proposals`, `/api/proposals/{id}...`).
 // Each write names a client patch id (H5), so a lost answer is resubmitted rather than guessed
 // at; nothing retries on its own.
-import { answerFailure, networkFailure, rejectionOf, type CairnClient, type HttpFailure, type Schema } from "@cairn/client";
+import { TITLE_BYTES_MAX, answerFailure, networkFailure, rejectionOf, type CairnClient, type HttpFailure, type Schema } from "@cairn/client";
 
 import { Missing, ReadFailed } from "./host.ts";
 
@@ -50,11 +50,11 @@ export function newProposalId(): string {
   return `pr_${crypto.randomUUID().replaceAll("-", "")}`;
 }
 
-/** `text` as a proposal's title: one line, cut to a title's size (256 bytes) without splitting a character. */
+/** `text` as a proposal's title: one line, cut to a title's size without splitting a character. */
 export function titled(text: string): string {
   const encoder = new TextEncoder();
   let title = text.replace(/\s+/g, " ").trim();
-  while (encoder.encode(title).length > 256) {
+  while (encoder.encode(title).length > TITLE_BYTES_MAX) {
     title = Array.from(title).slice(0, -1).join("");
   }
   return title;

@@ -64,8 +64,8 @@ function Sentence({ view, detail, rank }: { view: Ready; detail: NodeDetail; ran
 }
 
 /**
- * `extra` sits under the actions: the node's structure, in a journey's edit mode, or on a
- * card its way past breaking down. `folded` starts every section closed, as a card shows them.
+ * `extra` sits under the actions: the node's structure, in a journey's edit mode, whose guidance
+ * editor stands in for the read-only Guidance fold. `folded` starts every section closed, as a card shows them.
  */
 export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view: Ready; nodeKey: string; extra?: ReactNode; folded?: boolean }) {
   const detail = nodeDetail(view, nodeKey);
@@ -100,7 +100,7 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
           {node.kind === "decision" ? <Affects view={view} detail={detail} /> : null}
           <Connections view={view} detail={detail} />
           <Checklist view={view} detail={detail} />
-          <ResourceList view={view} detail={detail} />
+          {extra === undefined ? <ResourceList view={view} detail={detail} /> : null}
           <AttachmentList view={view} detail={detail} />
           <Dates view={view} detail={detail} />
           <WhyRank view={view} detail={detail} position={position} row={row} />

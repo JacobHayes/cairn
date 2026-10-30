@@ -382,6 +382,20 @@ fn walk_proposals(records: &Records, ops: &mut BTreeSet<String>) -> Records {
         ),
         "an extension drafted against another destination revision is stale"
     );
+    let notes = (0..300).fold(String::new(), |all, at| {
+        format!(
+            "{all}  - op: add_annotation\n    annotation: {{key: a_big{at}, note: \"{}\"}}\n",
+            "x".repeat(60_000)
+        )
+    });
+    let huge =
+        format!("- op: extend_proposal\n  destination_revision: {before}\n  mutations:\n{notes}");
+    let refused = support::patch_to(&records, proposal, &huge);
+    assert_eq!(
+        support::codes(support::apply(&records, &refused, &support::fixed_inputs())),
+        [ViolationCode::LimitExceeded],
+        "an extension past the size a proposal may hold is refused"
+    );
     let records = accept(&records, proposal, &extend, ops);
     assert_eq!(
         journey_revision(&records),

@@ -3,8 +3,8 @@
 //! mutations run in order exactly as if the patch held them and every check applies.
 
 use cairn_schema::{
-    BoundedVec, Domain, Mutation, PatchTarget, Proposal, ProposalDraft, ProposalStatus, Record,
-    RevisionConflict, RevisionOf, Subject, ViolationCode, Write,
+    BoundedVec, Domain, Limit, Mutation, PatchTarget, Proposal, ProposalDraft, ProposalStatus,
+    Record, RevisionConflict, RevisionOf, Subject, ViolationCode, Write,
 };
 
 use super::{ARCHIVED_REFUSAL, Session};
@@ -68,6 +68,9 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
         },
         (other, _) => unreachable!("{other:?} does not edit a proposal"),
     };
+    if !matches!(mutation, Mutation::DiscardProposal {}) && oversize(session, &next) {
+        return Vec::new();
+    }
     assert_eq!(
         next.revision, revision,
         "a proposal patch advances its revision by one"
@@ -112,14 +115,6 @@ fn extended(
         );
         return None;
     }
-    if added.iter().any(Mutation::edits_a_proposal) {
-        reject(
-            session,
-            ViolationCode::MutationNotForTarget,
-            "a proposal's mutations cannot create, edit, apply, or discard a proposal",
-        );
-        return None;
-    }
     let all: Vec<Mutation> = found
         .draft
         .mutations
@@ -139,10 +134,43 @@ fn extended(
         }
         return None;
     };
-    Some(ProposalDraft {
+    let draft = &found.draft;
+    let Ok(grown) = ProposalDraft::new(
+        draft.title.clone(),
+        draft.description.clone(),
+        draft.destination_revision,
         mutations,
-        ..found.draft.clone()
-    })
+        draft.items.clone(),
+    ) else {
+        reject(
+            session,
+            ViolationCode::MutationNotForTarget,
+            "a proposal's mutations cannot create, edit, apply, or discard a proposal",
+        );
+        return None;
+    };
+    Some(grown)
+}
+
+/// Whether `proposal`'s content is past the size a proposal may hold, rejecting the write when
+/// it is. PRACTICES, Explicit limits: like a graph, a proposal's content is at most 16 MiB.
+fn oversize(session: &mut Session<'_>, proposal: &Proposal) -> bool {
+    let bytes = match cairn_schema::to_json(&proposal.draft) {
+        Ok(json) => json.len(),
+        Err(error) => panic!("a proposal draft always serializes: {error}"),
+    };
+    if Limit::GraphBytes.check(bytes).is_ok() {
+        return false;
+    }
+    reject(
+        session,
+        ViolationCode::LimitExceeded,
+        &format!("the proposal would serialize to {bytes} bytes, past graph_bytes_max"),
+    );
+    if let Some(violation) = session.violations.last_mut() {
+        violation.limit = Some(Limit::GraphBytes);
+    }
+    true
 }
 
 fn reject(session: &mut Session<'_>, code: ViolationCode, message: &str) {

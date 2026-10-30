@@ -14,7 +14,7 @@ import { authorCommand } from "../authoring/write.ts";
 import type { Mutation } from "../authoring/graph.ts";
 import type { Command } from "../data/edit-command.ts";
 import { useSession, useWrite, type Write } from "../data/react.ts";
-import { newProposalId, titled, type Domain } from "../data/proposals.ts";
+import { newProposalId, type Domain } from "../data/proposals.ts";
 import { newPatchId } from "../data/writes.ts";
 import type { Ready } from "../detail/model.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
@@ -56,20 +56,23 @@ function SaveAsRoute({ ready }: { ready: Ready }) {
   const { write, start } = useDraftAndOpen(`save-as-route:${header.id}`, header.name);
   const [route, setRoute] = useState(slugOf(header.name, "route"));
   const [name, setName] = useState(header.name);
+  const [looking, setLooking] = useState(false);
   const propose = async () => {
     const id = route.trim();
+    setLooking(true);
     // A route that is not there yet is created with its draft, from nothing (revision 0); one that is has its draft opened from its revision.
     // A route that cannot be read is taken as new: the server refuses a create over one that exists.
     const existing = await host.route(id).catch(() => undefined);
     const mutations: Mutation[] = [...(existing === undefined ? [{ op: "create_route" as const, name: name.trim() }] : []), { op: "open_draft", source: { save_as_route: { journey: header.id } } }];
     const patch = { id: newPatchId(), target: { route: id }, base_revision: existing?.revision ?? 0, mutations };
-    start({ route: id }, (proposal) => ({ kind: "patch", patch, note: titled(`Save ${header.name} as a route`), proposal }));
+    setLooking(false);
+    start({ route: id }, (proposal) => ({ kind: "patch", patch, proposal }));
   };
   return (
     <span className="row" data-testid="save-as-route-flow">
       <Input aria-label="Route id" value={route} onChange={(event) => { setRoute(event.target.value); }} />
       <Input aria-label="Route name" value={name} onChange={(event) => { setName(event.target.value); }} />
-      <Button disabled={write.disabled || route.trim() === "" || name.trim() === ""} onClick={() => void propose()}>
+      <Button disabled={write.disabled || looking || route.trim() === "" || name.trim() === ""} onClick={() => void propose()}>
         Propose saving it as a route
       </Button>
       <Problem write={write} onRebase={write.dismiss} />

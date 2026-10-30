@@ -78,7 +78,7 @@ pub fn save_as_route(
     let mut items = participation_items(&structure);
     items.extend(exclusion_items(&held.graph));
     let revision = existing.map_or(Revision::NONE, |found| found.revision);
-    let title = format!("Save {} as a route", held.header.name.as_str());
+    let title = saved_title(held.header.name.as_str());
     let proposal = draft(&title, revision, mutations, items)?;
     let dropped = everything_dropped(&proposal);
     let remedy = latest_version(records, route).map(|version| {
@@ -89,6 +89,22 @@ pub fn save_as_route(
         .map(|found| with_remedy(found, remedy.as_deref()))
         .collect();
     with_violations(proposal, violations)
+}
+
+/// The proposal's title for saving a journey named `name`: the name is cut, at a character
+/// boundary, to leave the words around it inside a title's size.
+fn saved_title(name: &str) -> String {
+    let (before, after) = ("Save ", " as a route");
+    let room = usize::try_from(cairn_schema::limits::TITLE_BYTES_MAX)
+        .unwrap_or(usize::MAX)
+        .saturating_sub(before.len() + after.len());
+    let kept = name
+        .char_indices()
+        .map(|(at, each)| at + each.len_utf8())
+        .take_while(|end| *end <= room)
+        .last()
+        .map_or("", |end| &name[..end]);
+    format!("{before}{kept}{after}")
 }
 
 /// The route's latest published version, the one whose retired keys a journey behind it
@@ -242,5 +258,22 @@ fn trial_patch_id() -> cairn_schema::PatchId {
     match "p_trial".parse() {
         Ok(id) => id,
         Err(error) => unreachable!("a fixed patch id parses: {error}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::saved_title;
+
+    #[test]
+    fn a_title_made_from_the_longest_name_still_fits_a_title() {
+        for name in [
+            "a".repeat(256),
+            "\u{e9}".repeat(128),
+            "\u{1F600}".repeat(64),
+        ] {
+            let title = saved_title(&name);
+            assert!(title.parse::<cairn_schema::Title>().is_ok(), "{title}");
+        }
     }
 }

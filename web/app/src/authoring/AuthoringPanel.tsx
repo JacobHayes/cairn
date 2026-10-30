@@ -28,7 +28,7 @@ export function AuthoringPanel({ authored, node, onRemoved }: AuthoringPanelProp
     <div key={node.key} className="stack author-panel" data-testid="authoring" data-node={node.key}>
       <NodeForm key={node.key} authored={authored} node={node} />
       <div className="detail-folds">
-        <Section title="People" summary={Object.keys(node.participations ?? {}).length === 0 ? undefined : String(Object.keys(node.participations ?? {}).length)} testId="author-participations">
+        <Section title="Roles" summary={Object.keys(node.participations ?? {}).length === 0 ? undefined : String(Object.keys(node.participations ?? {}).length)} testId="author-participations">
           <ParticipationWiring authored={authored} node={node} />
         </Section>
         <Section title="Guidance" summary={resources.length === 0 ? undefined : String(resources.length)} testId="author-resources">
