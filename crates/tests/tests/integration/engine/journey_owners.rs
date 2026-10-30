@@ -183,7 +183,7 @@ fn a_saved_route_leaves_out_the_owners() {
         &records,
         &JOURNEY.parse().unwrap(),
         &"vendor-saved".parse().unwrap(),
-        &"Saved".parse().unwrap(),
+        Some(&"Saved".parse().unwrap()),
         &support::fixed_inputs(),
     )
     .unwrap();

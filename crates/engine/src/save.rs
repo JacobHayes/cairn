@@ -23,6 +23,8 @@ use crate::records::Records;
 pub enum DraftError {
     /// The records do not hold the journey.
     JourneyMissing(JourneyId),
+    /// The route does not exist, and the request names no new route to create.
+    RouteMissing(RouteId),
     /// The draft would hold more mutations or items than a proposal may.
     TooLarge,
 }
@@ -31,6 +33,12 @@ impl fmt::Display for DraftError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DraftError::JourneyMissing(id) => write!(formatter, "no journey {id}"),
+            DraftError::RouteMissing(id) => {
+                write!(
+                    formatter,
+                    "route {id} does not exist: name it to create it with the save"
+                )
+            }
             DraftError::TooLarge => {
                 formatter.write_str("the draft passes a proposal's mutation or size limit")
             }
@@ -40,19 +48,21 @@ impl fmt::Display for DraftError {
 
 impl std::error::Error for DraftError {}
 
-/// B8: the proposal that saves a journey as a draft of `route`: created with `name` when
-/// the records hold no such route, or a new draft of it (A11: rejected at apply while
-/// another draft is open). Every violation of a trial apply, with every identity dropped and
-/// nothing more excluded, is listed.
+/// B8: the proposal that saves a journey as a draft of `route`: created, named `name` and
+/// described as the journey is, when the records hold no such route, or a new draft of it
+/// (A11: rejected at apply while another draft is open; `name` is not read then). Every
+/// violation of a trial apply, with every identity dropped and nothing more excluded, is
+/// listed.
 ///
 /// # Errors
 ///
-/// When the journey is not loaded, or the draft passes a proposal's limits.
+/// When the journey is not loaded, the route is not there and `name` is none, or the draft
+/// passes a proposal's limits.
 pub fn save_as_route(
     records: &Records,
     journey: &JourneyId,
     route: &RouteId,
-    name: &Title,
+    name: Option<&Title>,
     inputs: &ApplyInputs,
 ) -> Result<ProposalDraft, DraftError> {
     let held = records
@@ -64,6 +74,7 @@ pub fn save_as_route(
     let existing = records.routes.get(route);
     let mut mutations = Vec::new();
     if existing.is_none() {
+        let name = name.ok_or_else(|| DraftError::RouteMissing(route.clone()))?;
         mutations.push(Mutation::CreateRoute {
             name: name.clone(),
             description: held.header.description.clone(),

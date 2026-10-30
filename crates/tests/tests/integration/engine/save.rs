@@ -21,7 +21,7 @@ fn save(records: &Records) -> ProposalDraft {
         records,
         &journey_id(),
         &SAVED.parse().unwrap(),
-        &"Vendor evaluation, as run".parse().unwrap(),
+        Some(&"Vendor evaluation, as run".parse().unwrap()),
         &support::fixed_inputs(),
     )
     .unwrap()
@@ -170,7 +170,7 @@ fn saving_a_journey_behind_its_route_names_the_retired_keys() {
         &records,
         &journey_id(),
         &"vendor-evaluation".parse().unwrap(),
-        &"Vendor evaluation".parse().unwrap(),
+        None,
         &support::fixed_inputs(),
     )
     .unwrap();

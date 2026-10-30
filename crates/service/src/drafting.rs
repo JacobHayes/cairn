@@ -49,7 +49,9 @@ pub enum ProposeError {
 impl From<DraftError> for ProposeError {
     fn from(error: DraftError) -> Self {
         match error {
-            DraftError::JourneyMissing(_) => ProposeError::Missing(error),
+            DraftError::JourneyMissing(_) | DraftError::RouteMissing(_) => {
+                ProposeError::Missing(error)
+            }
             DraftError::TooLarge => ProposeError::CannotDraft(error),
         }
     }
@@ -173,14 +175,13 @@ impl Service {
         }
         let mutations = patch.mutations.as_slice();
         let save = save_of(&destination, mutations)?;
-        let held = self.store.proposal(id).await?;
         let Some(revision) = proposing.revision else {
             // A create, or its resubmission after a lost answer.
             return self
                 .create_proposed(call, submitted, &destination, id, save)
                 .await;
         };
-        let Some(held) = held else {
+        let Some(held) = self.store.proposal(id).await? else {
             return Err(ProposeError::refused(
                 "proposal_revision",
                 format!(
@@ -241,21 +242,9 @@ impl Service {
             {
                 return Ok(answer);
             }
-            let name = match name {
-                Some(name) => name,
-                None => match self.route(&route).await? {
-                    Some(found) => found.header.name,
-                    None => {
-                        return Err(ProposeError::refused(
-                            "mutations",
-                            format!(
-                                "route {route} does not exist: create_route comes before the save"
-                            ),
-                        ));
-                    }
-                },
-            };
-            let draft = self.draft_save(call, &journey, &route, &name).await?;
+            let draft = self
+                .draft_save(call, &journey, &route, name.as_ref())
+                .await?;
             if draft.destination_revision != patch.base_revision {
                 return Err(self
                     .stale_save(destination, &draft, patch.base_revision)
@@ -396,14 +385,8 @@ impl Service {
                 route,
                 name,
             } => {
-                let name = match name {
-                    Some(name) => name,
-                    None => match self.route(&route).await? {
-                        Some(found) => found.header.name,
-                        None => held.draft.title.clone(),
-                    },
-                };
-                self.draft_save(call, &journey, &route, &name).await?
+                self.draft_save(call, &journey, &route, name.as_ref())
+                    .await?
             }
             Drafted::Other => ProposalDraft {
                 destination_revision: self.current_revision(&held.destination).await?,
@@ -424,7 +407,7 @@ impl Service {
         call: &Call,
         journey: &JourneyId,
         route: &RouteId,
-        name: &Title,
+        name: Option<&Title>,
     ) -> Result<ProposalDraft, ProposeError> {
         let records = load::drafting(&*self.store, journey, route).await?;
         let inputs = self.drafting_inputs(call);
@@ -452,47 +435,44 @@ fn save_of(
     destination: &Domain,
     mutations: &[Mutation],
 ) -> Result<Option<(JourneyId, RouteId, Option<Title>)>, ProposeError> {
-    let Some(at) = mutations.iter().position(|mutation| {
-        matches!(
-            mutation,
+    let (name, journey) = match mutations {
+        [
+            Mutation::CreateRoute {
+                name,
+                description: None,
+            },
             Mutation::OpenDraft {
-                source: DraftSource::SaveAsRoute { .. }
-            }
-        )
-    }) else {
-        return Ok(None);
+                source: DraftSource::SaveAsRoute { journey },
+            },
+        ] => (Some(name), journey),
+        [
+            Mutation::OpenDraft {
+                source: DraftSource::SaveAsRoute { journey },
+            },
+        ] => (None, journey),
+        _ if mutations.iter().any(|mutation| {
+            matches!(
+                mutation,
+                Mutation::OpenDraft {
+                    source: DraftSource::SaveAsRoute { .. }
+                }
+            )
+        }) =>
+        {
+            return Err(ProposeError::refused(
+                "mutations",
+                "a save as route is an open_draft from a journey, after a create_route that names the route when it does not exist yet (its description is the journey's), and nothing else",
+            ));
+        }
+        _ => return Ok(None),
     };
-    let Mutation::OpenDraft {
-        source: DraftSource::SaveAsRoute { journey },
-    } = &mutations[at]
-    else {
-        unreachable!("the position found a save");
-    };
-    let (Domain::Route(route), name) = (
-        destination,
-        match &mutations[..at] {
-            [] => None,
-            [Mutation::CreateRoute { name, .. }] => Some(name.clone()),
-            _ => {
-                return Err(ProposeError::refused(
-                    "mutations",
-                    "a save as route is an open_draft from a journey, after a create_route when the route does not exist yet, and nothing else",
-                ));
-            }
-        },
-    ) else {
+    let Domain::Route(route) = destination else {
         return Err(ProposeError::refused(
             "target",
             "a save as route is written to a route",
         ));
     };
-    if at + 1 != mutations.len() {
-        return Err(ProposeError::refused(
-            "mutations",
-            "a save as route is an open_draft from a journey, after a create_route when the route does not exist yet, and nothing else",
-        ));
-    }
-    Ok(Some((journey.clone(), route.clone(), name)))
+    Ok(Some((journey.clone(), route.clone(), name.cloned())))
 }
 
 /// Whether proposal `held` is what a create under its id asks for: the same destination,
