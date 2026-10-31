@@ -65,7 +65,7 @@ function DraftForm({
   );
 }
 
-const dateInput = (label: string, today: string, zone: string) => (value: string, change: (value: string) => void) => <WhenInput label={label} today={today} value={value} zone={zone} onChange={change} />;
+const dateInput = (label: string, zone: string) => (value: string, change: (value: string) => void) => <WhenInput label={label} value={value} zone={zone} onChange={change} />;
 
 /**
  * F2, E3: the node's pin. A milestone a date decision feeds is pinned only through that
@@ -101,7 +101,7 @@ export function PinEditor({ view, detail }: { view: Ready; detail: NodeDetail })
           form="pin"
           start={current ?? view.key.today}
           label={current === undefined ? "Pin a date" : "Change the pin"}
-          input={dateInput("Pin date", view.derived.today, view.inputs.timezone)}
+          input={dateInput("Pin date", view.inputs.timezone)}
           mutations={set}
         />
         {current === undefined || !write.writable || pinForm.draft !== undefined ? null : (
@@ -165,7 +165,7 @@ export function UntilFields({ view, group, exclude, value, onChange }: { view: R
           ))}
         </div>
       </fieldset>
-      {until === "date" ? <WhenInput label="Snooze until" today={view.derived.today} value={date} zone={view.inputs.timezone} onChange={(next) => { onChange({ date: next }); }} /> : null}
+      {until === "date" ? <WhenInput label="Snooze until" value={date} zone={view.inputs.timezone} onChange={(next) => { onChange({ date: next }); }} /> : null}
       {until === "node" ? <UntilNode view={view} label="Snooze until node" exclude={exclude} value={target} onChange={(next) => { onChange({ target: next }); }} /> : null}
     </>
   );

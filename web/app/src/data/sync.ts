@@ -14,6 +14,7 @@ import { assign, setup, type ActorRefFrom } from "xstate";
 
 import type { SaveEvent } from "./activity.ts";
 import type { Lag } from "./keyed-read.ts";
+import { timeWords } from "../status/when.ts";
 import { plural } from "../ui/words.ts";
 
 /** A write has to take this long to show SAVING, and a refetch to show UPDATING (no flicker). */
@@ -212,9 +213,6 @@ export interface SyncReading {
   latest: SaveEvent | undefined;
 }
 
-/** The wall time of a save, as the chip says it. */
-export const clockWords = (at: Date): string => at.toLocaleTimeString([], { hour12: false });
-
 /** The rule's input from the scheduler's facts and the owners'; the one place the in-flight fact is made. */
 export function syncInputOf(timing: SyncTiming, read: SyncReading): SyncInput {
   return {
@@ -225,7 +223,7 @@ export function syncInputOf(timing: SyncTiming, read: SyncReading): SyncInput {
     problems: read.problems,
     inFlight: read.count > 0 && timing.inFlightSince !== undefined ? { count: read.count, since: timing.inFlightSince } : undefined,
     lag: timing.lag,
-    saved: timing.saved !== undefined && read.latest !== undefined ? { at: timing.saved, time: clockWords(read.latest.at) } : undefined,
+    saved: timing.saved !== undefined && read.latest !== undefined ? { at: timing.saved, time: timeWords(read.latest.at) } : undefined,
     revision: read.revision,
   };
 }

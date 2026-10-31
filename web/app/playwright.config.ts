@@ -22,7 +22,8 @@ export default defineConfig({
   workers: Math.min(availableParallelism(), WORKERS_MAX),
   // A trace is kept only for a failure: a flake in a long run leaves what happened (no measurable cost on green runs).
   // Reduced motion turns the app's motion off (DESIGN, Motion), so nothing a test reads is mid-animation.
-  use: { trace: "retain-on-failure", contextOptions: { reducedMotion: "reduce" } },
+  // A fixed zone and locale, since a time of day is written on the viewer's clock.
+  use: { trace: "retain-on-failure", contextOptions: { reducedMotion: "reduce" }, timezoneId: "UTC", locale: "en-GB" },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     // The structural walks (`mise run screenshots`, `mise run sweep`): not tests of behaviour but

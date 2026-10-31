@@ -1,7 +1,8 @@
 // Dates in plain words, in one place, so no surface prints a bare `Oct 12 · 3d` or an ISO date and
 // every surface says one date the same way: "Due in 3 days", "3 days late", "Decide by Oct 14",
 // "in 18 days (Nov 23)". A date more than two weeks off is a date: the distance is only worth a word
-// while it is near. Pure, so the unit tests check it without a page.
+// while it is near. A day is a calendar day everywhere; a moment is said on the viewer's clock, the
+// browser's zone and hour cycle. Pure but for those two defaults, so the unit tests check it without a page.
 import { dayOf } from "../timeline/model.ts";
 import { plural } from "../ui/words.ts";
 
@@ -13,28 +14,56 @@ export const SOON_DAYS = 7;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** The wall time (`08:15`) of a moment (`2026-10-10T08:15+01:00`), in the deployment's zone; none for a day. */
-export function timeOf(when: string): string | undefined {
-  return when.length > 10 ? when.slice(11, 16) : undefined;
+/** The viewer's time zone and locale: the browser's. */
+const VIEWER = new Intl.DateTimeFormat().resolvedOptions();
+
+/** A clock reading: the calendar day (`2026-10-11`) and the 24-hour wall time (`04:00`). */
+interface Wall {
+  day: string;
+  time: string;
 }
 
-/** ` at 08:15` after a distance in words (`Due tomorrow at 08:15`); nothing for a day. */
-function atTime(when: string): string {
-  const time = timeOf(when);
-  return time === undefined ? "" : ` at ${time}`;
+/** The wall clock in `zone` at `instant` (ms since the epoch), to the minute. */
+export function wallIn(zone: string, instant: number): Wall {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(instant);
+  const field = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return { day: `${field("year")}-${field("month")}-${field("day")}`, time: `${field("hour")}:${field("minute")}` };
 }
 
-/** A calendar date in words: `Oct 6`, with the year (`Oct 6, 2027`) when it is not in `today`'s, or always when there is no `today` to compare with; a moment adds its time (`Oct 6, 08:15`). */
+/** A time of day as the viewer's browser writes one, 12- or 24-hour by its locale, in its zone: the one formatter for every time a screen shows. */
+export function timeWords(at: number | Date, zone: string = VIEWER.timeZone, locale: string = VIEWER.locale): string {
+  return new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone: zone }).format(at);
+}
+
+/** The viewer's date today (`2026-10-10`). */
+export function viewerToday(): string {
+  return wallIn(VIEWER.timeZone, Date.now()).day;
+}
+
+/** Whether `when` is a moment (`2026-10-10T08:15+01:00`) rather than a day. */
+function isMoment(when: string): boolean {
+  return when.length > 10;
+}
+
+/** The viewer's clock at a moment: its day and 24-hour time in `zone` (the viewer's), as a date and a time input hold them; none for a day, which is a calendar day everywhere. */
+export function localWall(when: string, zone: string = VIEWER.timeZone): Wall | undefined {
+  return isMoment(when) ? wallIn(zone, Date.parse(when)) : undefined;
+}
+
+/** A calendar date in words: `Oct 6`, with the year (`Oct 6, 2027`) when it is not in `today`'s, or always when there is no `today` to compare with; a moment is said on the viewer's date and clock (`Oct 6, 4:00 PM`). */
 export function dateWords(date: string, today?: string): string {
-  const parsed = new Date(`${date.slice(0, 10)}T00:00:00Z`);
+  const day = localWall(date)?.day ?? date.slice(0, 10);
+  const parsed = new Date(`${day}T00:00:00Z`);
   const words = `${MONTHS[parsed.getUTCMonth()] ?? ""} ${String(parsed.getUTCDate())}`;
-  const day = today !== undefined && date.slice(0, 4) === today.slice(0, 4) ? words : `${words}, ${String(parsed.getUTCFullYear())}`;
-  const time = timeOf(date);
-  return time === undefined ? day : `${day}, ${time}`;
+  const said = today !== undefined && day.slice(0, 4) === today.slice(0, 4) ? words : `${words}, ${String(parsed.getUTCFullYear())}`;
+  return isMoment(date) ? `${said}, ${timeWords(Date.parse(date))}` : said;
 }
 
-/** A date as `dateWords` says it (`Oct 6`, `Oct 6, 2027`, with a time `Oct 6, 08:15`), or a time of day (`08:15`). */
-const DATE_OR_TIME = new RegExp(`\\b(?:${MONTHS.join("|")}) \\d{1,2}(?:, \\d{4})?(?:, \\d{2}:\\d{2})?|\\b\\d{2}:\\d{2}\\b`, "g");
+/** A time of day in either hour cycle: `04:00`, `4:00 AM`, `4:00 p.m.`. */
+const TIME = String.raw`\d{1,2}:\d{2}(?:\s?[AaPp]\.?[Mm]\b\.?)?`;
+
+/** A date as `dateWords` says it (`Oct 6`, `Oct 6, 2027`, with a time `Oct 6, 4:00 PM`), or a time of day alone. */
+const DATE_OR_TIME = new RegExp(`\\b(?:${MONTHS.join("|")}) \\d{1,2}(?:, \\d{4})?(?:, ${TIME})?|\\b${TIME}`, "g");
 
 /** `words` cut into its plain stretches and the dates and times in it (`date`), so a screen sets only those in mono (DESIGN, Dates). */
 export function dateParts(words: string): { text: string; date: boolean }[] {
@@ -50,28 +79,29 @@ export function dateParts(words: string): { text: string; date: boolean }[] {
   return at < words.length ? [...parts, { text: words.slice(at), date: false }] : parts;
 }
 
+/** The UTC offset `zone` has at `instant`, in minutes. */
+function offsetAt(zone: string, instant: number): number {
+  const wall = wallIn(zone, instant);
+  return Math.round((Date.parse(`${wall.day}T${wall.time}:00Z`) - Math.floor(instant / 60_000) * 60_000) / 60_000);
+}
+
 /**
- * A moment's day and time of day in `zone` as the engine stores it: the wall time and the zone's UTC offset then
- * (`2026-10-10T08:15+01:00`). A wall time that happens twice (the clocks go back) reads as its first time, and one that
- * is skipped (they go forward) as the time that many minutes on.
+ * The value the engine stores for a day and time of day read on the clock of `viewer` (the viewer's zone): the same
+ * instant as the wall time in `deployment` and that zone's UTC offset then (`2026-10-10T08:15+01:00`). A wall time that
+ * happens twice (the clocks go back) reads as its first time, and one that is skipped (they go forward) as the time
+ * that many minutes on.
  */
-export function momentIn(zone: string, day: string, time: string): string {
+export function momentFrom(deployment: string, day: string, time: string, viewer: string = VIEWER.timeZone): string {
   const wall = Date.parse(`${day}T${time}:00Z`);
-  const offsetAt = (instant: number): number => {
-    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(instant));
-    const field = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
-    const shown = Date.UTC(field("year"), field("month") - 1, field("day"), field("hour"), field("minute"), field("second"));
-    return Math.round((shown - Math.floor(instant / 1000) * 1000) / 60_000);
-  };
   const DAY = 86_400_000;
-  // The offsets either side of a change; each that reads the wall time as written holds.
-  const around = [offsetAt(wall - DAY), offsetAt(wall + DAY)];
-  const holding = around.filter((minutes) => offsetAt(wall - minutes * 60_000) === minutes);
+  // The viewer's offsets either side of a change; each that reads the wall time as written holds.
+  const around = [offsetAt(viewer, wall - DAY), offsetAt(viewer, wall + DAY)];
+  const holding = around.filter((minutes) => offsetAt(viewer, wall - minutes * 60_000) === minutes);
   const instant = wall - (holding.length > 0 ? Math.max(...holding) : Math.min(...around)) * 60_000;
-  const minutes = offsetAt(instant);
-  const shown = new Date(instant + minutes * 60_000).toISOString();
+  const minutes = offsetAt(deployment, instant);
+  const stored = wallIn(deployment, instant);
   const pad = (count: number) => String(Math.abs(count)).padStart(2, "0");
-  return `${shown.slice(0, 10)}T${shown.slice(11, 16)}${minutes < 0 ? "-" : "+"}${pad(Math.trunc(minutes / 60))}:${pad(minutes % 60)}`;
+  return `${stored.day}T${stored.time}${minutes < 0 ? "-" : "+"}${pad(Math.trunc(minutes / 60))}:${pad(minutes % 60)}`;
 }
 
 /** The text of a lateness in days: a time that has passed today is late by no days. */
@@ -119,23 +149,27 @@ export function relativeDays(days: number): string {
 /**
  * When a node is due, in words: late once the engine says so (`late`, its days overdue), a
  * distance while it is near, a date after that. A decision is decided by a date, not due on it.
+ * A moment is named by its date and time: a distance counts the deployment's days, which the
+ * viewer's clock need not share.
  */
 export function dueWords(date: string, today: string, decision: boolean, late: number | undefined): string {
   if (late !== undefined) {
     return lateWords(late);
   }
   const days = daysUntil(date, today);
-  const at = atTime(date);
   if (decision) {
-    return days === 0 ? `Decide today${at}` : `Decide by ${dateWords(date, today)}`;
+    return days === 0 && !isMoment(date) ? "Decide today" : `Decide by ${dateWords(date, today)}`;
+  }
+  if (isMoment(date)) {
+    return `Due ${dateWords(date, today)}`;
   }
   if (days === 0) {
-    return `Due today${at}`;
+    return "Due today";
   }
   if (days === 1) {
-    return `Due tomorrow${at}`;
+    return "Due tomorrow";
   }
-  return days > 0 && days <= NEAR_DAYS ? `Due in ${daysWords(days)}${at}` : `Due ${dateWords(date, today)}`;
+  return days > 0 && days <= NEAR_DAYS ? `Due in ${daysWords(days)}` : `Due ${dateWords(date, today)}`;
 }
 
 /** Where an effective date comes from: a recorded actual, a pin, or worked out from the plan (the engine's `DateOrigin`, or the inspector's bound origin). */
@@ -157,12 +191,16 @@ export function originWord(origin: Origin): string {
 /**
  * A milestone's date as a reader weighs it, the nearness first and the calendar date after it, so
  * it reads right after a verb title or a noun title: `in 18 days (Nov 23)`, `3 days late (Oct 2)`,
- * `today (Oct 6)`; an actual date is `done Nov 20` (never late). `late` is the engine's days overdue.
+ * `today (Oct 6)`; a moment is its date and time alone (`Nov 23, 9:30 AM`), as in `dueWords`; an
+ * actual date is `done Nov 20` (never late). `late` is the engine's days overdue.
  */
 export function whenWords(date: string, origin: Origin | undefined, today: string, late: number | undefined): string {
   const when = dateWords(date, today);
   if (origin === "actual") {
     return `done ${when}`;
   }
-  return late !== undefined ? `${lateWords(late)} (${when})` : `${relativeDays(daysUntil(date, today))} (${when})`;
+  if (late !== undefined) {
+    return `${lateWords(late)} (${when})`;
+  }
+  return isMoment(date) ? when : `${relativeDays(daysUntil(date, today))} (${when})`;
 }

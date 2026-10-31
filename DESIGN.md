@@ -91,7 +91,7 @@ Screen code uses tokens only: no raw hex, no radius above `--radius-lg`, no own 
 - **Rank tag and hanging tag.** Small labels off a card's corners for rank and transient lens information; each slot has one owner.
 - **Nothing spills out of its box.** Every box holds its content; text is never cut without an ellipsis or clamp mark. Only tags, badges, handles, popovers, menus and tooltips overhang, each marked `data-overhang`. Text yields before controls: controls and chips never shrink. Browser tests enforce it on every screen, and the stress journey holds the worst content the limits allow.
 - **Names, not keys.** No screen, tooltip or error prints an internal key, digest, or revision number where a name belongs. What is gone is said in words ("someone no longer here"). Browser tests enforce it.
-- **Dates.** Words first: `Decide by Oct 14`, `Due in 3 days`, `3 days late`. The year only when it is not this year; ISO only in tooltips. Source words: `pinned`, `recorded`, `worked out`. Soon in warning ink, overdue in error ink, always with words. A time of day follows its date in 24-hour mono, only where the date has one.
+- **Dates.** Words first: `Decide by Oct 14`, `Due in 3 days`, `3 days late`. The year only when it is not this year; ISO only in tooltips. Source words: `pinned`, `recorded`, `worked out`. Soon in warning ink, overdue in error ink, always with words. A date with a time of day is named, never counted in days; the time follows the date in mono, written on the viewer's clock: their zone, and 12- or 24-hour as their browser writes it.
 
 ## Charts and graphs
 

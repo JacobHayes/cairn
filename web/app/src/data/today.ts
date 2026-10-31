@@ -2,16 +2,11 @@
 // host computed in the deployment's time zone, so when that date passes, or the next time of
 // day that would change the derivation, the shell refetches what it holds. The browser's Intl knows every zone, so the page can tell when it passes.
 
+import { wallIn } from "../status/when.ts";
+
 /** The date (YYYY-MM-DD) it is at `at` in `zone`, an IANA time zone name. */
 export function todayIn(zone: string, at: Date): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: zone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(at);
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((found) => found.type === type)?.value ?? "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
+  return wallIn(zone, at.getTime()).day;
 }
 
 /**

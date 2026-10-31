@@ -12,7 +12,7 @@ import { Link, useNavigate } from "react-router";
 import { pathTo } from "../address.ts";
 import type { SaveEvent } from "../data/activity.ts";
 import { useCapabilities, useDerivation, useProblems, useSaves, useSavedAnnouncement, useSession, useSettled, useSkew, useStreamStatus, useSync } from "../data/react.ts";
-import { dateWords } from "../status/when.ts";
+import { dateWords, timeWords } from "../status/when.ts";
 import type { Problem, SyncSummary } from "../data/sync.ts";
 import { Button } from "../ui/kit.tsx";
 import { place, windowBounds } from "../ui/place.ts";
@@ -78,7 +78,7 @@ function Recent({ saves, onGo }: { saves: readonly SaveEvent[]; onGo: () => void
         <ul>
           {saves.map((save) => (
             <li key={save.id} data-testid="sync-recent">
-              <span className="mono small muted">{save.at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}</span> {save.text}
+              <span className="mono small muted">{timeWords(save.at)}</span> {save.text}
               {save.warning === undefined ? null : <span className="small muted sync-warning">{save.warning}</span>}
               {save.address === undefined ? null : (
                 <>

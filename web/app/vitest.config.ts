@@ -4,6 +4,11 @@
 // each start a `cairn demo` from the binary the run builds (src/demo.global-setup.ts).
 import { defineConfig } from "vitest/config";
 
+// A time of day is written on the viewer's clock, the zone and locale the process starts with, so
+// the tests fix both; the worker processes inherit them.
+process.env["TZ"] = "UTC";
+process.env["LC_ALL"] = "en_US.UTF-8";
+
 export default defineConfig({
   test: { include: ["src/**/*.test.ts", "src/**/*.test.tsx"], environment: "node", globalSetup: ["src/demo.global-setup.ts"], setupFiles: ["src/canvas/measure.test-support.ts"] },
 });
