@@ -9,7 +9,7 @@ import { Link, Outlet, useLocation } from "react-router";
 import { pathTo, sectionOf } from "../address.ts";
 import { HOME_PATH, indexPath } from "../journeys/address.ts";
 import { ROUTES_INDEX_PATH } from "../routes/address.ts";
-import { FrameActionsContext, FrameStateContext } from "./frame.tsx";
+import { FrameActionsContext, FrameStateContext, SHEET, useMedia } from "./frame.tsx";
 import { InspectorColumn } from "./InspectorColumn.tsx";
 import { KeysHint } from "./KeysHint.tsx";
 import { Tour, TourProvider, useTour } from "../tour/Tour.tsx";
@@ -73,6 +73,8 @@ export function Shell() {
   const { pathname, search } = useLocation();
   const frame = useFrame();
   const ask = useNameAsk();
+  // A full sheet covers the workspace whole: what is under it is out of reach, by keyboard too.
+  const covered = useMedia(SHEET) && frame.open && !frame.folded && frame.snap === "full";
   return (
     <TipLayer>
     <PointedProvider>
@@ -84,7 +86,7 @@ export function Shell() {
           <NamePrompt ask={ask} />
           <main className="workspace" data-screen={`${pathname}${search}`}>
             <Tour />
-            <div className="ws-body">
+            <div className="ws-body" inert={covered}>
               <LoadFailure screen={pathname}>
                 <Suspense fallback={<Pending>Loading...</Pending>}>
                   <Outlet />

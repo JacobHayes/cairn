@@ -29,6 +29,9 @@ export const PHONE_WIDTH = `(max-width: ${String(DESKTOP_MIN - 1)}px)`;
 /** A window too short for the tour's guidance to sit above or below a card and leave the card room: it sits beside it. */
 export const SHORT = "(max-height: 479px)";
 
+/** A phone either way up: narrow, or turned and short. */
+export const PHONE = `${PHONE_WIDTH}, ${SHORT}`;
+
 /** Whether the window matches `query` now, and as it changes. */
 export function useMedia(query: string): boolean {
   return useSyncExternalStore(

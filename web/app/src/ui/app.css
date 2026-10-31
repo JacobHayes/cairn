@@ -9,11 +9,11 @@
   --popover-w: 360px; /* the sync and keys popovers' width */
   --fold-w: 32px; /* the hidden inspector's rail */
   --inspector-pad: 20px; /* where the inspector's cards and the assistant start their content (DESIGN, More air) */
-  /* The sheet's three heights (below 1100px): the peek is its head alone (the tabs and the grip), clear of the home indicator; the tall one leaves room above it for a notice: a window's worth, less a notice. The pill is the closed sheet's one control. */
+  /* The sheet's three heights (below 1100px): the peek is its head alone (the tabs and the grip), clear of the home indicator; the tall one is the whole workspace, below a phone's top bar. The pill is the closed sheet's one control. */
   --sheet-head: calc(var(--touch-target) + 1px); /* a touch-sized row and its rule */
   --sheet-peek: calc(var(--sheet-head) + env(safe-area-inset-bottom, 0px));
   --sheet-half: 40dvh;
-  --sheet-full: min(85dvh, calc(100dvh - 160px));
+  --sheet-full: 100dvh;
   --sheet-pill: calc(56px + env(safe-area-inset-bottom, 0px));
   /* DESIGN's four corner ticks (L-shaped, 8px, inset 3px) as background layers, for the ruled canvases: the graph and the timeline. */
   --corner-ticks:
@@ -609,6 +609,10 @@ body {
   .frame > .inspector {
     left: 0;
   }
+  /* The top bar stays in view over a full sheet: a touch-target row and its rule (base.css). */
+  .frame {
+    --sheet-full: calc(100dvh - var(--touch-target) - 1px);
+  }
 }
 
 /* ---- the toast and callouts ------------------------------------------------------------------- */
@@ -628,6 +632,10 @@ body {
 @media (max-width: 1099px) {
   .frame:not([data-inspector="off"]) .toasts {
     bottom: calc(var(--sheet-covers) + var(--space-3));
+  }
+  /* A full sheet is the whole workspace: the toast rises over its foot. */
+  .frame[data-sheet="full"][data-inspector="on"] .toasts {
+    bottom: var(--space-3);
   }
 }
 /* The design's toast is fixed to the window; here the container places it, and the pointer pauses it. */

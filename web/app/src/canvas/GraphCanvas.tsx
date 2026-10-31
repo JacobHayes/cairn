@@ -2,8 +2,9 @@
 // the edges ELK routed (ARCHITECTURE, Web UI: Canvas), over cards and lines already laid out.
 // Nothing is dragged (layout is automatic, C15; pinned positions are Later), nothing animates
 // (C6), and the view fits when what it shows changes (a step, an expand or a collapse), not on
-// every revision, so a live edit never jumps the viewport. It opens fitted to the whole drawn
-// graph, as `f` and the Fit button do, unless it is given nodes to open on (`firstFit`).
+// every revision, so a live edit never jumps the viewport. It opens on the nodes it is given
+// (`firstFit`) with as much of the graph as stays readable: the whole of it, as `f` and the
+// Fit button show it, when that reads.
 //
 // Input: a drag or two-finger scroll pans freely, the wheel alone never zooms, a
 // pinch or Ctrl/Cmd+wheel zooms at the pointer, a double-click zooms into a container. Zoom only
@@ -26,7 +27,7 @@ import { headHeight } from "./cards.ts";
 import { dateRoutes } from "./dateRoutes.ts";
 import { DateEdgeLine, EdgeLine, type Box, type DateEdge, type LineEdge } from "./EdgeLine.tsx";
 import { usePointedNode } from "./pointed.tsx";
-import { NEAR_ZOOM, firstFrame, fitZoom, listenPinch, minZoomOf, roomOf, shiftInto, viewportAround } from "./gestures.ts";
+import { NEAR_ZOOM, firstFrame, fitZoom, listenPinch, minZoomOf, roomOf, shiftInto, unionOf, viewportAround, zoomFitting } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
 import { fadedCards } from "./look.ts";
@@ -89,7 +90,7 @@ export interface GraphCanvasProps {
    */
   selection?: { picked: ReadonlySet<string>; members: readonly string[]; toggle: (key: string) => void; set: (keys: string[]) => void } | undefined;
   reveal?: Reveal | undefined;
-  /** The nodes the view first opens framed on (a proposal's changes, in the rail's order: see `firstFrame`), with the whole graph when none is drawn; none yet (an empty list) holds the first fit back. Fit still fits all. */
+  /** The nodes the view first opens framed on, in order (a proposal's changes, or the ranked work: see `firstFrame`), taking in the whole graph when it still reads, and the whole graph when none is drawn; none yet (an empty list) holds the first fit back. Fit still fits all. */
   firstFit?: readonly string[] | undefined;
   /** What sits over the canvas: the Signal button, Reveal. A new view mounts it afresh. */
   children?: ReactNode;
@@ -339,6 +340,12 @@ function onNextFrame(work: (step: Promise<unknown>) => void, move: () => Promise
   };
 }
 
+/** Where the layout put card `id` on the canvas, as one box or none: hidden inside a tile or not (a card inside a tile is not measured, so its laid-out size is read). */
+function cardBox(flow: ReturnType<typeof useReactFlow>, id: string): { x: number; y: number; width: number; height: number }[] {
+  const card = flow.getInternalNode(id);
+  return card === undefined ? [] : [{ ...card.internals.positionAbsolute, width: card.measured.width ?? card.width ?? 0, height: card.measured.height ?? card.height ?? 0 }];
+}
+
 /**
  * A fit the viewer asks for (the `f` key, the Fit button, an expanded container): the whole graph,
  * or `nodes` alone at no more than full size, measured when it runs and padded for the sheet or
@@ -357,19 +364,15 @@ function useFit(table: TileTable): (nodes?: string | readonly string[]) => Promi
       if (nodes === undefined) {
         return flow.fitView({ ...FIT, padding });
       }
-      // The cards asked for, hidden inside a tile or not, are framed by where the layout put them (fitView leaves a hidden node out; a card inside a tile is not measured, so its laid-out size is read).
-      const frames = wanted.flatMap((id) => {
-        const each = flow.getInternalNode(id);
-        return each === undefined ? [] : [{ x: each.internals.positionAbsolute.x, y: each.internals.positionAbsolute.y, width: each.measured.width ?? each.width ?? 0, height: each.measured.height ?? each.height ?? 0 }];
-      });
+      // The cards asked for, hidden inside a tile or not, are framed by where the layout put them (fitView leaves a hidden node out).
+      const frames = wanted.flatMap((id) => cardBox(flow, id));
       if (frames.length === 0) {
         return flow.fitView({ ...FIT, padding });
       }
-      const [left, top] = [Math.min(...frames.map((frame) => frame.x)), Math.min(...frames.map((frame) => frame.y))];
-      const frame = { x: left, y: top, width: Math.max(...frames.map((each) => each.x + each.width)) - left, height: Math.max(...frames.map((each) => each.y + each.height)) - top };
+      const frame = frames.reduce(unionOf);
       const { width, height } = store.getState();
       const room = roomOf({ width, height }, PAD, covered);
-      const fits = Math.min(1, (room.right - room.left) / Math.max(1, frame.width), (room.bottom - room.top) / Math.max(1, frame.height));
+      const fits = zoomFitting(frame, room);
       // One card framed alone lands at least at the zoom it is drawn as itself at (a container opened, a card readable), so it is not left inside a tile.
       return flow.setViewport(viewportAround(frame, Math.max(wanted.length === 1 && wanted[0] !== undefined ? drawnZoomOf(table, wanted[0]) : 0, fits), room));
     },
@@ -378,18 +381,16 @@ function useFit(table: TileTable): (nodes?: string | readonly string[]) => Promi
 }
 
 /**
- * Below 1100px the inspector is a sheet over the page, and over the canvas's lower
- * part where the canvas reaches it: a node picked is brought into the band the sheet leaves, less the zones the floating controls
- * keep (PAD), by the least move (none if it is already whole in it), so the selection is never under the sheet and the view keeps its neighbours.
+ * A node picked (on the canvas, from a list or a proposal's rail) is brought into the room the canvas leaves, less the zones the floating controls
+ * keep (PAD) and, below 1100px, the inspector's sheet over its lower part, by the least move (none if it is already whole in it), so the selection is never off the view or under the sheet and the view keeps its neighbours.
  */
-function useCenterAboveSheet(selected: string | undefined, layered: boolean, table: TileTable): void {
+function useKeepPickInView(selected: string | undefined, table: TileTable): void {
   const flow = useReactFlow();
   const store = useStoreApi();
   const sheet = useFrameState()?.inspector?.parentElement;
   const work = useWork();
   useEffect(() => {
-    // Under a proposal's layer the rail's rows pick nodes the view may not show, in a column as on a sheet.
-    if (selected === undefined || ((sheet === null || sheet === undefined || !isSheet(sheet)) && !layered)) {
+    if (selected === undefined) {
       return undefined;
     }
     // After the commit that shows the sheet, so its height is there to read.
@@ -555,7 +556,7 @@ function useZoomRange(props: GraphCanvasProps, root: RefObject<HTMLDivElement | 
 }
 
 /**
- * The first fit, once the canvas has a size and its cards are in: the whole drawn graph, or under a proposal's layer the changed cards (`firstFit`, in the rail's order) in the room the sheet or rail leaves (see `firstFrame`).
+ * The first fit, once the canvas has a size and its cards are in: the `firstFit` cards in order, then the whole drawn graph, framed by `firstFrame` in the room the sheet or rail leaves, so the view opens readable on what it was given and shows the whole graph where that reads; with none of them drawn, the whole graph.
  */
 function useFirstFit(props: GraphCanvasProps, fit: number): void {
   const flow = useReactFlow();
@@ -566,7 +567,7 @@ function useFirstFit(props: GraphCanvasProps, fit: number): void {
   const target = firstFitCards(props.firstFit, props.model.cards);
   const work = useWork();
   useEffect(() => {
-    // The layer's rail is what the room is measured against, and its changes are what is framed: wait for both (an empty `firstFit` is the changes not yet known), so the cards are not framed under a sheet that is not there yet or before they are drawn.
+    // The sheet or the layer's rail is what the room is measured against: wait for it and for the cards to frame (an empty `firstFit` is the changes not yet known), so the cards are not framed under a sheet that is not there yet or before they are drawn.
     if (!initialized || !sized || done.current || (target !== undefined && sheet === undefined) || props.firstFit?.length === 0) {
       return;
     }
@@ -575,11 +576,9 @@ function useFirstFit(props: GraphCanvasProps, fit: number): void {
     const { width, height, domNode } = store.getState();
     // Where the inspector's sheet lies over the canvas's lower part, fit into what it leaves.
     const covered = coveredBy(sheet, domNode);
-    const boxes = (target ?? []).flatMap((id) => {
-      const card = flow.getInternalNode(id);
-      return card === undefined ? [] : [{ ...card.internals.positionAbsolute, width: card.measured.width ?? 0, height: card.measured.height ?? 0 }];
-    });
-    const frame = firstFrame(boxes, roomOf({ width, height }, PAD, covered));
+    const boxes = (target ?? []).flatMap((id) => cardBox(flow, id));
+    const whole = props.model.cards.filter((card) => card.parent === undefined).flatMap((card) => cardBox(flow, card.key));
+    const frame = boxes.length === 0 || whole.length === 0 ? undefined : firstFrame([...boxes, whole.reduce(unionOf)], roomOf({ width, height }, PAD, covered));
     if (frame !== undefined) {
       void flow.setViewport(frame);
       return;
@@ -604,10 +603,7 @@ function useTourFraming(framing: Framing | undefined, layout: Layout): void {
     if (framing === undefined || !initialized || !sized || done.current === framing.id) {
       return undefined;
     }
-    const boxes = framing.cards.flatMap((id) => {
-      const card = flow.getInternalNode(id);
-      return card === undefined ? [] : [{ ...card.internals.positionAbsolute, width: card.measured.width ?? 0, height: card.measured.height ?? 0 }];
-    });
+    const boxes = framing.cards.flatMap((id) => cardBox(flow, id));
     const first = framing.cards[0];
     if (first === undefined || flow.getInternalNode(first) === undefined) {
       return undefined;
@@ -896,7 +892,7 @@ function Flow(props: GraphCanvasProps) {
   useFirstFit(props, fit);
   useTourFraming(useFraming(), props.layout);
   useZoomVariable(root);
-  useCenterAboveSheet(props.selected, props.firstFit !== undefined, table);
+  useKeepPickInView(props.selected, table);
   useReveal(props.reveal, props.model, table);
   useCanvasKeys(props, table);
   useTileFocus(root, tiling);

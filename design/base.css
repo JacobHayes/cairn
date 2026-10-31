@@ -1140,7 +1140,7 @@ svg.chart .datum-line {
   .shell:has(> .inspector) {
     display: block;
   }
-  /* The top bar is one row of tabs (Plex Sans, sentence case, a 44px target) and the sync dot: the brand is the Home tab's job, and You and the keys hint are for other widths (You is in the sync popover). */
+  /* The top bar is one row of tabs (Plex Sans, sentence case, a touch-target tall) and the sync dot: the brand is the Home tab's job, and You and the keys hint are for other widths (You is in the sync popover). */
   .rail {
     position: sticky;
     z-index: 5;
@@ -1170,7 +1170,7 @@ svg.chart .datum-line {
   }
   .rail nav a {
     align-items: center;
-    min-height: 44px;
+    min-height: var(--touch-target);
     padding: 0 10px;
     border-left: 0;
     border-bottom: 2px solid transparent;
@@ -1182,8 +1182,8 @@ svg.chart .datum-line {
     border-bottom-color: var(--chrome-brand);
   }
   .rail .sync {
-    width: 44px;
-    min-height: 44px;
+    width: var(--touch-target);
+    min-height: var(--touch-target);
   }
   .rail > button {
     width: auto;

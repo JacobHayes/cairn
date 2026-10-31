@@ -97,7 +97,16 @@ export function PhoneDue({ view, line, fact }: { view: Ready; line: Line; fact: 
     return null;
   }
   // The fact under the title already says it when it is the due words ("14 days late").
-  return said.words === fact ? null : <span className={`list-due-phone small ${said.ink ?? "muted"}`}><Words text={said.words} /></span>;
+  return said.words === fact ? null : <span className={`list-due-phone ${said.ink ?? "muted"}`}><Words text={said.words} /></span>;
+}
+
+/** Who owns a row: its owners' names, "No owner" for unowned work, else nothing. */
+function Owner({ line, context }: { line: Line; context: CellContext }) {
+  const { row } = line;
+  if (row === undefined) {
+    return null;
+  }
+  return (row.owners ?? []).length > 0 ? ownerWords(context.view, row.owners, context.viewer) : row.unassigned === true ? <span className="list-unassigned">{NO_OWNER}</span> : null;
 }
 
 /** How far a container is, and the one thing beneath it that needs attention. */
@@ -128,7 +137,7 @@ function Fact({ line, context }: { line: Line; context: CellContext }) {
   );
 }
 
-/** C10: under a frontier row's title, why it is there and its primary action; the Owner column says who, so the action leaves the owner out unless there is none. */
+/** C10: under a frontier row's title, why it is there and its primary action; the Owner column (or, narrow, the line under the title) says who, so the action leaves the owner out. */
 function Acting({ line, context }: { line: Line; context: CellContext }) {
   const addresses = useNodeAddresses();
   return line.row === undefined ? null : (
@@ -155,7 +164,13 @@ function Title({ line, context }: { line: Line; context: CellContext }) {
         {acting ? <Acting line={line} context={context} /> : tree ? (line.container ? <Progress view={view} line={line} /> : null) : <Under view={view} line={line} />}
         <Return view={view} line={line} />
         <Scheduled view={view} line={line} />
-        <PhoneDue view={view} line={line} fact={acting && line.row !== undefined ? factOf(view, line.row, context.sort ?? "rank")?.words : undefined} />
+        {/* Where the region has no room for the Owner and Due columns, the row says them under its title. */}
+        <span className="list-stacked small">
+          <span className="list-owner-stacked muted">
+            <Owner line={line} context={context} />
+          </span>
+          <PhoneDue view={view} line={line} fact={acting && line.row !== undefined ? factOf(view, line.row, context.sort ?? "rank")?.words : undefined} />
+        </span>
       </div>
     </div>
   );
@@ -209,7 +224,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
   }
   switch (column) {
     case "owner":
-      return (row.owners ?? []).length > 0 ? ownerWords(view, row.owners, context.viewer) : row.unassigned === true ? <span className="list-unassigned">{NO_OWNER}</span> : null;
+      return <Owner line={line} context={context} />;
     case "due":
     {
       const said = row.due == null || !open ? undefined : dueSaid(view, line.key, node.kind, row.due);

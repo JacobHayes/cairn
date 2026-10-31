@@ -131,18 +131,18 @@ export function viewportAround(box: Box, zoom: number, room: Room): { x: number;
 }
 
 /** The zoom at which `box` fits `room`, at most 1. */
-function zoomFitting(box: Box, room: Room): number {
+export function zoomFitting(box: Box, room: Room): number {
   return Math.min(1, (room.right - room.left) / Math.max(1, box.width), (room.bottom - room.top) / Math.max(1, box.height));
 }
 
 /** The smallest box holding both. */
-function unionOf(left: Box, right: Box): Box {
+export function unionOf(left: Box, right: Box): Box {
   const [x, y] = [Math.min(left.x, right.x), Math.min(left.y, right.y)];
   return { x, y, width: Math.max(left.x + left.width, right.x + right.width) - x, height: Math.max(left.y + left.height, right.y + right.height) - y };
 }
 
 /**
- * C14: the view a proposal's layer opens on. The boxes are the changed cards in the rail's order. The first is always framed; each later one is framed with it when all of them still fit `room` at or above `legible` (LEGIBLE_ZOOM unless the caller reads at a lower floor; never zoomed in past 1), so a change next to the first is in view with it, and the others, too far off to read together, are reached from the rail's rows. A first change alone is as large as the room holds it, never below LEGIBLE_ZOOM.
+ * C3, C14: the view a canvas opens on. The boxes are what it opens on, in order: a proposal's changed cards in the rail's order, or the ranked work, then the whole graph. The first is always framed; each later one is framed with it when all of them still fit `room` at or above `legible` (LEGIBLE_ZOOM unless the caller reads at a lower floor; never zoomed in past 1), so what is next to the first is in view with it, the whole graph is shown when it reads, and the rest, too far off to read together, is reached by panning, Fit, or the rail's rows. A first box alone is as large as the room holds it, never below LEGIBLE_ZOOM.
  */
 export function firstFrame(boxes: readonly Box[], room: Room, legible: number = LEGIBLE_ZOOM): { x: number; y: number; zoom: number } | undefined {
   const first = boxes[0];

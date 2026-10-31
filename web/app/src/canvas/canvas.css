@@ -165,7 +165,7 @@
     --lift: var(--sheet-covers);
   }
 
-  /* A full sheet, or one at half on a short window, leaves the canvas a sliver: what floats on it waits until the sheet comes down. */
+  /* A full sheet covers the canvas, and one at half on a short window leaves it a sliver: what floats on it waits until the sheet comes down. */
   .frame[data-sheet="full"][data-inspector="on"] .canvas :is(.react-flow__panel, .canvas-held) {
     visibility: hidden;
   }

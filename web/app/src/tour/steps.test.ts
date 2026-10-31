@@ -8,7 +8,7 @@ import { PRACTICE, practiceMutations } from "./practice.ts";
 import { cardOf, clampCursor, exampleReply, factsOf, rowOf, stepDone, stepsFor, type Facts, type StepId, type Where, type WindowKind } from "./steps.ts";
 
 const { decision, draft, comments, review, summary } = PRACTICE;
-const wide: WindowKind = { phone: false, short: false };
+const wide: WindowKind = { phone: false };
 
 let host: Fixtures;
 const facts = new Map<Stage, Facts>();
@@ -102,8 +102,8 @@ describe("the copy names what is true now", () => {
     expect(step("map").instruction(factsAt("no"), wide)).not.toContain("waits for a decision");
   });
 
-  it("the map in a short window leaves out the cards that window cannot show beside the decision", () => {
-    const text = step("map").instruction(factsAt("created"), { phone: false, short: true });
+  it("the map on a phone leaves out the cards that window cannot show beside the decision", () => {
+    const text = step("map").instruction(factsAt("created"), { phone: true });
     expect(text).toContain(factsAt("created").title(decision));
     expect(text).not.toContain(factsAt("created").title(review));
     expect(text).not.toContain(factsAt("created").title(draft));
@@ -139,7 +139,7 @@ describe("the copy names what is true now", () => {
 
   it("the phone's instruction sends the person to Controls", () => {
     const facts = factsAt("yes");
-    expect(step("frontier").instruction(facts, { phone: true, short: false })).toContain("Controls");
+    expect(step("frontier").instruction(facts, { phone: true })).toContain("Controls");
     expect(step("frontier").instruction(facts, wide)).not.toContain("Controls");
   });
 });

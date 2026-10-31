@@ -242,7 +242,7 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
           }
         }}
         selection={graph.layer === undefined ? { picked: new Set(others.length === 0 ? [] : selection.members), members: selection.members, toggle: selection.toggle, set: selection.set } : { picked: new Set(), members: selection.members, toggle: () => undefined, set: () => undefined }}
-        firstFit={graph.layer === undefined ? undefined : changedKeys(graph.layer)}
+        firstFit={graph.layer === undefined ? (ready.derived.acting_frontier.length === 0 ? undefined : ready.derived.acting_frontier) : changedKeys(graph.layer)}
         reveal={reveal}
         held={
           <>

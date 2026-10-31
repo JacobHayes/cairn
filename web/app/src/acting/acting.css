@@ -304,13 +304,27 @@ summary.node-panel-head {
   justify-content: space-between;
 }
 
+/* Where the region has no room for the Owner and Due columns, a row says them under its title. */
+.list-stacked,
+.list-owner-stacked:empty {
+  display: none;
+}
+
 /* The decision's why gives way when the region cannot hold it: it is narrower than the window by
    the rail, and by the inspector's column while a node is open. The columns Columns adds stay and
-   the region scrolls to them, with Status and Title held at the left. The owner goes with them (the inspector says it), so
-   Status, Title and Due fit. */
+   the region scrolls to them, with Status and Title held at the left. The owner's column goes with
+   them and the owner moves under the title, so Status, Title and Due fit. */
 @container journey-scroll (max-width: 810px) {
   .list-table :is([data-gives-way="true"], [data-column="owner"]) {
     display: none;
+  }
+
+  /* On a line of its own under the action, so a row's title, fact, action, owner and due always stack in that order. */
+  .list-stacked {
+    display: flex;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    column-gap: var(--space-3);
   }
 }
 
@@ -335,10 +349,8 @@ summary.node-panel-head {
     display: none;
   }
 
-  /* On a line of its own under the action, so a row's title, fact, action and due always stack in that order. */
   .list-due-phone {
-    display: block;
-    flex-basis: 100%;
+    display: inline;
   }
 }
 

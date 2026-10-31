@@ -59,7 +59,7 @@ Screen code uses tokens only: no raw hex, no radius above `--radius-lg`, no own 
 
 - **Shell.** A rail on the left, the workspace edge to edge, and an optional inspector for the selection. Rail and inspector are chrome.
 - **One scroller per region.** The document never scrolls; each region's body scrolls once. A gesture surface (graph or timeline) never sits inside a scroller.
-- **Responsive**, from about 390px to 2560px. Below 1100px the inspector is a bottom sheet whose smallest height is its tabs alone; below 720px the rail is a bar across the top and everything else stacks into one column. A phone drops no fact a desktop shows: rows stack instead.
+- **Responsive**, from about 390px to 2560px. Below 1100px the inspector is a bottom sheet whose smallest height is its tabs alone and whose tallest is the whole workspace; below 720px the rail is a bar across the top and everything else stacks into one column. A phone drops no fact a desktop shows: rows stack instead.
 - **Grid.** Modules sit on repeating `minmax(0, 1fr)` columns.
 
 ## Components
@@ -103,8 +103,8 @@ Screen code uses tokens only: no raw hex, no radius above `--radius-lg`, no own 
 - **Edges** are 1px steel at every zoom; kind is line style and end marker, never a label. A line to a hidden node is drawn to what stands for it.
 - **Tracing.** Selecting a node draws what it needs in ink and what it unblocks in accent; everything else goes out of focus.
 - **Date lines** are not edges: dashed, drawn only for the selected node while its dates are open.
-- **The view controls** are one row on every drawn view (Depth, Frontier, Filter, Search); the Summary has none, and a route has no Frontier. What a view cannot honour stays set, disabled with its reason. A count badge says what the settings hide. When nothing is drawn, the view says so and offers to reset.
-- **Fits clear the controls** and always show the whole drawn graph.
+- **The view controls** are one row on every drawn view (Depth, Frontier, Filter, Search), folded into one Controls menu on a phone, either way up; the Summary has none, and a route has no Frontier. What a view cannot honour stays set, disabled with its reason. A count badge says what the settings hide. When nothing is drawn, the view says so and offers to reset.
+- **Fits clear the controls.** Fit shows the whole drawn graph. A view opens on it where it reads, else on the work ranked first at a readable zoom, with as much around it as still reads.
 - A pan is never a click.
 
 ## Accessibility

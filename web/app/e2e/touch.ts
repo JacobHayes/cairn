@@ -194,11 +194,21 @@ function hitBox(control: Control): { left: number; top: number; right: number; b
       [hit.left, hit.top, hit.right, hit.bottom] = [Math.min(hit.left, at.x), Math.min(hit.top, at.y), Math.max(hit.right, at.x + at.width), Math.max(hit.bottom, at.y + at.height)];
     }
   }
-  // What an ancestor that clips shows no more of takes no tap (a scroller is scrolled to the control, so it clips nothing the control is measured at).
+  // What an ancestor that clips shows no more of takes no tap. A scroller is scrolled to the control, so it clips the control only on an axis it does not scroll, and what clips it from above (the edge it scrolls under) not at all.
   for (const up of upFrom(control.part.parent)) {
     const clip = up.box;
-    if (clip !== undefined && /hidden|clip/.test(clip.style["overflow-x"] + clip.style["overflow-y"])) {
-      [hit.left, hit.top, hit.right, hit.bottom] = [Math.max(hit.left, clip.x), Math.max(hit.top, clip.y), Math.min(hit.right, clip.x + clip.width), Math.min(hit.bottom, clip.y + clip.height)];
+    if (clip === undefined) {
+      continue;
+    }
+    const [x, y] = [clip.style["overflow-x"], clip.style["overflow-y"]];
+    if (/hidden|clip/.test(x)) {
+      [hit.left, hit.right] = [Math.max(hit.left, clip.x), Math.min(hit.right, clip.x + clip.width)];
+    }
+    if (/hidden|clip/.test(y)) {
+      [hit.top, hit.bottom] = [Math.max(hit.top, clip.y), Math.min(hit.bottom, clip.y + clip.height)];
+    }
+    if (/auto|scroll/.test(x + y)) {
+      break;
     }
   }
   return hit;

@@ -14,7 +14,7 @@ import { useLocation } from "react-router";
 
 import { useJourney } from "../data/react.ts";
 import { viewStateFrom } from "../journeys/view.ts";
-import { PHONE_WIDTH, SHEET, SHORT, useFrameActions, useFrameState, useMedia } from "../shell/frame.tsx";
+import { PHONE, SHEET, SHORT, useFrameActions, useFrameState, useMedia } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { place, type Rect, type Side } from "../ui/place.ts";
 import type { Framing } from "./presentation.ts";
@@ -406,7 +406,7 @@ export function Overlay({ api, run }: { api: TourApi; run: string }) {
 
 function StepOverlay({ api, run, step }: { api: TourApi; run: string; step: Step }) {
   const { pathname, search } = useLocation();
-  const [phone, short, sheet] = [useMedia(PHONE_WIDTH), useMedia(SHORT), useMedia(SHEET)];
+  const [phone, short, sheet] = [useMedia(PHONE), useMedia(SHORT), useMedia(SHEET)];
   const actions = useFrameActions();
   const view = useJourney(run);
   const [callout, title] = [useRef<HTMLElement>(null), useRef<HTMLHeadingElement>(null)];
@@ -426,7 +426,7 @@ function StepOverlay({ api, run, step }: { api: TourApi; run: string; step: Step
   dockedFor.current = placement.side === "dock" ? dockKey : dockedFor.current;
   useFraming(step, facts, phase, layout, placement, again, api.setFraming);
   useFocusKept(callout, layout?.hole, !lifted && layout?.hole !== undefined);
-  const words = facts === undefined ? "Reading the practice journey..." : ((phase === "reveal" ? step.result?.(facts) : undefined) ?? step.instruction(facts, { phone, short }));
+  const words = facts === undefined ? "Reading the practice journey..." : ((phase === "reveal" ? step.result?.(facts) : undefined) ?? step.instruction(facts, { phone }));
   const missing = layout?.anchor === undefined;
   return (
     <>

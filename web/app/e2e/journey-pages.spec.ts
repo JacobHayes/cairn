@@ -15,6 +15,7 @@ import { expect, test } from "./test.ts";
 
 import { journeyName, setStatus, startJourney } from "./around.ts";
 import { viewportOf } from "./canvas.ts";
+import { LEGIBLE_ZOOM } from "../src/canvas/gestures.ts";
 import { daysAfter, frontierKeys, listKeys, passOrder, select, setFrontier, withFrontier } from "./acting.ts";
 import { expectAddress, fresh, goTo, holdToday, nodeCard, nodePanel, openAt, openFilter, openJourney, readable, setDepth, setFade, settled, whenSettled } from "./shell.ts";
 import { closePopover, filterOf, ownAndPin, search, setCheck, setViewState, VIEWER } from "./view-state.ts";
@@ -216,14 +217,17 @@ async function stockViewAndChips(page: Page): Promise<void> {
   // A journey opens as the stock view, switching views keeps the chips, and coming back to the journey starts over.
   await openJourney(page, "j_vendor_eval", "");
   const depth = page.getByTestId("depth-button");
-  // The stock view: every depth, fitted to the whole graph.
+  // The stock view: every depth, opened readable on the work ranked first, whole inside the canvas.
   await expect(depth).toHaveAccessibleName("Depth: Actions");
-  await expect(nodeCard(page, "n_plan")).toBeVisible();
   await settled(page);
   const opened = await viewportOf(page);
-  await page.keyboard.press("f");
-  await settled(page);
-  expect(await viewportOf(page)).toEqual(opened);
+  expect(opened.zoom).toBeGreaterThanOrEqual(LEGIBLE_ZOOM);
+  const [canvas, first] = await whenSettled(page, () => Promise.all([page.getByTestId("canvas").boundingBox(), page.locator('[data-testid="node-card"]:has([aria-label="ranked 1"])').boundingBox()]));
+  expect(first).not.toBeNull();
+  expect(first?.x).toBeGreaterThanOrEqual(canvas?.x ?? 0);
+  expect((first?.x ?? 0) + (first?.width ?? 0)).toBeLessThanOrEqual((canvas?.x ?? 0) + (canvas?.width ?? 0));
+  expect(first?.y).toBeGreaterThanOrEqual(canvas?.y ?? 0);
+  expect((first?.y ?? 0) + (first?.height ?? 0)).toBeLessThanOrEqual((canvas?.y ?? 0) + (canvas?.height ?? 0));
   // A chip follows a switch of view and back; the pan is the view's own.
   await page.getByTestId("chip-frontier").click();
   await page.mouse.move(600, 500);

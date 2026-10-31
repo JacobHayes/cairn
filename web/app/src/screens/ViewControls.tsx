@@ -4,7 +4,7 @@
 // conditional class and Search; the rest is left out, not disabled (it is not a setting a
 // sibling view of the same subject honours). On the graph the
 // row floats at the canvas's top left; on the list, the
-// timeline and the walk it sits at the top of the pane; on a phone it is one Controls menu in every view. Every control reads and writes the
+// timeline and the walk it sits at the top of the pane; on a phone, either way up, it is one Controls menu in every view. Every control reads and writes the
 // journey's one view state (journeys/view.ts), so it means the same on every view: Depth, Filter
 // and search choose what is drawn, through the engine's level; Frontier only lights what is
 // there, and so does Depth's Fade, which draws every kind and dims those below the depth instead
@@ -25,7 +25,7 @@ import { identityName } from "../detail/sections.tsx";
 import type { Screen } from "../journeys/address.ts";
 import type { HiddenCounts } from "../journeys/requests.ts";
 import { canDraw, fadeOn, FILTER_FLAGS, JOURNEY_OFFERS, RELEVANCE_CLASSES, ROUTE_OFFERS, SCREEN_VIEWS, filterChanged, filterChips, isStock, searchCheck, stockView, useViewState, withViewState, type RelevanceClass, type ViewFilter, type ViewOffers } from "../journeys/view.ts";
-import { useMedia, PHONE_WIDTH } from "../shell/frame.tsx";
+import { useMedia, PHONE } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { ActiveFilters } from "./ActiveFilters.tsx";
 import type { Badge } from "./badge.ts";
@@ -346,7 +346,7 @@ export interface ViewControlsProps {
   end?: ReactNode;
 }
 
-/** The controls on a phone, where a view has room for one button: the same controls in a Controls menu, with the depth and filter badges summed on it, and what the screen puts at the row's end beside it. */
+/** The controls on a phone, either way up, where a view has room for one button: the same controls in a Controls menu, with the depth and filter badges summed on it, and what the screen puts at the row's end beside it. */
 function PhoneControls({ subject, screen, badges, end }: { subject: ViewSubject; screen: Screen; badges: Badges | undefined; end: ReactNode }) {
   const shown = [badges?.depth, badges?.filter].flatMap((badge) => (badge === undefined || badge.count === 0 ? [] : [badge]));
   const total = shown.length === 0 ? undefined : { count: shown.reduce((sum, badge) => sum + badge.count, 0), words: shown.map((badge) => badge.words).join(". ") };
@@ -387,8 +387,7 @@ function PhoneControls({ subject, screen, badges, end }: { subject: ViewSubject;
 
 export function ViewControls({ subject, screen, badges, end }: ViewControlsProps) {
   // A phone has room for one button on every view: the controls fold into a Controls menu.
-  const phone = useMedia(PHONE_WIDTH);
-  if (phone) {
+  if (useMedia(PHONE)) {
     return <PhoneControls subject={subject} screen={screen} badges={badges} end={end} />;
   }
   return (

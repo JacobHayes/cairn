@@ -36,10 +36,9 @@ export interface Facts {
 /** How the screen answers an action that is done: the dimming lifts for the whole screen, or widens to take in the change when it grows out of the action's own box, or there is no action and nothing changes. */
 export type Reveal = "lift" | "widen" | "none";
 
-/** The window the tour is in, as far as its words go: a phone's width, or a window too short to show the cards a sentence compares. */
+/** The window the tour is in, as far as its words go: a phone either way up, whose view controls are one Controls menu and which cannot show the cards a sentence compares. */
 export interface WindowKind {
   phone: boolean;
-  short: boolean;
 }
 
 /** The phone's Controls menu, which holds the Frontier switch. */
@@ -126,9 +125,9 @@ const STEPS: Record<StepId, Step> = {
     revealSheet: "half",
     done: (_facts, where) => where.selected === decision,
     waits: "Select the decision first",
-    instruction: (facts, { phone, short }) => {
+    instruction: (facts, { phone }) => {
       // A window that cannot show the cards the sentence compares gets the shorter sentence.
-      if (phone || short) {
+      if (phone) {
         return `Select ${said(facts, decision)}. Cairn works out each item's state from what depends on what.`;
       }
       const waiting = facts.state(review);
