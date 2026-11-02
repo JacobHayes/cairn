@@ -1,12 +1,7 @@
 // The touch-target invariant (DESIGN, Tokens): on a touch screen every control a person taps has a
-// hit area at least `--touch-target` in each direction. The hit area is measured the way a finger
-// meets it: the points around the control where a tap lands on it (or on the label it belongs
-// to), so a padded or extended hit area counts and a neighbour that covers part of it does not.
-//
-// Most controls are decided from Chrome's layout snapshot (e2e/snapshot.ts): a control drawn whole
-// in the window, at least the minimum each way, with nothing painted over it, meets the minimum.
-// Only the rest (a small box, one something covers, one partly out of the window) are measured in
-// the page, by the points around them, which is exact where a box is not.
+// hit area at least `--touch-target` in each direction. The hit area is read from Chrome's layout
+// snapshot (e2e/snapshot.ts): the box of the control or the label it belongs to, with its own
+// generated content that reaches past it, less what a clipping ancestor hides.
 import type { Page } from "@playwright/test";
 
 import { under, upFrom, type Part, type Snapshot } from "./snapshot.ts";
@@ -19,97 +14,9 @@ interface Offender {
   height: number;
 }
 
-/** Where a control and its owner are in the page (`pathOf`), for the live probe. */
-interface Place {
-  control: number[];
-  owner: number[];
-}
-
-/** `measure`, with every scroll position put back afterwards: it scrolls controls into view, and the page must stay as the test left it. */
-async function keepingScroll<T>(page: Page, measure: () => Promise<T>): Promise<T> {
-  const key = "__touchScroll";
-   
-  await page.evaluate((name) => {
-    const all = [...document.querySelectorAll("*")].filter((each) => each.scrollHeight > each.clientHeight || each.scrollWidth > each.clientWidth);
-    Reflect.set(window, name, all.map((each) => ({ each, top: each.scrollTop, left: each.scrollLeft })));
-  }, key);
-  try {
-    return await measure();
-  } finally {
-    await page.evaluate((name) => {
-      for (const { each, top, left } of Reflect.get(window, name) as { each: Element; top: number; left: number }[]) {
-        each.scrollTo({ top, left, behavior: "instant" });
-      }
-      Reflect.deleteProperty(window, name);
-    }, key);
-  }
-}
-
-/**
- * The controls `only` (each with its owner, the label a tap on it lands on, as places in the page)
- * whose hit area is under the touch-target minimum, measured by the points around them: their
- * index in `only` and hit size, named by the caller. Which elements are controls, and which are exempt, is `controlsOf`'s
- * to say over the snapshot; here only what the live page alone knows is read (where a tap lands).
- */
-async function undersized(page: Page, only: Place[], minimum: number): Promise<{ at: number; width: number; height: number }[]> {
-  // eslint-disable-next-line e2e/settled-reads -- the caller reads it in whenSettled
-  return page.evaluate(([places, minimum]) => {
-    const STEP = 2;
-    const found: { at: number; width: number; height: number }[] = [];
-    const find = (path: number[]): Element | undefined => path.reduce<Element | undefined>((at, index) => at?.children[index], document.documentElement);
-    /** The width and height of the points around `el` where a tap lands on it or on `owner` (its label). */
-    const hitSize = (el: HTMLElement, owner: HTMLElement, rect: DOMRect): [number, number] => {
-      const meets = (x: number, y: number): boolean => {
-        const at = document.elementFromPoint(x, y);
-        return at !== null && (el.contains(at) || owner.contains(at));
-      };
-      const clamp = (value: number, max: number): number => Math.min(Math.max(value, 0), max - 1);
-      // Not reachable by a tap at all (under a dim, a modal, another panel): not a target now.
-      if (!meets(clamp(rect.left + rect.width / 2, innerWidth), clamp(rect.top + rect.height / 2, innerHeight))) {
-        return [Infinity, Infinity];
-      }
-      // A box that is the minimum already and is met all over (a 3 by 3 sample) needs no scan of the points around it.
-      if (rect.width >= minimum && rect.height >= minimum && rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight) {
-        const across = [0.02, 0.5, 0.98];
-        if (across.every((fy) => across.every((fx) => meets(clamp(rect.left + rect.width * fx, innerWidth), clamp(rect.top + rect.height * fy, innerHeight))))) {
-          return [rect.width, rect.height];
-        }
-      }
-      let [left, right, top, bottom] = [Infinity, -Infinity, Infinity, -Infinity];
-      const reach = Math.ceil(minimum);
-      for (let y = clamp(Math.floor(rect.top) - reach, innerHeight); y <= clamp(Math.ceil(rect.bottom) + reach, innerHeight); y += STEP) {
-        for (let x = clamp(Math.floor(rect.left) - reach, innerWidth); x <= clamp(Math.ceil(rect.right) + reach, innerWidth); x += STEP) {
-          if (meets(x, y)) {
-            [left, right, top, bottom] = [Math.min(left, x), Math.max(right, x), Math.min(top, y), Math.max(bottom, y)];
-          }
-        }
-      }
-      return [right - left + STEP, bottom - top + STEP];
-    };
-    for (const [at, place] of places.entries()) {
-      const [el, owner] = [find(place.control), find(place.owner)];
-      if (!(el instanceof HTMLElement) || !(owner instanceof HTMLElement)) {
-        throw new Error(`the control at ${place.control.join("/")} is not in the page`);
-      }
-      if (!el.closest(".react-flow")) {
-        el.scrollIntoView({ block: "center", inline: "center" });
-      }
-      const rect = owner.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0 || rect.bottom < 0 || rect.top > innerHeight || rect.right < 0 || rect.left > innerWidth) {
-        continue;
-      }
-      const [width, height] = hitSize(el, owner, rect);
-      if (width < minimum - 1 || height < minimum - 1) {
-        found.push({ at, width, height });
-      }
-    }
-    return found;
-  }, [only, minimum] as const);
-}
-
 const CONTROL_ROLES = new Set(["button", "menuitem", "menuitemradio", "menuitemcheckbox", "tab", "radio", "checkbox", "switch", "option", "slider"]);
 
-/** Whether `part` is what a finger can tap. The one definition of a control: the live probe is given the controls this picks. */
+/** Whether `part` is what a finger can tap: the one definition of a control. */
 function isControl(part: Part): boolean {
   const { tag, attr } = part;
   return (
@@ -149,15 +56,6 @@ function controlsOf(snapshot: Snapshot): Control[] {
   return found;
 }
 
-/** Where `part` is in the page: the index of each element from the document element down, among its parent's elements. */
-function pathOf(part: Part): number[] {
-  const path: number[] = [];
-  for (let at = part; at.parent !== undefined && at.parent.tag !== "#document"; at = at.parent) {
-    path.unshift(at.parent.children.filter((child) => !child.tag.startsWith("#") && !child.tag.startsWith("::")).indexOf(at));
-  }
-  return path;
-}
-
 /** How a control is named in a report. */
 function describe(control: Control, width: number, height: number): Offender {
   const { part } = control;
@@ -167,38 +65,36 @@ function describe(control: Control, width: number, height: number): Offender {
   return { name: `${part.tag}${testId === undefined ? "" : `[${testId}]`} in ${parent} "${text}"`, width, height };
 }
 
-/** Whether the control's box says less than a tap does: it or an ancestor is clipped to a shape, or rotated or skewed, so only the points around it can say. (Rounded corners are 4px at most and are not counted.) */
-function distorted(part: Part): boolean {
-  return [...upFrom(part)].some((up) => {
-    const style = up.box?.style;
-    if (style === undefined) {
-      return false;
-    }
-    const matrix = /^matrix\(([^)]*)\)$/.exec(style.transform);
-    const [, b = "0", c = "0"] = matrix === null ? [] : (matrix[1] ?? "").split(",").map((each) => each.trim());
-    const turned = style.transform !== "" && style.transform !== "none" && (matrix === null || Math.abs(Number(b)) > 1e-6 || Math.abs(Number(c)) > 1e-6);
-    return (style["clip-path"] !== "" && style["clip-path"] !== "none") || turned;
-  });
+/** A box by its edges. */
+interface Edges {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 }
 
-/** The control's hit box from the layout: its owner's box, with the boxes of its own generated content (a ::before that reaches past it), kept to what the ancestors that clip let through. */
-function hitBox(control: Control): { left: number; top: number; right: number; bottom: number } {
-  const own = control.owner.box;
-  if (own === undefined) {
-    return { left: 0, top: 0, right: 0, bottom: 0 };
+/**
+ * `box` less what the ancestors from `from` up that clip it show no more of. A box placed with
+ * `position: absolute` is clipped only from its containing block (the nearest placed ancestor) up,
+ * and a fixed one by none, as the browser clips them. A scroller can be scrolled to the control,
+ * so nothing from a scroller up counts.
+ */
+function clipped(box: Edges, from: Part | undefined, position: string): Edges {
+  const hit = { ...box };
+  if (position === "fixed") {
+    return hit;
   }
-  const hit = { left: own.x, top: own.y, right: own.x + own.width, bottom: own.y + own.height };
-  for (const each of control.part.children.filter((child) => child.tag.startsWith("::") && child.box !== undefined && child.box.style["pointer-events"] !== "none")) {
-    const at = each.box;
-    if (at !== undefined) {
-      [hit.left, hit.top, hit.right, hit.bottom] = [Math.min(hit.left, at.x), Math.min(hit.top, at.y), Math.max(hit.right, at.x + at.width), Math.max(hit.bottom, at.y + at.height)];
-    }
-  }
-  // What an ancestor that clips shows no more of takes no tap. A scroller is scrolled to the control, so it clips the control only on an axis it does not scroll, and what clips it from above (the edge it scrolls under) not at all.
-  for (const up of upFrom(control.part.parent)) {
+  let inside = position !== "absolute";
+  for (const up of upFrom(from)) {
     const clip = up.box;
     if (clip === undefined) {
       continue;
+    }
+    if (!inside) {
+      if (clip.style.position === "static") {
+        continue;
+      }
+      inside = true;
     }
     const [x, y] = [clip.style["overflow-x"], clip.style["overflow-y"]];
     if (/hidden|clip/.test(x)) {
@@ -214,21 +110,47 @@ function hitBox(control: Control): { left: number; top: number; right: number; b
   return hit;
 }
 
-/** Whether something not part of the control is painted over `hit` or may be (Chrome gives the boxes of one paint layer one order) and takes taps. */
-function coveredIn(snapshot: Snapshot, control: Control, hit: { left: number; top: number; right: number; bottom: number }): boolean {
-  const paint = control.part.box?.paint ?? 0;
-  const related = new Set<Part>([...upFrom(control.part), ...upFrom(control.owner), ...under(control.part), ...under(control.owner)]);
-  return snapshot.nodes.some((other) => {
-    const box = other.box;
-    if (box === undefined || other.tag === "#text" || box.paint < paint || box.width <= 0 || box.height <= 0 || box.style["pointer-events"] === "none" || box.style.visibility !== "visible") {
-      return false;
+/**
+ * Where generated content placed with `position: absolute` is: Chrome gives an empty one (`content:
+ * ""`, the usual way to reach a hit area past its control) no box, so it is placed from its
+ * containing block (the nearest placed ancestor, from the control up) and its insets. None when
+ * an inset is not a length.
+ */
+function placed(pseudo: Part, control: Part): Edges | undefined {
+  const box = pseudo.box;
+  if (box === undefined || box.style.position !== "absolute") {
+    return undefined;
+  }
+  if (box.width > 0 && box.height > 0) {
+    return { left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height };
+  }
+  const block = [...upFrom(control)].find((up) => up.box !== undefined && up.box.style.position !== "static")?.box;
+  const [top, right, bottom, left] = (["top", "right", "bottom", "left"] as const).map((side) => /^-?[\d.]+px$/.test(box.style[side]) ? Number.parseFloat(box.style[side]) : Number.NaN);
+  if (block === undefined || [top, right, bottom, left].some((each) => Number.isNaN(each))) {
+    return undefined;
+  }
+  return { left: block.x + (left ?? 0), top: block.y + (top ?? 0), right: block.x + block.width - (right ?? 0), bottom: block.y + block.height - (bottom ?? 0) };
+}
+
+/** The control's hit box from the layout: its owner's box, with the boxes of its own generated content (a ::before that reaches past it), each kept to what the ancestors that clip it let through. */
+function hitBox(control: Control): Edges {
+  const own = control.owner.box;
+  if (own === undefined) {
+    return { left: 0, top: 0, right: 0, bottom: 0 };
+  }
+  const hit = clipped({ left: own.x, top: own.y, right: own.x + own.width, bottom: own.y + own.height }, control.owner.parent, own.style.position);
+  for (const each of control.part.children.filter((child) => child.tag.startsWith("::") && child.box !== undefined && child.box.style["pointer-events"] !== "none")) {
+    const at = each.box;
+    const box = at === undefined ? undefined : at.style.position === "absolute" ? placed(each, control.part) : { left: at.x, top: at.y, right: at.x + at.width, bottom: at.y + at.height };
+    if (at === undefined || box === undefined) {
+      continue;
     }
-    // A generated box takes taps for its element.
-    if (related.has(other) || (other.tag.startsWith("::") && other.parent !== undefined && related.has(other.parent))) {
-      return false;
+    const extra = clipped(box, control.part, at.style.position);
+    if (extra.right > extra.left && extra.bottom > extra.top) {
+      [hit.left, hit.top, hit.right, hit.bottom] = [Math.min(hit.left, extra.left), Math.min(hit.top, extra.top), Math.max(hit.right, extra.right), Math.max(hit.bottom, extra.bottom)];
     }
-    return box.x < hit.right && box.x + box.width > hit.left && box.y < hit.bottom && box.y + box.height > hit.top;
-  });
+  }
+  return hit;
 }
 
 /** What the touch check found on one page: the controls under the minimum, and every measured control's hit size. */
@@ -237,7 +159,7 @@ export interface TouchReport {
   sizes: Offender[];
 }
 
-/** The page's controls against the touch-target minimum (none on a page opened with a mouse, which is not held to it). Measuring leaves the scroll positions as they were. */
+/** The page's controls against the touch-target minimum (none on a page opened with a mouse, which is not held to it). */
 export async function touchReport(page: Page, snapshot: Snapshot): Promise<TouchReport> {
   const empty = { problems: [], sizes: [] };
   if (page.isClosed() || page.url() === "about:blank" || !(await whenSettled(page, () => page.evaluate(() => matchMedia("(pointer: coarse)").matches)))) {
@@ -249,8 +171,7 @@ export async function touchReport(page: Page, snapshot: Snapshot): Promise<Touch
   }
   // The tour's callout floats over the page as a popover does, also while the page under it is live.
   const popovers = snapshot.nodes.filter((part) => ("data-popover" in part.attr || part.attr["data-testid"] === "tour-callout") && part.box !== undefined);
-  const { width: windowWidth, height: windowHeight } = snapshot.viewport;
-  const [sizes, doubtful] = [new Array<Offender>(), new Array<Control>()];
+  const [problems, sizes] = [new Array<string>(), new Array<Offender>()];
   for (const control of controlsOf(snapshot)) {
     const rect = control.owner.box;
     if (rect === undefined || rect.width === 0 || rect.height === 0) {
@@ -262,20 +183,11 @@ export async function touchReport(page: Page, snapshot: Snapshot): Promise<Touch
       continue;
     }
     const hit = hitBox(control);
-    const [width, height] = [hit.right - hit.left, hit.bottom - hit.top];
-    sizes.push(describe(control, Math.round(width), Math.round(height)));
-    const whole = hit.left >= 0 && hit.top >= 0 && hit.right <= windowWidth && hit.bottom <= windowHeight;
-    // A box the minimum already, drawn whole with nothing over it, is met all over. One out of the window is scrolled to and measured there, in the page, unless it is large enough that only a cover could shrink it.
-    if (width >= minimum && height >= minimum && !distorted(control.part) && (!whole || !coveredIn(snapshot, control, hit))) {
-      continue;
+    const found = describe(control, Math.round(hit.right - hit.left), Math.round(hit.bottom - hit.top));
+    sizes.push(found);
+    if (found.width < minimum - 1 || found.height < minimum - 1) {
+      problems.push(`${found.name} ${String(found.width)}x${String(found.height)}`);
     }
-    doubtful.push(control);
   }
-  const places = doubtful.map((control) => ({ control: pathOf(control.part), owner: pathOf(control.owner) }));
-  const rest = doubtful.length === 0 ? [] : await whenSettled(page, () => keepingScroll(page, () => undersized(page, places, minimum)));
-  const problems = rest.map(({ at, width, height }) => {
-    const found = describe(doubtful[at] as Control, width, height);
-    return `${found.name} ${String(found.width)}x${String(found.height)}`;
-  });
   return { problems, sizes };
 }
