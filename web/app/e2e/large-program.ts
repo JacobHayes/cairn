@@ -1,6 +1,6 @@
 // The large program fixture (fixtures/large-program): five stages with nested groups and the
 // milestones and decisions between them, large enough that its fit is far below the canvas's
-// reading zoom. A browser test or a proof imports the route, publishes it and starts a journey.
+// tile zoom. A browser test or a proof imports the route, publishes it and starts a journey.
 import { expect, type Page } from "@playwright/test";
 
 import { fixtureRoute, journeyName, publishDraft, startJourney } from "./around.ts";

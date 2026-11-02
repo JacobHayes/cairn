@@ -90,6 +90,11 @@ export function minZoomOf(fit: number): number {
 /** Below this zoom a container's head is simplified: its title, and a stage's state chip. */
 export const NEAR_ZOOM = 0.6;
 
+/** Whether `zoom` is at or above the near zoom, where a container's head is drawn whole. */
+export function isNear(zoom: number): boolean {
+  return zoom >= NEAR_ZOOM;
+}
+
 /** The zoom a card's title stays readable at (about 10px of its 14px): a first fit never goes below it. */
 export const LEGIBLE_ZOOM = 0.75;
 

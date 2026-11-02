@@ -14,7 +14,7 @@ import type { ContextGroup } from "../ui/ContextMenu.tsx";
 import { Meter } from "../ui/kit.tsx";
 import { statusTone, statusWord } from "../status/words.ts";
 import { BORDER_PX, CARD_GEOMETRY_VARS, CHIP_VARS, MARKER_ROW_PX, TITLE_LINE_PX, cardRows, headChipFits, headTitleBox, titleFitPx, titleLines, titleWordOverflows, type CardRows } from "./cards.ts";
-import { NEAR_ZOOM } from "./gestures.ts";
+import { isNear } from "./gestures.ts";
 import type { LensChip } from "./lens.ts";
 import { hereWords, nodeClasses } from "./look.ts";
 import { RANK_TAG_COUNT, type Card, type CardBody } from "./model.ts";
@@ -326,7 +326,7 @@ function Hanging({ data }: { data: CardData }) {
 function HeadChip({ card, box }: { card: Card; box: { width: number; height: number } }) {
   const journey = card.journey;
   const word = journey === undefined ? "" : statusWord(journey.state, card.kind);
-  const show = useStore((state) => state.transform[2] < NEAR_ZOOM && headChipFits(card.title, word.length, box, state.transform[2]));
+  const show = useStore((state) => !isNear(state.transform[2]) && headChipFits(card.title, word.length, box, state.transform[2]));
   if (journey === undefined || !show) {
     return null;
   }

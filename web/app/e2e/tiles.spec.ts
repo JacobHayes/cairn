@@ -1,17 +1,16 @@
 // A container zoomed out is a tile: the real zoom on the large program, whose fit is far below the
-// reading zoom. Nothing moves when a stage becomes a tile, what it holds is not drawn, lines run
+// tile zoom. Nothing moves when a stage becomes a tile, what it holds is not drawn, lines run
 // to the tile, and what the canvas does with a card (selection, search, focus, a double-click) reads
 // the one mapping from a card to the tile that stands for it.
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { lineBetween, viewportOf } from "./canvas.ts";
+import { NEAR_ZOOM } from "../src/canvas/gestures.ts";
+import { TILE_ZOOM } from "../src/canvas/tiles.ts";
 import { LARGE, openLargeGraph, startLargeProgram } from "./large-program.ts";
 import { expect, test } from "./test.ts";
 import { nodeCard, open, whenSettled } from "./shell.ts";
 import { search } from "./view-state.ts";
-
-/** The reading zoom: at or above it nothing is a tile. */
-const READING = 0.6;
 
 /** Zooms the canvas with a pinch at its middle: `steps` notches in (negative: out). */
 async function pinch(page: Page, steps: number): Promise<void> {
@@ -37,6 +36,21 @@ async function zoomTo(page: Page, zoom: number): Promise<void> {
     .toBe(true);
 }
 
+/** Zooms out a notch at a time, each drawn before the next, until `shown` is drawn. */
+async function zoomOutUntil(page: Page, shown: Locator): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        if ((await whenSettled(page, () => shown.count())) === 0) {
+          await pinch(page, -1);
+        }
+        return whenSettled(page, () => shown.count());
+      },
+      { intervals: [0] },
+    )
+    .toBeGreaterThan(0);
+}
+
 /** The large program's graph, fitted: stages are tiles. */
 async function fitted(page: Page): Promise<string> {
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -57,27 +71,19 @@ test("a stage is drawn as a tile at the fit, nothing inside it is drawn, and it 
   // No card inside a stage is drawn: only tiles and the cards outside every container.
   await expect(page.locator('[data-testid="node-card"][data-parent]')).toHaveCount(0);
   const [x, y] = await whenSettled(page, async () => [await nodeCard(page, LARGE.build).getAttribute("data-x"), await nodeCard(page, LARGE.build).getAttribute("data-y")]);
-  await zoomTo(page, READING);
+  await zoomTo(page, TILE_ZOOM);
   await expect(tile(page, LARGE.build)).toHaveCount(0);
   await expect(nodeCard(page, LARGE.build)).toHaveAttribute("data-x", x ?? "");
   await expect(nodeCard(page, LARGE.build)).toHaveAttribute("data-y", y ?? "");
-  // At the reading zoom nothing is a tile.
+  // At the tile zoom nothing is a tile.
   await expect(page.locator("[data-tile]")).toHaveCount(0);
 });
 
 test("a line between two tiles is drawn once, ends on both, and its card lists every link it stands for", async ({ page }) => {
   const id = await fitted(page);
   await open(page, `/journeys/${id}/nodes/${LARGE.helpers}?view=graph&depth=actions`);
-  await zoomTo(page, READING);
-  // Zoom out until the groups of the build are tiles.
-  await expect
-    .poll(async () => {
-      if ((await tile(page, LARGE.partA).count()) === 0) {
-        await pinch(page, -1);
-      }
-      return tile(page, LARGE.partA).count();
-    })
-    .toBe(1);
+  await zoomTo(page, TILE_ZOOM);
+  await zoomOutUntil(page, tile(page, LARGE.partA));
   const between = lineBetween(page, LARGE.partA, LARGE.helpers);
   await expect(between).toHaveCount(1);
   // The line may lie under the inspector at this zoom, so it is clicked where it is, not at a point.
@@ -103,20 +109,20 @@ test("a line between two tiles is drawn once, ends on both, and its card lists e
 test("a selection inside a tile is named on it, and a search says how many matches the tile holds", async ({ page }) => {
   const id = await fitted(page);
   await open(page, `/journeys/${id}/nodes/${LARGE.componentTwo}?view=graph&depth=actions`);
-  await zoomTo(page, READING);
-  await pinch(page, -8);
-  await expect.poll(async () => (await viewportOf(page)).zoom).toBeLessThan(0.3);
+  await zoomTo(page, TILE_ZOOM);
   const stood = page.locator("[data-tile]").filter({ has: page.getByTestId("tile-fact") });
+  await zoomOutUntil(page, stood);
   await expect(stood.getByTestId("tile-fact")).toHaveText("Component two selected");
   await page.keyboard.press("Escape");
   await search(page, "component");
   await page.keyboard.press("f");
   const holder = page.locator("[data-tile]").filter({ has: page.getByTestId("tile-fact") }).first();
+  await zoomOutUntil(page, holder);
   const said = Number(/(\d+) match/.exec((await whenSettled(page, () => holder.getByTestId("tile-fact").textContent())) ?? "")?.[1]);
   const stage = (await whenSettled(page, () => holder.getAttribute("data-node"))) ?? "";
   expect(said).toBeGreaterThan(1);
   // Zoomed in, the stage holds exactly that many nodes whose title says "component" (containers among them), and the tile counted each.
-  await zoomTo(page, READING);
+  await zoomTo(page, TILE_ZOOM);
   const inside = await whenSettled(page, () =>
     page.getByTestId("node-card").evaluateAll(
       (cards, outer) => {
@@ -133,11 +139,9 @@ test("a selection inside a tile is named on it, and a search says how many match
 test("focus on a card that a tile forms over moves to the tile, and a double-click on a tile frames it drawn open", async ({ page }) => {
   const id = await fitted(page);
   await open(page, `/journeys/${id}/nodes/${LARGE.partA}?view=graph&depth=actions`);
-  await zoomTo(page, READING);
+  await zoomTo(page, TILE_ZOOM);
   await page.locator(`.react-flow__node[data-id="${LARGE.partA}"]`).focus();
-  await pinch(page, -8);
-  await expect.poll(async () => (await viewportOf(page)).zoom).toBeLessThan(0.2);
-  await expect(page.locator("[data-tile]").first()).toBeVisible();
+  await zoomOutUntil(page, tile(page, LARGE.build));
   await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.closest(".react-flow__node")?.getAttribute("data-id") ?? "")).toBe(LARGE.build);
   await page.keyboard.press("Escape");
   await page.keyboard.press("f");
@@ -147,20 +151,11 @@ test("focus on a card that a tile forms over moves to the tile, and a double-cli
   await expect(nodeCard(page, LARGE.build)).toBeVisible();
 });
 
-test("a container opened early, below the reading zoom, draws its state chip inside its head", async ({ page }) => {
+test("an open container below the near zoom draws its state chip inside its head", async ({ page }) => {
   const id = await fitted(page);
   await open(page, `/journeys/${id}/nodes/${LARGE.helpers}?view=graph&depth=actions`);
-  await zoomTo(page, READING);
-  // Zoom out until the build stage has opened with its groups drawn as tiles.
-  await expect
-    .poll(async () => {
-      if ((await tile(page, LARGE.partA).count()) === 0) {
-        await pinch(page, -1);
-      }
-      return tile(page, LARGE.partA).count();
-    })
-    .toBe(1);
-  expect((await viewportOf(page)).zoom).toBeLessThan(READING);
+  await zoomTo(page, TILE_ZOOM);
+  expect((await viewportOf(page)).zoom).toBeLessThan(NEAR_ZOOM);
   const stage = nodeCard(page, LARGE.build);
   await expect(stage).not.toHaveAttribute("data-tile", "");
   const chip = stage.getByTestId("card-head-chip");
@@ -173,11 +168,9 @@ test("a container opened early, below the reading zoom, draws its state chip ins
 test("focus on a container's own title stays on it when the container becomes a tile", async ({ page }) => {
   const id = await fitted(page);
   await open(page, `/journeys/${id}/nodes/${LARGE.partA}?view=graph&depth=actions`);
-  await zoomTo(page, READING);
+  await zoomTo(page, TILE_ZOOM);
   await nodeCard(page, LARGE.build).getByTestId("card-open").focus();
-  await pinch(page, -8);
-  await expect.poll(async () => (await viewportOf(page)).zoom).toBeLessThan(0.2);
-  await expect(tile(page, LARGE.build)).toBeVisible();
+  await zoomOutUntil(page, tile(page, LARGE.build));
   await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.closest(".react-flow__node")?.getAttribute("data-id") ?? "")).toBe(LARGE.build);
 });
 

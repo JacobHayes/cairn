@@ -9,7 +9,7 @@
 // Input: a drag or two-finger scroll pans freely, the wheel alone never zooms, a
 // pinch or Ctrl/Cmd+wheel zooms at the pointer, a double-click zooms into a container. Zoom only
 // simplifies a container's head below a zoom (`data-lod` on the root, CSS only); a card never changes size.
-// Below the reading zoom a container is drawn as a tile (tiles.ts) and what it holds is hidden;
+// Below the tile zoom a container is drawn as a tile (tiles.ts) and what it holds is hidden;
 // the lines, the trace and the focus read the one mapping from a hidden card to the tile.
 import "@xyflow/react/dist/base.css";
 import "./canvas.css";
@@ -27,7 +27,7 @@ import { headHeight } from "./cards.ts";
 import { dateRoutes } from "./dateRoutes.ts";
 import { DateEdgeLine, EdgeLine, type Box, type DateEdge, type LineEdge } from "./EdgeLine.tsx";
 import { usePointedNode } from "./pointed.tsx";
-import { NEAR_ZOOM, firstFrame, fitZoom, listenPinch, minZoomOf, roomOf, shiftInto, unionOf, viewportAround, zoomFitting } from "./gestures.ts";
+import { NEAR_ZOOM, firstFrame, isNear, fitZoom, listenPinch, minZoomOf, roomOf, shiftInto, unionOf, viewportAround, zoomFitting } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
 import { fadedCards } from "./look.ts";
@@ -373,7 +373,7 @@ function useFit(table: TileTable): (nodes?: string | readonly string[]) => Promi
       const { width, height } = store.getState();
       const room = roomOf({ width, height }, PAD, covered);
       const fits = zoomFitting(frame, room);
-      // One card framed alone lands at least at the zoom it is drawn as itself at (a container opened, a card readable), so it is not left inside a tile.
+      // One card framed alone lands at least at the zoom it is drawn as itself at, so it is not left inside a tile.
       return flow.setViewport(viewportAround(frame, Math.max(wanted.length === 1 && wanted[0] !== undefined ? drawnZoomOf(table, wanted[0]) : 0, fits), room));
     },
     [sheet, store, flow, table],
@@ -441,9 +441,9 @@ function useReveal(reveal: Reveal | undefined, model: CanvasModel, table: TileTa
         return undefined;
       }
       const { x, y } = card.internals.positionAbsolute;
-      return flow.setCenter(x + (card.measured.width ?? 0) / 2, y + (card.measured.height ?? 0) / 2, { zoom: Math.max(flow.getZoom(), NEAR_ZOOM) });
+      return flow.setCenter(x + (card.measured.width ?? 0) / 2, y + (card.measured.height ?? 0) / 2, { zoom: Math.max(flow.getZoom(), NEAR_ZOOM, drawnZoomOf(table, reveal.key)) });
     });
-  }, [reveal, model, flow, fitTo, work]);
+  }, [reveal, model, flow, fitTo, work, table]);
 }
 
 /** The canvas's own key: `f` fits the selection, or the whole graph with none. Depth's keys are the view's (screens/keys.ts). */
@@ -887,7 +887,7 @@ function Flow(props: GraphCanvasProps) {
   const dateEdges = useMemo(() => dateEdgesOf({ model, layout, dates }, tiling), [model, layout, dates, tiling]);
   const edges = useMemo<(LineEdge | DateEdge)[]>(() => [...edgesOf(withEmphasis(shown)), ...dateEdges], [shown, dateEdges]);
   const { menu, menus, openMenu, closeMenu } = useNodeMenu(props);
-  const near = useStore((state) => state.transform[2] >= NEAR_ZOOM);
+  const near = useStore((state) => isNear(state.transform[2]));
   const { minZoom, fit } = useZoomRange(props, root);
   useFirstFit(props, fit);
   useTourFraming(useFraming(), props.layout);

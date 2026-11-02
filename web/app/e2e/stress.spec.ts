@@ -33,7 +33,7 @@ function walkOf(page: Page, journey: string): Walk {
   return { page, found, look, check };
 }
 
-/** The graph fitted, at the reading zoom in a window that holds it (every card drawn at the near zoom), and with the stages folded. */
+/** The graph fitted, at the near zoom in a window that holds it (every card drawn whole), and with the stages folded. */
 async function graphs({ page, look, check }: Walk): Promise<void> {
   await check("graph");
   await expect(page.getByTestId("node-card").first()).toBeVisible();
@@ -45,7 +45,7 @@ async function graphs({ page, look, check }: Walk): Promise<void> {
   await page.keyboard.press("f");
   await settled(page);
   expect((await viewportOf(page)).zoom).toBeGreaterThanOrEqual(NEAR_ZOOM);
-  await look("graph at the reading zoom");
+  await look("graph at the near zoom");
   await expectTitleLinesAsLaidOut(page);
   // The foot's owner is a fact the card states, so it is never cut: the date beside it gives way.
   const owners = page.getByTestId("card-owner");
@@ -85,7 +85,7 @@ async function details({ page, look, check }: Walk): Promise<void> {
   await check("walk");
 }
 
-/** The stress route's own graph, fitted and at the reading zoom in a window that holds it. */
+/** The stress route's own graph, fitted and at the near zoom in a window that holds it. */
 async function routeGraph({ page, look }: Walk): Promise<void> {
   await routeAt(page, STRESS.route, "graph");
   await expect(page.getByTestId("node-card").first()).toBeVisible();
@@ -98,7 +98,7 @@ async function routeGraph({ page, look }: Walk): Promise<void> {
   await page.keyboard.press("f");
   await settled(page);
   expect((await viewportOf(page)).zoom).toBeGreaterThanOrEqual(NEAR_ZOOM);
-  await look("the route's graph at the reading zoom");
+  await look("the route's graph at the near zoom");
   await expectTitleLinesAsLaidOut(page);
   await page.setViewportSize({ width: 1280, height: 720 });
 }

@@ -2,10 +2,9 @@
 // the lines drawn to a tile, and what a tile of a given size has room to say.
 import { describe, expect, it } from "vitest";
 
-import { NEAR_ZOOM } from "./gestures.ts";
 import { rolledLine, lineOf, type Card, type DateLine, type Line, type LineLink, type CanvasModel } from "./model.ts";
 import type { CanvasOverlay } from "./overlay.ts";
-import { OPEN_CHILD_PX, TILE_STACK_MIN_PX, TILE_TICKS_MIN_PX, bandOf, drawnZoomOf, rolledRoute, standsBehind, tileLayoutOf, tileLinesOf, tileOverlay, tilePiecesOf, tileTableOf, tiledDates, tilingIn, type TilePieces } from "./tiles.ts";
+import { OPEN_CHILD_PX, TILE_ZOOM, TILE_STACK_MIN_PX, TILE_TICKS_MIN_PX, bandOf, drawnZoomOf, rolledRoute, standsBehind, tileLayoutOf, tileLinesOf, tileOverlay, tilePiecesOf, tileTableOf, tiledDates, tilingIn, type TilePieces } from "./tiles.ts";
 
 const card = (key: string, parent?: string): Card => ({ key, kind: "action", title: key, parent, stage: false, collapsed: false, rolledUp: [], hiddenPrerequisites: [], matched: false, journey: undefined });
 const edge = (requirement: string, dependent: string, extra: Partial<LineLink> = {}): LineLink => ({ requirement, dependent, kind: "requires", holds: false, sentence: "", ...extra });
@@ -13,30 +12,30 @@ const line = (from: string, to: string, extra: Partial<LineLink> = {}): Line => 
 
 /** A stage holding two groups, each holding two cards; a card beside them. */
 const cards = [card("stage"), card("group_a", "stage"), card("a1", "group_a"), card("a2", "group_a"), card("group_b", "stage"), card("b1", "group_b"), card("loose")];
-const sizes: Record<string, { width: number; height: number }> = { stage: { width: 900, height: 400 }, group_a: { width: 400, height: 200 }, group_b: { width: 400, height: 200 } };
+const sizes: Record<string, { width: number; height: number }> = { stage: { width: 1800, height: 800 }, group_a: { width: 800, height: 400 }, group_b: { width: 800, height: 400 } };
 const table = tileTableOf(cards, (key) => sizes[key] ?? { width: 240, height: 80 });
 
 describe("open zooms", () => {
-  it("opens a container of loose cards at the reading zoom, and one holding only containers earlier, once each is big enough on screen", () => {
-    expect(table.opens.get("group_a")).toBe(NEAR_ZOOM);
-    // The groups are 400 x 200: 120 px wide on screen at 0.3.
-    expect(table.opens.get("stage")).toBeCloseTo(OPEN_CHILD_PX.width / 400);
+  it("opens a container of loose cards at the tile zoom, and one holding only containers earlier, once each is big enough on screen", () => {
+    expect(table.opens.get("group_a")).toBe(TILE_ZOOM);
+    // The groups are 800 x 400: 120 px wide on screen at 0.15.
+    expect(table.opens.get("stage")).toBeCloseTo(OPEN_CHILD_PX.width / 800);
   });
 
-  it("opens a container later when its smallest container child is smaller, never past the reading zoom", () => {
-    const narrow = tileTableOf(cards, (key) => (key === "group_b" ? { width: 250, height: 200 } : (sizes[key] ?? { width: 240, height: 80 })));
-    expect(narrow.opens.get("stage")).toBeCloseTo(OPEN_CHILD_PX.width / 250);
+  it("opens a container later when its smallest container child is smaller, never past the tile zoom", () => {
+    const narrow = tileTableOf(cards, (key) => (key === "group_b" ? { width: 500, height: 400 } : (sizes[key] ?? { width: 240, height: 80 })));
+    expect(narrow.opens.get("stage")).toBeCloseTo(OPEN_CHILD_PX.width / 500);
     const tiny = tileTableOf(cards, (key) => (key === "group_b" ? { width: 20, height: 20 } : (sizes[key] ?? { width: 240, height: 80 })));
-    expect(tiny.opens.get("stage")).toBe(NEAR_ZOOM);
+    expect(tiny.opens.get("stage")).toBe(TILE_ZOOM);
   });
 
-  it("opens a container that holds a loose card at the reading zoom, whatever else it holds", () => {
+  it("opens a container that holds a loose card at the tile zoom, whatever else it holds", () => {
     const mixed = tileTableOf([...cards, card("note", "stage")], (key) => sizes[key] ?? { width: 240, height: 80 });
-    expect(mixed.opens.get("stage")).toBe(NEAR_ZOOM);
+    expect(mixed.opens.get("stage")).toBe(TILE_ZOOM);
   });
 
-  it("makes nothing a tile at the reading zoom or above", () => {
-    for (const zoom of [NEAR_ZOOM, 0.9, 1.5]) {
+  it("makes nothing a tile at the tile zoom or above", () => {
+    for (const zoom of [TILE_ZOOM, 0.9, 1.5]) {
       expect(tilingIn(table, bandOf(table, zoom)).tiles.size).toBe(0);
     }
   });
@@ -47,24 +46,24 @@ describe("the zoom a card is drawn as itself at", () => {
   const big = tileTableOf(nested, () => ({ width: 1000, height: 600 }));
 
   it("is the zoom the card's own container and every container above it have opened by, so framing a container never leaves it inside a tile", () => {
-    // mid holds one large container and opens early; outer also holds a loose card and waits for the reading zoom.
-    expect(big.opens.get("mid")).toBeLessThan(NEAR_ZOOM);
-    expect(drawnZoomOf(big, "mid")).toBe(NEAR_ZOOM);
+    // mid holds one large container and opens early; outer also holds a loose card and waits for the tile zoom.
+    expect(big.opens.get("mid")).toBeLessThan(TILE_ZOOM);
+    expect(drawnZoomOf(big, "mid")).toBe(TILE_ZOOM);
     expect(tilingIn(big, bandOf(big, drawnZoomOf(big, "mid"))).hidden.has("mid")).toBe(false);
   });
 
-  it("is the reading zoom for a card, and the container's own open zoom for one with nothing closed above it", () => {
-    expect(drawnZoomOf(big, "leaf")).toBe(NEAR_ZOOM);
-    expect(drawnZoomOf(big, "outer")).toBe(NEAR_ZOOM);
+  it("is the tile zoom for a card, and the container's own open zoom for one with nothing closed above it", () => {
+    expect(drawnZoomOf(big, "leaf")).toBe(TILE_ZOOM);
+    expect(drawnZoomOf(big, "outer")).toBe(TILE_ZOOM);
     const early = tileTableOf([card("top"), card("mid", "top"), card("inner", "mid"), card("leaf", "inner")], () => ({ width: 1000, height: 600 }));
     expect(drawnZoomOf(early, "mid")).toBe(early.opens.get("mid"));
-    expect(drawnZoomOf(early, "mid")).toBeLessThan(NEAR_ZOOM);
+    expect(drawnZoomOf(early, "mid")).toBeLessThan(TILE_ZOOM);
   });
 });
 
 describe("tiles at a zoom", () => {
   it("draws only the outermost closed container, with everything inside standing behind it", () => {
-    const far = tilingIn(table, bandOf(table, 0.1));
+    const far = tilingIn(table, bandOf(table, 0.05));
     expect([...far.tiles]).toEqual(["stage"]);
     expect(standsBehind(far, "a1")).toBe("stage");
     expect(standsBehind(far, "group_b")).toBe("stage");
@@ -72,22 +71,22 @@ describe("tiles at a zoom", () => {
   });
 
   it("opens the stage first and then its groups as the zoom rises", () => {
-    const middle = tilingIn(table, bandOf(table, 0.4));
+    const middle = tilingIn(table, bandOf(table, 0.2));
     expect([...middle.tiles].sort()).toEqual(["group_a", "group_b"]);
     expect(standsBehind(middle, "a1")).toBe("group_a");
     expect(standsBehind(middle, "stage")).toBe("stage");
   });
 
   it("is the same for every zoom in a band, so the canvas re-renders only when a container opens", () => {
-    expect(bandOf(table, 0.35)).toBe(bandOf(table, 0.45));
-    expect(bandOf(table, 0.2)).not.toBe(bandOf(table, 0.4));
+    expect(bandOf(table, 0.18)).toBe(bandOf(table, 0.25));
+    expect(bandOf(table, 0.1)).not.toBe(bandOf(table, 0.2));
   });
 });
 
 describe("lines drawn to tiles", () => {
   const routes = { "a1->b1": [{ x: 380, y: 100 }, { x: 450, y: 100 }, { x: 450, y: 300 }, { x: 520, y: 300 }] };
   const boxes = new Map([["group_a", { x: 0, y: 0, width: 400, height: 200 }], ["group_b", { x: 500, y: 250, width: 400, height: 200 }], ["a1", { x: 20, y: 40, width: 240, height: 80 }], ["b1", { x: 520, y: 290, width: 240, height: 80 }], ["loose", { x: 0, y: 500, width: 240, height: 80 }]]);
-  const tiling = tilingIn(table, bandOf(table, 0.4));
+  const tiling = tilingIn(table, bandOf(table, 0.2));
 
   it("draws lines between the same two tiles as one that keeps every edge, and none inside a tile", () => {
     const lines = [line("a1", "b1"), line("a2", "b1"), line("a1", "a2"), line("loose", "a1")];
@@ -142,7 +141,7 @@ describe("lines drawn to tiles", () => {
 });
 
 describe("the overlay and the date lines at a tiling", () => {
-  const tiling = tilingIn(table, bandOf(table, 0.4));
+  const tiling = tilingIn(table, bandOf(table, 0.2));
   const tiled = tileLinesOf([line("a1", "b1")], tiling, {}, new Map());
 
   it("keeps a tile in focus when a card it stands for is marked, and lights its line as its member is", () => {

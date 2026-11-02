@@ -240,7 +240,7 @@ export async function goTo(page: Page, view: string): Promise<void> {
   await expect(frame).toHaveAttribute("data-screen", view);
 }
 
-/** A window wide enough that a fitted graph is at the reading zoom, so every card is a card and not inside a tile. */
+/** A window wide enough that a fitted graph is at the near zoom, where every card is drawn whole. */
 export async function readable(page: Page): Promise<void> {
   await page.setViewportSize({ width: 3200, height: 2000 });
 }

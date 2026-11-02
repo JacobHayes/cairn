@@ -1,7 +1,7 @@
-// The canvas draws a container as a tile when zoomed out (DESIGN, Charts and graphs: Graph
-// cards). Below the reading zoom a stage or group is one sheet at its own laid-out box, carrying
-// its title, state, progress and due date, and it opens in place once what it holds would be
-// readable: at the reading zoom, or earlier when everything directly inside it is itself a
+// The canvas draws a container as a tile when zoomed far out (DESIGN, Charts and graphs: Graph
+// cards). Below the tile zoom a stage or group is one sheet at its own laid-out box, carrying
+// its title, state, progress and due date, and it opens in place as a frame: at the tile zoom,
+// or earlier when everything directly inside it is itself a
 // container at least OPEN_CHILD_PX on screen. The zoom alone decides it: a pan never changes
 // it, and nothing moves, since a tile occupies its container's own box. This file is the pure
 // part: each container's open zoom, the tiles and the hidden cards at a zoom, the line a tile's
@@ -11,7 +11,6 @@
 // distinct tiling; the canvas asks again only when the zoom crosses an open zoom.
 import { statusWord } from "../status/words.ts";
 import { CHIP_EXTRA_PX, CHIP_LETTER_PX } from "./cards.ts";
-import { NEAR_ZOOM } from "./gestures.ts";
 import type { Point, Routes } from "./layout.ts";
 import { wrappedLines } from "./measure.ts";
 import { mergeDateParts } from "./dates.ts";
@@ -19,7 +18,10 @@ import { joinLines, STRENGTH, type Card, type DateLine, type Line } from "./mode
 import { DATED_MARK, type CanvasOverlay, type LineMark, type OverlayMark } from "./overlay.ts";
 import { markedDoneWords, progressWords } from "./words.ts";
 
-/** A container whose children are all containers at least this big on screen (px) opens before the reading zoom. */
+/** Below this zoom a container is a tile: far enough out that its frame's cards are specks, so its title and progress say more. */
+export const TILE_ZOOM = 0.3;
+
+/** A container whose children are all containers at least this big on screen (px) opens before the tile zoom. */
 export const OPEN_CHILD_PX = { width: 120, height: 40 };
 
 /** What the table reads of a card. */
@@ -33,12 +35,12 @@ export interface TileTable {
   /** The zoom a container opens at; a card with no children is not in it. */
   opens: ReadonlyMap<string, number>;
   parents: ReadonlyMap<string, string | undefined>;
-  /** The open zooms below the reading zoom, ascending: the zooms at which some container opens or closes. */
+  /** The open zooms, ascending and at most the tile zoom: the zooms at which some container opens or closes. */
   thresholds: readonly number[];
 }
 
 /**
- * The zoom each container opens at: the reading zoom, or less when every card directly inside it
+ * The zoom each container opens at: the tile zoom, or less when every card directly inside it
  * is a container whose laid-out box is OPEN_CHILD_PX or more on screen at that zoom (so the
  * smallest zoom at which they all are).
  */
@@ -55,12 +57,12 @@ export function tileTableOf(cards: readonly TileCard[], sizeOf: (key: string) =>
     for (const child of inside) {
       const size = sizeOf(child);
       if (!children.has(child) || size === undefined || size.width <= 0 || size.height <= 0) {
-        zoom = NEAR_ZOOM;
+        zoom = Infinity;
         break;
       }
       zoom = Math.max(zoom, OPEN_CHILD_PX.width / size.width, OPEN_CHILD_PX.height / size.height);
     }
-    opens.set(key, Math.min(NEAR_ZOOM, zoom));
+    opens.set(key, Math.min(TILE_ZOOM, zoom));
   }
   const thresholds = [...new Set(opens.values())].sort((one, other) => one - other);
   return { opens, parents: new Map(cards.map((card) => [card.key, card.parent])), thresholds };
@@ -68,11 +70,10 @@ export function tileTableOf(cards: readonly TileCard[], sizeOf: (key: string) =>
 
 /**
  * The least zoom at which `key` is drawn as itself, not as or inside a tile: the zoom every
- * container above it (and it, if it holds cards) has opened by. A card is never drawn smaller
- * than the reading zoom.
+ * container above it (and it, if it holds cards) has opened by: 0 for a card in no container, the tile zoom at most.
  */
 export function drawnZoomOf(table: TileTable, key: string): number {
-  let zoom = table.opens.get(key) ?? NEAR_ZOOM;
+  let zoom = table.opens.get(key) ?? 0;
   for (let at = table.parents.get(key), seen = 0; at !== undefined && seen <= table.parents.size; at = table.parents.get(at), seen += 1) {
     zoom = Math.max(zoom, table.opens.get(at) ?? 0);
   }

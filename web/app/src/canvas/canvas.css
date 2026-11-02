@@ -804,7 +804,7 @@
 
 /* ---- a container zoomed out: a tile ------------------------------------------------------------- */
 
-/* Below the reading zoom a container is one sheet at its own box (TileCard.tsx): an opaque paper with the card's small shadow, a second sheet's edge 4px behind it (none under 40px on screen) and corner ticks from 100px. It is not a frame: nothing of what it holds is drawn. Sizes are in px on screen (`--z` is the zoom), so a hairline stays one and a word keeps its size; the block of words is centred in the sheet. */
+/* Below the tile zoom a container is one sheet at its own box (TileCard.tsx): an opaque paper with the card's small shadow, a second sheet's edge 4px behind it (none under 40px on screen) and corner ticks from 100px. It is not a frame: nothing of what it holds is drawn. Sizes are in px on screen (`--z` is the zoom), so a hairline stays one and a word keeps its size; the block of words is centred in the sheet. */
 .node.node-tile {
   justify-content: center;
   padding: calc(var(--tile-pad) / var(--z, 1));

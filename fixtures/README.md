@@ -266,7 +266,7 @@ engine's insertion test checks the root paths and the frontier.
 A route with no scenario, for what looks at a large graph: five stages (shape, plan, build, review,
 wrap up), each holding groups nested up to three deep, with milestones and decisions between the
 stages, 62 nodes in all. At 1280 by 800 with the inspector open its fit is about 7%, far below the
-canvas's reading zoom, so it shows what a stage and a group look like drawn as tiles. The canvas's
+canvas's tile zoom, so it shows what a stage and a group look like drawn as tiles. The canvas's
 browser tests import it into a route and start a journey from it.
 
 ## Status summaries

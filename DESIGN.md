@@ -98,7 +98,7 @@ Screen code uses tokens only: no raw hex, no radius above `--radius-lg`, no own 
 - **The ruling lives on canvases**: only the graph and the timeline.
 - Marks are ink, a second series steel; a selected or anomalous mark is accent. An ordinal signal on nodes is a labelled chip, never border weight or opacity. A relative axis labels days from the start ("Day 7"), never a calendar date.
 - **Graph cards** show kind, status, title, and one foot line with the date and, only when it is the viewer or missing, the owner. A body line only for a decided answer, a container's progress, or a leaf's checklist.
-- **The graph zoomed out shows its structure, not its cards.** Below reading zoom a container is a tile showing its title, state, and progress, dropping detail as it shrinks. Zoom alone decides; nothing moves.
+- **The graph zoomed out shows its structure, not its cards.** Zoomed far out, below the tile zoom, a container is a tile showing its title, state, and progress, dropping detail as it shrinks. Zoom alone decides; nothing moves.
 - **Group frame.** A group draws as a frame around its members, with a head showing its title, state and progress.
 - **Edges** are 1px steel at every zoom; kind is line style and end marker, never a label. A line to a hidden node is drawn to what stands for it.
 - **Tracing.** Selecting a node draws what it needs in ink and what it unblocks in accent; everything else goes out of focus.
