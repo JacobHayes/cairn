@@ -13,7 +13,7 @@ Your scope is what you were given.
 
 ## What to look for
 
-Anything that adds weight without earning its place: one rule decided in several places that agree only because someone keeps them in step, one job done twice, code and features nothing reaches, interfaces their callers work around, tests that catch nothing another test does not, and documents that repeat another document or write a case where a principle belongs.
+Anything that adds weight without earning its place: one rule decided in several places that agree only because someone keeps them in step, one job done twice, code and features nothing reaches, interfaces their callers work around, tests that are not worth their time, and documents that repeat another document or write a case where a principle belongs.
 
 On-screen text earns its place by preventing a real mistake (an irreversible delete, someone else's work lost, a refusal that says how to recover) or by labelling a control. Cut the rest: a notice that states what the person just did, a line that repeats a label or button, a disclaimer about something they can undo, an empty state that only says the obvious.
 
@@ -21,7 +21,7 @@ Copies of one rule rarely look alike. Start from each rule's owner and ask who e
 
 ## Evidence
 
-Confirm each finding at every copy, and drop what you cannot confirm. For tests, use the evidence that exists: CI's per-test browser report, the Rust suite and step times. A test earns its place by what it catches, so judge it by the break it would catch and whether another test catches the same.
+Confirm each finding at every copy, and drop what you cannot confirm. For tests, use the evidence that exists: CI's per-test browser report, the Rust suite and step times. A test earns its place only by a break it would catch that is likely, matters to a person or agent using Cairn, and nothing cheaper catches (a unit test, the walks' structural rules, another test); many things are not worth testing at all. Judge every test in scope this way, not only the ones another test repeats: name the break or say there is none, and default to cutting a test that cannot name one. "It covers a write path" or "it is wiring" is not a break.
 
 ## Output
 
