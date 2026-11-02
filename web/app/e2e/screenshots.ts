@@ -297,10 +297,7 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
   journeyProposalNode: [{ name: "item", reach: async (page, on) => { await indexAt(page, `/journeys/${proposalsOf(on).breakdownJourney}/proposals/${proposalsOf(on).breakdown}/nodes/n_workload`); await reviewOpen(page); await fitGraph(page); }, ready: (page) => page.getByTestId("item-editor") }],
   routes: [{ name: "index", reach: (page) => indexAt(page, "/routes"), ready: (page) => page.getByTestId("routes") }],
   routeNew: [{ name: "form", reach: (page) => indexAt(page, "/routes/new"), ready: (page) => page.getByTestId("new-route") }],
-  route: [
-    ...nonEmpty(viewsOf(ROUTE_OFFERS.screens, async (page, on, view) => { await routeAt(page, on.route, view); if (view === "graph") { await fitGraph(page); } }, routeReady)),
-    { name: "stages-open", reach: async (page, on) => { await routeAt(page, on.route, "list"); await openSheet(page); await page.getByTestId("card-stages").locator("summary").click(); }, ready: (page) => page.getByTestId("stage-row").first(), only: "desktop" },
-  ],
+  route: nonEmpty(viewsOf(ROUTE_OFFERS.screens, async (page, on, view) => { await routeAt(page, on.route, view); if (view === "graph") { await fitGraph(page); } }, routeReady)),
   routeNode: [{ name: "list", reach: (page, on) => routeAt(page, on.route, "list", `/nodes/${on.node}`), ready: (page) => page.getByTestId("route-node") }],
   routeEdge: [{ name: "edge-card", reach: async (page, on) => { await routeAt(page, on.route, "graph", `/edges/${on.edge}`); await fitGraph(page); }, ready: (page) => page.getByTestId("edge-card") }],
   routeProposals: [{ name: "tab", reach: (page, on) => indexAt(page, `/routes/${on.route}/proposals`), ready: (page) => page.getByTestId("proposals-pane") }],
@@ -358,7 +355,7 @@ export const WALK_VIEWPORTS = { desktop: { width: 1440, height: 900 }, phone: { 
  * three seconds a visit, and every state or width added multiplies; this holds them to about what
  * the step spends on them now, so growth fails a check instead of slowing every one.
  */
-export const MAX_STATE_VISITS = 252;
+export const MAX_STATE_VISITS = 250;
 
 /** The states of `address` a walk visits at a phone's width or a desktop's. */
 export function statesFor(address: AddressName, phone: boolean): State[] {
