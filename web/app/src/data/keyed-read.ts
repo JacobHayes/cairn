@@ -11,8 +11,9 @@
 // freshness. One read runs at a time; ticks and key changes that arrive meanwhile coalesce into
 // one more read.
 //
-// How the read behaves is the source's input: when it starts (at once, or after a settle for a
-// preview someone is still editing), whether version skew stops it, the ticks that keep it
+// How the read behaves is the source's input: when it starts (at once, or, for a change to a key
+// someone is still editing, after a settle; a key's first value is read at once, since nothing is
+// being typed over it yet), whether version skew stops it, the ticks that keep it
 // current (H6), and what releases a value it holds. A transient failure is retried after the
 // shared backoff (250 ms to 15 s); a refusal for authentication, the engine, version skew or a
 // missing subject never is.
@@ -200,7 +201,7 @@ export interface ReadContext {
   newest: Readonly<Record<string, number>>;
   /** When (monotonic ms) a newer revision than the one held was first announced and the value still shows the older. */
   staleSince: number | undefined;
-  /** Whether the settle wait for the key wanted has run. */
+  /** Whether the key wanted is read without a settle wait: it is the first value of its `of`, or the wait has run. */
   settled: boolean;
   /** Counts the children spawned, for their ids. */
   children: number;
@@ -425,7 +426,7 @@ export const keyedRead = setup({
   actions: {
     begin: assign(({ context, event }) => {
       const key = wantOf(event);
-      return { ...fresh(context), of: key?.of, want: key, ticks: key === undefined ? undefined : context.source.ticks?.(key.args as never) };
+      return { ...fresh(context), settled: true, of: key?.of, want: key, ticks: key === undefined ? undefined : context.source.ticks?.(key.args as never) };
     }),
     wantMore: assign(({ event }) => ({ want: wantOf(event), settled: false })),
     unwant: assign({ want: undefined }),

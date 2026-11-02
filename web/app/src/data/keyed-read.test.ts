@@ -536,49 +536,57 @@ describe("ticks and the stream", () => {
 });
 
 describe("a settle policy", () => {
-  it("reads once, with the last key, after the key has held still", () => {
+  it("reads a key's first value at once, and a run of changes once, with the last, after it has held still", async () => {
     const h = harness({ policy: previewPolicy(250) });
-    h.want(h.keyed("A"));
+    h.want(h.keyed("K", ["A"], "A"));
+    expect(h.calls.map((call) => call.args)).toEqual(["A"]);
+    h.calls[0]?.resolve(answer("a"));
+    await h.flush();
+    h.want(h.keyed("K", ["B"], "B"));
     h.clock.increment(100);
-    h.want(h.keyed("B"));
-    h.clock.increment(100);
-    h.want(h.keyed("C"));
+    h.want(h.keyed("K", ["C"], "C"));
     h.clock.increment(249);
-    expect(h.calls).toHaveLength(0);
-    expect(h.view("C", [])).toEqual({ status: "loading" });
+    expect(h.calls).toHaveLength(1);
     h.clock.increment(1);
-    expect(h.calls.map((call) => call.args)).toEqual(["C"]);
+    expect(h.calls.map((call) => call.args)).toEqual(["A", "C"]);
   });
 
-  it("reads at once, with the last key, when the person has finished typing", () => {
+  it("reads a change at once when the person has finished typing", async () => {
     const h = harness({ policy: previewPolicy(250) });
-    h.want(h.keyed("A"));
+    h.want(h.keyed("K", ["A"], "A"));
+    h.calls[0]?.resolve(answer("a"));
+    await h.flush();
+    h.want(h.keyed("K", ["B"], "B"));
     h.clock.increment(100);
-    h.want(h.keyed("B"));
     h.ref.send({ type: "flush" });
-    expect(h.calls.map((call) => call.args)).toEqual(["B"]);
+    expect(h.calls.map((call) => call.args)).toEqual(["A", "B"]);
     h.clock.increment(1000);
-    expect(h.calls).toHaveLength(1);
+    expect(h.calls).toHaveLength(2);
   });
 });
 
 describe("the work it reports", () => {
   it("is under way while the read settles and reads, and over while it waits out a failure and once it rests", async () => {
     const h = harness({ policy: previewPolicy(250) });
-    h.want(h.keyed("A"));
+    h.want(h.keyed("K", ["A"], "A"));
+    expect(h.stream.working.size).toBe(1);
+    h.calls[0]?.resolve(answer("a"));
+    await h.flush();
+    expect(h.stream.working.size).toBe(0);
+    h.want(h.keyed("K", ["B"], "B"));
     expect(h.stream.working.size).toBe(1);
     h.clock.increment(250);
-    expect(h.calls).toHaveLength(1);
+    expect(h.calls).toHaveLength(2);
     expect(h.stream.working.size).toBe(1);
-    h.calls[0]?.reject(failed503());
+    h.calls[1]?.reject(failed503());
     await h.flush();
-    expect(h.view("A", [])).toMatchObject({ status: "failed", retrying: true });
+    expect(h.view("K", ["B"])).toMatchObject({ status: "behind", value: answer("a"), retrying: true });
     expect(h.stream.working.size).toBe(0);
     h.clock.increment(backoffDelayMs(0));
     expect(h.stream.working.size).toBe(1);
-    h.calls[1]?.resolve(answer("a"));
+    h.calls[2]?.resolve(answer("b"));
     await h.flush();
-    expect(h.view("A", [])).toEqual({ status: "current", value: answer("a") });
+    expect(h.view("K", ["B"])).toEqual({ status: "current", value: answer("b") });
     expect(h.stream.working.size).toBe(0);
   });
 
@@ -596,14 +604,17 @@ describe("the work it reports", () => {
 });
 
 describe("version skew", () => {
-  it("stops a read that was settling, and starts nothing", () => {
+  it("stops a read that was settling, and starts nothing", async () => {
     const h = harness({ policy: previewPolicy(250) });
-    h.want(h.keyed("A"));
+    h.want(h.keyed("K", ["A"], "A"));
+    h.calls[0]?.resolve(answer("a"));
+    await h.flush();
+    h.want(h.keyed("K", ["B"], "B"));
     h.clock.increment(100);
     h.state.compatible = false;
     h.clock.increment(150);
-    expect(h.calls).toHaveLength(0);
-    expect(h.view("A", [])).toMatchObject({ status: "failed", error: { kind: "skew" } });
+    expect(h.calls).toHaveLength(1);
+    expect(h.view("K", ["B"])).toMatchObject({ status: "behind", value: answer("a"), error: { kind: "skew" } });
   });
 
   it("does not retry a failure that was waiting", async () => {

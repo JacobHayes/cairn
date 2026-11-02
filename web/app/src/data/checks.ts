@@ -10,7 +10,8 @@ import { DERIVE, previewPolicy, readOnce, type ReadEnv, type ReadSource } from "
 /**
  * How long a value rests after the last keystroke before the engine is asked about it: every
  * check of a typed value (a form's field, the search box, an email being typed) waits this long
- * (or until the field is left), so the worker is asked about what was typed, not about every key.
+ * after a change (or until the field is left), so the worker is asked about what was typed, not
+ * about every key. The value a field opens with is asked about at once.
  */
 export const CHECK_DELAY_MS = 350;
 

@@ -12,9 +12,9 @@ export async function open(page: Page, path: string): Promise<void> {
   // eslint-disable-next-line e2e/settled-reads -- whether the app runs in this tab at all: a blank tab has nothing to settle
   if ((await nav.count()) === 1) {
     await goWithin(page, path);
-  } else {
-    await page.goto(path);
+    return;
   }
+  await page.goto(path);
   await expect(nav).toBeVisible();
   await settled(page);
 }
