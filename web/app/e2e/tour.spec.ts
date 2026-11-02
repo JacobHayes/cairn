@@ -317,6 +317,7 @@ test.describe("on a phone, where the inspector is a sheet", () => {
     await next(page);
     await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "half");
     await expectClear(page, phone);
+    await checkpoint(page);
     // The sheet lowered, the callout says so and offers to raise it.
     await page.getByRole("button", { name: "Resize the inspector" }).focus();
     await page.keyboard.press("ArrowDown");

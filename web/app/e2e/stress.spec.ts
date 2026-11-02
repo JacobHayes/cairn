@@ -12,6 +12,7 @@ import { observe } from "./structure.ts";
 import { indexAt, journeyAt, openCardMenu, openControlsMenu, openPopover, routeAt } from "./screenshots.ts";
 import { nodeCard, settled, whenSettled } from "./shell.ts";
 import { STRESS, publishStressJourney } from "./stress.ts";
+import { openTip } from "./tips.ts";
 
 /** The walk's reach: every screen is looked at and every problem listed with the screen it is on, so one run shows them all. */
 interface Walk {
@@ -117,12 +118,12 @@ async function phoneChrome({ page, look, check }: Walk): Promise<void> {
   }
 }
 
-/** Each screen at desktop and phone width (a phone also opens each view's Controls menu), the clamped journey name opened by a tap, and the screens that list journeys, routes and people. */
+/** Each view at a phone's width (with its Controls menu open too), the clamped journey name opened by a tap, and the screens that list journeys, routes and people. At a desktop's width the walk has looked at each view already (`graphs`, `details`), so it starts at the name. */
 async function widths(walk: Walk, sizes: number[]): Promise<void> {
   const { page, look, check } = walk;
   for (const width of sizes) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 720 });
-    for (const address of ["graph", "list", "timeline", "summary", "walk"]) {
+    for (const address of width === 390 ? ["graph", "list", "timeline", "summary", "walk"] : []) {
       await check(address);
       if (width === 390 && address !== "summary") {
         await openControlsMenu(page);
@@ -151,13 +152,28 @@ async function widths(walk: Walk, sizes: number[]): Promise<void> {
   }
 }
 
-test("the stress journey stays inside its boxes on every screen at desktop width", async ({ page }) => {
+/** A timeline title cut short shows whole in a tip that is not itself cut (ui/Tip.tsx). */
+async function timelineTip({ page, check }: Walk): Promise<void> {
+  await check("timeline");
+  const links = page.locator(".timeline-text a");
+  // A title that is cut and already in the window: the pointer goes straight to it, and nothing has to scroll (a scroll under the pointer closes a tip, as it should).
+  const cut = await whenSettled(page, () => links.evaluateAll((all) => all.flatMap((each, at) => (each.scrollWidth > each.clientWidth + 1 && each.getBoundingClientRect().top >= 0 && each.getBoundingClientRect().bottom <= window.innerHeight ? [at] : []))));
+  expect(cut.length, "the stress journey cuts some timeline titles inside the window").toBeGreaterThan(0);
+  const long = links.nth(cut[0] ?? 0);
+  const whole = (await whenSettled(page, () => long.textContent()))?.trim() ?? "";
+  await long.hover();
+  await expect(openTip(page)).toHaveText(whole);
+  await expect.poll(() => openTip(page).evaluate((tip) => tip.scrollWidth - tip.clientWidth)).toBeLessThanOrEqual(1);
+}
+
+test("the stress journey stays inside its boxes on every screen at desktop width, and a cut timeline title shows whole in a tip", async ({ page }) => {
   const walk = walkOf(page, await publishStressJourney(page));
   await graphs(walk);
   await routeGraph(walk);
   await details(walk);
   await widths(walk, [1280]);
   expect(walk.found).toEqual([]);
+  await timelineTip(walk);
 });
 
 // A phone is a touch screen: the same walk there also holds every control to the touch-sized hit area.

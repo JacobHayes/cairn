@@ -1,5 +1,4 @@
-// The edit manager on the server host, against `cairn demo` (the `server` project of
-// playwright.config.ts): a write belongs to the tab, not to the control that sent it. A rename
+// The edit manager on the server host, against `cairn demo`: a write belongs to the tab, not to the control that sent it. A rename
 // whose answer comes after its screen was left stays on the chip until it is
 // dealt with (H5, H6), and one whose answer was lost is resent with its patch id and lands once.
 // A node's actions form that sent its write stays until that write ends: text typed since is

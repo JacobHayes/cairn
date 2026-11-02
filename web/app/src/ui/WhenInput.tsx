@@ -7,8 +7,13 @@ import { localWall, momentFrom, viewerToday } from "../status/when.ts";
 import { Input } from "./kit.tsx";
 
 /** The value of `day` with the time `time` (none for a day), stored in the deployment's `zone`. */
-function joined(zone: string, day: string, time: string): string {
+export function joined(zone: string, day: string, time: string): string {
   return day === "" || time === "" ? day : momentFrom(zone, day, time);
+}
+
+/** The value once `time` is typed beside `day`, which is `today` while no date is typed. */
+export function timeTyped(zone: string, day: string, time: string, today: string): string {
+  return joined(zone, day === "" ? today : day, time);
 }
 
 export function WhenInput({ label, value, zone, testid, onChange }: { label: string; value: string; zone: string; testid?: string; onChange: (value: string) => void }) {
@@ -33,7 +38,7 @@ export function WhenInput({ label, value, zone, testid, onChange }: { label: str
         {...(testid === undefined ? {} : { "data-testid": `${testid}-time` })}
         value={time}
         onChange={(event) => {
-          onChange(joined(zone, day === "" ? viewerToday() : day, event.target.value));
+          onChange(timeTyped(zone, day, event.target.value, viewerToday()));
         }}
       />
     </span>

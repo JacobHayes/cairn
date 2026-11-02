@@ -1,10 +1,11 @@
 // `mise run sweep`: the structural rules (e2e/invariants.ts, `checkpoint`) over every state of the
 // screenshot table at the widths where the layout can change, chosen by rule: both sides of each
 // viewport switch the CSS's media queries name (read from the stylesheets, so a new one is swept
-// with no edit here: a min-width switches at its value, a max-width one pixel above it), the
-// narrowest phone and a wide screen, and one width for each container-query switch (the list's
+// with no edit here: a min-width switches at its value, a max-width one pixel above it), a wide
+// screen, and one width for each container-query switch (the list's
 // rows at 420 and 760, the Summary at 960, the journey's scroll area at 560) that no other chosen
-// width reaches. Light only (light and dark are held to the same layout by the screenshot walk). A
+// width reaches. Not the narrowest phone (390): the screenshot walk's phone run checks every state
+// there with the same rules. Light only (light and dark are held to the same layout by the screenshot walk). A
 // phone's states are visited below the desktop threshold and the desktop's from it. The browser
 // step runs it on every push (decisions/).
 import { expect, test } from "./test.ts";
@@ -17,8 +18,8 @@ import { mediaFeatures } from "./stylesheets.ts";
 /** The height every width is swept at. */
 const HEIGHT = 900;
 
-/** The narrowest phone and a wide screen, then the container-query switches the other widths do not reach: the Summary's (960) and the journey scroll area's (560). */
-const FIXED = [390, 560, 960, 2560];
+/** A wide screen, then the container-query switches the other widths do not reach: the Summary's (960) and the journey scroll area's (560). */
+const FIXED = [560, 960, 2560];
 
 /** Every width at which a media query in the app's stylesheets switches: a `min-width` at its value, a `max-width` one above it. */
 function thresholds(): number[] {

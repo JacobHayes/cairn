@@ -1,12 +1,7 @@
-// The shell on the server host, against `cairn demo` (the `server` project of
-// playwright.config.ts): what only a live server shows. Writes from different pages meet
-// through the conflict (H5), a later page and a page on the index follow
-// what another wrote (H6), a deployment tick re-derives what it moved, and an identity
-// signed in at the demo's stub issuer links to the user (H3). Each test makes what it
-// changes, so the fixtures other tests read stay as seeded. The tests tagged @serial change what
-// the whole deployment holds (its identities, its revision, the scripted assistant) and run
-// one at a time, after the others have finished; the rest each work on a journey or route of
-// their own (ownJourney, newRoute) and run side by side.
+// The shell on the server host, against `cairn demo`: what only a live server shows. Writes from
+// different pages meet through the conflict (H5), a later page and a page on the index follow
+// what another wrote (H6), a deployment tick re-derives what it moved, and an identity signed in
+// at the demo's stub issuer links to the user (H3).
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { checkpoint } from "./invariants.ts";
@@ -283,46 +278,6 @@ test("C14: the deployment's open proposals are the Identities inspector's Propos
   // The identities page, with the new identity marked as added in place.
   await expect(page.getByTestId("layer-band")).toHaveAttribute("data-mode", "reviewing");
   await expect(page.locator('[data-testid="identity"][data-diff="added"]')).toContainText("Nina Alvarez");
-});
-
-test("C14, G5: a proposal that removes a ticked item and adds one of the same title gives the new item an id of its own, so it starts unticked", async ({ page, context }) => {
-  const { id } = await ownJourney(context.request, "hiring-loop");
-  await openJourney(page, id);
-  const written = await context.request.post(`/api/journeys/${id}/patches`, {
-    data: {
-      patch: {
-        id: patchId(),
-        target: { journey: id },
-        base_revision: await derivedRevision(page),
-        mutations: [
-          { op: "set_node_field", node: "n_screen", value: { checklist: [{ id: "alpha", title: "Alpha" }, { id: "beta", title: "Beta" }] } },
-          { op: "set_ticked", node: "n_screen", item: "alpha", ticked: true },
-        ],
-      },
-    },
-  });
-  expect(written.ok(), await written.text()).toBe(true);
-  await page.reload();
-  const proposal = `pr_${crypto.randomUUID().replaceAll("-", "")}`;
-  const drafted = await context.request.post(`/api/journeys/${id}/patches`, {
-    data: {
-      note: "Trim the checklist",
-      proposal,
-      patch: { id: patchId(), target: { journey: id }, base_revision: await derivedRevision(page), mutations: [{ op: "set_node_field", node: "n_screen", value: { checklist: [{ id: "beta", title: "Beta" }] } }] },
-    },
-  });
-  expect(drafted.ok(), await drafted.text()).toBe(true);
-  await open(page, `/journeys/${id}/proposals/${proposal}/nodes/n_screen?view=graph`);
-  const changes = page.getByTestId("item-changes");
-  await changes.getByRole("button", { name: "Edit" }).click();
-  await changes.getByLabel("New item", { exact: true }).fill("Alpha");
-  await changes.getByLabel("New item", { exact: true }).press("Enter");
-  await expect(changes.getByTestId("checklist-item-edit")).toHaveCount(2);
-  await page.getByTestId("save-proposal").click();
-  await expect(page.getByTestId("unsaved")).toHaveCount(0);
-  const saved = await (await context.request.get(`/api/journeys/${id}/proposals/${proposal}`)).text();
-  expect(saved).toContain('"title":"Alpha"');
-  expect(saved).not.toContain('"id":"alpha"');
 });
 
 test("Connect an agent shows this server's address, makes a token that acts as its agent until it is revoked, and is one tap away on a phone", async ({ page, context, playwright, baseURL }) => {

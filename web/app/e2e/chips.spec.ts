@@ -1,22 +1,29 @@
 // The multi-value email field of the identity form on the identities screen (H3): each email a removable chip, taken on
-// Enter, comma, a paste or leaving the field; a bad or repeated one stays under its reason, selected so a paste replaces it;
+// Enter, comma, a paste or leaving the field, and read as it is typed; a bad or repeated one stays under its reason, selected so a paste replaces it;
 // Backspace in the empty input removes the last; it saves the list as chips. On cairn demo. Splitting a pasted list
-// is ui/chips.test.ts's.
+// is ui/chips.test.ts's, and asking once the typing rests is keyed-read.test.ts's.
 import type { Page } from "@playwright/test";
 
 import { open, openSheet } from "./shell.ts";
-import { allowHoldingChecks, checksAsked, holdChecks, releaseChecks } from "./held-checks.ts";
+import { allowHoldingChecks, holdChecks, releaseChecks } from "./held-checks.ts";
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
 
 const field = (page: Page) => page.getByTestId("create-identity").getByLabel("Emails");
 const chips = (page: Page) => page.getByTestId("create-identity").getByTestId("chip-value");
 
-test("H3: emails are chips taken from the keyboard, refused with a reason, replaced by a paste, and saved as a list, on a desktop and a phone", async ({ page }) => {
+test("H3: emails are chips taken from the keyboard, read as they are typed, refused with a reason, replaced by a paste, and saved as a list, on a desktop and a phone", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await open(page, "/identities/new");
   await expect(page.getByTestId("create-identity")).toBeAttached();
   await openSheet(page);
+  // No Enter, separator or blur: the typing alone brings the reason, and fixing it clears it.
+  await field(page).pressSequentially("not-an-email");
+  await expect(page.getByTestId("chips-reason")).toContainText("not-an-email");
+  await field(page).pressSequentially("@example.org");
+  await expect(page.getByTestId("chips-reason")).toHaveCount(0);
+  await expect(chips(page)).toHaveCount(0);
+  await field(page).fill("");
   await field(page).fill("Ann@Example.org");
   await field(page).press("Enter");
   // The input is read-only while the engine reads a value, so the next is typed once this one has joined.
@@ -90,33 +97,4 @@ test("H3: what is typed while the engine reads an email is kept, and its answer 
   await releaseChecks(page);
   await expect(chips(page)).toHaveText(["ann@example.org"]);
   await expect(page.getByTestId("create-identity").getByLabel("Name")).toHaveValue("Ann");
-});
-
-test("H3: an email is read as it is typed: its reason shows once the typing rests and clears when it is fixed", async ({ page }) => {
-  await open(page, "/identities/new");
-  await expect(page.getByTestId("create-identity")).toBeAttached();
-  await openSheet(page);
-  // No Enter, separator or blur: the typing alone brings the reason.
-  await field(page).pressSequentially("not-an-email");
-  await expect(page.getByTestId("chips-reason")).toContainText("not-an-email");
-  await field(page).pressSequentially("@example.org");
-  await expect(page.getByTestId("chips-reason")).toHaveCount(0);
-  await expect(chips(page)).toHaveCount(0);
-});
-
-test("H3: typing asks the engine once the typing rests, not at every key", async ({ page }) => {
-  await allowHoldingChecks(page);
-  await page.clock.install();
-  await open(page, "/identities/new");
-  await expect(page.getByTestId("create-identity")).toBeAttached();
-  await openSheet(page);
-  await page.clock.runFor(1000);
-  const before = await checksAsked(page);
-  await field(page).pressSequentially("typed-quickly@example.org", { delay: 10 });
-  // Nothing has rested yet; once it has, the one question is about the whole text.
-  expect(await checksAsked(page)).toBe(before);
-  await page.clock.runFor(1000);
-  await expect.poll(() => checksAsked(page)).toBe(before + 1);
-  await page.clock.runFor(1000);
-  expect(await checksAsked(page)).toBe(before + 1);
 });

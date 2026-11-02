@@ -363,32 +363,12 @@ export async function openSheet(page: Page): Promise<void> {
   }
 }
 
-/**
- * A journey only this test touches, on the server host: started through one API patch from
- * version 1 of `route`, under a name no other run used. The server tests that run side by side
- * each make their own, so none reads or writes another's (the fixtures' journeys stay as seeded).
- * A journey is created against the deployment revision it was checked under, so a refusal as
- * stale (another test moved the deployment meanwhile) is asked again.
- */
-export async function ownJourney(request: APIRequestContext, route: string, stem = "Own"): Promise<{ id: string; name: string }> {
-  const name = fresh(stem);
-  const id = `j_${name.replace(/\W/g, "_").toLowerCase()}`;
-  for (let attempt = 0; ; attempt += 1) {
-    const response = await request.post(`/api/journeys/${id}/patches`, {
-      data: {
-        patch: {
-          id: `p_${crypto.randomUUID().replaceAll("-", "")}`,
-          target: { journey: id },
-          base_revision: 0,
-          mutations: [{ op: "create_journey", name, from: { route, version: 1 } }],
-        },
-      },
-    });
-    const body = await response.text();
-    if (response.ok()) {
-      return { id, name };
-    }
-    expect(body, `starting ${id}`).toContain("stale");
-    expect(attempt, `starting ${id} kept going stale`).toBeLessThan(5);
-  }
+/** A journey as version 1 of `route` starts it, through one API patch: for a test that needs one untouched by the fixtures' scenarios. */
+export async function ownJourney(request: APIRequestContext, route: string): Promise<{ id: string; name: string }> {
+  const [id, name] = [`j_own_${route.replace(/\W/g, "_")}`, `Own ${route}`];
+  const response = await request.post(`/api/journeys/${id}/patches`, {
+    data: { patch: { id: `p_${crypto.randomUUID().replaceAll("-", "")}`, target: { journey: id }, base_revision: 0, mutations: [{ op: "create_journey", name, from: { route, version: 1 } }] } },
+  });
+  expect(response.ok(), `starting ${id}: ${await response.text()}`).toBe(true);
+  return { id, name };
 }

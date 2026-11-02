@@ -286,8 +286,6 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
     { name: "list", reach: (page, on) => journeyAt(page, on.journey, "list", on.node), ready: (page) => inspector(page).getByTestId("detail-header") },
     { name: "graph", reach: async (page, on) => { await journeyAt(page, on.journey, "graph", on.node); await fitGraph(page); }, ready: (page, on) => nodePanel(page, on.node) },
     { name: "pin-time-form", reach: (page, on) => enterPin(page, on, false), ready: (page) => page.getByTestId("pin-form"), only: "desktop" },
-    { name: "answer-time-form", reach: (page, on) => enterAnswer(page, on, false), ready: (page) => nodePanel(page, TIMED.answer).getByLabel("Answer, time of day"), only: "desktop" },
-    { name: "snooze-time-form", reach: (page, on) => enterSnooze(page, on, false), ready: (page) => nodePanel(page, TIMED.snooze).getByTestId("snooze"), only: "desktop" },
     { name: "pinned-time", reach: async (page, on) => { await settledInspector(page, on.journey, TIMED.pin); await section(nodePanel(page, TIMED.pin), "dates"); }, ready: (page) => nodePanel(page, TIMED.pin).getByTestId("dates"), timed: true },
     { name: "answered-time", reach: (page, on) => settledInspector(page, on.journey, TIMED.answer), ready: (page) => nodePanel(page, TIMED.answer), timed: true },
     { name: "snoozed-time", reach: (page, on) => settledInspector(page, on.journey, TIMED.snooze), ready: (page) => nodePanel(page, TIMED.snooze), timed: true },

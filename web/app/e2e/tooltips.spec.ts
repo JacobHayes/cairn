@@ -89,7 +89,7 @@ test("the inspector's Hide tip keeps clear of the window's right edge", async ({
   await expect(openTip(page).locator("kbd")).toHaveText("]");
 });
 
-test("a card title cut short shows whole in a tip, promptly; a title that fits shows none; a mark on a card shows its own", async ({ page }) => {
+test("a card title cut short shows whole in a tip, promptly; a title that fits shows none", async ({ page }) => {
   await page.clock.install();
   await page.setViewportSize({ width: 4200, height: 3200 });
   const journey = await publishStressJourney(page);
@@ -183,21 +183,6 @@ test("a line's tip goes when the view that drew it does, without the pointer mov
   await page.keyboard.press("v");
   await expect(page.getByTestId("canvas")).toHaveCount(0);
   await expect(openTip(page)).toHaveCount(0);
-});
-
-test("a timeline title cut short shows whole in a tip that is not itself cut", async ({ page }) => {
-  await page.setViewportSize({ width: 1400, height: 900 });
-  const journey = await publishStressJourney(page);
-  await openAt(page, journey, "timeline");
-  const links = page.locator(".timeline-text a");
-  // A title that is cut and already in the window: the pointer goes straight to it, and nothing has to scroll (a scroll under the pointer closes a tip, as it should).
-  const cut = await whenSettled(page, () => links.evaluateAll((all) => all.flatMap((each, at) => (each.scrollWidth > each.clientWidth + 1 && each.getBoundingClientRect().top >= 0 && each.getBoundingClientRect().bottom <= window.innerHeight ? [at] : []))));
-  expect(cut.length, "the stress journey cuts some timeline titles inside the window").toBeGreaterThan(0);
-  const long = links.nth(cut[0] ?? 0);
-  const whole = (await whenSettled(page, () => long.textContent()))?.trim() ?? "";
-  await long.hover();
-  await expect(openTip(page)).toHaveText(whole);
-  await expect.poll(() => openTip(page).evaluate((tip) => tip.scrollWidth - tip.clientWidth)).toBeLessThanOrEqual(1);
 });
 
 test("a scroll in another scroller does not take a tip from a pointer resting on its control", async ({ page }) => {

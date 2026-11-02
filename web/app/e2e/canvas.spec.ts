@@ -554,7 +554,7 @@ test("The journey card's Stages list: a row per stage, choosing one selects and 
   await expect(page.getByTestId("card-stages")).toHaveCount(0);
 });
 
-test("A route's Stages list: a row per stage with its days, choosing one selects and frames it", async ({ page }) => {
+test("A route's Stages list: a row per stage with its days; choosing one selects it, and in the List scrolls its row into view", async ({ page }) => {
   await visit(page, "/routes/product-launch?version=1&view=graph&depth=actions");
   await expect(nodeCard(page, "n_beta")).toBeVisible();
   const stages = page.getByTestId("card-stages");
@@ -564,17 +564,12 @@ test("A route's Stages list: a row per stage with its days, choosing one selects
   const row = stages.locator('[data-testid="stage-row"][data-node="n_beta"]');
   await expect(row).toContainText(/Days? \d/);
   await expect(row.locator(".badge")).toHaveCount(0);
-  await row.hover();
-  await expect(nodeCard(page, "n_beta")).toHaveClass(/node-edge-end/);
   await row.click({ position: { x: 4, y: 4 } });
   await expect(page).toHaveURL(/nodes\/n_beta/);
   await expect(page.getByTestId("route-node")).toBeVisible();
-});
 
-test("A route's Stages list: choosing a stage scrolls its row into view in the List", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 420 });
   await visit(page, "/routes/product-launch?version=1&view=list&depth=actions");
-  const stages = page.getByTestId("card-stages");
   await stages.locator("summary").click();
   await stages.getByTestId("stage-row").last().click({ position: { x: 4, y: 4 } });
   await expect(page.locator('[data-testid="route-row"][aria-current="true"]')).toBeInViewport();

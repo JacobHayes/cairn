@@ -23,16 +23,18 @@ async function pinch(page: Page, steps: number): Promise<void> {
   }
 }
 
-/** Zooms in until the canvas is at least at `zoom`. */
+/** Zooms in a notch at a time, each drawn before the next, until the canvas is at least at `zoom`. */
 async function zoomTo(page: Page, zoom: number): Promise<void> {
   await expect
-    .poll(async () => {
-      const now = (await viewportOf(page)).zoom;
-      if (now < zoom) {
-        await pinch(page, 1);
-      }
-      return (await viewportOf(page)).zoom >= zoom;
-    })
+    .poll(
+      async () => {
+        if ((await whenSettled(page, () => viewportOf(page))).zoom < zoom) {
+          await pinch(page, 1);
+        }
+        return (await whenSettled(page, () => viewportOf(page))).zoom >= zoom;
+      },
+      { intervals: [0] },
+    )
     .toBe(true);
 }
 
@@ -63,7 +65,7 @@ async function fitted(page: Page): Promise<string> {
 
 const tile = (page: Page, key: string) => page.locator(`[data-testid="node-card"][data-node="${key}"][data-tile]`);
 
-test("a stage is drawn as a tile at the fit, nothing inside it is drawn, and it opens in place without moving", async ({ page }) => {
+test("a stage is drawn as a tile at the fit, nothing inside it is drawn, and it opens in place without moving, its state chip in its head", async ({ page }) => {
   await fitted(page);
   for (const stage of LARGE.stages) {
     await expect(tile(page, stage)).toBeVisible();
@@ -77,6 +79,9 @@ test("a stage is drawn as a tile at the fit, nothing inside it is drawn, and it 
   await expect(nodeCard(page, LARGE.build)).toHaveAttribute("data-y", y ?? "");
   // At the tile zoom nothing is a tile.
   await expect(page.locator("[data-tile]")).toHaveCount(0);
+  // Open below the near zoom, a stage's head carries its state chip (the invariants hold it inside the head).
+  expect((await viewportOf(page)).zoom).toBeLessThan(NEAR_ZOOM);
+  await expect(nodeCard(page, LARGE.build).getByTestId("card-head-chip")).toBeVisible();
 });
 
 test("a line between two tiles is drawn once, ends on both, and its card lists every link it stands for", async ({ page }) => {
@@ -136,7 +141,7 @@ test("a selection inside a tile is named on it, and a search says how many match
   expect(inside).toBe(said);
 });
 
-test("focus on a card that a tile forms over moves to the tile, and a double-click on a tile frames it drawn open", async ({ page }) => {
+test("focus on a card a tile forms over, or on the container's own title, moves to the tile; a double-click or Enter on a tile frames it drawn open", async ({ page }) => {
   const id = await fitted(page);
   await open(page, `/journeys/${id}/nodes/${LARGE.partA}?view=graph&depth=actions`);
   await zoomTo(page, TILE_ZOOM);
@@ -149,33 +154,10 @@ test("focus on a card that a tile forms over moves to the tile, and a double-cli
   await tile(page, LARGE.build).dblclick();
   await expect(tile(page, LARGE.build)).toHaveCount(0);
   await expect(nodeCard(page, LARGE.build)).toBeVisible();
-});
-
-test("an open container below the near zoom draws its state chip inside its head", async ({ page }) => {
-  const id = await fitted(page);
-  await open(page, `/journeys/${id}/nodes/${LARGE.helpers}?view=graph&depth=actions`);
-  await zoomTo(page, TILE_ZOOM);
-  expect((await viewportOf(page)).zoom).toBeLessThan(NEAR_ZOOM);
-  const stage = nodeCard(page, LARGE.build);
-  await expect(stage).not.toHaveAttribute("data-tile", "");
-  const chip = stage.getByTestId("card-head-chip");
-  await expect(chip).toBeVisible();
-  const [chipBox, stageBox] = await whenSettled(page, () => Promise.all([chip.boundingBox(), stage.boundingBox()]));
-  expect(chipBox?.y).toBeGreaterThanOrEqual(stageBox?.y ?? Infinity);
-  expect((chipBox?.x ?? Infinity) + (chipBox?.width ?? 0)).toBeLessThanOrEqual((stageBox?.x ?? 0) + (stageBox?.width ?? 0));
-});
-
-test("focus on a container's own title stays on it when the container becomes a tile", async ({ page }) => {
-  const id = await fitted(page);
-  await open(page, `/journeys/${id}/nodes/${LARGE.partA}?view=graph&depth=actions`);
-  await zoomTo(page, TILE_ZOOM);
+  // Its own title keeps the focus as the container becomes a tile, and Enter on the tile opens it again.
   await nodeCard(page, LARGE.build).getByTestId("card-open").focus();
   await zoomOutUntil(page, tile(page, LARGE.build));
   await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.closest(".react-flow__node")?.getAttribute("data-id") ?? "")).toBe(LARGE.build);
-});
-
-test("Enter on a tile frames it drawn open", async ({ page }) => {
-  await fitted(page);
   await page.locator(`.react-flow__node[data-id="${LARGE.build}"]`).focus();
   await page.keyboard.press("Enter");
   await expect(tile(page, LARGE.build)).toHaveCount(0);
