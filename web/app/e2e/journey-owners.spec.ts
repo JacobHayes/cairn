@@ -6,7 +6,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./test.ts";
 
 import { journeyName } from "./around.ts";
-import { open, openJourney, visit, whenSettled } from "./shell.ts";
+import { open, openJourney, whenSettled } from "./shell.ts";
 
 const JOURNEY = "j_vendor_eval";
 
@@ -81,16 +81,4 @@ test("C16, E4: a journey started with its viewer as owner stays under Mine with 
   await expect(table.getByRole("link", { name: owned })).toBeVisible();
   await expect(table.getByRole("link", { name: unowned })).toHaveCount(0);
   await expect(table.getByRole("row").filter({ hasText: owned }).getByTestId("row-owners")).toContainText("you");
-});
-
-test("C16: a new-journey draft kept before owners existed opens with no owners, its name intact", async ({ page }) => {
-  await open(page, "/journeys/new");
-  await page.evaluate(() => {
-    sessionStorage.setItem("cairn:draft:new-journey:", JSON.stringify({ name: "Older draft", description: "", route: "", version: 0 }));
-  });
-  await visit(page, "/journeys/new");
-  const form = page.getByTestId("new-journey-form");
-  await expect(form.getByLabel("Name")).toHaveValue("Older draft");
-  await expect(form.getByTestId("owners-field")).toBeVisible();
-  await expect(form.getByTestId("chip-value")).toHaveCount(0);
 });

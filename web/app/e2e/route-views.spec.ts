@@ -7,11 +7,11 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
 
-import { openRoute, pickVersion, publishDraft, routeMenuItem, versionSelect } from "./around.ts";
+import { openRoute, pickVersion, publishDraft, versionSelect } from "./around.ts";
 import { formField, saveForm } from "./authoring.ts";
 import { publishVersionTwo } from "./proposals.ts";
 import { lineBetween, pointOn } from "./canvas.ts";
-import { expectAddress, follow, goWithin, importRoute, nodeCard, open, readable, setDepth, settled, whenSettled } from "./shell.ts";
+import { expectAddress, follow, goWithin, nodeCard, readable, setDepth, settled, whenSettled } from "./shell.ts";
 import { search } from "./view-state.ts";
 
 /** Opens a draft on the route being shown (a version) and waits for the draft view. */
@@ -96,19 +96,6 @@ test("C19: a draft opened on a version shows without a version in the address, a
   await expect(page.getByTestId("publish-draft")).toHaveCount(0);
   await expect(page.getByTestId("version-card")).toBeVisible();
   await expect(page.locator('[data-testid="version-journey"][data-journey="j_vendor_eval"]')).toBeVisible();
-});
-
-test("C19: discarding a route's only draft leaves the empty route with its header and Retire", async ({ page }) => {
-  await open(page, "/routes/new");
-  await page.getByLabel("Name").fill("Throwaway");
-  await page.getByRole("button", { name: /create/i }).click();
-  await expect(page.getByTestId("route-header")).toBeVisible();
-  await routeMenuItem(page, "discard-draft");
-  await expect(page.getByTestId("route-empty")).toBeVisible();
-  await expect(page.getByTestId("route-header")).toBeVisible();
-  await expect(page.getByTestId("route-menu")).toBeVisible();
-  await page.getByTestId("route-menu").click();
-  await expect(page.getByTestId("menu-retire")).toBeVisible();
 });
 
 /** The route timeline lays the product launch from day 0: the feature bar starts at the start line, the launch ends it, and a title opens the node. */
@@ -287,22 +274,4 @@ test("C1, C7, C19: a line on a route opens its card: on a version the address ke
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/routes\/vendor-evaluation(\?|$)/);
   await expect(page.getByTestId("draft-card")).toBeVisible();
-});
-
-test("C1: a line that stands for many links lists the first of them and shows the rest on request", async ({ page }) => {
-  // Two stages joined by sixty requirements: more than a card lists at once.
-  const leaf = (stage: string, i: number, requires: string) => `- key: n_${stage}${String(i)}\n  id: ${stage}${String(i)}\n  parent: ${stage}\n  kind: action\n  title: ${stage.toUpperCase()} step ${String(i)}\n${requires}`;
-  const needs = (i: number) => `  requires:\n  - a/a${String(i % 3)}\n  - a/a${String((i + 1) % 3)}\n`;
-  const nodes = [0, 1, 2].map((i) => leaf("a", i, "")).join("") + Array.from({ length: 30 }, (_, i) => leaf("b", i, needs(i))).join("");
-  const file = `format: 1\nroute: many-links\nname: Many links\nnodes:\n- key: n_a\n  id: a\n  kind: group\n  title: Prepare\n- key: n_b\n  id: b\n  kind: group\n  title: Deliver\n${nodes}- key: n_end\n  id: end\n  kind: milestone\n  title: Done\n  final: true\n  requires:\n  - b/b0\n`;
-  await importRoute(page, { name: "many-links.yaml", mimeType: "text/yaml", buffer: Buffer.from(file) });
-  await expect(versionSelect(page)).toContainText("Draft");
-  await goWithin(page, "/routes/many-links/edges/n_a~n_b?depth=stages");
-  const rows = page.getByTestId("edge-card").locator("[data-requirement]");
-  await expect(rows.first()).toBeVisible();
-  const first = await whenSettled(page, () => rows.count());
-  expect(first).toBeLessThan(60);
-  await page.getByTestId("edge-links-all").click();
-  await expect(rows).toHaveCount(60);
-  await expect(page.getByTestId("edge-links-all")).toHaveCount(0);
 });

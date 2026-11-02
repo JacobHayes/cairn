@@ -210,21 +210,3 @@ test("A1a, A15: Publish waits for every form holding input not yet sent, a blank
   expect(id).not.toBeNull();
   await expect(formField(page, "final").getByRole("checkbox")).toHaveAttribute("aria-describedby", new RegExp(`(^| )${id ?? ""}( |$)`));
 });
-
-test("A6: a role's id follows its label until the author types over it, and an unsent form is not lost to another role's Edit", async ({ page }) => {
-  await newRoute(page, routeName("Roles"));
-  await addRole(page, "Lead");
-  const roles = page.getByTestId("roles-and-kinds").getByTestId("roles");
-  await roles.getByRole("button", { name: "Add a role" }).click();
-  const form = roles.getByTestId("role-form");
-  await form.getByLabel("role label").fill("Sponsor");
-  await expect(form.getByLabel("role id")).toHaveValue("sponsor");
-  await form.getByLabel("role id").fill("chief");
-  await form.getByLabel("role label").fill("Sponsor of the work");
-  await expect(form.getByLabel("role id")).toHaveValue("chief");
-  // Another role's Edit would replace the form: it waits, and the form keeps what was typed.
-  const edit = roles.getByTestId("role").filter({ hasText: "Lead" }).getByRole("button", { name: "Edit" });
-  await expect(edit).toHaveAttribute("aria-disabled", "true");
-  await edit.click({ force: true });
-  await expect(form.getByLabel("role label")).toHaveValue("Sponsor of the work");
-});

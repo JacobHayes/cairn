@@ -5,11 +5,10 @@
 // The browser's own tooltip is excluded on every page by the invariants (e2e/tips.ts).
 import type { Locator, Page } from "@playwright/test";
 
-import { pointOn } from "./canvas.ts";
-import { open, openAt, nodeCard, nodePanel, settled, whenSettled } from "./shell.ts";
+import { open, openAt, nodeCard, settled, whenSettled } from "./shell.ts";
 import { publishStressJourney } from "./stress.ts";
 import { expect, test } from "./test.ts";
-import { HOVER_LEAVE_MS, TIP_SHOW_MS } from "../src/ui/tip.ts";
+import { TIP_SHOW_MS } from "../src/ui/tip.ts";
 import { expectTipInWindow, openTip } from "./tips.ts";
 
 const FIXTURE = "j_launch";
@@ -27,67 +26,6 @@ async function tabTo(page: Page, target: Locator): Promise<void> {
 
 /** The words of the tip that is open. */
 const tipWords = async (page: Page): Promise<string> => (await whenSettled(page, () => openTip(page).locator(".tip-words").textContent())) ?? "";
-
-test("a control's tip waits for the pointer to rest, then follows it to a neighbour at once, with its key, and stays for a pointer moving onto it", async ({ page }) => {
-  await page.clock.install();
-  await openAt(page, FIXTURE, "graph");
-  const depth = page.getByTestId("depth-button");
-  const frontier = page.getByTestId("chip-frontier");
-  await depth.hover();
-  await expect(openTip(page)).toHaveCount(0);
-  await page.clock.runFor(TIP_SHOW_MS);
-  await expect(openTip(page)).toBeVisible();
-  await expectTipInWindow(page);
-  await expect(depth).toHaveAccessibleDescription(await tipWords(page));
-  // Straight onto the neighbour: its tip is there with no wait, and carries its key.
-  await frontier.hover();
-  await expect(openTip(page).locator("kbd")).toHaveText("Shift F");
-  await expect(frontier).toHaveAccessibleDescription(await tipWords(page));
-  // Slowly onto the tip itself: it stays, hoverable.
-  const [control, tip] = await whenSettled(page, () => Promise.all([frontier.boundingBox(), openTip(page).boundingBox()]));
-  if (control === null || tip === null) {
-    throw new Error("no boxes");
-  }
-  const [x, y] = [control.x + control.width / 2, control.y + control.height - 1];
-  await page.mouse.move(x, y);
-  for (const at of [y + 3, tip.y + 2]) {
-    await page.mouse.move(x, at);
-    await page.clock.runFor(HOVER_LEAVE_MS / 4);
-  }
-  await page.clock.runFor(3 * HOVER_LEAVE_MS);
-  await expect(openTip(page)).toBeVisible();
-  // Off both: gone.
-  await page.mouse.move(5, 400);
-  await page.clock.runFor(3 * HOVER_LEAVE_MS);
-  await expect(openTip(page)).toHaveCount(0);
-});
-
-test("a tip shows at once on keyboard focus, stays while the focus does, and Esc hides it and nothing else", async ({ page }) => {
-  await page.clock.install();
-  await openAt(page, FIXTURE, "graph", { node: "n_announcement" });
-  await expect(nodePanel(page, "n_announcement")).toBeVisible();
-  const frontier = page.getByTestId("chip-frontier");
-  await tabTo(page, frontier);
-  expect(await tipWords(page)).toContain("Light up");
-  await page.mouse.move(300, 500);
-  await page.clock.runFor(2 * TIP_SHOW_MS);
-  await expect(openTip(page)).toBeVisible();
-  // The first Esc hides the tip: the focus and the selection stay. The second does the usual.
-  await page.keyboard.press("Escape");
-  await expect(openTip(page)).toHaveCount(0);
-  await expect(frontier).toBeFocused();
-  await expect(nodePanel(page, "n_announcement")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(nodePanel(page, "n_announcement")).toHaveCount(0);
-});
-
-test("the inspector's Hide tip keeps clear of the window's right edge", async ({ page }) => {
-  await openAt(page, FIXTURE, "graph", { node: "n_announcement" });
-  await page.getByRole("button", { name: "Hide inspector" }).hover();
-  await expect(openTip(page)).toBeVisible();
-  await expectTipInWindow(page, 8);
-  await expect(openTip(page).locator("kbd")).toHaveText("]");
-});
 
 test("a card title cut short shows whole in a tip, promptly; a title that fits shows none", async ({ page }) => {
   await page.clock.install();
@@ -172,31 +110,4 @@ test("the rail's ? is drawn where the page binds keys, previews them on hover, a
   await expectTipInWindow(page, 12);
   await keys.click();
   await expect(page.getByTestId("key-sheet")).toBeVisible();
-});
-
-test("a line's tip goes when the view that drew it does, without the pointer moving", async ({ page }) => {
-  await openAt(page, FIXTURE, "graph");
-  await settled(page);
-  const at = await pointOn(page.locator(".react-flow__edge").first());
-  await page.mouse.move(at.x, at.y);
-  await expect(openTip(page)).toBeVisible();
-  await page.keyboard.press("v");
-  await expect(page.getByTestId("canvas")).toHaveCount(0);
-  await expect(openTip(page)).toHaveCount(0);
-});
-
-test("a scroll in another scroller does not take a tip from a pointer resting on its control", async ({ page }) => {
-  await page.clock.install();
-  await openAt(page, FIXTURE, "graph");
-  await page.getByTestId("chip-frontier").hover();
-  await expect(openTip(page)).toHaveCount(0);
-  await page.evaluate(() => {
-    const other = document.createElement("div");
-    other.style.cssText = "position:fixed;left:0;bottom:0;width:20px;height:20px;overflow:auto";
-    other.innerHTML = '<div style="height:200px"></div>';
-    document.body.append(other);
-    other.scrollTop = 40;
-  });
-  await page.clock.runFor(TIP_SHOW_MS);
-  await expect(openTip(page)).toBeVisible();
 });

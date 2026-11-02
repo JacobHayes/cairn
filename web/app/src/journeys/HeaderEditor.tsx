@@ -31,9 +31,7 @@ export function HeaderEditor({ ready }: { ready: Ready }) {
     );
   }
   const { base, deployment } = form.draft;
-  // A draft kept before owners were edited here has none.
-  const stored: Partial<HeaderDraft> = form.draft.value;
-  const value: HeaderDraft = { ...form.draft.value, owners: stored.owners ?? [] };
+  const value = form.draft.value;
   const save = async () => {
     const description = value.description.trim();
     const mutation = { op: "edit_journey" as const, name: value.name.trim(), ...(description === "" ? {} : { description }), owners: value.owners };

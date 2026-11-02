@@ -136,18 +136,6 @@ test("a pin carries a time of day, which is shown on the node and kept across a 
   await expect(dates).not.toContainText("14:30");
 });
 
-test("a node held by its container's snooze offers Unsnooze of the container, which lifts it (B6)", async ({ page }) => {
-  const panel = await openNode(page, "j_launch", "n_announcement");
-  await menuItem(panel, "snooze");
-  await panel.getByRole("radio", { name: /^All of / }).first().check();
-  await panel.getByTestId("snooze").getByRole("button", { name: "Snooze", exact: true }).click();
-  const unsnooze = panel.getByTestId("actions").getByRole("button", { name: /^Unsnooze / });
-  await expect(unsnooze).toBeVisible();
-  await unsnooze.click();
-  await expect(unsnooze).toHaveCount(0);
-  await expect(panel.getByRole("button", { name: "Mark done" })).toBeVisible();
-});
-
 test("a milestone done on a phone: an empty date says what to choose and blocks Mark done, done leaves its sentence a readable line, and editing the date offers Save only for a new one", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openAt(page, "j_vendor_eval", "list", { node: "n_decision_meeting" });
@@ -256,17 +244,7 @@ test("a checklist is written in the node form, ticked in place, finished with Ma
   await expect(done.getByTestId("detail-sentence")).toContainText("Support team briefed");
 });
 
-test("leaving the new-item field adds the typed item and clears the field (G5)", async ({ page }) => {
-  await openEditing(page, "j_bakeoff");
-  await openFromCanvas(page, "n_trial_b");
-  const completion = await openForm(page, "completion");
-  await completion.getByLabel("New item", { exact: true }).fill("Left behind");
-  await completion.getByLabel("Requires all items ticked before done").focus();
-  await expect(completion.getByTestId("checklist-item-edit")).toHaveCount(1);
-  await expect(completion.getByLabel("New item", { exact: true })).toHaveValue("");
-});
-
-test("one press of Save keeps an item typed in the new-item field when it is the only change (G5)", async ({ page }) => {
+test("one press of Save keeps an item typed in the new-item field when it is the only change, and leaving the field adds the typed item and clears it (G5)", async ({ page }) => {
   await openEditing(page, "j_bakeoff");
   await openFromCanvas(page, "n_trial_b");
   const completion = await openForm(page, "completion");
@@ -278,6 +256,13 @@ test("one press of Save keeps an item typed in the new-item field when it is the
   await openJourney(page, "j_bakeoff");
   const panel = await openFromCanvas(page, "n_trial_b");
   await expect(panel.getByTestId("checklist").getByTestId("checklist-item")).toHaveText(["Solo item"]);
+  await openEditing(page, "j_bakeoff");
+  await openFromCanvas(page, "n_trial_b");
+  const again = await openForm(page, "completion");
+  await again.getByLabel("New item", { exact: true }).fill("Left behind");
+  await again.getByLabel("Requires all items ticked before done").focus();
+  await expect(again.getByTestId("checklist-item-edit")).toHaveCount(2);
+  await expect(again.getByLabel("New item", { exact: true })).toHaveValue("");
 });
 
 test("a checklist item typed and not added survives a reload, and a replacement for a removed ticked item starts unticked (G5)", async ({ page }) => {

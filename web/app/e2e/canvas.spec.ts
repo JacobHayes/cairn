@@ -11,7 +11,7 @@ import { openTip } from "./tips.ts";
 
 import { expectTitleLinesAsLaidOut, lineBetween, pointOn, viewportOf } from "./canvas.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { goWithin, nodeCard, nodePanel, openFromCanvas, openJourney, openSheet, readable, setDepth, setFade, settled, visit, whenSettled } from "./shell.ts";
+import { nodeCard, nodePanel, openFromCanvas, openJourney, openSheet, readable, setDepth, setFade, settled, visit, whenSettled } from "./shell.ts";
 
 /** The open Filter counts what it hides beside its box, and showing the not relevant removes the count. */
 async function filterCountsWhatItHides(page: Page): Promise<void> {
@@ -291,89 +291,6 @@ test("selection is one set with no mode: click selects, shift-click adds, the in
   await menuArrowsSkipDisabled(page);
   await checkpoint(page);
   await contextMenuActsOnTheSelection(page);
-});
-
-/** Under Fade the cards below the depth are 0.3 whatever their state, a container holding a decision stays clear, and Frontier's dimming joins it without multiplying. */
-async function fadeAndFrontierLevels(page: Page): Promise<void> {
-  const read = () =>
-    whenSettled(page, () => page.getByTestId("node-card").evaluateAll((found) =>
-      found.map((card) => ({
-        key: card.getAttribute("data-node") ?? "",
-        kind: card.getAttribute("data-kind") ?? "",
-        parent: card.getAttribute("data-parent"),
-        done: card.classList.contains("node-done"),
-        here: card.getAttribute("data-here") ?? "",
-        opacity: Number(getComputedStyle(card).opacity),
-      })),
-    ));
-  const cards = await read();
-  const held = new Set(cards.filter((card) => card.kind === "decision").flatMap((card) => {
-    const above: string[] = [];
-    for (let at = card.parent; at !== null; at = cards.find((each) => each.key === at)?.parent ?? null) {
-      above.push(at);
-    }
-    return above;
-  }));
-  const below = (card: (typeof cards)[number]) => (card.kind === "deliverable" || card.kind === "action") && !held.has(card.key);
-  // The fixture has what the rule needs to be seen: work below the depth, done and open, and a deliverable holding a decision or a group in focus.
-  expect(cards.filter((card) => below(card) && card.done).length).toBeGreaterThan(0);
-  expect(cards.filter((card) => below(card) && !card.done).length).toBeGreaterThan(0);
-  for (const card of cards) {
-    expect(card.opacity, `${card.key} (${card.kind}${card.done ? ", done" : ""})`).toBeCloseTo(below(card) ? 0.3 : card.done ? 0.5 : 1);
-  }
-  // With Frontier on as well, a card out of either focus is 0.3, never 0.3 times 0.3.
-  await page.getByTestId("chip-frontier").click();
-  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
-  await expect.poll(async () => (await read()).some((card) => !below(card) && !card.here.includes("actionable now") && card.opacity < 0.5)).toBe(true);
-  for (const card of await read()) {
-    expect(card.opacity, card.key).toBeGreaterThanOrEqual(0.3 - 1e-9);
-    expect([0.3, 0.5, 1].some((level) => Math.abs(card.opacity - level) < 1e-6), `${card.key} is at a level`).toBe(true);
-  }
-  await checkpoint(page);
-}
-
-/** Reveal's nodes are dimmed by the depth under Fade as the rest are, never lifted by the trace (Frontier off, so it supplies no opacity). */
-async function revealedNodesStayDimmed(page: Page): Promise<void> {
-  await page.getByTestId("chip-frontier").click();
-  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "false");
-  await nodeCard(page, "n_partner_runs").getByTestId("card-open").click();
-  await expect(page.getByTestId("trace-reveal")).toBeVisible();
-  await page.getByTestId("trace-reveal").click();
-  await expect(page.getByTestId("trace-reveal")).toHaveText("Hide revealed nodes");
-  for (const key of ["n_criteria", "n_partner_results"]) {
-    await expect(nodeCard(page, key), key).toBeVisible();
-    await expect(nodeCard(page, key), key).toHaveCSS("opacity", "0.3");
-  }
-  await checkpoint(page);
-}
-
-/** At the stock view, open and in focus is full and done is half; a trace puts what is outside it at a third. */
-async function stockAndTracedOpacity(page: Page): Promise<void> {
-  await goWithin(page, "/journeys/j_vendor_eval?view=graph&depth=actions");
-  await expect(nodeCard(page, "n_plan")).toBeVisible();
-  await page.keyboard.press("f");
-  await expect(nodeCard(page, "n_reporting")).toHaveCSS("opacity", "1");
-  await expect(nodeCard(page, "n_testing")).toHaveCSS("opacity", "0.5");
-  // Tracing a card puts what is outside the trace at a third, done or not: the levels are never multiplied.
-  await nodeCard(page, "n_final_review").getByTestId("card-open").click({ force: true });
-  await expect(nodeCard(page, "n_purpose")).toHaveCSS("opacity", "0.3");
-  // The final review closes at the decision meeting: with its Dates section folded that card is outside the trace; open, it is the far end of a date line and stays in focus.
-  await setDatesOpen(page, "n_final_review", false);
-  await expect(nodeCard(page, "n_decision_meeting")).toHaveCSS("opacity", "0.3");
-  await setDatesOpen(page, "n_final_review", true);
-  await expect(nodeCard(page, "n_decision_meeting")).toHaveCSS("opacity", "1");
-  await expect(nodeCard(page, "n_kickoff")).toHaveCSS("opacity", "0.5");
-}
-
-test("C2, DESIGN opacity: a card takes the lowest opacity that applies: under Fade the cards below the depth are 0.3 whatever their state, a container holding a decision stays clear, Frontier's dimming joins it without multiplying, and a trace's never lifts it", async ({ page }) => {
-  await readable(page);
-  await openJourney(page, "j_vendor_eval", "?depth=decisions&fade=1");
-  await expect(nodeCard(page, "n_plan")).toBeVisible();
-  await fadeAndFrontierLevels(page);
-  await checkpoint(page);
-  await revealedNodesStayDimmed(page);
-  await checkpoint(page);
-  await stockAndTracedOpacity(page);
 });
 
 /** A line between folded stages opens the links it stands for, and each end is a link. */

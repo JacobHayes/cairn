@@ -65,9 +65,7 @@ function NewJourneyForm({ routes, initial, asked }: { routes: RouteSummary[]; in
   const navigate = useNavigate();
   const write = useScreenWrite("new-journey");
   const [draft, setDraft] = useDraft<Form>(`new-journey:${asked}`);
-  // A draft kept before owners were chosen here has none.
-  const stored: Partial<Form> = draft ?? initial;
-  const form: Form = { ...(draft ?? initial), owners: stored.owners ?? [] };
+  const form = draft ?? initial;
   const deployment = useDeployment();
   const chosen = routes.find((route) => route.header.id === form.route);
   // A route chosen, or kept in the draft, that is no longer offered (retired meanwhile) is not

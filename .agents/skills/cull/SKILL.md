@@ -21,7 +21,7 @@ Copies of one rule rarely look alike. Start from each rule's owner and ask who e
 
 ## Evidence
 
-Confirm each finding at every copy, and drop what you cannot confirm. For tests, use the evidence that exists: CI's per-test browser report, the Rust suite and step times. A test earns its place only by a break it would catch that is likely, matters to a person or agent using Cairn, and nothing cheaper catches (a unit test, the walks' structural rules, another test); many things are not worth testing at all. Judge every test in scope this way, not only the ones another test repeats: name the break or say there is none, and default to cutting a test that cannot name one. "It covers a write path" or "it is wiring" is not a break.
+Confirm each finding at every copy, and drop what you cannot confirm. For tests, hold every test in scope to PRACTICES.md on what a test earns its place by, not only the ones another test repeats, with the evidence that exists: CI's per-test browser report, the Rust suite and step times. Name the break each would catch or say there is none, and default to cutting a test that cannot name one; "it covers a write path" or "it is wiring" is not a break. Rank by cost against value: a slow test of middling worth, or a walk visiting more states or widths than its breaks need, comes before a quick test of none.
 
 ## Output
 

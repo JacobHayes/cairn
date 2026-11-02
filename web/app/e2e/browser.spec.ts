@@ -10,8 +10,6 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
 
-import { openRoute, routeMenuItem, savedText } from "./around.ts";
-import { TOAST_MS } from "../src/data/toasts.ts";
 import { HOVER_LEAVE_MS } from "../src/ui/tip.ts";
 import { derivedRevision, expectAddress, fresh, goTo, goWithin, openJourney, readable, recentSaves, rename, syncChip, visit, whenSettled } from "./shell.ts";
 
@@ -162,40 +160,4 @@ test("the sync dot shows its popover on hover and focus, inside the window; it o
   const size = page.viewportSize();
   await page.setViewportSize({ width: (size?.width ?? 1280) - 40, height: size?.height ?? 720 });
   await expect(popover).toHaveCount(0);
-});
-
-test("a toast stays while the pointer is on it, the next one replaces it, and it goes after the pointer leaves", async ({ page }) => {
-  await openRoute(page, "hiring-loop");
-  // The toast's time is a timer the test runs, so a slow machine cannot let it lapse before the pointer is on it.
-  await page.clock.install();
-  await page.clock.pauseAt(new Date(Date.now() + 60_000));
-  const toast = page.getByTestId("toast");
-  await savedText(page, () => routeMenuItem(page, "menu-export"));
-  await expect(toast).toHaveText("Route file exported");
-  // Whether the pointer is on the toast, as the browser has it: the time a pointer move has been taken in, since the toast's hold follows the browser's enter and leave.
-  const pointerOn = (on: boolean) => expect.poll(() => toast.evaluate((element) => element.matches(":hover"))).toBe(on);
-  await toast.hover();
-  await pointerOn(true);
-  // Past the toast's time, the pointer holds it.
-  await page.clock.runFor(TOAST_MS.confirm + 1000);
-  await expect(toast).toBeVisible();
-  // The next toast, raised from the keyboard with the pointer still on the toast, replaces it (a new element) and is held too.
-  const first = await toast.elementHandle();
-  await page.getByTestId("route-menu").focus();
-  await page.keyboard.press("Enter");
-  await page.getByTestId("menu-export").focus();
-  await savedText(page, () => page.keyboard.press("Enter"));
-  await expect.poll(() => first.evaluate((element) => element.isConnected)).toBe(false);
-  await expect(toast).toHaveCount(1);
-  await pointerOn(true);
-  // A new element under a still pointer is entered at the browser's next pointer move, which a loaded machine may take late: move within the toast, so its enter has come before the pointer leaves.
-  const box = (await whenSettled(page, () => toast.boundingBox())) ?? { x: 0, y: 0, width: 0, height: 0 };
-  await page.mouse.move(box.x + box.width / 2 + 2, box.y + box.height / 2 + 2);
-  await page.clock.runFor(TOAST_MS.confirm + 1000);
-  await expect(toast).toBeVisible();
-  // Once the pointer has left, the toast goes after its full time.
-  await page.mouse.move(5, 5);
-  await pointerOn(false);
-  await page.clock.runFor(TOAST_MS.confirm + 1000);
-  await expect(toast).toHaveCount(0);
 });

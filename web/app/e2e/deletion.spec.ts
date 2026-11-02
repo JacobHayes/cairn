@@ -62,16 +62,3 @@ test("A19, C17: a route nothing uses is deleted from its menu, and one a journey
   await expect(page).toHaveURL(/\/routes$/);
   await expect(page.locator(`a[href="/routes/${id}"]`)).toHaveCount(0);
 });
-
-test("C16: a Shift-click picks every journey from the last one picked to the one clicked", async ({ page }) => {
-  await open(page, "/journeys?status=any");
-  const rows = page.getByTestId("journey-row");
-  await expect(rows.nth(2)).toBeVisible();
-  await rows.nth(0).getByRole("checkbox").check();
-  await rows.nth(2).getByRole("link").first().click({ modifiers: ["Shift"] });
-  await expect(page).toHaveURL(/\/journeys\?status=any$/);
-  for (const at of [0, 1, 2]) {
-    await expect(rows.nth(at)).toHaveAttribute("data-selected", "true");
-  }
-  await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "3");
-});

@@ -9,7 +9,7 @@
 // every view, Fade moves nothing, and the walk through at Decisions is the decision walkthrough.
 import { type Locator, type Page } from "@playwright/test";
 
-import { allowHoldingChecks, checksAsked, holdChecks, releaseChecks } from "./held-checks.ts";
+import { allowHoldingChecks, checksAsked } from "./held-checks.ts";
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
 
@@ -371,25 +371,6 @@ test("C2, C9: a search narrows the graph to its matches and fits them; nothing m
   await expect(page.getByTestId("list-row").first()).toBeVisible();
 });
 
-test("C1, C9: the Filter's badge counts the rows its settings take off the list and never the not relevant; the open Filter counts what a setting hides beside it", async ({ page }) => {
-  await openAt(page, "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
-  const total = async () => Number(await whenSettled(page, () => page.getByTestId("list-total").getAttribute("data-total")));
-  const badge = page.getByTestId("filter-badge");
-  await expect(badge).toHaveCount(0);
-  const before = await total();
-  await page.getByTestId("filter-button").click();
-  await page.getByTestId("flag-unassigned").click();
-  await expect.poll(total).toBeLessThan(before);
-  const hidden = before - (await total());
-  // A badge past 9 reads 9+, so the exact count is the setting's own beside its box.
-  await expect(page.getByTestId("flag-unassigned-count")).toHaveText(String(hidden));
-  await expect(badge).toHaveText(hidden > 9 ? "9+" : String(hidden));
-  // Showing the not relevant leaves the badge where it was: they are never counted.
-  await page.getByTestId("show-not-relevant").click();
-  await expect(page.getByTestId("show-not-relevant")).toHaveAttribute("data-status", "on");
-  await expect(badge).toHaveText(hidden > 9 ? "9+" : String(hidden));
-});
-
 test("C2: a fold holds until a depth is picked: back at Actions after another depth, every level is open again", async ({ page }) => {
   await openAt(page, "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   const fold = () => listRow(page, "n_setup").getByTestId("list-fold");
@@ -572,49 +553,11 @@ test("C9, C11: the View picker works from the keyboard: it opens on the current 
   await expect(page.getByTestId("journey-status")).toHaveCount(0);
 });
 
-test("B11, A19, C16: the status moves from the menu's Status, and the header says when the journey is not active", async ({ page }) => {
-  await openAt(page, "j_vendor_eval", "graph", { fixedToday: FIXED_TODAY });
-  const menu = page.getByTestId("journey-menu");
-  const status = page.getByTestId("menu-status");
-  const chip = page.getByTestId("journey-status");
-  // Active says nothing beside the name; the Status row says so, closed, and opens to the moves.
-  await expect(chip).toHaveCount(0);
-  await menu.click();
-  await expect(status).toHaveAttribute("data-status", "active");
-  await expect(status).toHaveAttribute("aria-expanded", "false");
-  await expect(page.getByTestId("status-completed")).toHaveCount(0);
-  await status.click();
-  await expect(page.getByTestId("status-completed")).toBeVisible();
-  await expect(page.getByTestId("status-archived")).toBeVisible();
-  await expect(page.getByTestId("status-delete")).toHaveCount(0);
-  await page.getByTestId("status-archived").click();
-  await expect(chip).toHaveAttribute("data-status", "archived");
-  // Archived: no Edit, a way back, and deletion.
-  await menu.click();
-  await expect(page.getByTestId("menu-edit")).toHaveCount(0);
-  await status.click();
-  await expect(page.getByTestId("status-active")).toBeVisible();
-  await expect(page.getByTestId("status-completed")).toBeVisible();
-  await expect(page.getByTestId("status-delete")).toBeVisible();
-  await page.getByTestId("status-completed").click();
-  await expect(chip).toHaveAttribute("data-status", "completed");
-  await setStatus(page, "active");
-  await expect(chip).toHaveCount(0);
-  // Deletion is asked for once archived, and once it lands the index is shown without it.
-  await setStatus(page, "archived");
-  await menu.click();
-  await status.click();
-  await page.getByTestId("status-delete").click();
-  const confirm = page.getByTestId("delete-confirm");
-  await expect(confirm).toHaveAttribute("data-count", "1");
-  await confirm.getByTestId("delete-confirmed").click();
-  await expect(page).toHaveURL(/\/journeys\?status=any$/);
-  await expect(page.locator('[data-testid="journey-row"][data-journey="j_vendor_eval"]')).toHaveCount(0);
-});
-
-test("B11: an archived journey takes no write: the open node keeps only where to find it, and the list offers nothing to act on", async ({ page }) => {
+test("B11: an archived journey takes no write and says so: the header names its status, the open node keeps only where to find it, and the list and the Summary offer nothing to act on", async ({ page }) => {
   const node = "n_announcement";
   await openAt(page, "j_launch", "list?frontier=1");
+  // Active says nothing beside the name.
+  await expect(page.getByTestId("journey-status")).toHaveCount(0);
   await page.locator(`[data-testid="list-row"][data-node="${node}"] a[data-node="${node}"]`).click();
   const actions = nodePanel(page, node).getByTestId("actions");
   await expect(actions.getByRole("button").nth(1)).toBeVisible();
@@ -628,16 +571,10 @@ test("B11: an archived journey takes no write: the open node keeps only where to
   await expect(page.getByRole("menuitem", { name: "Rename" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(rowActs).toHaveCount(0);
-});
-
-test("C13: a pan does not come back when the range is chosen away and back", async ({ page }) => {
-  await openAt(page, "j_vendor_eval", "timeline");
-  await page.getByTestId("timeline").hover();
-  await page.mouse.wheel(300, 0);
-  await expect(page.getByTestId("timeline-reset")).toBeVisible();
-  await page.getByTestId("timeline-range").getByText("Month", { exact: true }).click();
-  await page.getByTestId("timeline-range").getByText("Fit", { exact: true }).click();
-  await expect(page.getByTestId("timeline-reset")).toHaveCount(0);
+  await openAt(page, "j_launch", "summary");
+  await expect(page.getByTestId("summary-lead")).toBeVisible();
+  await expect(page.locator(".summary .row-act")).toHaveCount(0);
+  await expect(page.getByTestId("summary-about").getByRole("button")).toHaveCount(0);
 });
 
 test("C9: a search the engine refuses is said at the box and not applied; one it reads is applied", async ({ page }) => {
@@ -671,18 +608,4 @@ test("C9: a search is read as it is typed: the reason shows once the typing rest
   await expect(page.getByTestId("problem")).toHaveCount(0);
   await expect(box).not.toHaveAttribute("aria-invalid", "true");
   expect(new URL(page.url()).searchParams.has("q")).toBe(false);
-});
-
-test("C9: a search the engine is still reading is dropped when the box is cleared meanwhile", async ({ page }) => {
-  await allowHoldingChecks(page);
-  await openJourney(page, "j_launch", "?view=graph");
-  await holdChecks(page);
-  const box = page.getByTestId("toolbar-search");
-  await box.fill("kickoff");
-  await box.press("Enter");
-  await box.fill("");
-  await releaseChecks(page);
-  await settled(page);
-  expect(new URL(page.url()).searchParams.has("q")).toBe(false);
-  await expect(box).toHaveValue("");
 });

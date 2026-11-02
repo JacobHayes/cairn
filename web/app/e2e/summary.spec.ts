@@ -7,7 +7,6 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
 
-import { setStatus } from "./around.ts";
 import { countOf, keysOf, panelOf, rowsOf, stall, startOnSummary } from "./summary.ts";
 import { goTo, nodePanel, openAt, whenSettled } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
@@ -126,23 +125,6 @@ test("C18, H6: a list past five rows shows five and Show all reveals the rest wi
   expect(painted).toBe("rgb(255, 255, 255) rgb(0, 0, 0)");
 });
 
-test("C18, A19: an archived journey's Summary is read-only: its notes are shown, what it waits on is listed, and nothing offers a change or an action", async ({ page }) => {
-  await stall(page, "j_bakeoff", ["n_trial_a", "n_trial_b", "n_wrap_up"]);
-  await expect(page.getByRole("button", { name: "Unsnooze" }).first()).toBeVisible();
-  const about = page.getByTestId("summary-about");
-  await about.getByRole("button", { name: "Add a note or link" }).click();
-  await about.getByLabel("Note").fill("A note kept on the journey");
-  await about.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(about.getByTestId("annotation")).toHaveCount(1);
-  await setStatus(page, "archived");
-  await expect(page.getByTestId("summary-lead")).toBeVisible();
-  await expect(about.getByTestId("annotation")).toHaveCount(1);
-  await expect(page.locator(".summary .row-act")).toHaveCount(0);
-  await expect(about.getByRole("button")).toHaveCount(0);
-  await expect(page.getByTestId("stalled")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Unsnooze" })).toHaveCount(0);
-});
-
 test("D5: the list's stalled panel offers the same actions, and an unsnooze acts in place", async ({ page }) => {
   await stall(page, "j_bakeoff", ["n_trial_a", "n_trial_b", "n_wrap_up"]);
   await goTo(page, "list");
@@ -156,36 +138,5 @@ test("D5: the list's stalled panel offers the same actions, and an unsnooze acts
   // The unsnoozed node can be acted on again, so nothing is stalled.
   await expect(page.getByTestId("stalled")).toHaveCount(0);
   expect(before).toBeGreaterThan(0);
-});
-
-test("C18: a journey with no node invites planning and offers no completion", async ({ page }) => {
-  // Wide enough for two columns beside the side panel the assistant's tab opens.
-  await page.setViewportSize({ width: 1800, height: 900 });
-  await startOnSummary(page, undefined);
-  await expect(page.getByTestId("summary-empty")).toBeVisible();
-  await expect(page.getByTestId("completion-suggested")).toHaveCount(0);
-  // The invitation leads and the description sits beside it, not as wide as it.
-  const [invite, about] = await whenSettled(page, () => Promise.all([page.getByTestId("summary-empty").boundingBox(), page.getByTestId("summary-about").boundingBox()]));
-  expect(about?.width ?? 9999).toBeLessThan(invite?.width ?? 0);
-  await page.getByTestId("summary-plan").click();
-  await expect(page).toHaveURL(/view=graph.*edit=on|edit=on.*view=graph/);
-});
-
-test("B11, C18: a completed journey still says what is left, has no Waiting on you, and prints its status beside its name and not the controls", async ({ page }) => {
-  await openAt(page, "j_launch", "summary", fixed);
-  await expect(panelOf(page, "summary-yours")).toBeVisible();
-  await setStatus(page, "completed");
-  await expect(page.getByTestId("summary-left")).toHaveAttribute("data-remaining", /^[1-9]/);
-  await expect(panelOf(page, "summary-yours")).toHaveCount(0);
-  // It says it is closed and what it left, and lists that as left unfinished, not as next.
-  const remaining = await whenSettled(page, () => page.getByTestId("summary-left").getAttribute("data-remaining"));
-  await expect(page.getByTestId("summary-lifecycle")).toContainText(String(remaining));
-  await expect(panelOf(page, "summary-next")).toHaveAttribute("aria-label", /ready or active/i);
-  await goTo(page, "list");
-  await goTo(page, "summary");
-  await expect(page.getByTestId("summary-lead")).toBeVisible();
-  await page.emulateMedia({ media: "print" });
-  await expect(page.getByTestId("journey-status")).toBeVisible();
-  await expect(page.getByTestId("view-picker")).toBeHidden();
 });
 

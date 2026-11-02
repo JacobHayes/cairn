@@ -291,42 +291,6 @@ async function phoneSheetFoldsAndReturns(page: Page): Promise<void> {
   expect(await snapOf(page)).toBe("half");
 }
 
-
-const sheetBox = async (page: Page) => (await whenSettled(page, () => sheet(page).boundingBox())) ?? { y: 0, height: 0 };
-const graphShare = async (page: Page, height: number) => {
-  const canvas = (await whenSettled(page, () => page.getByTestId("canvas").boundingBox())) ?? { y: 0, height: 0 };
-  return (Math.min(canvas.y + canvas.height, (await sheetBox(page)).y) - canvas.y) / height;
-};
-
-
-async function phoneTurns(page: Page): Promise<void> {
-  await openAt(page, "j_hiring", "graph?depth=decisions");
-  await hiringNode(page).getByTestId("card-open").click();
-  await expect.poll(() => snapOf(page)).toBe("half");
-  expect((await sheetBox(page)).height).toBeCloseTo(844 * 0.4, 0);
-  // Turned, the sheet keeps its snap and takes the new window's height.
-  await page.setViewportSize({ width: 844, height: 390 });
-  await expect.poll(async () => (await sheetBox(page)).height).toBeCloseTo(390 * 0.4, 0);
-  expect(await snapOf(page)).toBe("half");
-  await expect.poll(() => graphShare(page, 390)).toBeGreaterThan(0.25);
-  // A landscape phone's peek is a small share of a short window, so the graph keeps most of it.
-  await handle(page).focus();
-  await page.keyboard.press("ArrowDown");
-  await expect.poll(() => snapOf(page)).toBe("peek");
-  expect((await sheetBox(page)).height).toBeLessThan(390 * 0.3);
-  await expect.poll(() => graphShare(page, 390)).toBeGreaterThan(0.5);
-  await expect(page.locator(".inspector-head")).toBeInViewport();
-  await page.keyboard.press("ArrowUp");
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect.poll(async () => (await sheetBox(page)).height).toBeCloseTo(844 * 0.4, 0);
-  // A desktop width is a column beside the workspace; narrowing again keeps the sheet's snap.
-  await page.setViewportSize({ width: 1440, height: 800 });
-  await expect.poll(async () => (await sheet(page).boundingBox())?.width ?? 0).toBeLessThan(500);
-  expect((await sheetBox(page)).height).toBeGreaterThan(600);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect.poll(async () => (await sheetBox(page)).height).toBeCloseTo(844 * 0.4, 0);
-}
-
 test.describe("a phone", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -339,7 +303,4 @@ test.describe("a phone", () => {
     await phoneSheetFoldsAndReturns(page);
   });
 
-  test("the sheet keeps its snap and takes the new window's height when the phone turns, its peek on a short window leaves the graph most of it, and a desktop width puts it in its column", async ({ page }) => {
-    await phoneTurns(page);
-  });
 });

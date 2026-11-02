@@ -83,6 +83,8 @@ Limits are named constants, each with the reason for its value in its doc commen
 
 **One structural check beats a test per case.** A property that must hold everywhere (no id in served text, nothing outside its box, a tool list within budget) is one check every case runs through.
 
+**A test earns its place by a break it would catch** that is likely, matters to a person or agent using Cairn, and nothing cheaper catches; weigh that against what the test costs on every run. Not worth a test: a rule a unit test already holds, replayed through a browser; a CSS value or box sum restated; the framework doing its job; a cosmetic slip nobody loses work over; a fallback the code should not have.
+
 - **Scenario tests** cover every product rule once, at a fixed clock over the shared fixtures, citing the requirement ids they cover.
 - **Replay**: engine tests apply through a helper that replays the patch's events and compares with stored state.
 - **Property tests** over generated graphs and operation sequences: apply then replay equals apply; a rejected patch changes nothing; derive is pure and deterministic. They use `patina-dst-proptest`; a failing case becomes a scenario test, then a fix.
