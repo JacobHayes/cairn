@@ -1,10 +1,10 @@
 #!/usr/bin/env -S bash -euo pipefail
-#MISE description="Land the current change (only the fix while CI on main is red): under a lock, rebase it onto main, run the fast check on the result, and move the main bookmark to it (never pushes)"
+#MISE description="Land the current change and those under it above main (only the fix while CI on main is red): under a lock, rebase them onto main, run the fast check once on the result, and move the main bookmark to the top (never pushes)"
 # usage: mise run land [--fix]
 # The lock (scripts/locked, with CAIRN_LOCK_FILE) is a file in the jj repository's directory, so every workspace of the repository
 # lands one at a time and a change is always checked on the main it will sit on. The change
-# is the working copy, or its parent when the working copy is empty. The rebase moves the
-# change and its working copy with it; a stack of more than one commit, or a conflict, stops the landing.
+# is the working copy, or its parent when the working copy is empty, with every commit under it
+# above main. The rebase moves them and the working copy with them; a conflict stops the landing.
 # The fast check runs with the machine-wide check lock (scripts/locked) as it does anywhere;
 # the main bookmark moves only when it passes. The log of the check is dist/land-check.log.
 cd "$(dirname "$0")/.."
@@ -41,13 +41,8 @@ fi
 # The change is the working copy, or its parent when the working copy is empty.
 head=@
 if [ -n "$(jj log -r '@ & empty()' --no-graph -T 'change_id')" ]; then head='@-'; fi
-# One logical commit per landing: the fast check picks its steps from the working copy's (or its
-# parent's) files, so a stack could skip the steps its lower commits need.
-count=$(jj log -r "main..$head" --no-graph -T '"x"' | wc -c)
-if [ "$count" -ne 1 ]; then
-  echo "land: $count commits above main; squash them into one change and land again" >&2
-  exit 1
-fi
+# A stack lands in one check: the fast check picks its steps from every file the stack changes
+# (scripts/changed), so no commit in it skips the steps it needs.
 jj rebase -b "$head" -d main
 if [ -n "$(jj log -r "$head" --no-graph -T 'if(conflict, "conflict")')" ]; then
   echo "land: the rebase onto main left conflicts; resolve them and land again" >&2

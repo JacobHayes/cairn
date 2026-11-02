@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // What the current change touches, so the inner loop (`mise run check:fast`)
-// runs only the tests it can affect. The change is the files `jj diff -r @ --name-only` lists,
-// or `-r @-` when the working copy is empty (the usual state right after `jj commit`). When jj
-// is missing or the diff fails, everything counts as changed, so the answer errs toward
-// running more. The full `mise run check` and CI never ask.
+// runs only the tests it can affect. The change is every file the working copy's stack changes
+// since it left main, so a stack of several commits is checked for all of them at once; on main
+// itself it is main's newest commit (the usual state right after `jj commit`). When jj is missing
+// or the diff fails, everything counts as changed, so the answer errs toward running more. The
+// full `mise run check` and CI never ask.
 //
 // usage: scripts/changed
 //   Prints one line, "RUST WEB INTEGRATION COUNT": RUST, WEB, and INTEGRATION are 1 when the
@@ -40,10 +41,10 @@ function integrationInputs() {
 // The tooling that runs the checks and the pinned tools are inputs of both.
 const bothInputs = /^(scripts|mise-tasks|\.github)\/|^mise\.(toml|lock)$/;
 
-/** The files of the current change: the working copy's, or its parent's when that is empty. */
+/** The files of the current change: the stack's since it left main, or main's newest commit's when the working copy sits on main with nothing in it. */
 function changedFiles() {
-  for (const revision of ["@", "@-"]) {
-    const output = execFileSync("jj", ["diff", "-r", revision, "--name-only", "--color=never", "--no-pager"], {
+  for (const range of [["--from", "heads(::@ & ::main)", "--to", "@"], ["-r", "@-"]]) {
+    const output = execFileSync("jj", ["diff", ...range, "--name-only", "--color=never", "--no-pager"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });
