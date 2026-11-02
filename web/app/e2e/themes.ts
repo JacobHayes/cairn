@@ -49,10 +49,15 @@ export function themeDifferences(light: Snapshot, dark: Snapshot): string[] {
 /** The page, in the light theme, against itself in the dark; the page is in the light theme again afterwards. */
 export async function themeProblems(page: Page): Promise<string[]> {
   const light = await snapshotOf(page);
+  return inDark(page, async () => themeDifferences(light, await snapshotOf(page)));
+}
+
+/** What `read` finds with the page in dark, settled; the page is back in light after. */
+export async function inDark<T>(page: Page, read: () => Promise<T>): Promise<T> {
   await page.emulateMedia({ colorScheme: "dark" });
   try {
     await settled(page);
-    return themeDifferences(light, await snapshotOf(page));
+    return await read();
   } finally {
     await page.emulateMedia({ colorScheme: "light" });
   }
