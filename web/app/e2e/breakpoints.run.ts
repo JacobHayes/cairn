@@ -12,7 +12,7 @@ import { expect, test } from "./test.ts";
 
 import { DESKTOP_MIN } from "../src/shell/breakpoints.ts";
 import { checkpoint } from "./invariants.ts";
-import { walkStates } from "./screenshots.ts";
+import { MAX_STATE_VISITS, visitsAt, WALK_VIEWPORTS, walkStates } from "./screenshots.ts";
 import { mediaFeatures } from "./stylesheets.ts";
 
 /** The height every width is swept at. */
@@ -34,6 +34,11 @@ function thresholds(): number[] {
 }
 
 const WIDTHS = [...new Set([...thresholds(), ...FIXED])].sort((a, b) => a - b);
+
+const visits = visitsAt([...Object.values(WALK_VIEWPORTS).map((each) => each.width), ...WIDTHS]);
+if (visits > MAX_STATE_VISITS) {
+  throw new Error(`the screenshot walk and the sweep visit ${String(visits)} states, past their limit of ${String(MAX_STATE_VISITS)}: cut states or widths`);
+}
 
 for (const width of WIDTHS) {
   const phone = width < DESKTOP_MIN;

@@ -18,6 +18,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 import type { AddressName } from "../src/address.ts";
 import { JOURNEY_OFFERS, ROUTE_OFFERS } from "../src/journeys/view.ts";
+import { DESKTOP_MIN } from "../src/shell/breakpoints.ts";
 import { openJourneyCard } from "./around.ts";
 import { draftBreakdown, reviewOpen } from "./proposals.ts";
 import { section } from "./detail.ts";
@@ -348,6 +349,28 @@ const NEEDS_PROPOSALS: readonly AddressName[] = ["journeyProposals", "journeyPro
  * state, given what reaches it again. A state whose visit throws is listed with the rest, so one
  * run shows every state that fails; the list is returned.
  */
+/** The widths the screenshot walk runs at. */
+export const WALK_VIEWPORTS = { desktop: { width: 1440, height: 900 }, phone: { width: 390, height: 844 } } as const;
+
+/**
+ * The most state visits the screenshot walk and the breakpoint sweep make together in a check, one
+ * for each state at each width a walk runs at. They are most of the browser step's time, at one to
+ * three seconds a visit, and every state or width added multiplies; this holds them to about what
+ * the step spends on them now, so growth fails a check instead of slowing every one.
+ */
+export const MAX_STATE_VISITS = 252;
+
+/** The states of `address` a walk visits at a phone's width or a desktop's. */
+export function statesFor(address: AddressName, phone: boolean): State[] {
+  return SCREENS[address].filter((each: State) => each.only === undefined || each.only === (phone ? "phone" : "desktop"));
+}
+
+/** How many state visits walks at `widths` make in all. */
+export function visitsAt(widths: number[]): number {
+  const addresses = Object.keys(SCREENS) as AddressName[];
+  return widths.reduce((sum, width) => sum + addresses.reduce((count, address) => count + statesFor(address, width < DESKTOP_MIN).length, 0), 0);
+}
+
 export async function walkStates(
   page: Page,
   size: { width: number; height: number },
@@ -365,7 +388,7 @@ export async function walkStates(
       on = { ...on, proposals: await seedProposals(page, on) };
       await page.setViewportSize(size);
     }
-    for (const state of SCREENS[address].filter((each: State) => each.only === undefined || each.only === (phone ? "phone" : "desktop"))) {
+    for (const state of statesFor(address, phone)) {
       try {
         if (state.timed === true && on.timed !== true) {
           await seedTimes(page, on);

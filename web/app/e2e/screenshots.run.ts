@@ -12,17 +12,16 @@ import { join, resolve } from "node:path";
 import { expect, test } from "./test.ts";
 
 import { capture } from "./invariants.ts";
-import { SCREENS, walkStates } from "./screenshots.ts";
+import { SCREENS, WALK_VIEWPORTS, walkStates } from "./screenshots.ts";
 import { checkState } from "./walk-checks.ts";
 
 /** Where the pictures go; none are taken without it. */
 const dir = process.env["CAIRN_SCREENSHOTS_DIR"] === undefined ? undefined : resolve(process.env["CAIRN_SCREENSHOTS_DIR"]);
 
-const VIEWPORTS = { desktop: { width: 1440, height: 900 }, phone: { width: 390, height: 844 } } as const;
 /** Dark is pictured, never checked apart: the light run holds it to the same layout. */
 const THEMES = dir === undefined ? (["light"] as const) : (["light", "dark"] as const);
 
-for (const [viewport, size] of Object.entries(VIEWPORTS)) {
+for (const [viewport, size] of Object.entries(WALK_VIEWPORTS)) {
   // A phone is a touch screen: the coarse-pointer rules (touch-sized controls) apply to what is pictured.
   test.describe(`screenshots ${viewport}`, () => {
     test.use({ viewport: size, hasTouch: viewport === "phone" });
