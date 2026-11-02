@@ -89,7 +89,8 @@ fn hash_files(directory: &Path, prefix: &str, hasher: &mut DefaultHasher) -> io:
 
 /// Writes `fixtures.rs` (`src/fixtures.rs` includes it).
 fn write_fixtures() -> Result<(), Box<dyn std::error::Error>> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures");
+    // Read when the script runs: a compiled build script is reused when its checkout is copied or moved.
+    let root = Path::new(&std::env::var("CARGO_MANIFEST_DIR")?).join("../../fixtures");
     println!("cargo::rerun-if-changed={}", root.display());
     let mut names = Vec::new();
     for entry in fs::read_dir(&root)? {

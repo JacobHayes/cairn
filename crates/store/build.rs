@@ -8,7 +8,8 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/conformance");
+    // Read when the script runs: a compiled build script is reused when its checkout is copied or moved.
+    let directory = Path::new(&std::env::var("CARGO_MANIFEST_DIR")?).join("src/conformance");
     println!("cargo:rerun-if-changed={}", directory.display());
     let mut files: Vec<_> = std::fs::read_dir(&directory)?
         .map(|entry| entry.map(|entry| entry.path()))
