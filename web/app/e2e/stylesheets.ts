@@ -1,6 +1,5 @@
-// Reads the app's stylesheets for the sizes their media queries name: shared by the breakpoint
-// agreement test (src/shell/breakpoints.test.ts) and the breakpoint sweep (breakpoints.run.ts), so
-// one reader decides what a stylesheet's layout switches are.
+// Reads the app's stylesheets for the sizes their media queries name, for the breakpoint agreement
+// test (src/shell/breakpoints.test.ts).
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
