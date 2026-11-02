@@ -19,7 +19,7 @@ import { checkState } from "./walk-checks.ts";
 const dir = process.env["CAIRN_SCREENSHOTS_DIR"] === undefined ? undefined : resolve(process.env["CAIRN_SCREENSHOTS_DIR"]);
 
 const VIEWPORTS = { desktop: { width: 1440, height: 900 }, phone: { width: 390, height: 844 } } as const;
-/** Dark is pictured, never checked apart: the light run holds it to the same layout and runs axe in it. */
+/** Dark is pictured, never checked apart: the light run holds it to the same layout. */
 const THEMES = dir === undefined ? (["light"] as const) : (["light", "dark"] as const);
 
 for (const [viewport, size] of Object.entries(VIEWPORTS)) {

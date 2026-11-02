@@ -7,11 +7,11 @@ import { axeProblems } from "./axe.ts";
 import { focusRingProblems } from "./focus.ts";
 import { expectFoldsOpenStructure } from "./folds.ts";
 import { open } from "./shell.ts";
-import { inDark, themeProblems } from "./themes.ts";
+import { themeProblems } from "./themes.ts";
 
 /** What the walk checks in this state: the run it is in, and how to reach it again. */
 export interface Walk {
-  /** axe runs once per state, in the light run of the viewport the state is pictured at (a phone-only state in the phone's), with the page in dark. */
+  /** axe runs once per state, in the light run of the viewport the state is pictured at (a phone-only state in the phone's). */
   axe: boolean;
   /** The light run reads the state in dark too. */
   darkToo: boolean;
@@ -30,7 +30,7 @@ async function reachAgain(page: Page, walk: Walk): Promise<void> {
 /** Runs the checks of this walk over `page`, in the state `label`; fails on the first that finds a problem. */
 export async function checkState(page: Page, label: string, walk: Walk): Promise<void> {
   if (walk.axe) {
-    expect(await inDark(page, () => axeProblems(page)), `${label} axe in dark`).toEqual([]);
+    expect(await axeProblems(page), `${label} axe`).toEqual([]);
   }
   // The theme changes colours and no box.
   if (walk.darkToo) {
