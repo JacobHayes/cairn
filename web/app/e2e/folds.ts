@@ -1,71 +1,61 @@
-// Folded content, checked a second time: a screen's folds (a `<details>`, a tree's `.tree-fold`,
-// a collapsed canvas card's expand button) hide content the first pass cannot see, so the
-// structural rules run again with every fold open. Opening changes the page, so the state is
-// put back by reaching it again.
+// Folded sections, checked a second time: a screen's collapsed sections (`<details>`) hide content
+// the first pass cannot see, so the structural rules run again with every section open. They are
+// opened and closed again with no toggle reaching the app, which would keep it as the viewer's
+// choice, so the state is as it was after. A tree's or a card's fold hides more rows or cards of
+// the kinds the first pass checks.
 import type { Page } from "@playwright/test";
 
-import { whenSettled } from "./shell.ts";
+import { settled } from "./shell.ts";
 import { expectStructure } from "./structure.ts";
 
-/** What opens a fold, in the page. A tree or card fold can reveal more folds, so the walk repeats. */
-const CLOSED = "details:not([open]), button.tree-fold[aria-expanded='false'], [data-testid='card-expand']";
+/** Marks the sections the check opened, so it closes those and no others. */
+const OPENED = "data-walk-opened";
 
-/** More passes than any screen has folds nested: a pass that opens none ends the walk, so only a fold that keeps reappearing runs into it. */
-const PASSES_MAX = 100;
-
-const STOP = "__foldsStop";
-
-/** Opens every fold the page shows, and those they reveal; returns how many it opened. */
-async function openFolds(page: Page): Promise<number> {
-  let opened = 0;
-  for (let pass = 0; pass < PASSES_MAX; pass += 1) {
-    // Clicks in one turn can overwrite each other's state, so a fold may stay closed for the next pass.
-     
-    const now = await whenSettled(page, () =>
-      page.evaluate((selector) => {
-        const closed = [...document.querySelectorAll<HTMLElement>(selector)];
-        for (const each of closed) {
-          if (each instanceof HTMLDetailsElement) {
-            each.open = true;
-          } else {
-            each.click();
+/** Opens or closes every section `selector` finds, holding back the toggle events from the app until each has fired; returns how many it changed. */
+async function toggleQuietly(page: Page, selector: string, open: boolean): Promise<number> {
+  // eslint-disable-next-line e2e/settled-reads -- the caller has settled the page
+  return page.evaluate(
+    async ([selector, open, mark]) => {
+      const sections = [...document.querySelectorAll<HTMLDetailsElement>(selector)];
+      if (sections.length === 0) {
+        return 0;
+      }
+      let seen = 0;
+      let done = (): void => undefined;
+      const fired = new Promise<void>((resolve) => {
+        done = resolve;
+      });
+      const stop = (event: Event): void => {
+        if (event.target instanceof HTMLDetailsElement && sections.includes(event.target)) {
+          event.stopImmediatePropagation();
+          seen += 1;
+          if (seen === sections.length) {
+            done();
           }
         }
-        return closed.length;
-      }, CLOSED),
-    );
-    if (now === 0) {
-      return opened;
-    }
-    opened += now;
-  }
-  throw new Error(`folds were still closed after ${String(PASSES_MAX)} passes`);
+      };
+      document.addEventListener("toggle", stop, true);
+      for (const each of sections) {
+        each.open = open;
+        each.toggleAttribute(mark, open);
+      }
+      await fired;
+      document.removeEventListener("toggle", stop, true);
+      return sections.length;
+    },
+    [selector, open, OPENED] as const,
+  );
 }
 
-/** Runs the structural rules over the page with every fold open, and puts the state back with `restore` when it had any. A section's toggle would be remembered as the viewer's choice, so the toggle events do not reach the app meanwhile. */
-export async function expectFoldsOpenStructure(page: Page, where: string, restore: () => Promise<void>): Promise<void> {
-   
-  await page.evaluate((name) => {
-    const stop = (event: Event): void => { event.stopImmediatePropagation(); };
-    Reflect.set(window, name, stop);
-    document.addEventListener("toggle", stop, true);
-  }, STOP);
-  let opened = 0;
+/** Runs the structural rules over the page with every section open, then closes the ones it opened. */
+export async function expectSectionsOpenStructure(page: Page, where: string): Promise<void> {
+  await settled(page);
+  if ((await toggleQuietly(page, "details:not([open])", true)) === 0) {
+    return;
+  }
   try {
-    opened = await openFolds(page);
-    if (opened > 0) {
-      await expectStructure(page, `${where} with its folds open`);
-    }
+    await expectStructure(page, `${where} with its sections open`);
   } finally {
-     
-    await page.evaluate((name) => {
-      const stop = Reflect.get(window, name) as EventListener | undefined;
-      if (stop !== undefined) {
-        document.removeEventListener("toggle", stop, true);
-      }
-    }, STOP);
-    if (opened > 0) {
-      await restore();
-    }
+    await toggleQuietly(page, `details[${OPENED}]`, false);
   }
 }

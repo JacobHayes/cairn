@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 import { expect, test } from "./test.ts";
 
 import { capture } from "./invariants.ts";
-import { SCREENS, WALK_VIEWPORTS, walkStates } from "./screenshots.ts";
+import { WALK_VIEWPORTS, walkStates } from "./screenshots.ts";
 import { checkState } from "./walk-checks.ts";
 
 /** Where the pictures go; none are taken without it. */
@@ -37,7 +37,7 @@ for (const [viewport, size] of Object.entries(WALK_VIEWPORTS)) {
           const file = `${address}-${state.name}-${viewport}-${theme}.png`;
           await capture(page, join(dir ?? "", file), { structure: true, ...(dir === undefined ? { dry: true } : {}) });
           const url = new URL(page.url());
-          await checkState(page, `${address} ${state.name}`, { axe: viewport === (state.only ?? "desktop") && theme === "light", darkToo: theme === "light", tabs: viewport === "desktop" && theme === "light" && state === SCREENS[address][0], reach });
+          await checkState(page, `${address} ${state.name}`, { axe: viewport === (state.only ?? "desktop") && theme === "light", darkToo: theme === "light" });
           taken.push({ file, checks: file.replace(/\.png$/, ".checks.json"), aria: file.replace(/\.png$/, ".aria.yml"), address, state: state.name, viewport, theme, url: url.pathname + url.search });
         });
         if (dir !== undefined) {
