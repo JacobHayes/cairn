@@ -121,7 +121,7 @@ for file in web/app/e2e/*.spec.ts; do
   fi
 done
 if [ ${#specs[@]} -gt 0 ]; then
-  [ -x "$playwright" ] || ladder_fail "$playwright is missing: run npm ci"
+  [ -x "$playwright" ] || ladder_fail "$playwright is missing: run mise deps"
   start=$SECONDS
   ladder_run "the engine's module build" mise-tasks/build/wasm
   # The tests' demos serve the web build, which is made when any source it comes from is newer

@@ -6,6 +6,27 @@
 CAIRN_REVIEW_MODEL = "gpt-6.1-sol"
 CAIRN_REVIEW_EFFORT = "high"
 
+[settings]
+# For `[deps]`, mise's project-dependency installer.
+experimental = true
+
+# Each provider runs before any `mise run` or `mise exec` once its sources changed or its outputs
+# are missing; `mise deps` runs them alone. The npm workspace's packages, from the lockfile:
+[deps.npm]
+auto = true
+run = "npm ci"
+sources = ["package.json", "package-lock.json", "web/*/package.json"]
+outputs = ["node_modules/"]
+
+# The browser the browser tests drive, at the revision the locked Playwright names; it lives in
+# Playwright's own cache, outside the checkout, so only the lockfile decides when it runs. No
+# --with-deps: CI's runners and the dev hosts have the browser's system libraries.
+[deps.playwright]
+auto = true
+depends = ["npm"]
+run = "npx playwright install chromium"
+sources = ["package-lock.json"]
+
 [tools]
 node = "26.12.1"
 rust = { version = "1.99.1", profile = "minimal", components = "clippy,rustfmt", targets = "wasm32-unknown-unknown" }

@@ -104,13 +104,7 @@ jobs:
           elif [ -n "$(ls -A target 2>/dev/null)" ]; then state=partial
           else state=none; fi
           echo "state=$state" >>"$GITHUB_OUTPUT"
-      # The npm workspace's tools (TypeScript, eslint, openapi-typescript, Vitest, Vite).
-      - run: npm ci
-      # The browser step's browser, without --with-deps: the runner image has the libraries it
-      # needs, and the apt round trip cost more than the download. The download is not cached: a
-      # restore took as long as fetching it (about 7 s).
-      - if: matrix.part == 'browser'
-        run: npx playwright install chromium
+      # `mise run` installs the npm packages and the browser first (mise.toml, `[deps]`).
       - run: mise run check --part "$PART"
         env:
           PART: ${{ matrix.part }}

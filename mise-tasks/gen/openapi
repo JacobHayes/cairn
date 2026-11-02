@@ -1,6 +1,5 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE description="Regenerate openapi/ from crates/api, and web/client/generated/ (the API types, and the engine's rule tables) from it"
-#MISE depends=["packages"]
 # ARCHITECTURE, Generated artifacts. Writes only into openapi/ and web/client/generated/;
 # every file there is generated. The TypeScript types come from the OpenAPI document, so
 # one generator writes both, in that order; the engine then writes rules.ts, the limits and

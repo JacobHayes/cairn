@@ -1,6 +1,6 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE description="Take screenshots and video of a change: build the web app, then run the *.proof.ts specs in a directory outside the repository with web/app/playwright.proof.config.ts"
-#MISE depends=["packages", "build:web"]
+#MISE depends=["build:web"]
 # usage: mise run proof <dir> [playwright test args...]
 #   <dir>  the directory holding the *.proof.ts specs: absolute, or from the checkout's root
 # AGENTS, Show a change people can see: nothing here is committed. The spec lives in the

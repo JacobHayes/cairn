@@ -29,7 +29,7 @@ ladder_require_tool rustfmt cargo fmt --version
 ladder_require_tool clippy cargo clippy --version
 ladder_require_tool node node --version
 ladder_require_tool cargo-machete cargo machete --version
-[ -x node_modules/.bin/knip ] || ladder_fail "tool missing: knip (run npm ci)"
+[ -x node_modules/.bin/knip ] || ladder_fail "tool missing: knip (run mise deps)"
 
 # PRACTICES, Code conventions (TypeScript): the strict typecheck over every web package's
 # sources and generated types, and eslint with the type-aware rules over the hand-written
@@ -42,7 +42,7 @@ ladder_require_tool cargo-machete cargo machete --version
 # Outside CI that one eslint run also fixes (`--fix`), and the typecheck starts once it is
 # done, so it reads the fixed files.
 for tool in tsc eslint; do
-  [ -x "node_modules/.bin/$tool" ] || ladder_fail "tool missing: $tool (run npm ci)"
+  [ -x "node_modules/.bin/$tool" ] || ladder_fail "tool missing: $tool (run mise deps)"
 done
 fixing=0
 eslint_fix=()

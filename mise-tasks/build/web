@@ -1,6 +1,6 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE description="Build the web app: the app's Vite build into web/app/dist/build/ for the binary to embed; installs the packages and builds the engine's module first"
-#MISE depends=["packages", "build:wasm"]
+#MISE depends=["build:wasm"]
 # ARCHITECTURE, Build, run, deploy: the web build is made before `cargo build` and embedded
 # with rust-embed (crates/cairn/src/assets.rs). A build output, never checked in.
 (cd web/app && ../../scripts/timed build ../../node_modules/.bin/vite build --config vite.config.ts)
