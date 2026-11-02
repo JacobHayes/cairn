@@ -111,7 +111,8 @@ impl World {
     }
 
     /// Plays the fixture `name`'s scenario as `actor`, its first `steps` steps or all of
-    /// them, its route published first, each step at its own time: the journey it builds.
+    /// them, its route published first, each step at its own time: the journey it builds, so
+    /// not its proposals.
     pub async fn fixture_after(&self, actor: &Actor, name: &str, steps: Option<usize>) -> String {
         let (call, people) = crate::people::people_write();
         self.service.patch(&call, &people).await.unwrap();
@@ -120,6 +121,13 @@ impl World {
         let scenario: Scenario = from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap();
         let all = scenario.steps.as_slice();
         for step in all.iter().take(steps.unwrap_or(all.len())) {
+            // A proposal leaves the journey as it is.
+            if matches!(
+                step.patch.target,
+                cairn_schema::PatchTarget::Proposal { .. }
+            ) {
+                continue;
+            }
             self.now.store(step.at.as_second(), Ordering::SeqCst);
             self.patch(actor, step.patch.clone()).await;
         }

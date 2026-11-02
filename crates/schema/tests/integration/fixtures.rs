@@ -123,11 +123,14 @@ fn scenarios_are_sequential_patches_over_their_own_route() {
         for (index, step) in scenario.steps.as_slice().iter().enumerate() {
             let patch = &step.patch;
             let at = format!("{name} step {index}");
-            assert_eq!(
-                patch.target.domain(),
-                cairn_schema::Domain::Journey(scenario.journey.clone()),
-                "{at}"
-            );
+            // Every patch is the journey's, but a proposal to save the journey as a route.
+            if !saves_the_journey(patch, &scenario.journey) {
+                assert_eq!(
+                    patch.target.domain(),
+                    cairn_schema::Domain::Journey(scenario.journey.clone()),
+                    "{at}"
+                );
+            }
             // Journey patches advance the journey one revision at a time from 0 (A17);
             // proposal patches have their own revision and leave the journey's alone (H5).
             if !matches!(patch.target, PatchTarget::Proposal { .. }) {
@@ -148,6 +151,22 @@ fn scenarios_are_sequential_patches_over_their_own_route() {
             }
         }
     }
+}
+
+/// Whether `patch` proposes saving `journey` as a new route.
+fn saves_the_journey(patch: &cairn_schema::Patch, journey: &cairn_schema::JourneyId) -> bool {
+    let [Mutation::CreateProposal { proposal }] = patch.mutations.as_slice() else {
+        return false;
+    };
+    matches!(patch.target.domain(), cairn_schema::Domain::Route(_))
+        && proposal.mutations.as_slice().iter().any(|mutation| {
+            matches!(
+                mutation,
+                Mutation::OpenDraft {
+                    source: cairn_schema::DraftSource::SaveAsRoute { journey: from },
+                } if from == journey
+            )
+        })
 }
 
 type Mechanisms = Vec<(&'static str, bool)>;

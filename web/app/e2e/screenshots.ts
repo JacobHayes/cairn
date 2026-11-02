@@ -19,35 +19,35 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import type { AddressName } from "../src/address.ts";
 import { JOURNEY_OFFERS, ROUTE_OFFERS } from "../src/journeys/view.ts";
 import { DESKTOP_MIN } from "../src/shell/breakpoints.ts";
-import { openJourneyCard } from "./around.ts";
-import { draftBreakdown, reviewOpen } from "./proposals.ts";
+import { reviewOpen } from "./proposals.ts";
 import { section } from "./detail.ts";
-import { holdToday, menuItem, nodeCard, nodePanel, open, openAt, openSheet, reachCard, settled, whenSettled } from "./shell.ts";
+import { holdToday, nodeCard, nodePanel, open, openAt, openSheet, reachCard, settled, whenSettled } from "./shell.ts";
 
-/** What the walk reaches states of: the journey and the route it opens, a node and an edge both have, an identity, and the proposals `seedProposals` made. */
+/** What the walk reaches states of: the journey and the route it opens, a node and an edge both have, an identity, and two open proposals. */
 export interface Subject {
   journey: string;
   route: string;
   node: string;
   edge: string;
   identity: string;
-  /** The proposals `seedProposals` drafted; none until it has run. */
-  proposals?: Proposals;
-  /** Whether `seedTimes` has set the times of day; false until it has run. */
-  timed?: boolean;
+  proposals: Proposals;
 }
 
-/** The ids of the two proposals `seedProposals` drafted: the journey's breakdown, and its saving as the route `savedRoute`. */
+/** Two open proposals: one on a journey, and one saving a journey as a new route, each with a node it changes. */
 export interface Proposals {
-  breakdown: string;
-  /** The journey the breakdown is of. */
-  breakdownJourney: string;
-  saved: string;
-  savedRoute: string;
+  journey: { journey: string; proposal: string; node: string };
+  route: { route: string; proposal: string; node: string };
 }
 
-/** The fixtures' subject: the vendor evaluation, its first journey, and the first identity. */
-export const FIXTURE_SUBJECT: Subject = { journey: "j_vendor_eval", route: "vendor-evaluation", node: "n_access", edge: "n_access~n_plan", identity: "who_k3d7qm2xw5tn6pfa" };
+/** The fixtures' subject: the vendor evaluation, its first journey, the first identity, and the hiring loop's proposals. */
+export const FIXTURE_SUBJECT: Subject = {
+  journey: "j_vendor_eval",
+  route: "vendor-evaluation",
+  node: "n_access",
+  edge: "n_access~n_plan",
+  identity: "who_k3d7qm2xw5tn6pfa",
+  proposals: { journey: { journey: "j_hiring", proposal: "pr_offer_draft", node: "n_offer_draft" }, route: { route: "platform-hiring", proposal: "pr_save_hiring", node: "n_offer" } },
+};
 
 /** One state of one address: how to reach it from anywhere, and the sign that it is drawn. */
 export interface State {
@@ -58,8 +58,6 @@ export interface State {
   ready: (page: Page, on: Subject) => Locator;
   /** Narrows it to one width: a phone's Controls menu is not on a desktop. */
   only?: "desktop" | "phone";
-  /** It shows the times of day `seedTimes` sets, so the walk sets them before it. */
-  timed?: true;
 }
 
 /** The journey screen `view` of `journey`, with `node` open beside it when given. */
@@ -136,15 +134,13 @@ async function inspectorOf(page: Page, journey: string, node: string): Promise<L
   return panel;
 }
 
-/** Node `node`'s inspector with any form a state before left open put away. */
+/** Node `node`'s inspector with the pin form a state before left open put away. */
 function settledInspector(page: Page, journey: string, node: string): Promise<void> {
   return inDraftingWindow(page, async () => {
     const panel = await inspectorOf(page, journey, node);
-    for (const form of ["pin-form", "snooze"]) {
-      const cancel = panel.getByTestId(form).getByRole("button", { name: "Cancel" });
-      if ((await whenSettled(page, () => cancel.count())) > 0) {
-        await cancel.click();
-      }
+    const cancel = panel.getByTestId("pin-form").getByRole("button", { name: "Cancel" });
+    if ((await whenSettled(page, () => cancel.count())) > 0) {
+      await cancel.click();
     }
   });
 }
@@ -159,12 +155,12 @@ async function inDraftingWindow(page: Page, enter: () => Promise<void>): Promise
   }
 }
 
-/** The pin form of the final report with the day and time entered; saved when `save`. */
-function enterPin(page: Page, on: Subject, save: boolean): Promise<void> {
-  return inDraftingWindow(page, () => pinTime(page, on, save));
+/** The pin form of the final report, open with a day and time entered. */
+function enterPin(page: Page, on: Subject): Promise<void> {
+  return inDraftingWindow(page, () => pinTime(page, on));
 }
 
-async function pinTime(page: Page, on: Subject, save: boolean): Promise<void> {
+async function pinTime(page: Page, on: Subject): Promise<void> {
   const panel = await inspectorOf(page, on.journey, TIMED.pin);
   const editor = (await section(panel, "dates")).getByTestId("pin");
   if ((await whenSettled(page, () => editor.getByTestId("pin-form").count())) === 0) {
@@ -172,51 +168,32 @@ async function pinTime(page: Page, on: Subject, save: boolean): Promise<void> {
   }
   await editor.getByLabel("Pin date", { exact: true }).fill(TIMES.pin.day);
   await editor.getByLabel("Pin date, time of day").fill(TIMES.pin.time);
-  if (save) {
-    await editor.getByTestId("pin-form").getByRole("button", { name: "Save" }).click();
-    await expect(editor.getByTestId("pin-form")).toHaveCount(0);
-  }
 }
 
-/** The meeting date's answer with the day and time entered; saved when `save`. */
-function enterAnswer(page: Page, on: Subject, save: boolean): Promise<void> {
-  return inDraftingWindow(page, () => answerTime(page, on, save));
-}
-
-async function answerTime(page: Page, on: Subject, save: boolean): Promise<void> {
-  const panel = await inspectorOf(page, on.journey, TIMED.answer);
-  await panel.getByLabel("Answer", { exact: true }).fill(TIMES.answer.day);
-  await panel.getByLabel("Answer, time of day").fill(TIMES.answer.time);
-  if (save) {
-    await panel.getByRole("button", { name: /^Save/ }).click();
-    await expect(panel.getByRole("button", { name: /^Save/ })).toBeDisabled();
-  }
-}
-
-/** The final review's snooze to a day and time; set when `save`. */
-function enterSnooze(page: Page, on: Subject, save: boolean): Promise<void> {
-  return inDraftingWindow(page, () => snoozeTime(page, on, save));
-}
-
-async function snoozeTime(page: Page, on: Subject, save: boolean): Promise<void> {
-  const panel = await inspectorOf(page, on.journey, TIMED.snooze);
-  if ((await whenSettled(page, () => panel.getByTestId("snooze").count())) === 0) {
-    await menuItem(panel, "snooze");
-  }
-  await panel.getByRole("radio", { name: "A date" }).check();
-  await panel.getByLabel("Snooze until", { exact: true }).fill(TIMES.snooze.day);
-  await panel.getByLabel("Snooze until, time of day").fill(TIMES.snooze.time);
-  if (save) {
-    await panel.getByTestId("snooze").getByRole("button", { name: "Snooze", exact: true }).click();
-    await expect(panel.getByTestId("snooze")).toHaveCount(0);
-  }
-}
-
-/** Sets a pin, an answer and a snooze that carry a time of day on the journey (the pin is already gone by on the held day, so its work reads late today). It edits the journey, so the walk sets them just before the first state that shows them. */
-export async function seedTimes(page: Page, on: Subject): Promise<void> {
-  await enterPin(page, on, true);
-  await enterAnswer(page, on, true);
-  await enterSnooze(page, on, true);
+/**
+ * Sets a pin, an answer and a snooze that carry a time of day on the journey, in one patch (the
+ * pin is already gone by on the held day, so its work reads late today). A time of day is written
+ * with its deployment's offset, so the fixtures, which load into deployments of any zone, hold
+ * none, and the walk sets them on the demo, which keeps UTC.
+ */
+async function setTimes(page: Page, on: Subject): Promise<void> {
+  const { revision } = (await (await page.request.get(`/api/journeys/${on.journey}/derived`)).json()) as { revision: number };
+  const moment = (when: { day: string; time: string }) => `${when.day}T${when.time}+00:00`;
+  const response = await page.request.post(`/api/journeys/${on.journey}/patches`, {
+    data: {
+      patch: {
+        id: "p_walk_times",
+        target: { journey: on.journey },
+        base_revision: revision,
+        mutations: [
+          { op: "set_pin", node: TIMED.pin, date: moment(TIMES.pin) },
+          { op: "answer", decision: TIMED.answer, value: { date: moment(TIMES.answer) } },
+          { op: "snooze", node: TIMED.snooze, until: { date: moment(TIMES.snooze) } },
+        ],
+      },
+    },
+  });
+  expect(response.ok(), `setting the times of day: ${await response.text()}`).toBe(true);
 }
 
 /** The popover states of a journey's list: each opens one control and shows what it holds. */
@@ -241,14 +218,6 @@ const POPOVERS: State[] = (
 /** A view of each screen an address offers. */
 function viewsOf(screens: readonly string[], reach: (page: Page, on: Subject, view: string) => Promise<void>, ready: (page: Page, view: string) => Locator): State[] {
   return screens.map((view) => ({ name: view, reach: (page, on) => reach(page, on, view), ready: (page) => ready(page, view) }));
-}
-
-/** Where a seeded proposal is, or a failure naming the missing `seedProposals`. */
-function proposalsOf(on: Subject): Proposals {
-  if (on.proposals === undefined) {
-    throw new Error("seedProposals has not run");
-  }
-  return on.proposals;
 }
 
 /** `states` as the table's non-empty tuple. */
@@ -281,30 +250,30 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
     ...POPOVERS,
     { name: "stages-open", reach: async (page, on) => { await journeyAt(page, on.journey, "list"); await openSheet(page); await page.getByTestId("card-stages").locator("summary").click(); }, ready: (page) => page.getByTestId("stage-row").first(), only: "desktop" },
     { name: "frontier", reach: (page, on) => journeyAt(page, on.journey, "list?frontier=1"), ready: (page) => page.getByTestId("list") },
-    { name: "timeline-timed", reach: (page, on) => journeyAt(page, on.journey, "timeline", TIMED.pin), ready: (page) => page.getByTestId("timeline"), timed: true },
+    { name: "timeline-timed", reach: (page, on) => journeyAt(page, on.journey, "timeline", TIMED.pin), ready: (page) => page.getByTestId("timeline") },
     { name: "card-menu", reach: async (page, on) => { await journeyAt(page, on.journey, "graph"); await fitGraph(page); await openCardMenu(page, "n_kickoff"); }, ready: (page) => page.getByTestId("context-menu"), only: "desktop" },
     { name: "controls-menu", reach: async (page, on) => { await journeyAt(page, on.journey, "list"); await openControlsMenu(page); }, ready: (page) => page.getByTestId("controls-panel-phone"), only: "phone" },
   ],
   journeyNode: [
     { name: "list", reach: (page, on) => journeyAt(page, on.journey, "list", on.node), ready: (page) => inspector(page).getByTestId("detail-header") },
     { name: "graph", reach: async (page, on) => { await journeyAt(page, on.journey, "graph", on.node); await fitGraph(page); }, ready: (page, on) => nodePanel(page, on.node) },
-    { name: "pin-time-form", reach: (page, on) => enterPin(page, on, false), ready: (page) => page.getByTestId("pin-form"), only: "desktop" },
-    { name: "pinned-time", reach: async (page, on) => { await settledInspector(page, on.journey, TIMED.pin); await section(nodePanel(page, TIMED.pin), "dates"); }, ready: (page) => nodePanel(page, TIMED.pin).getByTestId("dates"), timed: true },
-    { name: "answered-time", reach: (page, on) => settledInspector(page, on.journey, TIMED.answer), ready: (page) => nodePanel(page, TIMED.answer), timed: true },
-    { name: "snoozed-time", reach: (page, on) => settledInspector(page, on.journey, TIMED.snooze), ready: (page) => nodePanel(page, TIMED.snooze), timed: true },
+    { name: "pin-time-form", reach: (page, on) => enterPin(page, on), ready: (page) => page.getByTestId("pin-form"), only: "desktop" },
+    { name: "pinned-time", reach: async (page, on) => { await settledInspector(page, on.journey, TIMED.pin); await section(nodePanel(page, TIMED.pin), "dates"); }, ready: (page) => nodePanel(page, TIMED.pin).getByTestId("dates") },
+    { name: "answered-time", reach: (page, on) => settledInspector(page, on.journey, TIMED.answer), ready: (page) => nodePanel(page, TIMED.answer) },
+    { name: "snoozed-time", reach: (page, on) => settledInspector(page, on.journey, TIMED.snooze), ready: (page) => nodePanel(page, TIMED.snooze) },
   ],
   journeyEdge: [{ name: "edge-card", reach: async (page, on) => { await journeyAt(page, on.journey, `graph/edges/${on.edge}`); await fitGraph(page); }, ready: (page) => page.getByTestId("edge-card") }],
-  journeyProposals: [{ name: "tab", reach: (page, on) => indexAt(page, `/journeys/${proposalsOf(on).breakdownJourney}/proposals`), ready: (page) => page.getByTestId("proposals-pane") }],
-  journeyProposal: [{ name: "review", reach: async (page, on) => { await indexAt(page, `/journeys/${proposalsOf(on).breakdownJourney}/proposals/${proposalsOf(on).breakdown}`); await reviewOpen(page); await fitGraph(page); }, ready: (page) => page.getByTestId("layer-band") }],
-  journeyProposalNode: [{ name: "item", reach: async (page, on) => { await indexAt(page, `/journeys/${proposalsOf(on).breakdownJourney}/proposals/${proposalsOf(on).breakdown}/nodes/n_workload`); await reviewOpen(page); await fitGraph(page); }, ready: (page) => page.getByTestId("item-editor") }],
+  journeyProposals: [{ name: "tab", reach: (page, on) => indexAt(page, `/journeys/${on.proposals.journey.journey}/proposals`), ready: (page) => page.getByTestId("proposals-pane") }],
+  journeyProposal: [{ name: "review", reach: async (page, on) => { await indexAt(page, `/journeys/${on.proposals.journey.journey}/proposals/${on.proposals.journey.proposal}`); await reviewOpen(page); await fitGraph(page); }, ready: (page) => page.getByTestId("layer-band") }],
+  journeyProposalNode: [{ name: "item", reach: async (page, on) => { await indexAt(page, `/journeys/${on.proposals.journey.journey}/proposals/${on.proposals.journey.proposal}/nodes/${on.proposals.journey.node}`); await reviewOpen(page); await fitGraph(page); }, ready: (page) => page.getByTestId("item-editor") }],
   routes: [{ name: "index", reach: (page) => indexAt(page, "/routes"), ready: (page) => page.getByTestId("routes") }],
   routeNew: [{ name: "form", reach: (page) => indexAt(page, "/routes/new"), ready: (page) => page.getByTestId("new-route") }],
   route: nonEmpty(viewsOf(ROUTE_OFFERS.screens, async (page, on, view) => { await routeAt(page, on.route, view); if (view === "graph") { await fitGraph(page); } }, routeReady)),
   routeNode: [{ name: "list", reach: (page, on) => routeAt(page, on.route, "list", `/nodes/${on.node}`), ready: (page) => page.getByTestId("route-node") }],
   routeEdge: [{ name: "edge-card", reach: async (page, on) => { await routeAt(page, on.route, "graph", `/edges/${on.edge}`); await fitGraph(page); }, ready: (page) => page.getByTestId("edge-card") }],
   routeProposals: [{ name: "tab", reach: (page, on) => indexAt(page, `/routes/${on.route}/proposals`), ready: (page) => page.getByTestId("proposals-pane") }],
-  routeProposal: [{ name: "review", reach: async (page, on) => { await indexAt(page, `/routes/${proposalsOf(on).savedRoute}/proposals/${proposalsOf(on).saved}`); await reviewOpen(page); }, ready: (page) => page.getByTestId("layer-band") }],
-  routeProposalNode: [{ name: "item", reach: async (page, on) => { await indexAt(page, `/routes/${proposalsOf(on).savedRoute}/proposals/${proposalsOf(on).saved}/nodes/n_access`); await reviewOpen(page); }, ready: (page) => page.getByTestId("item-editor") }],
+  routeProposal: [{ name: "review", reach: async (page, on) => { await indexAt(page, `/routes/${on.proposals.route.route}/proposals/${on.proposals.route.proposal}`); await reviewOpen(page); }, ready: (page) => page.getByTestId("layer-band") }],
+  routeProposalNode: [{ name: "item", reach: async (page, on) => { await indexAt(page, `/routes/${on.proposals.route.route}/proposals/${on.proposals.route.proposal}/nodes/${on.proposals.route.node}`); await reviewOpen(page); }, ready: (page) => page.getByTestId("item-editor") }],
   identities: [{ name: "index", reach: (page) => indexAt(page, "/identities"), ready: (page) => page.getByTestId("identity-list") }],
   newIdentity: [{ name: "form", reach: (page) => indexAt(page, "/identities/new"), ready: (page) => page.getByTestId("create-identity") }],
   identity: [{ name: "detail", reach: (page, on) => indexAt(page, `/identities/${on.identity}`), ready: (page) => page.getByTestId("identity-detail") }],
@@ -314,40 +283,9 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
   agents: [{ name: "agents", reach: (page) => indexAt(page, "/agents"), ready: (page) => page.getByTestId("agents-screen") }],
 };
 
-/**
- * Drafts the two proposals the proposal addresses show, on the page's own store: the vendor
- * evaluation's workload placeholder broken down in a journey of its own, and the
- * scenario journey saved as a route. Returns their ids, which `Subject.proposals` carries. It edits the
- * journey, so the walk takes it last.
- */
-export async function seedProposals(page: Page, on: Subject): Promise<Proposals> {
-  const { journey, reviewed } = await draftBreakdown(page);
-  const breakdown = /\/proposals\/(pr_[0-9a-f]+)$/.exec(reviewed)?.[1] ?? "";
-  expect(breakdown).not.toBe("");
-  await openJourneyCard(page, on.journey);
-  await page.getByTestId("journey-menu").click();
-  await page.getByTestId("menu-save").click();
-  await page.getByTestId("save-as-route-flow").getByLabel("Route id").fill("r_saved");
-  await page.getByTestId("save-as-route-flow").getByRole("button", { name: "Propose saving it as a route" }).click();
-  await reviewOpen(page);
-  const saved = /\/routes\/r_saved\/proposals\/(pr_[0-9a-f]+)$/.exec(new URL(page.url()).pathname)?.[1] ?? "";
-  expect(saved).not.toBe("");
-  return { breakdown, breakdownJourney: journey, saved, savedRoute: "r_saved" };
-}
-
 /** The day the fixtures' last scenario patch applies, so the dates every walk shows read as one history. */
 const WALK_TODAY = "2026-10-26";
 
-/** The proposal addresses need the proposals drafted, which edits the journey: they come last. */
-const NEEDS_PROPOSALS: readonly AddressName[] = ["journeyProposals", "journeyProposal", "journeyProposalNode", "routeProposal", "routeProposalNode"];
-
-/**
- * Visits every state of the table that `phone` (or a desktop) reaches, in the window `size` that
- * the caller set on `page` (its theme and touch are the caller's too): the page at Home on the
- * fixed day, the proposals drafted once the addresses that need them come, then `visit` for each
- * state, given what reaches it again. A state whose visit throws is listed with the rest, so one
- * run shows every state that fails; the list is returned.
- */
 /** The widths the screenshot walk runs at. */
 export const WALK_VIEWPORTS = { desktop: { width: 1440, height: 900 }, phone: { width: 390, height: 844 } } as const;
 
@@ -370,29 +308,26 @@ export function visitsAt(widths: number[]): number {
   return widths.reduce((sum, width) => sum + addresses.reduce((count, address) => count + statesFor(address, width < DESKTOP_MIN).length, 0), 0);
 }
 
+/**
+ * Visits every state of the table that `phone` (or a desktop) reaches, in the window the caller
+ * set on `page` (its theme and touch are the caller's too): the times of day set, the
+ * page at Home on the fixed day, then `visit` for each state, given what reaches it again. A state
+ * whose visit throws is listed with the rest, so one run shows every state that fails; the list is
+ * returned.
+ */
 export async function walkStates(
   page: Page,
-  size: { width: number; height: number },
   phone: boolean,
   visit: (address: AddressName, state: State, reach: () => Promise<void>) => Promise<void>,
 ): Promise<string[]> {
+  const on = FIXTURE_SUBJECT;
+  await setTimes(page, on);
   await holdToday(page, WALK_TODAY);
   await open(page, "/");
   const failed: string[] = [];
-  let on: Subject = FIXTURE_SUBJECT;
-  const addresses = Object.keys(SCREENS) as AddressName[];
-  for (const address of [...addresses.filter((each) => !NEEDS_PROPOSALS.includes(each)), ...NEEDS_PROPOSALS]) {
-    if (NEEDS_PROPOSALS.includes(address) && on.proposals === undefined) {
-      await page.setViewportSize(DRAFTING_WINDOW);
-      on = { ...on, proposals: await seedProposals(page, on) };
-      await page.setViewportSize(size);
-    }
+  for (const address of Object.keys(SCREENS) as AddressName[]) {
     for (const state of statesFor(address, phone)) {
       try {
-        if (state.timed === true && on.timed !== true) {
-          await seedTimes(page, on);
-          on = { ...on, timed: true };
-        }
         await visit(address, state, () => reachState(page, address, state, on));
       } catch (error) {
         failed.push(`${address} ${state.name}: ${error instanceof Error ? error.message.replaceAll("\n", " | ").slice(0, 6000) : String(error)}`);

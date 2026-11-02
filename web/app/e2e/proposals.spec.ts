@@ -24,10 +24,10 @@ async function proposalIsListed(page: Page, journey: string, reviewed: string): 
   await open(page, `/journeys/${journey}/proposals`);
   await expect(page.getByTestId("tab-proposals")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("proposals-panel").getByTestId("proposal-row")).toHaveCount(1);
-  // Home waits on it too, in a fold after the journeys.
+  // Home waits on it too, in a fold after the journeys, beside the fixtures' open proposals.
   await open(page, "/");
   await page.getByTestId("home-proposals").locator("summary").click();
-  await page.getByTestId("home-proposals").getByTestId("proposal-row").getByRole("link").click();
+  await page.getByTestId("home-proposals").getByTestId("proposal-row").locator(`a[href="${reviewed}"]`).click();
   await reviewOpen(page);
   await expectAddress(page, reviewed);
   // The Proposals tab stays the pane's choice; the review's rail is under Inspector.

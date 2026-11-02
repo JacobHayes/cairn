@@ -34,7 +34,7 @@ for (const width of WIDTHS) {
     test.use({ viewport: { width, height: HEIGHT }, hasTouch: phone });
     test(`every state at ${String(width)}px`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
-      const failed = await walkStates(page, { width, height: HEIGHT }, phone, async (address, state, reach) => {
+      const failed = await walkStates(page, phone, async (address, state, reach) => {
         await reach();
         await checkpoint(page, `${address} ${state.name} at ${String(width)}px`);
       });

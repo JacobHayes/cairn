@@ -32,7 +32,7 @@ for (const [viewport, size] of Object.entries(WALK_VIEWPORTS)) {
         }
         await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
         const taken: Record<string, string>[] = [];
-        const failed = await walkStates(page, size, viewport === "phone", async (address, state, reach) => {
+        const failed = await walkStates(page, viewport === "phone", async (address, state, reach) => {
           await reach();
           const file = `${address}-${state.name}-${viewport}-${theme}.png`;
           await capture(page, join(dir ?? "", file), { structure: true, ...(dir === undefined ? { dry: true } : {}) });

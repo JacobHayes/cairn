@@ -194,7 +194,11 @@ condition: the offer letter when it is yes, the close-out otherwise. The phone s
 note before it is done, since its output is what the screener writes down. The scenario fills
 the panel, skips the screen with a reason (a skip is not guarded), has the assistant break the
 interviews into one interview per panelist with explicit participations, completes the onsite,
-and makes the offer with a rationale, which the journey keeps with that answer.
+and makes the offer with a rationale, which the journey keeps with that answer. It ends with two
+proposals left open, which leave the journey as it is: the assistant's, adding a drafting action
+under the offer letter, and the hiring manager's, saving the loop as the new route
+`platform-hiring`. A scenario's patches are its journey's, but for a proposal saving that journey
+as a route.
 
 Projected at the end of the scenario, read at 2026-10-06: the level with actions
 hidden, what rolls up, and the next list, which holds only the offer letter's decision.

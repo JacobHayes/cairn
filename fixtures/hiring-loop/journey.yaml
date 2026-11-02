@@ -156,3 +156,57 @@ steps:
       value:
         boolean: true
       rationale: The scorecard was strong across the whole loop and the panel agreed.
+- note: >-
+    The assistant proposes drafting the offer letter as its own step; drafting does
+    not advance the journey.
+  today: "2026-10-10"
+  at: "2026-10-10T12:30:00Z"
+  actor:
+    user: u_ben
+    agent: ag_assistant
+  patch:
+    id: p_hl_07
+    target:
+      proposal:
+        id: pr_offer_draft
+        destination:
+          journey: j_hiring
+    base_revision: 0
+    mutations:
+    - op: create_proposal
+      proposal:
+        title: Draft the offer letter as its own step
+        destination_revision: 6
+        mutations:
+        - op: add_node
+          node:
+            key: n_offer_draft
+            id: draft
+            parent: n_offer
+            kind: action
+            title: Draft the offer letter
+- note: The hiring manager proposes saving the loop as a route of its own.
+  today: "2026-10-10"
+  at: "2026-10-10T12:40:00Z"
+  actor:
+    user: u_ben
+  patch:
+    id: p_hl_08
+    target:
+      proposal:
+        id: pr_save_hiring
+        destination:
+          route: platform-hiring
+    base_revision: 0
+    mutations:
+    - op: create_proposal
+      proposal:
+        title: Save the hiring loop as a route
+        destination_revision: 0
+        mutations:
+        - op: create_route
+          name: Platform engineer hiring
+        - op: open_draft
+          source:
+            save_as_route:
+              journey: j_hiring
