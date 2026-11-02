@@ -479,6 +479,11 @@ table.data.list-table tbody td {
     flex-wrap: wrap;
     justify-content: flex-start;
   }
+
+  /* A deep row's indent and its button can outgrow the title's column: the words wrap rather than push the table past its panel. */
+  .list-table .list-acting .row-act > button {
+    white-space: normal;
+  }
 }
 
 /* With no reason to say, the actions sit on the title's line: no blank line is kept for them. */
