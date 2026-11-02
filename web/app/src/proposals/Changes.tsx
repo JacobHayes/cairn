@@ -26,7 +26,7 @@ import { NODE_FIELDS } from "@cairn/client";
 import { Button, Input, PickBox } from "../ui/kit.tsx";
 import { WhenInput } from "../ui/WhenInput.tsx";
 import { carryIds, withFieldValue, withMutation, withMutationsAdded, withoutMutation, type ProposalDraft } from "./model.ts";
-import { addNodeKey, isNewNodeValues, useNodeTyped } from "./typed.ts";
+import { addNodeKey, useNodeTyped } from "./typed.ts";
 import { mutationWords, type Names } from "./words.ts";
 
 /** What the change editors read and change. */
@@ -298,7 +298,7 @@ function AddNode({ context }: { context: ChangesContext }) {
   const pending = (context.draft.mutations ?? []).flatMap((mutation) => (mutation.op === "add_node" ? [mutation.node] : []));
   const lastParent = pending.at(-1)?.parent ?? undefined;
   // What is typed is kept like any unsent form, so switching to another node's editor and back finds it.
-  const [kept, setKept] = useDraft<NewNodeValues>(addNodeKey(context.proposal), isNewNodeValues);
+  const [kept, setKept] = useDraft<NewNodeValues>(addNodeKey(context.proposal));
   const { kind, title, parent } = kept ?? { kind: "action", title: "", parent: context.defaultParent ?? lastParent ?? "" };
   const check = useNewNodeCheck(title, context.tree.byKey.size);
   const unsendable = !check.ready;

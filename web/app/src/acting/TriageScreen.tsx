@@ -79,10 +79,9 @@ function Empty({ view, decisions, stalled, onContinue }: { view: Ready; decision
 
 /** The journey's pass, begun over its acting frontier the first time triage opens in this tab. */
 function usePass(view: Ready): [Pass, (pass: Pass) => void] {
-  // A pass kept by an earlier version of the app has no unlocked or acted-on nodes.
-  const [stored, setStored] = useDraft<Omit<Pass, "unlocked" | "acted"> & Partial<Pick<Pass, "unlocked" | "acted">>>(`triage-pass:${view.journey.header.id}`);
+  const [stored, setStored] = useDraft<Pass>(`triage-pass:${view.journey.header.id}`);
   const frontier = view.derived.acting_frontier;
-  const pass = useMemo(() => (stored === undefined ? begin(frontier) : { ...stored, unlocked: stored.unlocked ?? [], acted: stored.acted ?? [] }), [stored, frontier]);
+  const pass = useMemo(() => stored ?? begin(frontier), [stored, frontier]);
   useEffect(() => {
     if (stored === undefined) {
       setStored(pass);

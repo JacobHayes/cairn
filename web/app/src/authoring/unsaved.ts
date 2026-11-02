@@ -2,8 +2,8 @@
 // or a kind) is a draft this tab keeps (data/drafts.ts). Publishing would leave it out, so Publish
 // waits for each to be saved or discarded: this names them, in the words the held Publish says.
 import { useDraftHolding, useDraftKeysHolding } from "../data/drafts.ts";
-import { isKept, type Kept } from "./NodeForm.tsx";
-import { isEditing, unsent, type Editing } from "./editing.ts";
+import type { Kept } from "./NodeForm.tsx";
+import { unsent, type Editing } from "./editing.ts";
 import type { ResourceForm } from "./ResourceEditor.tsx";
 import type { Slot } from "./RolesAndKindsPanel.tsx";
 import { titleIn } from "./graph.ts";
@@ -29,10 +29,10 @@ export interface UnsavedForm {
 /** The unfinished forms of the draft, in the order the sentence lists them. */
 export function useUnsavedForms(authored: Authored): UnsavedForm[] {
   const domain = domainOf(authored);
-  const nodes = useDraftKeysHolding<Kept>(`node-form:${domain}:`, () => true, isKept).filter((key) => authored.tree.byKey.has(key));
-  const resources = useDraftKeysHolding<Editing<ResourceForm>>(`resource-form:${domain}:`, unsent, isEditing).filter((key) => authored.tree.byKey.has(key));
-  const roles = useDraftHolding<Editing<Slot>>(`slot-form:${domain}:role`, unsent, isEditing);
-  const kinds = useDraftHolding<Editing<Slot>>(`slot-form:${domain}:kind`, unsent, isEditing);
+  const nodes = useDraftKeysHolding<Kept>(`node-form:${domain}:`, () => true).filter((key) => authored.tree.byKey.has(key));
+  const resources = useDraftKeysHolding<Editing<ResourceForm>>(`resource-form:${domain}:`, unsent).filter((key) => authored.tree.byKey.has(key));
+  const roles = useDraftHolding<Editing<Slot>>(`slot-form:${domain}:role`, unsent);
+  const kinds = useDraftHolding<Editing<Slot>>(`slot-form:${domain}:kind`, unsent);
   const palette = useDraftHolding<PaletteDraft>(`add-node:${domain}`, (draft) => draft.title.trim() !== "");
   return [
     ...nodes.map((key) => ({ label: titleIn(authored.tree, key), node: key, field: `[data-testid="node-form"][data-node="${key}"] :is(input:not([type=hidden]), textarea)` })),

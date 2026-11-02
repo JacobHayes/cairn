@@ -2,7 +2,8 @@
 // kept per tab in session storage, so a reload, a crash, or a version-skew reload loses
 // nothing. An edit already sent is no longer a draft: the edit manager keeps its record
 // (edit-manager.ts). Storage that refuses (a private window, a full quota) leaves the draft in
-// memory only.
+// memory only. A draft whose shape changes takes a new key, so a reload onto a new build never
+// reads one written by the old.
 import { useCallback, useState, useSyncExternalStore } from "react";
 
 /** What every draft's storage key starts with. */
@@ -18,12 +19,9 @@ export function tabStorage(): Storage | undefined {
   }
 }
 
-/** Whether a restored value is a draft of the shape the screen reads now: a draft kept by an older build, or by hand, is none. */
-export type Valid<T> = (draft: unknown) => draft is T;
-
-/** The draft kept under `key`, if any, and if it passes `valid` (a draft that fails it is discarded as if never kept). */
- 
-export function readDraft<T>(key: string, valid?: Valid<T>): T | undefined {
+/** The draft kept under `key`, if any. */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller names the shape its draft was kept in
+export function readDraft<T>(key: string): T | undefined {
   let draft: unknown;
   try {
     const text = tabStorage()?.getItem(PREFIX + key);
@@ -31,7 +29,7 @@ export function readDraft<T>(key: string, valid?: Valid<T>): T | undefined {
   } catch {
     draft = memoryOnly.get(key);
   }
-  return draft === undefined || (valid !== undefined && !valid(draft)) ? undefined : (draft as T);
+  return draft as T | undefined;
 }
 
 const watchers = new Set<() => void>();
@@ -84,22 +82,22 @@ function watch(notify: () => void): () => void {
  * The keys, after `prefix`, of the drafts kept under it that `holds` something worth keeping, read
  * again whenever any draft is written (a draft's contents change while its key stays).
  */
- 
-export function useDraftKeysHolding<T>(prefix: string, holds: (draft: T) => boolean, valid?: Valid<T>): string[] {
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller names the shape its draft was kept in
+export function useDraftKeysHolding<T>(prefix: string, holds: (draft: T) => boolean): string[] {
   // A JSON list, so a key that is empty is still one.
-  const kept = useSyncExternalStore(watch, () => JSON.stringify(draftKeys(prefix).filter((key) => holdsAt(prefix + key, holds, valid))));
+  const kept = useSyncExternalStore(watch, () => JSON.stringify(draftKeys(prefix).filter((key) => holdsAt(prefix + key, holds))));
   return JSON.parse(kept) as string[];
 }
 
 /** Whether the draft kept under exactly `key` holds something worth keeping (a single draft, not a family sharing a prefix). */
- 
-export function useDraftHolding<T>(key: string, holds: (draft: T) => boolean, valid?: Valid<T>): boolean {
-  return useSyncExternalStore(watch, () => holdsAt(key, holds, valid));
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller names the shape its draft was kept in
+export function useDraftHolding<T>(key: string, holds: (draft: T) => boolean): boolean {
+  return useSyncExternalStore(watch, () => holdsAt(key, holds));
 }
 
- 
-function holdsAt<T>(key: string, holds: (draft: T) => boolean, valid?: Valid<T>): boolean {
-  const draft = readDraft<T>(key, valid);
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller names the shape its draft was kept in
+function holdsAt<T>(key: string, holds: (draft: T) => boolean): boolean {
+  const draft = readDraft<T>(key);
   return draft !== undefined && holds(draft);
 }
 
@@ -110,17 +108,17 @@ interface Held<T> {
 }
 
 /** `held` while it is `key`'s draft; otherwise what is kept under `key`, so a draft never follows a screen to another journey or node. */
-export function draftAt<T>(held: Held<T>, key: string, valid?: Valid<T>): Held<T> {
-  return held.key === key ? held : { key, value: readDraft<T>(key, valid) };
+export function draftAt<T>(held: Held<T>, key: string): Held<T> {
+  return held.key === key ? held : { key, value: readDraft<T>(key) };
 }
 
 /**
  * A draft kept under `key` across reloads of this tab: the value and its setter. When `key`
  * changes (a screen reused for another journey), the value is the new key's draft.
  */
-export function useDraft<T>(key: string, valid?: Valid<T>): [T | undefined, (value: T | undefined) => void] {
-  const [state, setState] = useState<Held<T>>(() => ({ key, value: readDraft<T>(key, valid) }));
-  const current = draftAt(state, key, valid);
+export function useDraft<T>(key: string): [T | undefined, (value: T | undefined) => void] {
+  const [state, setState] = useState<Held<T>>(() => ({ key, value: readDraft<T>(key) }));
+  const current = draftAt(state, key);
   if (current !== state) {
     setState(current);
   }

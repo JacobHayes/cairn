@@ -15,7 +15,7 @@ import { Button, Input } from "../ui/kit.tsx";
 import type { Resource } from "./graph.ts";
 import { mintKey } from "./keys.ts";
 import { countCheck, useValueProblems } from "./form-problems.ts";
-import { isEditing, unsent, type Editing } from "./editing.ts";
+import { unsent, type Editing } from "./editing.ts";
 import { CheckFailed, invalidAttrs, Labelled, Picker, Problem } from "./parts.tsx";
 import { placeholderOptions, useDraftStored } from "./placeholders.ts";
 import { Refusal, type NodeEditorProps } from "./StructureEditors.tsx";
@@ -151,7 +151,7 @@ export function ResourceEditor({ authored, node }: NodeEditorProps) {
   const { deriver } = useSession();
   // A draft is read before its form opens; nothing else opens one meanwhile, so a late answer cannot replace it.
   const [opening, setOpening] = useState(false);
-  const [editing, setEditing] = useDraft<Editing<ResourceForm>>(`resource-form:${domainOf(authored)}:${node.key}`, isEditing);
+  const [editing, setEditing] = useDraft<Editing<ResourceForm>>(`resource-form:${domainOf(authored)}:${node.key}`);
   const resources = node.resources ?? [];
   const room = useValueProblems([countCheck("count", "resource_count_per_node_max", "resources on a node", resources.length + 1)], ENGINE_CHECK);
   const full = room.problems.count !== undefined;

@@ -15,7 +15,3 @@ export function unsent<T>(editing: Editing<T>): boolean {
   return JSON.stringify(editing.value) !== JSON.stringify(editing.opened);
 }
 
-/** Whether a restored draft is an `Editing`: one kept by an older build has another shape and is discarded. */
-export function isEditing<T>(draft: unknown): draft is Editing<T> {
-  return typeof draft === "object" && draft !== null && "value" in draft && "opened" in draft && "base" in draft && typeof draft.base === "number";
-}

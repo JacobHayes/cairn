@@ -36,15 +36,6 @@ export interface Kept {
   newItem?: string;
 }
 
-/** Whether a restored draft is a `Kept` the form reads now: its date rules are the editor's parts (an older build kept the engine's rule shape), so one that is not is discarded. */
-export function isKept(draft: unknown): draft is Kept {
-  if (typeof draft !== "object" || draft === null || !("edits" in draft) || typeof draft.edits !== "object" || draft.edits === null) {
-    return false;
-  }
-  const edits: Record<string, unknown> = { ...draft.edits };
-  return [edits["due_by"], edits["not_before"]].every((rule) => rule === undefined || rule === null || (typeof rule === "object" && "sources" in rule && Array.isArray(rule.sources)));
-}
-
 /** The violations the form shows: the live preview's, or the last attempt's when it is about these fields. */
 function shownViolations(preview: ReturnType<typeof useLivePreview>, write: AuthorWrite): { violations: Violation[]; places: (Place | undefined)[] } {
   if (preview?.outcome === "rejected" && preview.rejection.rejection === "invalid") {
@@ -149,7 +140,7 @@ function useDropped(idle: boolean, drop: () => void): void {
 
 export function NodeForm({ authored, node }: NodeFormProps) {
   const write = useAuthorWrite(authored, `node-form:${node.key}`, node.title);
-  const [kept, setKept] = useDraft<Kept>(`node-form:${domainOf(authored)}:${node.key}`, isKept);
+  const [kept, setKept] = useDraft<Kept>(`node-form:${domainOf(authored)}:${node.key}`);
   const edits = kept?.edits ?? {};
   const draft: NodeDraft = { ...draftOf(node), ...edits };
   // Text typed in the new-item field and not yet added goes with Save as an item, so one press saves it (the field itself still shows it until it is added).

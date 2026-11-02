@@ -11,7 +11,7 @@ import { useId, useState } from "react";
 import { ENGINE_CHECK } from "../data/checks.ts";
 import { useDraft } from "../data/drafts.ts";
 import { Button, Input } from "../ui/kit.tsx";
-import { isEditing, unsent, type Editing } from "./editing.ts";
+import { unsent, type Editing } from "./editing.ts";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { useRemovalPlan } from "./removal.ts";
 import { rolesForSlot, type Kind, type Mutation, type Role } from "./graph.ts";
@@ -124,7 +124,7 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
 function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKind; slots: readonly Slot[] }) {
   const write = useAuthorWrite(authored, `slots:${kind.name}`);
   const room = useValueProblems([countCheck("count", kind.limit, kind.plural, slots.length + 1)], ENGINE_CHECK);
-  const [editing, setEditing] = useDraft<Editing<Slot>>(`slot-form:${domainOf(authored)}:${kind.name}`, isEditing);
+  const [editing, setEditing] = useDraft<Editing<Slot>>(`slot-form:${domainOf(authored)}:${kind.name}`);
   const [removing, setRemoving] = useState<Slot | undefined>(undefined);
   const plan = useRemovalPlan(authored.graph, authored.tree, removing === undefined ? undefined : kind.name === "role" ? { role: removing.key } : { kind: removing.key });
   return (
