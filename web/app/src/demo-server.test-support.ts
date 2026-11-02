@@ -51,8 +51,8 @@ function freePort(): Promise<number> {
   });
 }
 
-/** The shell script that runs the demo and stops it when its parent, or the shell, ends. */
-const WATCH = 'parent=$PPID; "$0" demo --listen "$1" & demo=$!; trap \'kill "$demo"; exit\' TERM INT; while kill -0 "$parent" 2>/dev/null && kill -0 "$demo" 2>/dev/null; do sleep 0.5; done; kill "$demo" 2>/dev/null; wait "$demo"';
+/** The shell script that runs the demo and stops it when its parent, or the shell, ends. It waits on its sleep, which a stop interrupts at once; a sleep in the foreground holds the stop until it ends. */
+const WATCH = 'parent=$PPID; "$0" demo --listen "$1" & demo=$!; trap \'kill "$demo"; exit\' TERM INT; while kill -0 "$parent" 2>/dev/null && kill -0 "$demo" 2>/dev/null; do sleep 0.5 & wait $!; done; kill "$demo" 2>/dev/null; wait "$demo"';
 
 /** Whether the demo at `origin` answers, or the process has stopped (`undefined`). */
 async function answers(origin: string, child: ChildProcess): Promise<boolean | undefined> {
