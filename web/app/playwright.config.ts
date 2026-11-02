@@ -24,12 +24,13 @@ export default defineConfig({
   // Reduced motion turns the app's motion off (DESIGN, Motion), so nothing a test reads is mid-animation.
   // A fixed zone and locale, since a time of day is written on the viewer's clock.
   use: { trace: "retain-on-failure", contextOptions: { reducedMotion: "reduce" }, timezoneId: "UTC", locale: "en-GB" },
+  // The structural walks (`mise run screenshots`, `mise run sweep`): not tests of behaviour but
+  // rules run over every screen state, so they match their own files. They are the longest tests
+  // and are listed first, so a run starts them first and the short tests fill the other workers.
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    // The structural walks (`mise run screenshots`, `mise run sweep`): not tests of behaviour but
-    // rules run over every screen state, so they match their own files.
     { name: "screenshots", testMatch: "screenshots.run.ts", timeout: 900_000, use: { ...devices["Desktop Chrome"], actionTimeout: 15_000 } },
     { name: "sweep", testMatch: "breakpoints.run.ts", timeout: 900_000, use: { ...devices["Desktop Chrome"], actionTimeout: 15_000 } },
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
   ],
   globalSetup: "./e2e/demo.setup.ts",
   globalTeardown: "./e2e/screenshots.teardown.ts",
