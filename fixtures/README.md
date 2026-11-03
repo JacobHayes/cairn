@@ -21,7 +21,7 @@ order, each with the clock it applies at and who submits it). A scenario's first
 creates its journey at base revision 0 from version 1 of the route beside it; the route
 file is that version. Route files carry every key, so scenario patches can refer to nodes,
 roles, and kinds by key. Every file is written in canonical form: parsing and writing it
-gives the same bytes, which `crates/schema/tests/integration/fixtures.rs` checks. A route
+gives the same bytes, which `crates/schema/tests/integration/document_command.rs` checks. A route
 fixture meant only for insertion holds a `route.yaml` and no scenario of its own:
 the engine's insertion tests insert it into another fixture's journey.
 

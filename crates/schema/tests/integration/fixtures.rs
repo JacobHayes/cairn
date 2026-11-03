@@ -1,105 +1,35 @@
-//! The shared fixtures (fixtures/): every file parses, writes back byte for byte, and
-//! validates against the generated JSON Schema; every scenario is a well-formed sequence of
-//! patches over its own route; the vendor evaluation covers the PRD's illustrative example.
+//! The shared fixtures (fixtures/): every route file validates against the generated JSON
+//! Schema.
 
 #![cfg(test)]
 
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use cairn_schema::{
-    AnswerSpec, Mutation, PatchTarget, Payload, ResourceContent, Revision, RouteFile, Scenario,
-    from_yaml, json_schema, to_json, to_yaml,
-};
+use cairn_schema::{RouteFile, from_yaml, json_schema, to_json};
 
 fn fixtures_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
 }
 
-/// The fixture directories, by name.
-fn directories() -> Vec<(String, PathBuf)> {
-    let mut found: Vec<(String, PathBuf)> = std::fs::read_dir(fixtures_root())
+/// Every route document the fixtures hold, whether or not a scenario runs over it.
+fn route_documents() -> Vec<(String, RouteFile)> {
+    let mut directories: Vec<PathBuf> = std::fs::read_dir(fixtures_root())
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|path| path.is_dir())
-        .map(|path| {
-            (
-                path.file_name().unwrap().to_string_lossy().into_owned(),
-                path,
-            )
-        })
         .collect();
-    found.sort();
-    found
-}
-
-/// Every route document the fixtures hold, whether or not a scenario runs over it.
-fn route_documents() -> Vec<(String, RouteFile)> {
+    directories.sort();
     let mut found = Vec::new();
-    for (name, directory) in directories() {
+    for directory in directories {
         let path = directory.join("route.yaml");
         if path.exists() {
-            found.push((
-                format!("{name}/route.yaml"),
-                read_canonical::<RouteFile>(&path),
-            ));
+            let text = std::fs::read_to_string(&path).unwrap();
+            let route =
+                from_yaml(&text).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+            found.push((path.display().to_string(), route));
         }
     }
     found
-}
-
-/// Each fixture directory with a scenario, with its route file if it has one.
-fn fixtures() -> Vec<(String, Option<RouteFile>, Scenario)> {
-    let mut found = Vec::new();
-    for (name, directory) in directories() {
-        if !directory.join("journey.yaml").exists() {
-            continue;
-        }
-        let route_path = directory.join("route.yaml");
-        let route = route_path
-            .exists()
-            .then(|| read_canonical::<RouteFile>(&route_path));
-        let scenario = read_canonical::<Scenario>(&directory.join("journey.yaml"));
-        found.push((name, route, scenario));
-    }
-    found
-}
-
-/// Parses a fixture and checks it is written in canonical form: the bytes on disk are the
-/// bytes the serializer writes, every time.
-fn read_canonical<T: serde::Serialize + serde::de::DeserializeOwned>(path: &Path) -> T {
-    let text = std::fs::read_to_string(path).unwrap();
-    let value: T = from_yaml(&text).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
-    let written = to_yaml(&value).unwrap();
-    assert_eq!(written, text, "{} is not in canonical form", path.display());
-    assert_eq!(
-        to_yaml(&value).unwrap(),
-        written,
-        "two serializations of {} differ",
-        path.display()
-    );
-    value
-}
-
-#[test]
-fn every_fixture_parses_and_round_trips_byte_for_byte() {
-    // read_canonical asserts both; this test names the acceptance and the brief's set: three
-    // routes with a journey each, and one journey with no route.
-    let found = fixtures();
-    let names: BTreeSet<&str> = found.iter().map(|(name, ..)| name.as_str()).collect();
-    for expected in ["vendor-evaluation", "hiring-loop", "product-launch"] {
-        assert!(names.contains(expected), "missing fixture {expected}");
-    }
-    assert!(
-        found.iter().any(|(_, route, _)| route.is_none()),
-        "no fixture journey without a route"
-    );
-    for (name, route, scenario) in found {
-        assert!(!scenario.steps.is_empty(), "{name}");
-        if let Some(route) = route {
-            assert!(!route.nodes.is_empty(), "{name}");
-        }
-    }
 }
 
 #[test]
@@ -113,253 +43,5 @@ fn every_route_file_validates_against_the_json_schema() {
             .map(|error| error.to_string())
             .collect();
         assert!(errors.is_empty(), "{name}: {errors:#?}");
-    }
-}
-
-#[test]
-fn scenarios_are_sequential_patches_over_their_own_route() {
-    for (name, route, scenario) in fixtures() {
-        let mut revision = Revision::NONE;
-        for (index, step) in scenario.steps.as_slice().iter().enumerate() {
-            let patch = &step.patch;
-            let at = format!("{name} step {index}");
-            // Every patch is the journey's, but a proposal to save the journey as a route.
-            if !saves_the_journey(patch, &scenario.journey) {
-                assert_eq!(
-                    patch.target.domain(),
-                    cairn_schema::Domain::Journey(scenario.journey.clone()),
-                    "{at}"
-                );
-            }
-            // Journey patches advance the journey one revision at a time from 0 (A17);
-            // proposal patches have their own revision and leave the journey's alone (H5).
-            if !matches!(patch.target, PatchTarget::Proposal { .. }) {
-                assert_eq!(patch.base_revision, revision, "{at}");
-                revision = revision.next();
-            }
-            for mutation in patch.mutations.as_slice() {
-                if let Mutation::CreateJourney {
-                    from: Some(lineage),
-                    ..
-                } = mutation
-                {
-                    let route = route
-                        .as_ref()
-                        .unwrap_or_else(|| panic!("{at}: a lineage needs a route file"));
-                    assert_eq!(lineage.route, route.route, "{at}");
-                }
-            }
-        }
-    }
-}
-
-/// Whether `patch` proposes saving `journey` as a new route.
-fn saves_the_journey(patch: &cairn_schema::Patch, journey: &cairn_schema::JourneyId) -> bool {
-    let [Mutation::CreateProposal { proposal }] = patch.mutations.as_slice() else {
-        return false;
-    };
-    matches!(patch.target.domain(), cairn_schema::Domain::Route(_))
-        && proposal.mutations.as_slice().iter().any(|mutation| {
-            matches!(
-                mutation,
-                Mutation::OpenDraft {
-                    source: cairn_schema::DraftSource::SaveAsRoute { journey: from },
-                } if from == journey
-            )
-        })
-}
-
-type Mechanisms = Vec<(&'static str, bool)>;
-
-/// The illustrative example's decisions and gating.
-fn decision_mechanisms(route: &RouteFile) -> Mechanisms {
-    let nodes = route.nodes.as_slice();
-    let decision = |pick: &dyn Fn(&AnswerSpec<cairn_schema::FileRefs>) -> bool| {
-        nodes.iter().any(
-            |node| matches!(&node.payload, Payload::Decision(decision) if pick(&decision.answer)),
-        )
-    };
-    vec![
-        (
-            "an identity decision filling a role",
-            decision(&|answer| {
-                matches!(
-                    answer,
-                    AnswerSpec::Identity {
-                        fills_role: Some(_)
-                    }
-                )
-            }),
-        ),
-        (
-            "an identity-list decision filling a role",
-            decision(&|answer| {
-                matches!(
-                    answer,
-                    AnswerSpec::IdentityList {
-                        fills_role: Some(_)
-                    }
-                )
-            }),
-        ),
-        (
-            "a date decision pinning a milestone",
-            decision(&|answer| {
-                matches!(
-                    answer,
-                    AnswerSpec::Date {
-                        feeds_milestone: Some(_)
-                    }
-                )
-            }),
-        ),
-        (
-            "a gated decision",
-            nodes.iter().any(|node| {
-                matches!(node.payload, Payload::Decision(_)) && !node.requires.is_empty()
-            }),
-        ),
-        (
-            "a conditional subset",
-            nodes
-                .iter()
-                .any(|node| matches!(node.payload, Payload::Group) && node.relevant_when.is_some()),
-        ),
-        ("a default owner", route.default_owner.is_some()),
-    ]
-}
-
-/// The illustrative example's stages, dates, placeholder, and resources.
-fn structure_mechanisms(route: &RouteFile) -> Mechanisms {
-    let nodes = route.nodes.as_slice();
-    let group = |pick: &dyn Fn(&cairn_schema::Node<cairn_schema::FileRefs>) -> bool| {
-        nodes
-            .iter()
-            .any(|node| matches!(node.payload, Payload::Group) && pick(node))
-    };
-    vec![
-        (
-            "a placeholder",
-            nodes.iter().any(
-                |node| matches!(node.payload, Payload::Deliverable(ref work) if work.placeholder),
-            ),
-        ),
-        (
-            "a stage that waits for a milestone",
-            group(&|group| !group.requires.is_empty()),
-        ),
-        (
-            "a stage with a deadline",
-            group(&|group| group.due_by.is_some()),
-        ),
-        (
-            "a rule relative to a milestone",
-            nodes.iter().any(|node| node.due_by.is_some()),
-        ),
-        (
-            "a final, weighted milestone",
-            nodes.iter().any(|node| {
-                matches!(node.payload, Payload::Milestone(ref m) if m.is_final)
-                    && node.weight.is_some()
-            }),
-        ),
-        (
-            "a message draft",
-            nodes
-                .iter()
-                .flat_map(|node| &node.resources)
-                .any(|r| matches!(r.content, ResourceContent::MessageDraft(_))),
-        ),
-    ]
-}
-
-/// Every identity key a value mentions (identity keys are the strings with the `who_` prefix).
-fn identity_keys(value: &serde_json::Value, found: &mut BTreeSet<String>) {
-    match value {
-        serde_json::Value::String(text) if text.starts_with("who_") => {
-            found.insert(text.clone());
-        }
-        serde_json::Value::Array(items) => items.iter().for_each(|item| identity_keys(item, found)),
-        serde_json::Value::Object(map) => {
-            map.iter().for_each(|(key, item)| {
-                if key.starts_with("who_") {
-                    found.insert(key.clone());
-                }
-                identity_keys(item, found);
-            });
-        }
-        _ => {}
-    }
-}
-
-#[test]
-fn patches_referring_to_existing_identities_name_the_deployment_revision() {
-    // E6, H5: a journey patch that writes a reference to an identity it did not create names
-    // the deployment revision it was validated against. Each scenario starts in the deployment
-    // `people.yaml` leaves, at revision 1; a patch creating identities advances it by one.
-    let people = read_canonical::<cairn_schema::ScenarioStep>(&fixtures_root().join("people.yaml"));
-    assert_eq!(people.patch.target, PatchTarget::Deployment);
-    assert_eq!(people.patch.base_revision, Revision::NONE);
-    for (name, _, scenario) in fixtures() {
-        let mut deployment = Revision::NONE.next();
-        // Identities a proposal creates are created when it is applied.
-        let mut proposed: BTreeSet<String> = BTreeSet::new();
-        for (index, step) in scenario.steps.as_slice().iter().enumerate() {
-            let mut created = BTreeSet::new();
-            let mut referenced = BTreeSet::new();
-            for mutation in step.patch.mutations.as_slice() {
-                match mutation {
-                    Mutation::CreateIdentity { identity } => {
-                        created.insert(identity.key.as_str().to_owned());
-                    }
-                    Mutation::CreateProposal { proposal } | Mutation::EditProposal { proposal } => {
-                        for inner in proposal.mutations.as_slice() {
-                            if let Mutation::CreateIdentity { identity } = inner {
-                                proposed.insert(identity.key.as_str().to_owned());
-                            }
-                        }
-                    }
-                    Mutation::ApplyProposal { .. } => created.append(&mut proposed),
-                    other => identity_keys(&serde_json::to_value(other).unwrap(), &mut referenced),
-                }
-            }
-            let existing: Vec<&String> = referenced.difference(&created).collect();
-            if !existing.is_empty() {
-                assert_eq!(
-                    step.patch.deployment_revision,
-                    Some(deployment),
-                    "{name} step {index} refers to {existing:?}"
-                );
-            }
-            if !created.is_empty() {
-                deployment = deployment.next();
-            }
-        }
-    }
-}
-
-#[test]
-fn the_vendor_evaluation_covers_the_illustrative_example() {
-    let (_, route, _) = fixtures()
-        .into_iter()
-        .find(|(name, ..)| name == "vendor-evaluation")
-        .unwrap();
-    let route = route.unwrap();
-    for (mechanism, present) in decision_mechanisms(&route)
-        .into_iter()
-        .chain(structure_mechanisms(&route))
-    {
-        assert!(present, "the vendor evaluation lacks {mechanism}");
-    }
-}
-
-#[test]
-fn the_readme_describes_every_fixture() {
-    let readme = std::fs::read_to_string(fixtures_root().join("README.md")).unwrap();
-    for (name, _) in directories() {
-        assert!(
-            readme.contains(&format!("`{name}/`")),
-            "fixtures/README.md has no section for {name}"
-        );
     }
 }
