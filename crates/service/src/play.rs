@@ -6,8 +6,9 @@
 use cairn_engine::from_file;
 use cairn_schema::{
     Actor, Domain, DraftSource, Mutation, Mutations, Patch, PatchTarget, Revision, RouteFile,
-    ScenarioStep, SequentialKeys, Timestamp, from_yaml,
+    ScenarioStep, SequentialKeys, TimeZoneName, Timestamp, from_yaml,
 };
+use serde::Deserialize;
 
 use crate::{Call, DomainPatch, Proposing, Service};
 
@@ -23,6 +24,26 @@ impl std::fmt::Display for PlayError {
 }
 
 impl std::error::Error for PlayError {}
+
+/// The deployment the fixtures record (`fixtures/deployment.yaml`): the time zone every
+/// deployment that loads them runs in, so a time of day in a fixture carries its offset.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Deployment {
+    time_zone: TimeZoneName,
+}
+
+/// The time zone `text`, the contents of `fixtures/deployment.yaml`, declares. A host resolves
+/// it with its own zone database for [`DeploymentSettings`](crate::DeploymentSettings).
+///
+/// # Errors
+///
+/// When the file does not parse.
+pub fn time_zone(text: &str) -> Result<TimeZoneName, PlayError> {
+    from_yaml::<Deployment>(text)
+        .map(|deployment| deployment.time_zone)
+        .map_err(|error| PlayError(format!("deployment: {error}")))
+}
 
 /// The patch that creates a fixture's route and publishes its file as version 1, as every
 /// scenario expects (fixtures/README.md): the route, a draft opened for an import, its roles,

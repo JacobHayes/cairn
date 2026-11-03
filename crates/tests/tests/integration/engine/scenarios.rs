@@ -89,8 +89,8 @@ fn state_of(graph: &Graph, node: &str) -> State {
 }
 
 /// B1, B6, B10, E6: the placeholder is broken down into the children it names, completing
-/// the baseline lifted its snooze, the final report is pinned, and an identity is created and
-/// used in one patch.
+/// the baseline lifted its snooze, the decision meeting is snoozed until a time, the findings
+/// are pinned to a time, and an identity is created and used in one patch.
 #[test]
 fn the_vendor_evaluation_ends_broken_down_and_pinned() {
     let records = finished("vendor-evaluation");
@@ -104,10 +104,15 @@ fn the_vendor_evaluation_ends_broken_down_and_pinned() {
     let breakdown = added_under("vendor-evaluation", "n_workload");
     assert!(breakdown > 0, "the scenario breaks the placeholder down");
     assert_eq!(children, breakdown, "the placeholder was broken down (B10)");
-    assert!(graph.state.snoozes.is_empty(), "B6");
+    let snoozed: Vec<_> = graph.state.snoozes.keys().cloned().collect();
+    assert_eq!(snoozed, [key("n_decision_meeting")], "B6");
     assert_eq!(
         graph.state.pins[&key("n_final_report")],
         "2026-11-02".parse().unwrap()
+    );
+    assert_eq!(
+        graph.state.pins[&key("n_findings")],
+        "2026-10-26T09:30-05:00".parse().unwrap()
     );
     let answers: BTreeSet<_> = graph.state.answers.keys().cloned().collect();
     assert_eq!(

@@ -43,6 +43,7 @@ Do as much as necessary and as little as possible; every layer, script, flag, br
 - **Cull what no longer earns its place.** Work in an area deletes the code and tests there that no longer pay. Keeping something takes the case adding it would; existing, effort spent, or a check running it are not reasons.
 - **Build the end state, removing first.**
 - **Fix the class, not the instance**, in the same change.
+- **Make parts agree at the source.** One owner and one definition for a fact, so the parts that need it read it there; remove a step rather than add one that translates between them.
 - **Fix it where it lives.** Report a tool's bug upstream; a workaround that stays names what it waits on.
 
 ### Frontend state

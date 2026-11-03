@@ -5,7 +5,8 @@
 use std::path::{Path, PathBuf};
 
 use cairn_schema::{Patch, Scenario, Timestamp, from_yaml};
-use cairn_service::Service;
+use cairn_service::{DeploymentSettings, Service};
+use jiff::tz::TimeZone;
 
 /// The repository's fixtures directory.
 pub fn fixtures_root() -> PathBuf {
@@ -16,6 +17,15 @@ pub fn fixtures_root() -> PathBuf {
 pub fn scenario(name: &str) -> Scenario {
     let path = fixtures_root().join(name).join("journey.yaml");
     from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap()
+}
+
+/// The settings of a deployment that loads the fixtures: the time zone they declare
+/// (`fixtures/deployment.yaml`).
+pub fn settings() -> DeploymentSettings {
+    let text = std::fs::read_to_string(fixtures_root().join("deployment.yaml")).unwrap();
+    let name = cairn_service::time_zone(&text).unwrap();
+    let zone = TimeZone::get(name.as_str()).unwrap();
+    DeploymentSettings::new(name, zone)
 }
 
 /// A fixture's route file.

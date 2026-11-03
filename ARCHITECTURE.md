@@ -47,7 +47,7 @@ Load-bearing decisions:
 
 - **Journeys are small** (hundreds of nodes, a few MB), hence whole-domain loads, full derive on read, and the whole journey sent to the browser. The limits in `PRACTICES.md` hold it there; past them the path is incremental derive and paged reads, with the same schema.
 - **One deployment, one trust boundary, one process** over one embedded database file.
-- **Days in the deployment's time zone.** Today and now are computed once per request and passed in, so everyone sees the same dates and rank. A time of day is stored as the instant with the zone's offset then, so the engine needs no zone rules; the host checks the offset on write.
+- **Days in the deployment's time zone.** Today and now are computed once per request and passed in, so everyone sees the same dates and rank. A time of day is stored as the instant with the zone's offset then, so the engine needs no zone rules; the host checks the offset on write. The fixtures declare the zone of the deployment they record (`fixtures/deployment.yaml`), and `cairn demo` and every test deployment that loads them run in it.
 
 ## Terms
 

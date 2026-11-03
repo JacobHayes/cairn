@@ -62,7 +62,7 @@ pub fn config(listen: SocketAddr) -> Result<Config, String> {
 database = "in-memory"
 listen = "{listen}"
 public_url = "http://{listen}/"
-timezone = "UTC"
+timezone = "{zone}"
 
 [[auth]]
 kind = "builtin_oauth"
@@ -85,7 +85,10 @@ client_id = "cairn"
 endpoint = "http://{listen}/demo/assistant/v1"
 model = "scripted"
 "#,
-        issuer = issuer_url(listen)
+        issuer = issuer_url(listen),
+        zone = crate::fixtures::time_zone()
+            .map_err(|error| error.to_string())?
+            .as_str(),
     );
     config::parse(&text, Path::new("."), &Environment::default()).map_err(|problems| {
         let lines: Vec<String> = problems.iter().map(ToString::to_string).collect();

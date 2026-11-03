@@ -74,7 +74,7 @@ describe("C13, F1, F6: the lead's milestone line", () => {
   it("names the final milestone with its pin", () => {
     const journey = open("j_vendor_eval");
     const { model } = pageOf(journey);
-    expect(milestoneLine(journey.ready, model)).toMatchObject({ role: "final", key: "n_decision_meeting", date: "2026-11-20", origin: "pin" });
+    expect(milestoneLine(journey.ready, model)).toMatchObject({ role: "final", key: "n_decision_meeting", date: "2026-11-20T09:45-05:00", origin: "pin" });
   });
 
   it("gives the final milestone its own shortfall and no other node's", () => {

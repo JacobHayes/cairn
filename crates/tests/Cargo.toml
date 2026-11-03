@@ -27,7 +27,8 @@ cookie.workspace = true
 ed25519-dalek.workspace = true
 futures-core.workspace = true
 http-body-util.workspace = true
-jiff.workspace = true
+# The fixtures' time zone resolves from jiff's bundled database, so no test reads the host's.
+jiff = { workspace = true, features = ["tzdb-bundle-always"] }
 jsonschema.workspace = true
 metrics.workspace = true
 metrics-util.workspace = true

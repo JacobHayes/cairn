@@ -5,6 +5,11 @@ engine's scenario tests, `cairn demo`, and the server's integration tests all lo
 them (ARCHITECTURE, Testing the engine). Nothing here refers to a real use case, person, or
 organization (PRD, Domain-free).
 
+`deployment.yaml` declares the deployment the fixtures record: its time zone, `Etc/GMT+5`, five
+hours behind UTC all year. Every deployment that loads the fixtures (`cairn demo`, each test
+harness, the durability testbed) runs in it, so a time of day in a fixture is written with that
+offset (`-05:00`) and code that assumes UTC fails everywhere.
+
 `people.yaml` is one deployment patch creating the people the scenarios share: invented,
 generic, with opaque keys, emails on some. Every scenario runs in the deployment it leaves,
 at revision 1, and binds those people to its own roles, so one person plays different roles in
@@ -45,8 +50,10 @@ The decision meeting is the final milestone, weight 10. Resources: an access-req
 draft, a report template, and two example test plans. The scenario answers the up-front
 decisions, completes kickoff, breaks down the workload, answers the comparison set once the plan
 is done, snoozes the baseline on a node, pins the report earlier than its derived due date,
-finishes the workload and the baseline (which completes testing and opens reporting), and
-answers the reviewer with a person created in the same patch.
+finishes the workload and the baseline (which completes testing and opens reporting), answers
+the reviewer with a person created in the same patch, and ends by giving a pin (the
+findings), a snooze (the decision meeting) and a date answer (the meeting date) a time of
+day.
 
 Derived at each decision point: the relevance and participations `derive` gives
 after steps 1, 2, 6, and 8. `fixture_readme.rs` reads this table and checks it against what the engine derives.
@@ -282,7 +289,7 @@ done with their effective dates, and the open decisions in rank order. Nothing i
 overdue on that day; the product launch's late code freeze leaves it and the launch short
 (F6). The engine's tests (`crates/tests/tests/integration/engine/fixture_readme.rs`) check these lines.
 
-- `vendor-evaluation`, status summary: active 1, ready 1, blocked 2, scheduled 1, done 19; remaining 5; overdue none; short none; stale none; upcoming `n_review_opens` 2026-10-30, `n_decision_meeting` 2026-11-20; open decisions none.
+- `vendor-evaluation`, status summary: active 1, ready 1, blocked 2, snoozed 1, done 19; remaining 5; overdue none; short none; stale none; upcoming `n_review_opens` 2026-10-30, `n_decision_meeting` 2026-11-20T09:45-05:00; open decisions none.
 - `hiring-loop`, status summary: ready 1, done 11, skipped 1; remaining 1; overdue none; short none; stale none; upcoming none; open decisions none.
 - `product-launch`, status summary: ready 4, blocked 3, scheduled 3, done 5; remaining 10; overdue none; short none; stale none; upcoming `n_beta_start` 2026-11-13, `n_beta_end` 2026-11-18, `n_launch` 2026-11-23; open decisions none.
 - `bake-off`, status summary: active 2, ready 1, blocked 3, done 2; remaining 6; overdue none; short none; stale none; upcoming `n_wrap_up` 2026-10-19; open decisions `n_winner`.

@@ -11,9 +11,8 @@ use cairn_assistant::{Assistant, Target, TurnReply, assistant_agent};
 use cairn_auth::Clock;
 use cairn_mcp::{ToolError, ToolSet};
 use cairn_schema::{Actor, Mutation, Scenario, Timestamp};
-use cairn_service::{Capabilities, DeploymentSettings, McpAccess, Parts, Service};
+use cairn_service::{Capabilities, McpAccess, Parts, Service};
 use cairn_store::{InProcessNotifier, MemoryStore};
-use jiff::tz::{Offset, TimeZone};
 use serde_json::{Value, json};
 
 pub use super::provider::{KEY, Provider, Step};
@@ -36,8 +35,7 @@ impl World {
 
     /// As [`World::new`], over a memory store whose commits `faults` can fail or hold.
     pub async fn with_faults(faults: cairn_store::Faults) -> Self {
-        let zone = TimeZone::fixed(Offset::constant(-5));
-        let settings = DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone);
+        let settings = crate::fixtures::settings();
         let store = Arc::new(MemoryStore::with_faults(faults));
         let service = Service::new(Parts {
             store: Arc::<MemoryStore>::clone(&store),

@@ -25,7 +25,6 @@ use cairn_service::{
     AgentSignIn, AuthKind, AuthMethod, Capabilities, DeploymentSettings, McpAccess, Parts, Service,
 };
 use cairn_store::{Faults, InProcessNotifier, MemoryStore};
-use jiff::tz::{Offset, TimeZone};
 use serde::de::DeserializeOwned;
 use url::Url;
 
@@ -96,10 +95,9 @@ pub const GOOGLE_CLIENT: &str = "relay-client.apps.example";
 /// That client's secret, which only Cairn and Google see.
 pub const GOOGLE_SECRET: &str = "relay-secret-value";
 
-/// The test deployment's time zone: five hours behind UTC all year.
+/// The test deployment's settings: the fixtures' time zone.
 pub fn settings() -> DeploymentSettings {
-    let zone = TimeZone::fixed(Offset::constant(-5));
-    DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone)
+    crate::fixtures::settings()
 }
 
 /// A server on loopback and what it stands on.

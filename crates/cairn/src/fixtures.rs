@@ -6,8 +6,8 @@
 //!
 //! Cost: one service write per route and per step, a few dozen in all.
 
-use cairn_schema::{Email, Scenario, ScenarioStep, Timestamp, from_yaml};
-use cairn_service::{PlayError, Service};
+use cairn_schema::{Email, Scenario, ScenarioStep, TimeZoneName, Timestamp, from_yaml};
+use cairn_service::{DeploymentSettings, PlayError, Service};
 use cairn_store::{LoginRecord, Store, UserRecord};
 
 /// One fixture: its name, its route file if it has one, and its journey scenario.
@@ -24,6 +24,9 @@ pub struct Fixture {
 /// The patch that creates the people every scenario starts from (`fixtures/people.yaml`).
 const PEOPLE: &str = include_str!("../../../fixtures/people.yaml");
 
+/// The deployment the fixtures record (`fixtures/deployment.yaml`).
+const DEPLOYMENT: &str = include_str!("../../../fixtures/deployment.yaml");
+
 // Every fixture, in name order (the order they are seeded); the `fixtures/` directory owns
 // the list (build.rs).
 include!(concat!(env!("OUT_DIR"), "/fixtures.rs"));
@@ -37,6 +40,28 @@ impl Fixture {
     pub fn scenario(&self) -> Result<Scenario, PlayError> {
         from_yaml(self.journey).map_err(|error| PlayError(format!("{}: {error}", self.name)))
     }
+}
+
+/// The time zone the fixtures declare, which every deployment that loads them runs in.
+///
+/// # Errors
+///
+/// When the file does not parse.
+pub fn time_zone() -> Result<TimeZoneName, PlayError> {
+    cairn_service::time_zone(DEPLOYMENT)
+}
+
+/// The settings of a deployment that loads the fixtures: their time zone, with its rules from
+/// the system's zone database.
+///
+/// # Errors
+///
+/// When the file does not parse or the system's database does not know the zone.
+pub fn settings() -> Result<DeploymentSettings, PlayError> {
+    let name = time_zone()?;
+    let zone = jiff::tz::TimeZone::get(name.as_str())
+        .map_err(|error| PlayError(format!("{}: {error}", name.as_str())))?;
+    Ok(DeploymentSettings::new(name, zone))
 }
 
 /// Seeds every fixture into `service`, in [`FIXTURES`] order.

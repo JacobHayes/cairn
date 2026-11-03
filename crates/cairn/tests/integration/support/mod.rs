@@ -26,15 +26,17 @@ use tokio::net::{TcpListener, TcpStream};
 /// The public URL the test deployments are configured with.
 pub const PUBLIC_HOST: &str = "cairn.example.com";
 
-/// A deployment on a loopback listener at `https://cairn.example.com/`, in UTC, signed in by
+/// A deployment on a loopback listener at `https://cairn.example.com/`, in the fixtures' time zone, signed in by
 /// one dev provider, with `extra` appended (more keys or tables).
 pub fn config(extra: &str) -> Config {
+    let zone = cairn::fixtures::time_zone().unwrap();
+    let zone = zone.as_str();
     let text = format!(
         r#"
 database = "unused.db"
 listen = "127.0.0.1:0"
 public_url = "https://{PUBLIC_HOST}/"
-timezone = "UTC"
+timezone = "{zone}"
 {extra}
 "#
     );

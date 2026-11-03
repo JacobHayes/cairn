@@ -15,13 +15,11 @@ use cairn_service::{
 };
 use cairn_store::{InProcessNotifier, MemoryStore, Store};
 use cairn_store_sqlite::SqliteStore;
-use jiff::tz::{Offset, TimeZone};
 
-/// The test deployment's time zone: five hours behind UTC all year (`Etc/GMT+5`), so a
-/// midnight in it is 05:00 UTC.
+/// The test deployment's settings: the fixtures' time zone (`Etc/GMT+5`, five hours behind
+/// UTC all year), so a midnight in it is 05:00 UTC.
 pub fn settings() -> DeploymentSettings {
-    let zone = TimeZone::fixed(Offset::constant(-5));
-    DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone)
+    crate::fixtures::settings()
 }
 
 /// A service over `store`, with its notifier.

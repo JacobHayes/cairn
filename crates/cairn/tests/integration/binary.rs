@@ -29,19 +29,25 @@ fn config_file(directory: &Path, text: &str) -> PathBuf {
     path
 }
 
-/// A deployment on a free loopback port, in UTC, with the dev provider.
-const CONFIG: &str = r#"
+/// A deployment on a free loopback port, in the fixtures' time zone, with the dev provider.
+fn config_text() -> String {
+    let zone = cairn::fixtures::time_zone().unwrap();
+    format!(
+        r#"
 database = "cairn.db"
 listen = "127.0.0.1:0"
 public_url = "http://localhost/"
-timezone = "UTC"
+timezone = "{}"
 
 [[auth]]
 kind = "dev"
 name = "dev"
 user = "Dev"
 verified_emails = ["dev@example.org"]
-"#;
+"#,
+        zone.as_str()
+    )
+}
 
 /// `cairn <arguments>`, with none of the caller's `CAIRN_` variables but the web build's
 /// folder: a developer's overrides or secrets must not reach the binary a test runs.
@@ -72,7 +78,7 @@ mod commands {
     #[test]
     fn a_missing_time_zone_or_public_url_fails_startup_naming_it() {
         let directory = directory("missing");
-        let text = CONFIG
+        let text = config_text()
             .lines()
             .filter(|line| !line.starts_with("timezone") && !line.starts_with("public_url"))
             .collect::<Vec<_>>()
@@ -101,7 +107,7 @@ mod commands {
     #[test]
     fn a_database_that_does_not_open_stops_the_process() {
         let directory = directory("unopenable");
-        let text = CONFIG.replace("cairn.db", "missing-directory/cairn.db");
+        let text = config_text().replace("cairn.db", "missing-directory/cairn.db");
         let path = config_file(&directory, &text);
         for command in ["serve", "migrate"] {
             let output = run(&[command, "--config", path.to_str().unwrap()], &[]);
@@ -115,7 +121,11 @@ mod commands {
     #[test]
     fn the_environment_completes_the_file() {
         let directory = directory("environment");
-        let text = CONFIG.replace("timezone = \"UTC\"\n", "");
+        let text = config_text()
+            .lines()
+            .filter(|line| !line.starts_with("timezone"))
+            .collect::<Vec<_>>()
+            .join("\n");
         let path = config_file(&directory, &text);
         let checked = run(
             &["config", "check"],
@@ -142,7 +152,7 @@ mod commands {
     #[test]
     fn migrate_creates_the_database_and_version_names_the_binary() {
         let directory = directory("migrate");
-        let path = config_file(&directory, CONFIG);
+        let path = config_file(&directory, &config_text());
         for _ in 0..2 {
             let migrated = run(&["migrate", "--config", path.to_str().unwrap()], &[]);
             assert!(
@@ -259,7 +269,7 @@ mod binary {
     #[tokio::test]
     async fn the_binary_serves_ui_and_api_on_one_port_and_stops() {
         let directory = directory("smoke");
-        let path = config_file(&directory, CONFIG);
+        let path = config_file(&directory, &config_text());
         support::seed::seed_fixtures(&directory.join("cairn.db"))
             .await
             .unwrap();
@@ -302,7 +312,7 @@ mod binary {
     #[tokio::test]
     async fn an_acknowledged_patch_is_in_the_database_file_after_a_stop() {
         let directory = directory("persisted");
-        let path = config_file(&directory, CONFIG);
+        let path = config_file(&directory, &config_text());
         let mut served = serve(&path);
         let patches = [
             json!({ "id": "p_create", "target": { "journey": "j_persisted" }, "base_revision": 0,
@@ -360,7 +370,7 @@ mod binary {
             .local_addr()
             .unwrap()
             .port();
-        let text = CONFIG.replace("127.0.0.1:0", &format!("127.0.0.1:{port}"));
+        let text = config_text().replace("127.0.0.1:0", &format!("127.0.0.1:{port}"));
         let path = config_file(&directory, &text);
         let mut served = Served::spawn(&path);
         let mut stderr = BufReader::new(served.stderr());

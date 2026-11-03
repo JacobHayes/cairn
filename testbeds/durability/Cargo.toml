@@ -24,8 +24,9 @@ cairn-schema = { path = "../../crates/schema" }
 cairn-service = { path = "../../crates/service" }
 cairn-store = { path = "../../crates/store" }
 cairn-store-sqlite = { path = "../../crates/store-sqlite" }
-# The deployment's time zone the service takes, at the root workspace's version.
-jiff = { version = "0.2.38", default-features = false, features = ["std"] }
+# The deployment's time zone the service takes, at the root workspace's version, from jiff's
+# bundled database (the fixtures' zone).
+jiff = { version = "0.2.38", default-features = false, features = ["std", "tzdb-bundle-always"] }
 # The SDK at the revision Cargo.toml's [workspace.dependencies] and mise.toml pin.
 patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "1dee57b448d57c390af26a9d5af5f2d3a8820cc8" }
 # The SQLite backend's runtime: one current-thread runtime with its timer (the working shape

@@ -15,7 +15,7 @@ use cairn_service::{
 };
 use cairn_store::{CommitPoint, Faults, InProcessNotifier, PauseHook, Store};
 use cairn_store_sqlite::SqliteStore;
-use jiff::tz::{Offset, TimeZone};
+use jiff::tz::TimeZone;
 
 use crate::ledger::{Entry, Ledger};
 use crate::plan::Plan;
@@ -211,8 +211,7 @@ struct Open {
 impl Open {
     fn new(directory: &Path, faults: &Faults) -> Result<Open, Stop> {
         let store = Arc::new(open_store(directory, faults)?);
-        let zone = TimeZone::fixed(Offset::constant(-5));
-        let settings = DeploymentSettings::new(parse("Etc/GMT+5"), zone);
+        let settings = fixtures_settings();
         let service = Service::new(Parts {
             store: Arc::<SqliteStore>::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
@@ -264,6 +263,20 @@ fn open_store(directory: &Path, faults: &Faults) -> Result<SqliteStore, Stop> {
                 }
             }
         }
+    }
+}
+
+/// The settings of the deployment the fixtures record (`fixtures/deployment.yaml`), whose time
+/// zone every deployment that loads them runs in.
+fn fixtures_settings() -> DeploymentSettings {
+    const DEPLOYMENT: &str = include_str!("../../../fixtures/deployment.yaml");
+    let name = match cairn_service::time_zone(DEPLOYMENT) {
+        Ok(name) => name,
+        Err(error) => unreachable!("the fixtures' deployment parses: {error}"),
+    };
+    match TimeZone::get(name.as_str()) {
+        Ok(zone) => DeploymentSettings::new(name, zone),
+        Err(error) => unreachable!("the fixtures' time zone resolves: {error}"),
     }
 }
 

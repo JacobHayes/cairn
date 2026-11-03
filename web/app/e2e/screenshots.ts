@@ -122,9 +122,9 @@ const inspector = (page: Page) => page.locator(".inspector");
 /** The window the authoring forms (and so the drafting of proposals) need, which is a desktop's. */
 const DRAFTING_WINDOW = { width: 1440, height: 900 };
 
-/** The nodes the times of day are set on, the times (in the deployment's zone), and the day the walk holds. */
-const TIMED = { pin: "n_final_report", answer: "n_meeting_date", snooze: "n_final_review" } as const;
-const TIMES = { pin: { day: "2026-10-26", time: "09:30" }, answer: { day: "2026-11-18", time: "09:45" }, snooze: { day: "2026-10-28", time: "16:00" } } as const;
+/** The nodes whose pin, answer and snooze carry a time of day in the fixtures, and the day and time the pin form is typed with (in the deployment's zone). */
+const TIMED = { pin: "n_findings", answer: "n_meeting_date", snooze: "n_decision_meeting" } as const;
+const TYPED_PIN = { day: "2026-10-26", time: "09:30" } as const;
 
 /** Node `node`'s inspector in the list of `journey`. */
 async function inspectorOf(page: Page, journey: string, node: string): Promise<Locator> {
@@ -166,34 +166,8 @@ async function pinTime(page: Page, on: Subject): Promise<void> {
   if ((await whenSettled(page, () => editor.getByTestId("pin-form").count())) === 0) {
     await editor.getByRole("button", { name: /^(Pin a date|Change the pin)$/ }).click();
   }
-  await editor.getByLabel("Pin date", { exact: true }).fill(TIMES.pin.day);
-  await editor.getByLabel("Pin date, time of day").fill(TIMES.pin.time);
-}
-
-/**
- * Sets a pin, an answer and a snooze that carry a time of day on the journey, in one patch (the
- * pin is already gone by on the held day, so its work reads late today). A time of day is written
- * with its deployment's offset, so the fixtures, which load into deployments of any zone, hold
- * none, and the walk sets them on the demo, which keeps UTC.
- */
-async function setTimes(page: Page, on: Subject): Promise<void> {
-  const { revision } = (await (await page.request.get(`/api/journeys/${on.journey}/derived`)).json()) as { revision: number };
-  const moment = (when: { day: string; time: string }) => `${when.day}T${when.time}+00:00`;
-  const response = await page.request.post(`/api/journeys/${on.journey}/patches`, {
-    data: {
-      patch: {
-        id: "p_walk_times",
-        target: { journey: on.journey },
-        base_revision: revision,
-        mutations: [
-          { op: "set_pin", node: TIMED.pin, date: moment(TIMES.pin) },
-          { op: "answer", decision: TIMED.answer, value: { date: moment(TIMES.answer) } },
-          { op: "snooze", node: TIMED.snooze, until: { date: moment(TIMES.snooze) } },
-        ],
-      },
-    },
-  });
-  expect(response.ok(), `setting the times of day: ${await response.text()}`).toBe(true);
+  await editor.getByLabel("Pin date", { exact: true }).fill(TYPED_PIN.day);
+  await editor.getByLabel("Pin date, time of day").fill(TYPED_PIN.time);
 }
 
 /** The popover states of a journey's list: each opens one control and shows what it holds. */
@@ -310,7 +284,7 @@ export function visitsAt(widths: number[]): number {
 
 /**
  * Visits every state of the table that `phone` (or a desktop) reaches, in the window the caller
- * set on `page` (its theme and touch are the caller's too): the times of day set, the
+ * set on `page` (its theme and touch are the caller's too): the
  * page at Home on the fixed day, then `visit` for each state, given what reaches it again. A state
  * whose visit throws is listed with the rest, so one run shows every state that fails; the list is
  * returned.
@@ -321,7 +295,6 @@ export async function walkStates(
   visit: (address: AddressName, state: State, reach: () => Promise<void>) => Promise<void>,
 ): Promise<string[]> {
   const on = FIXTURE_SUBJECT;
-  await setTimes(page, on);
   await holdToday(page, WALK_TODAY);
   await open(page, "/");
   const failed: string[] = [];

@@ -9,11 +9,8 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use cairn_auth::Clock;
 use cairn_mcp::{ToolError, ToolSet};
 use cairn_schema::{Actor, Patch, Timestamp};
-use cairn_service::{
-    Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service,
-};
+use cairn_service::{Call, Capabilities, DomainPatch, McpAccess, Parts, Service};
 use cairn_store::{InProcessNotifier, MemoryStore};
-use jiff::tz::{Offset, TimeZone};
 use serde_json::Value;
 
 /// The tool set over a fresh memory store, the service beneath it, and the clock its calls
@@ -27,8 +24,7 @@ pub struct World {
 impl World {
     /// The tools over an empty deployment, at the vendor evaluation's first step.
     pub fn new() -> Self {
-        let zone = TimeZone::fixed(Offset::constant(-5));
-        let settings = DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone);
+        let settings = crate::fixtures::settings();
         let service = Service::new(Parts {
             store: Arc::new(MemoryStore::new()),
             notifier: Arc::new(InProcessNotifier::new()),

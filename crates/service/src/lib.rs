@@ -37,7 +37,7 @@ pub use compose::{
 pub use drafting::{ProposeError, Proposing};
 pub use error::ServiceError;
 pub use observe::{DERIVE_DURATION, engine_call_active};
-pub use play::{PlayError, play, publish_route, publisher, route_patch};
+pub use play::{PlayError, play, publish_route, publisher, route_patch, time_zone};
 pub use projections::{ChildEntry, History, NodeDetail, Projected, ReadError};
 pub use proposals::{ProposalListing, ProposalReview, ProposalWritten, StaleBase};
 pub use reads::{IdentityReferences, RouteReference, RouteSummary};
