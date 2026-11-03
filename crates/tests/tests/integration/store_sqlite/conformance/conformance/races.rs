@@ -76,16 +76,19 @@ pub fn add_node(patch: &str, journey: &str, base: u32, key: &str) -> Commit {
 /// How long a commit waiting its turn beside a held one is shown to keep waiting.
 const MEANWHILE: Duration = Duration::from_millis(50);
 
-/// Runs `held` until it reaches the gate, then `meanwhile`, which must still be waiting for
-/// `held` a while later; then releases the gate and lets both finish.
-async fn beside_held<T, M: Future<Output = T>>(
+/// Runs `held` until it reaches the gate, then `during` to its end with the gate still shut,
+/// then `meanwhile`, which must still be waiting for `held` a while later; then releases the
+/// gate and lets both finish.
+async fn beside_held<D, T, M: Future<Output = T>>(
     store: &SqliteStore,
     gate: &Gate,
     held: Commit,
+    during: impl Future<Output = D>,
     meanwhile: M,
-) -> (Result<Committed, CommitError>, T) {
+) -> (Result<Committed, CommitError>, D, T) {
     let others = async {
         gate.reached.notified().await;
+        let during = during.await;
         let mut meanwhile = pin!(meanwhile);
         let early = tokio::time::timeout(MEANWHILE, meanwhile.as_mut()).await;
         assert!(
@@ -93,9 +96,10 @@ async fn beside_held<T, M: Future<Output = T>>(
             "a commit beside the held one waits its turn"
         );
         gate.release.notify_one();
-        meanwhile.await
+        (during, meanwhile.await)
     };
-    both(store.commit(held), others).await
+    let (long, (during, meanwhile)) = both(store.commit(held), others).await;
+    (long, during, meanwhile)
 }
 
 /// ARCHITECTURE, Backends: a long commit to one journey blocks no read of it, which sees
@@ -114,20 +118,15 @@ pub async fn a_long_commit_blocks_no_read_and_holds_the_next_commit(backend: &Sq
     )
     .await;
     let gate = Gate::at(CommitPoint::BetweenStateAndEvents, &faults);
-    let meanwhile = Box::pin(async {
-        let seen = promptly(journey(&store, "j_one")).await.unwrap();
-        let other = store
-            .commit(add_node("p_other", "j_two", 1, "n_other"))
-            .await;
-        (seen, other)
-    });
-    let (long, (seen, other)) = beside_held(
+    let (long, seen, other) = beside_held(
         &store,
         &gate,
         add_node("p_long", "j_one", 1, "n_long"),
-        meanwhile,
+        promptly(journey(&store, "j_one")),
+        store.commit(add_node("p_other", "j_two", 1, "n_other")),
     )
     .await;
+    let seen = seen.unwrap();
     assert!(matches!(long, Ok(Committed::Applied { .. })), "{long:?}");
     assert!(matches!(other, Ok(Committed::Applied { .. })), "{other:?}");
     assert_eq!((seen.revision, seen.graph.nodes.len()), (revision(1), 0));
@@ -220,7 +219,8 @@ pub async fn a_resubmission_beside_its_original_in_flight_is_answered_from_its_r
     let original = add_node("p_add", "j_one", 1, "n_added");
     let gate = Gate::at(CommitPoint::BetweenStateAndEvents, &faults);
     let meanwhile = promptly(store.commit(original.clone()));
-    let (first, again) = beside_held(&store, &gate, original, meanwhile).await;
+    let (first, (), again) =
+        beside_held(&store, &gate, original, std::future::ready(()), meanwhile).await;
     assert!(matches!(first, Ok(Committed::Applied { .. })), "{first:?}");
     assert!(
         matches!(again, Ok(Committed::AlreadyApplied(_))),
