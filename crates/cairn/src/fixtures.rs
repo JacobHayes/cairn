@@ -1,22 +1,13 @@
 //! The fixtures `cairn demo` is seeded with (fixtures/README.md), compiled in, and the
-//! seeding itself: each fixture's
-//! route published as version 1, then its scenario's steps submitted through the service in
-//! order, every fixture into one deployment.
-//!
-//! Every scenario is written for the deployment the shared people leave, at revision 1, which
-//! is seeded first; seeded one after another, a step that names a deployment revision names it
-//! counted from where its fixture started, so seeding moves it by how far the deployment has
-//! moved since the people. The identities a scenario creates are distinct across the fixtures,
-//! so nothing else collides.
+//! seeding itself: the shared people, then each fixture's route published as version 1 and
+//! its scenario played through the service (`cairn_service::play`), every fixture into one
+//! deployment. The identities a scenario creates are distinct across the fixtures, so nothing
+//! collides.
 //!
 //! Cost: one service write per route and per step, a few dozen in all.
 
-use cairn_engine::from_file;
-use cairn_schema::{
-    Actor, DraftSource, Email, Mutation, Mutations, Patch, PatchTarget, Revision, RouteFile,
-    Scenario, ScenarioStep, SequentialKeys, Timestamp, from_yaml,
-};
-use cairn_service::{Call, DomainPatch, Proposing, Service};
+use cairn_schema::{Email, Scenario, ScenarioStep, Timestamp, from_yaml};
+use cairn_service::{PlayError, Service};
 use cairn_store::{LoginRecord, Store, UserRecord};
 
 /// One fixture: its name, its route file if it has one, and its journey scenario.
@@ -37,84 +28,14 @@ const PEOPLE: &str = include_str!("../../../fixtures/people.yaml");
 // the list (build.rs).
 include!(concat!(env!("OUT_DIR"), "/fixtures.rs"));
 
-/// Why seeding stopped: a fixture that did not parse or a step the service did not commit,
-/// which is a bug in the fixtures or the service.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SeedError(pub String);
-
-impl std::fmt::Display for SeedError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "seeding the fixtures failed: {}", self.0)
-    }
-}
-
-impl std::error::Error for SeedError {}
-
 impl Fixture {
     /// Its journey scenario.
     ///
     /// # Errors
     ///
     /// When the file does not parse.
-    pub fn scenario(&self) -> Result<Scenario, SeedError> {
-        from_yaml(self.journey).map_err(|error| SeedError(format!("{}: {error}", self.name)))
-    }
-
-    /// The patch that creates its route and publishes the file as version 1, as every
-    /// scenario expects (fixtures/README.md): the route, a draft opened for an import, its
-    /// roles, kinds, default owner, and nodes, and the publish. None for a fixture with no
-    /// route.
-    ///
-    /// # Errors
-    ///
-    /// When the file does not parse or build.
-    pub fn route_patch(&self) -> Result<Option<Patch>, SeedError> {
-        let Some(text) = self.route else {
-            return Ok(None);
-        };
-        let failed = |error: &dyn std::fmt::Display| SeedError(format!("{}: {error}", self.name));
-        let file: RouteFile = from_yaml(text).map_err(|error| failed(&error))?;
-        let graph = from_file(&file, &mut SequentialKeys::default())
-            .map_err(|violations| failed(&format_args!("{violations:?}")))?
-            .into_document();
-        let mut mutations = vec![
-            Mutation::CreateRoute {
-                name: file.name.clone(),
-                description: file.description.clone(),
-            },
-            Mutation::OpenDraft {
-                source: DraftSource::Import,
-            },
-        ];
-        mutations.extend(cairn_engine::format::content(&graph));
-        mutations.push(Mutation::PublishDraft {});
-        let id = format!("p_seed_{}", self.name.replace('-', "_"));
-        Ok(Some(Patch {
-            id: id
-                .parse()
-                .map_err(|error| failed(&format_args!("{error:?}")))?,
-            target: PatchTarget::Route(file.route.clone()),
-            base_revision: Revision::NONE,
-            deployment_revision: None,
-            mutations: Mutations::new(mutations).map_err(|error| failed(&error))?,
-        }))
-    }
-}
-
-/// Who publishes the fixtures' routes, and when: before any scenario starts.
-fn author_call() -> Call {
-    let parse = |text: &str| {
-        text.parse()
-            .unwrap_or_else(|error| panic!("{text}: {error:?}"))
-    };
-    Call {
-        actor: Actor {
-            user: parse("u_author"),
-            agent: None,
-        },
-        now: "2026-09-01T12:00:00Z"
-            .parse::<Timestamp>()
-            .unwrap_or_else(|error| panic!("a fixed time: {error}")),
+    pub fn scenario(&self) -> Result<Scenario, PlayError> {
+        from_yaml(self.journey).map_err(|error| PlayError(format!("{}: {error}", self.name)))
     }
 }
 
@@ -123,116 +44,17 @@ fn author_call() -> Call {
 /// # Errors
 ///
 /// When a fixture does not parse or the service does not commit a step.
-pub async fn seed(service: &Service) -> Result<(), SeedError> {
+pub async fn seed(service: &Service) -> Result<(), PlayError> {
     let people: ScenarioStep =
-        from_yaml(PEOPLE).map_err(|error| SeedError(format!("people: {error}")))?;
-    seed_step(service, &people, Revision::NONE).await?;
-    let base = service
-        .deployment()
-        .await
-        .map_err(|error| SeedError(error.to_string()))?
-        .revision;
+        from_yaml(PEOPLE).map_err(|error| PlayError(format!("people: {error}")))?;
+    cairn_service::play(service, &[people], None).await?;
     for fixture in &FIXTURES {
-        let at = service
-            .deployment()
-            .await
-            .map_err(|error| SeedError(error.to_string()))?
-            .revision;
-        let start = Revision::try_from(at.get() - base.get())
-            .map_err(|error| SeedError(format!("{}: {error:?}", fixture.name)))?;
-        if let Some(patch) = fixture.route_patch()? {
-            submit(service, &author_call(), patch, None).await?;
+        if let Some(route) = fixture.route {
+            cairn_service::publish_route(service, fixture.name, route).await?;
         }
-        for step in fixture.scenario()?.steps.as_slice() {
-            seed_step(service, step, start).await?;
-        }
+        cairn_service::play(service, fixture.scenario()?.steps.as_slice(), None).await?;
     }
     Ok(())
-}
-
-/// One scenario step, its deployment revision counted from `start`: a proposal's create or
-/// apply through the proposal lifecycle (I6), anything else as a domain patch.
-async fn seed_step(
-    service: &Service,
-    step: &ScenarioStep,
-    start: Revision,
-) -> Result<(), SeedError> {
-    let call = Call {
-        actor: step.actor.clone(),
-        now: step.at,
-    };
-    let failed = |error: &dyn std::fmt::Debug| SeedError(format!("{}: {error:?}", step.patch.id));
-    let mut patch = step.patch.clone();
-    if let Some(revision) = patch.deployment_revision {
-        let moved = Revision::try_from(revision.get() + start.get()).map_err(|e| failed(&e))?;
-        patch.deployment_revision = Some(moved);
-    }
-    match (&patch.target, patch.mutations.as_slice()) {
-        (PatchTarget::Proposal { id, destination }, [Mutation::CreateProposal { proposal }]) => {
-            // The draft as the write that makes it: its mutations against the destination
-            // revision it was drafted at, titled by the note.
-            let drafted = Patch {
-                id: patch.id.clone(),
-                target: destination.clone().into(),
-                base_revision: proposal.destination_revision,
-                deployment_revision: None,
-                mutations: Mutations::new(proposal.mutations.as_slice().to_vec())
-                    .map_err(|error| failed(&error))?,
-            };
-            let note = proposal.title.as_str().parse().map_err(|e| failed(&e))?;
-            let drafted = DomainPatch::new(drafted, Some(note)).map_err(|error| failed(&error))?;
-            let Some(proposing) =
-                Proposing::named(Some(id.clone()), None).map_err(|e| failed(&e))?
-            else {
-                unreachable!("a proposal id was given");
-            };
-            service
-                .propose(&call, &drafted, &proposing)
-                .await
-                .map_err(|error| failed(&error))?;
-        }
-        (
-            PatchTarget::Journey(journey),
-            [
-                Mutation::ApplyProposal {
-                    proposal,
-                    reviewed_revision,
-                },
-            ],
-        ) => {
-            let destination = cairn_schema::Domain::Journey(journey.clone());
-            service
-                .apply_proposal(
-                    &call,
-                    patch.id.clone(),
-                    &destination,
-                    proposal,
-                    *reviewed_revision,
-                    Some(step.note.clone()),
-                )
-                .await
-                .map_err(|error| failed(&error))?;
-        }
-        _ => submit(service, &call, patch, Some(step.note.clone())).await?,
-    }
-    Ok(())
-}
-
-/// Submits a domain patch, which must commit.
-async fn submit(
-    service: &Service,
-    call: &Call,
-    patch: Patch,
-    note: Option<cairn_schema::Markdown>,
-) -> Result<(), SeedError> {
-    let id = patch.id.clone();
-    let submitted =
-        DomainPatch::new(patch, note).map_err(|error| SeedError(format!("{id}: {error:?}")))?;
-    service
-        .patch(call, &submitted)
-        .await
-        .map(|_| ())
-        .map_err(|error| SeedError(format!("{id}: {error:?}")))
 }
 
 /// The users the fixtures' events name (the routes' publisher and the scenarios' actors),
@@ -242,18 +64,18 @@ async fn submit(
 /// # Errors
 ///
 /// When the store fails.
-pub async fn put_fixture_users(store: &dyn Store, at: Timestamp) -> Result<(), SeedError> {
+pub async fn put_fixture_users(store: &dyn Store, at: Timestamp) -> Result<(), PlayError> {
     const USERS: [(&str, &str, Option<&str>); 4] = [
         ("u_author", "Route author", None),
         ("u_ana", "Ana Ruiz", Some("ana@example.org")),
         ("u_ben", "Ben Okafor", Some("ben@example.org")),
         ("u_gus", "Gus Lindqvist", Some("gus@example.org")),
     ];
-    fn parse<T: std::str::FromStr<Err: std::fmt::Debug>>(text: &str) -> Result<T, SeedError> {
+    fn parse<T: std::str::FromStr<Err: std::fmt::Debug>>(text: &str) -> Result<T, PlayError> {
         text.parse()
-            .map_err(|error| SeedError(format!("{text}: {error:?}")))
+            .map_err(|error| PlayError(format!("{text}: {error:?}")))
     }
-    let failed = |error: cairn_store::StoreError| SeedError(error.to_string());
+    let failed = |error: cairn_store::StoreError| PlayError(error.to_string());
     for (id, name, email) in USERS {
         let user: cairn_schema::UserId = parse(id)?;
         store

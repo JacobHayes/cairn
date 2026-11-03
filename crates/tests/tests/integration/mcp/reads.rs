@@ -63,7 +63,7 @@ async fn the_route_tools_read_what_was_published() {
 async fn the_journey_tools_read_what_is_held() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let index = world
         .ok(&ann, "list_journeys", json!({ "statuses": ["active"] }))
         .await;
@@ -84,7 +84,7 @@ async fn the_journey_tools_read_what_is_held() {
     let history = world
         .ok(&ann, "get_history", json!({ "journey": "j_vendor_eval" }))
         .await;
-    assert_eq!(history["patches"][0]["actor"]["user"], "u_ann");
+    assert_eq!(history["patches"][0]["actor"]["user"], "u_ana");
     let missing = world
         .call(&ann, "get_history", json!({ "journey": "j_nowhere" }))
         .await;
@@ -100,7 +100,7 @@ async fn the_journey_tools_read_what_is_held() {
 async fn history_names_each_patchs_events_and_gives_the_stored_changes_on_request() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_after(&ann, 2).await;
+    world.vendor_after(2).await;
     let journey = json!({ "journey": "j_vendor_eval" });
     let lean = world.ok(&ann, "get_history", journey.clone()).await;
     let full = world
@@ -149,7 +149,7 @@ async fn history_names_each_patchs_events_and_gives_the_stored_changes_on_reques
 async fn history_attributes_each_event_in_a_mixed_patch_to_its_own_maker() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let helper = agent("ag_helper", "u_ann");
     let child = json!({ "op": "add_node", "node": {
         "key": "n_workload_ingest", "id": "ingest", "parent": "n_workload",
@@ -200,7 +200,7 @@ async fn history_attributes_each_event_in_a_mixed_patch_to_its_own_maker() {
 async fn a_search_hit_on_a_resource_keeps_its_node_and_key() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let found = world
         .ok(&ann, "search", json!({ "text": "Report template" }))
         .await;
@@ -218,7 +218,7 @@ async fn a_search_hit_on_a_resource_keeps_its_node_and_key() {
 async fn identities_are_listed_and_journeys_found_by_the_identity_they_refer_to() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_after(&ann, 2).await;
+    world.vendor_after(2).await;
     let eli = "who_e7h2jv3nxc4yaw6t";
     let ana = "who_d4m6uk2eqf5rbhzs";
 

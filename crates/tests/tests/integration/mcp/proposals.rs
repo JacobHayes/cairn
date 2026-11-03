@@ -22,7 +22,7 @@ fn proposing(patch_id: &str, mutations: &[Value]) -> Value {
 async fn a_proposal_is_drafted_extended_reviewed_and_applied() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let helper = agent("ag_helper", "u_ann");
     let [ingest, query] = breakdown();
     let create = proposing("p_propose", &[ingest]);
@@ -92,7 +92,7 @@ async fn a_proposal_is_drafted_extended_reviewed_and_applied() {
 async fn a_proposal_is_discarded_against_its_revision() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let [ingest, _] = breakdown();
     world
         .ok(&ann, "apply_patch", proposing("p_propose", &[ingest]))
@@ -125,7 +125,7 @@ fn breakdown() -> [Value; 2] {
 async fn a_save_that_cannot_be_made_is_answered_by_its_kind() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let save = json!({ "target": { "route": "saved" }, "base_revision": 0, "patch_id": "p_save",
         "proposal": "pr_save", "mutations": [
             { "op": "create_route", "name": "Saved" },
@@ -146,7 +146,7 @@ async fn a_save_that_cannot_be_made_is_answered_by_its_kind() {
 async fn a_write_to_a_proposal_is_refused_at_the_argument_at_fault() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let [ingest, _] = breakdown();
     let with = |change: &dyn Fn(&mut Value)| {
         let mut arguments = proposing("p_one", std::slice::from_ref(&ingest));
@@ -205,7 +205,7 @@ async fn a_write_to_a_proposal_is_refused_at_the_argument_at_fault() {
 async fn a_stale_or_closed_proposal_takes_no_addition() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let [ingest, query] = breakdown();
     world
         .ok(&ann, "apply_patch", proposing("p_made", &[ingest]))

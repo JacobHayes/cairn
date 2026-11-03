@@ -101,11 +101,6 @@ pub fn step_call(step: &ScenarioStep) -> Call {
     }
 }
 
-/// A scenario step as a domain patch with its note.
-pub fn step_patch(step: &ScenarioStep) -> DomainPatch {
-    DomainPatch::new(step.patch.clone(), Some(step.note.clone())).unwrap()
-}
-
 /// The same step applied by the engine alone to `records`, as the store-free reference.
 pub fn engine_step(records: &Records, patch: &Patch, call: &Call, note: Option<&str>) -> Records {
     let inputs = ApplyInputs {
@@ -148,24 +143,9 @@ pub fn rejected(written: Result<Written, WriteError>) -> cairn_schema::Rejection
     }
 }
 
-/// Seeds the vendor evaluation's route and runs its scenario's first `steps` steps.
+/// Plays the vendor evaluation's route and its scenario's first `steps` steps.
 pub async fn vendor_after(service: &Service, steps: usize) {
-    let (people_call, people) = crate::people::people_write();
-    applied(service.patch(&people_call, &people).await);
-    let seed = publish_fixture_route("vendor-evaluation");
-    applied(
-        service
-            .patch(&call("u_author", "2026-09-01T12:00:00Z"), &domain(seed))
-            .await,
-    );
-    for step in scenario("vendor-evaluation")
-        .steps
-        .as_slice()
-        .iter()
-        .take(steps)
-    {
-        applied(service.patch(&step_call(step), &step_patch(step)).await);
-    }
+    crate::fixtures::play_fixture(service, "vendor-evaluation", Some(steps)).await;
 }
 
 /// A fresh SQLite store under `root`, shared.

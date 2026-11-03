@@ -25,7 +25,6 @@ axum = { workspace = true, features = ["matched-path"] }
 cairn-api.workspace = true
 cairn-assistant.workspace = true
 cairn-auth.workspace = true
-cairn-engine.workspace = true
 cairn-mcp.workspace = true
 cairn-schema.workspace = true
 cairn-service.workspace = true

@@ -315,6 +315,16 @@ mod in_process {
         let _installed = metrics::set_default_local_recorder(&recorder);
         let world = World::start().await;
         let ann = world.vendor_after(1).await;
+        let scenario = support::scenario("vendor-evaluation");
+        let answers = &scenario.steps.as_slice()[1];
+        world.clock.set_to(answers.at);
+        let patched = post(
+            &ann,
+            &format!("{JOURNEY}/patches"),
+            &request(&answers.patch),
+        )
+        .await;
+        ok::<serde_json::Value>(&patched);
         get::<Capabilities>(&ann, "/api/capabilities").await;
         let counted: Vec<(String, Vec<(String, String)>)> = snapshotter
             .snapshot()

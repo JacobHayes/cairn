@@ -93,7 +93,7 @@ fn complete_kickoff(patch: &str, base: u64) -> Value {
 async fn the_model_is_offered_the_mcp_tools_and_the_guide() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     world.script([Step::say("Hello.")]);
     world.turn(&lead, &vendor_target(), "What is next?").await;
     let request = &world.provider.requests()[0];
@@ -135,7 +135,7 @@ async fn the_model_is_offered_the_mcp_tools_and_the_guide() {
 async fn the_system_text_and_the_tools_do_not_depend_on_who_asks_or_where() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     world.empty_bakeoff().await;
     world.script([Step::say("One."), Step::say("Two.")]);
     world.turn(&lead, &vendor_target(), "Hello?").await;
@@ -185,7 +185,7 @@ async fn a_tool_outside_the_offered_list_is_refused_when_named() {
 async fn a_forbidden_tool_named_again_ends_the_turn() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     let apply = json!({ "proposal": "pr_x", "reviewed_revision": 1, "patch_id": "p_apply" });
     world.script(
         (0..=TOOL_CALL_FAILURE_REPEAT_COUNT_MAX)
@@ -271,7 +271,7 @@ async fn an_empty_journey_is_structured_through_a_proposal_the_user_applies() {
 async fn a_direct_write_is_reported_and_recorded_as_the_assistant_for_its_user() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     let mut answers = crate::assistant::support::step_mutations(&scenario("vendor-evaluation"), 1);
     // A meeting far sooner than the work feeding it can be done.
     for answer in &mut answers {
@@ -335,7 +335,7 @@ async fn a_direct_write_is_reported_and_recorded_as_the_assistant_for_its_user()
 async fn a_write_stands_and_is_reported_when_the_provider_fails_after_it() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     world.script([
         Step::call("update_journey_state", complete_kickoff("p_kickoff", 1)),
         Step::status(503),
@@ -369,7 +369,7 @@ async fn a_write_stands_and_is_reported_when_the_provider_fails_after_it() {
 async fn a_write_applied_before_is_reported_as_already_applied() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     let patch = complete_kickoff("p_kickoff", 1);
     world.script([
         Step::calls([
@@ -404,7 +404,7 @@ async fn a_missing_route_keeps_no_conversation_and_a_discard_is_reported_as_one(
     );
 
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     let add = json!({ "op": "add_node", "node": { "key": "n_extra", "id": "extra",
         "kind": "action", "title": "An extra step" } });
     let create = json!({ "proposal": "pr_extra", "target": { "journey": VENDOR },
@@ -458,7 +458,7 @@ async fn a_turn_about_a_missing_journey_is_refused() {
 async fn a_conversation_carries_on_for_its_user_alone() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     world.script([
         Step::call("update_journey_state", complete_kickoff("p_kickoff", 1)),
         Step::say("First answer."),
@@ -499,7 +499,7 @@ async fn a_conversation_carries_on_for_its_user_alone() {
 async fn only_the_newest_dialogue_within_the_budget_is_replayed() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     let big = "x".repeat(BODY_BYTES_MAX as usize / 2);
     let turns = DIALOGUE_REPLAY_BYTES_MAX as usize / big.len() + 2;
     world.script((0..=turns).map(|_| Step::say("Ok.")));
@@ -530,7 +530,7 @@ async fn only_the_newest_dialogue_within_the_budget_is_replayed() {
 async fn calls_past_the_per_reply_limit_are_refused() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     let read = json!({ "journey": VENDOR });
     let count = TOOL_CALL_COUNT_PER_REPLY_MAX as usize + 3;
     world.script([
@@ -555,7 +555,7 @@ async fn an_unfinished_reply_runs_no_tool_call() {
     for finish in ["length", "content_filter"] {
         let world = World::new().await;
         let lead = user("u_lead");
-        world.vendor_journey(&lead).await;
+        world.vendor_journey().await;
         world.script([
             Step::call("update_journey_state", complete_kickoff("p_cut", 1)).finishing(finish),
         ]);
@@ -574,7 +574,7 @@ async fn an_unfinished_reply_runs_no_tool_call() {
 async fn a_turn_ends_at_its_iteration_limit() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     let read = || Step::call("get_snapshot", json!({ "journey": VENDOR }));
     world.script((0..=TOOL_LOOP_ITERATION_COUNT_MAX).map(|_| read()));
     let turn = world.turn(&lead, &vendor_target(), "Look around.").await;
@@ -591,7 +591,7 @@ async fn a_turn_ends_at_its_iteration_limit() {
 async fn a_tool_call_repeated_after_failing_ends_the_turn() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     let bad = || {
         Step::call(
             "get_node",
@@ -607,7 +607,7 @@ async fn a_tool_call_repeated_after_failing_ends_the_turn() {
     );
 
     let world = World::new().await;
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     let missing = |node: &str| Step::call("get_node", json!({ "journey": VENDOR, "node": node }));
     world.script([
         missing("n_a"),
@@ -626,7 +626,7 @@ async fn a_tool_call_repeated_after_failing_ends_the_turn() {
 async fn a_turns_tool_results_are_bounded_between_provider_calls() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     let read = json!({ "route": "vendor-evaluation", "version": 1 });
     let size = world
         .ok(&lead, "get_route", read.clone())
@@ -672,7 +672,7 @@ async fn a_provider_failure_stops_the_turn_without_echoing_what_it_said() {
     for status in [401, 429, 500] {
         let world = World::new().await;
         let lead = user("u_lead");
-        world.vendor_journey(&lead).await;
+        world.vendor_journey().await;
         world.script([Step::status(status)]);
         let turn = world.turn(&lead, &vendor_target(), "Hello.").await;
         let why = stopped(&turn);
@@ -699,7 +699,7 @@ async fn a_provider_failure_stops_the_turn_without_echoing_what_it_said() {
 async fn a_provider_timeout_is_reported_and_the_writes_before_it_stand() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     world.script([
         Step::call("update_journey_state", complete_kickoff("p_kickoff", 1)),
         Step::hang(),
@@ -718,7 +718,7 @@ async fn a_provider_timeout_is_reported_and_the_writes_before_it_stand() {
 async fn a_turn_ends_at_its_duration_limit() {
     let world = World::new().await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     let read = || Step::call("get_snapshot", json!({ "journey": VENDOR }));
     world.script((0..10).map(|_| read().after(Duration::from_secs(100))));
     let turn = world.turn(&lead, &vendor_target(), "Look slowly.").await;
@@ -735,7 +735,7 @@ async fn a_turn_ends_at_its_duration_limit() {
 async fn turns_past_the_in_flight_limit_are_refused() {
     let world = Arc::new(World::new().await);
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     world.script((0..TURN_IN_FLIGHT_COUNT_MAX).map(|_| Step::hang()));
     let mut running = Vec::new();
     for index in 0..TURN_IN_FLIGHT_COUNT_MAX {
@@ -765,7 +765,7 @@ async fn turns_past_the_in_flight_limit_are_refused() {
 async fn a_conversation_runs_one_turn_at_a_time() {
     let world = Arc::new(World::new().await);
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     world.script([Step::hang(), Step::say("Hello.")]);
     let first = {
         let (world, lead) = (Arc::clone(&world), lead.clone());
@@ -791,7 +791,7 @@ async fn a_commit_landing_just_past_the_deadline_is_reported() {
     let faults = cairn_store::Faults::default();
     let world = World::with_faults(faults.clone()).await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     // A second past the turn's deadline (its limit less the save reserve).
     let lands = tokio::time::Instant::now() + TURN_DURATION_MAX - TURN_SAVE_RESERVE
         + Duration::from_secs(1);
@@ -814,7 +814,7 @@ async fn a_stalled_commit_cannot_hold_a_turn_past_its_limit() {
     let faults = cairn_store::Faults::default();
     let world = World::with_faults(faults.clone()).await;
     let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
+    world.vendor_journey().await;
     faults.pause_with(Arc::new(|_| Box::pin(std::future::pending())));
     world.script([
         Step::call("update_journey_state", complete_kickoff("p_stalled", 1)),

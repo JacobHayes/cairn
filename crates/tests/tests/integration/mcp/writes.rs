@@ -37,7 +37,7 @@ fn patch(patch_id: &str, base: u32, mutations: Value) -> Value {
 async fn a_refused_write_carries_every_violation() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let three = json!([
         { "op": "transition", "node": "n_kickoff", "transition": "start" },
         { "op": "transition", "node": "n_nowhere", "transition": "start" },
@@ -70,7 +70,7 @@ async fn a_refused_write_carries_every_violation() {
 async fn a_direct_write_applies_no_proposal() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let inside = json!([
         { "op": "transition", "node": "n_kickoff", "transition": "start" },
         { "op": "apply_proposal", "proposal": "pr_any", "reviewed_revision": 1 },
@@ -114,7 +114,7 @@ async fn completing_a_placeholder_not_broken_down_is_refused_until_bypassed() {
     let world = World::new();
     let ann = user("u_ann");
     // Kickoff done and access started: the workload is open and its stage has opened.
-    world.vendor_after(&ann, 4).await;
+    world.vendor_after(4).await;
     let complete = json!([{ "op": "transition", "node": "n_workload", "transition": "complete" }]);
     let complete = state("p_workload_done", 4, complete);
     let refused = world.call(&ann, "update_journey_state", complete).await;
@@ -165,7 +165,7 @@ async fn give_access_a_checklist(world: &World, ann: &cairn_schema::Actor) {
 async fn completing_work_with_a_checklist_needs_its_ticks_in_the_same_patch() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_after(&ann, 4).await;
+    world.vendor_after(4).await;
     give_access_a_checklist(&world, &ann).await;
     let complete = json!([{ "op": "transition", "node": "n_access", "transition": "complete" }]);
     let complete = state("p_access_done", 5, complete);
@@ -222,7 +222,7 @@ async fn completing_work_with_a_checklist_needs_its_ticks_in_the_same_patch() {
 async fn completing_undecided_work_applies_with_a_warning() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let complete = json!([{ "op": "transition", "node": "n_baseline", "transition": "complete" }]);
     let complete = state("p_baseline_done", 1, complete);
     let applied = world.ok(&ann, "update_journey_state", complete).await;
@@ -239,7 +239,7 @@ async fn completing_undecided_work_applies_with_a_warning() {
 async fn answering_a_decision_reports_what_left_scope() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let answer = json!([{ "op": "answer", "decision": "n_partner_runs",
         "value": { "boolean": false } }]);
     let answer = state("p_no_partner", 1, answer);
@@ -258,7 +258,7 @@ async fn answering_a_decision_reports_what_left_scope() {
 async fn stale_and_resubmitted_writes_are_answered_as_the_service_answers() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let answer = |patch_id: &str| {
         let purpose = json!([{ "op": "answer", "decision": "n_purpose",
             "value": { "single_choice": "purchase" } }]);
@@ -319,7 +319,7 @@ async fn stale_and_resubmitted_writes_are_answered_as_the_service_answers() {
 async fn an_answers_rationale_is_written_and_read_back() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let rationale = "- buy it\n- [quote](https://example.org)";
     let answer = json!([{ "op": "answer", "decision": "n_purpose",
         "value": { "single_choice": "purchase" }, "rationale": rationale }]);
@@ -336,7 +336,7 @@ async fn an_answers_rationale_is_written_and_read_back() {
 async fn an_agent_write_records_the_agent_and_its_user() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let helper = agent("ag_helper", "u_ann");
     let mut arguments = state(
         "p_kickoff",
@@ -363,7 +363,7 @@ async fn an_agent_write_records_the_agent_and_its_user() {
 async fn a_merge_resubmitted_after_its_journeys_moved_is_answered_from_its_receipt() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let mut informed = state(
         "p_informed",
         1,
@@ -535,7 +535,7 @@ async fn a_journey_is_created_with_owners_and_a_merge_moves_them_on() {
 async fn starting_work_that_waits_is_a_plain_transition() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let start = json!([{ "op": "transition", "node": "n_plan", "transition": "start" }]);
     let applied = world
         .ok(
@@ -557,7 +557,7 @@ async fn starting_work_that_waits_is_a_plain_transition() {
 async fn journey_state_refuses_what_is_not_journey_state_by_its_path() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let start = json!({ "op": "transition", "node": "n_kickoff", "transition": "start" });
     let others = [
         json!({ "op": "set_node_field", "node": "n_plan", "value": { "estimate": 3 } }),
@@ -591,7 +591,7 @@ async fn journey_state_refuses_what_is_not_journey_state_by_its_path() {
 async fn a_new_person_rides_with_the_answer_that_names_them() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let deployment = world.service.deployment().await.unwrap().revision.get();
     let mut named = state(
         "p_new_owner",
@@ -628,7 +628,7 @@ async fn a_new_person_rides_with_the_answer_that_names_them() {
 async fn a_removal_rides_with_the_state_it_needs_in_one_patch() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let snooze =
         json!([{ "op": "snooze", "node": "n_findings", "until": { "node": "n_baseline" } }]);
     world

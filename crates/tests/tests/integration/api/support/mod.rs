@@ -237,36 +237,14 @@ impl World {
         Transport::new(self.address, Some(token.to_owned()))
     }
 
-    /// Publishes the vendor evaluation's route as `ann` and runs its scenario's first
-    /// `steps` steps, each at its own time; answers `ann`'s transport.
+    /// Plays the vendor evaluation's route and its scenario's first `steps` steps, each as
+    /// its actor at its time, the clock left at the last; answers `ann`'s transport.
     pub async fn vendor_after(&self, steps: usize) -> Transport {
         let ann = self.signed_in("ann");
-        let (people_call, people) = crate::people::people_write();
-        self.service.patch(&people_call, &people).await.unwrap();
-        let seed = publish_fixture_route("vendor-evaluation");
-        let reply = post(
-            &ann,
-            &cairn_api::endpoints::PATCH_ROUTE.path_with(&["vendor-evaluation"]),
-            &request(&seed),
-        )
-        .await;
-        ok::<serde_json::Value>(&reply);
-        for step in scenario("vendor-evaluation")
-            .steps
-            .as_slice()
-            .iter()
-            .take(steps)
-        {
-            self.clock.set_to(step.at);
-            let body = serde_json::json!({ "patch": step.patch, "note": step.note });
-            ok::<serde_json::Value>(
-                &post(
-                    &ann,
-                    &cairn_api::endpoints::PATCH_JOURNEY.path_with(&["j_vendor_eval"]),
-                    &body,
-                )
-                .await,
-            );
+        let played =
+            crate::fixtures::play_fixture(&self.service, "vendor-evaluation", Some(steps)).await;
+        if let Some(at) = played {
+            self.clock.set_to(at);
         }
         ann
     }

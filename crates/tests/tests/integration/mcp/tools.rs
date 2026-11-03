@@ -358,7 +358,7 @@ async fn a_nodes_children_are_paged() {
 async fn get_node_leaves_out_only_what_the_rest_of_the_answer_says() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_after(&ann, 6).await;
+    world.vendor_after(6).await;
     world.set_clock("2026-10-01T14:00:00Z");
     let call = Call {
         actor: ann.clone(),
@@ -443,7 +443,7 @@ fn latest_start_left_out(key: &str, lean: &Value, dates: &cairn_schema::NodeDate
 async fn the_snapshot_counts_are_the_node_list_totals() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let snapshot = json!({ "journey": "j_vendor_eval" });
     let snapshot = world.ok(&ann, "get_snapshot", snapshot).await;
     assert_eq!(snapshot["revision"], 1);
@@ -472,7 +472,7 @@ async fn the_snapshot_counts_are_the_node_list_totals() {
 async fn the_node_list_and_node_reads_agree() {
     let world = World::new();
     let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
+    world.vendor_journey().await;
     let everything = json!({ "journey": "j_vendor_eval" });
     let everything = world.ok(&ann, "list_nodes", everything).await;
     let roots = json!({ "journey": "j_vendor_eval", "depth": 1 });
@@ -591,7 +591,7 @@ async fn node_rows_stay_within_their_budget_on_every_fixture_journey() {
     {
         let world = World::new();
         let ann = user("u_ann");
-        let journey = world.fixture_after(&ann, fixture, None).await;
+        let journey = world.fixture_after(fixture, None).await;
         let listed = world
             .ok(&ann, "list_nodes", json!({ "journey": journey }))
             .await;

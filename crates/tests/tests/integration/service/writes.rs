@@ -14,7 +14,7 @@ use cairn_store::{EventQuery, InProcessNotifier, Take, Tick, Watch};
 
 use support::{
     applied, call, domain, engine_step, patch, publish_fixture_route, rejected, scenario,
-    step_call, step_patch, vendor_after,
+    step_call, vendor_after,
 };
 
 /// Runs each case once over a fresh memory store and once over a fresh SQLite store.
@@ -116,9 +116,9 @@ async fn a_fixture_scenario_lands_as_the_engine_alone_would(
     service: &Service,
     _: &InProcessNotifier,
 ) {
-    let (people_call, people) = crate::people::people_write();
-    applied(service.patch(&people_call, &people).await);
+    crate::fixtures::play_fixture(service, "vendor-evaluation", None).await;
     let people_step = crate::people::people_step();
+    let people_call = step_call(&people_step);
     let mut reference = engine_step(
         &Records::default(),
         &people_step.patch,
@@ -127,13 +127,11 @@ async fn a_fixture_scenario_lands_as_the_engine_alone_would(
     );
     let seed = publish_fixture_route("vendor-evaluation");
     let seed_call = call("u_author", "2026-09-01T12:00:00Z");
-    applied(service.patch(&seed_call, &domain(seed.clone())).await);
     reference = engine_step(&reference, &seed, &seed_call, None);
     let steps = scenario("vendor-evaluation").steps;
     for step in steps.as_slice() {
         let call = step_call(step);
         assert_eq!(service.settings().today(call.now), step.today);
-        applied(service.patch(&call, &step_patch(step)).await);
         reference = engine_step(&reference, &step.patch, &call, Some(step.note.as_str()));
     }
     let id = journey_id("j_vendor_eval");
@@ -287,8 +285,9 @@ async fn a_stale_role_removal_never_clears_a_fill_made_meanwhile(
     service: &Service,
     _: &InProcessNotifier,
 ) {
-    let (people_call, people) = crate::people::people_write();
-    applied(service.patch(&people_call, &people).await);
+    cairn_service::play(service, &[crate::people::people_step()], None)
+        .await
+        .unwrap();
     let deployment = service.deployment().await.unwrap().revision;
     for (journey, filled) in [("j_same", "r_lead"), ("j_other", "r_alt")] {
         let target = format!("{{journey: {journey}}}");
@@ -339,8 +338,9 @@ async fn a_write_is_stale_beside_a_deployment_change_that_moved_only_the_deploym
     service: &Service,
     _: &InProcessNotifier,
 ) {
-    let (people_call, people) = crate::people::people_write();
-    applied(service.patch(&people_call, &people).await);
+    cairn_service::play(service, &[crate::people::people_step()], None)
+        .await
+        .unwrap();
     let deployment = service.deployment().await.unwrap().revision;
     let roles = "\
 - op: create_journey\n  name: Roles\n\

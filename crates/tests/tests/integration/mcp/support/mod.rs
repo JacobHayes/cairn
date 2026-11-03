@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 
 use cairn_auth::Clock;
 use cairn_mcp::{ToolError, ToolSet};
-use cairn_schema::{Actor, Patch, Scenario, Timestamp, from_yaml};
+use cairn_schema::{Actor, Patch, Timestamp};
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service,
 };
@@ -97,41 +97,25 @@ impl World {
         self.patch(actor, publish_fixture_route(fixture)).await;
     }
 
-    /// Publishes the vendor evaluation and starts `j_vendor_eval` from its version 1 with
-    /// the shared people created first (the scenario's first step): the journey at revision 1.
-    pub async fn vendor_journey(&self, actor: &Actor) {
-        self.vendor_after(actor, 1).await;
+    /// Plays the vendor evaluation's first step: the shared people created, its route
+    /// published, and `j_vendor_eval` started from its version 1, at revision 1.
+    pub async fn vendor_journey(&self) {
+        self.vendor_after(1).await;
     }
 
-    /// Publishes the vendor evaluation and applies its scenario's first `steps` steps as
-    /// `actor`, each at its own time: the journey at revision `steps`.
-    pub async fn vendor_after(&self, actor: &Actor, steps: usize) {
-        self.fixture_after(actor, "vendor-evaluation", Some(steps))
-            .await;
+    /// Plays the vendor evaluation's scenario's first `steps` steps, each as its actor at its
+    /// time, the clock left at the last: the journey at revision `steps`.
+    pub async fn vendor_after(&self, steps: usize) {
+        self.fixture_after("vendor-evaluation", Some(steps)).await;
     }
 
-    /// Plays the fixture `name`'s scenario as `actor`, its first `steps` steps or all of
-    /// them, its route published first, each step at its own time: the journey it builds, so
-    /// not its proposals.
-    pub async fn fixture_after(&self, actor: &Actor, name: &str, steps: Option<usize>) -> String {
-        let (call, people) = crate::people::people_write();
-        self.service.patch(&call, &people).await.unwrap();
-        self.publish(actor, name).await;
-        let path = fixtures_root().join(name).join("journey.yaml");
-        let scenario: Scenario = from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        let all = scenario.steps.as_slice();
-        for step in all.iter().take(steps.unwrap_or(all.len())) {
-            // A proposal leaves the journey as it is.
-            if matches!(
-                step.patch.target,
-                cairn_schema::PatchTarget::Proposal { .. }
-            ) {
-                continue;
-            }
-            self.now.store(step.at.as_second(), Ordering::SeqCst);
-            self.patch(actor, step.patch.clone()).await;
+    /// Plays the fixture `name`'s scenario, its first `steps` steps or all of them, proposals
+    /// included, the clock left at the last step: the journey it builds.
+    pub async fn fixture_after(&self, name: &str, steps: Option<usize>) -> String {
+        if let Some(at) = crate::fixtures::play_fixture(&self.service, name, steps).await {
+            self.now.store(at.as_second(), Ordering::SeqCst);
         }
-        scenario.journey.to_string()
+        crate::fixtures::scenario(name).journey.to_string()
     }
 }
 

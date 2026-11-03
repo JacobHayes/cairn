@@ -1,7 +1,6 @@
 //! The people every fixture scenario starts from (fixtures/README.md): one deployment
-#![cfg(test)]
-
 //! patch, applied before a scenario's first step.
+#![cfg(test)]
 
 use std::path::Path;
 
@@ -28,18 +27,4 @@ pub mod keys {
     pub const GUS: &str = "who_g6t4ycm2pe7vsjan";
     pub const HANA: &str = "who_h3w7bs5xkq2dfnr6";
     pub const FARID: &str = "who_j5v2nx6cwr4tdkq7";
-}
-
-/// The people as a write: submit it once to a fresh service before a scenario's first step.
-/// A second submission is answered from its receipt.
-pub fn people_write() -> (cairn_service::Call, cairn_service::DomainPatch) {
-    let step = people_step();
-    let call = cairn_service::Call {
-        actor: step.actor.clone(),
-        now: step.at,
-    };
-    (
-        call,
-        cairn_service::DomainPatch::new(step.patch, Some(step.note)).unwrap(),
-    )
 }

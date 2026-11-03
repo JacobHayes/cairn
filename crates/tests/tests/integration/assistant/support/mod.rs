@@ -10,10 +10,8 @@ use cairn_assistant::chat::{Credential, ProviderConfig};
 use cairn_assistant::{Assistant, Target, TurnReply, assistant_agent};
 use cairn_auth::Clock;
 use cairn_mcp::{ToolError, ToolSet};
-use cairn_schema::{Actor, Mutation, Patch, Scenario, Timestamp, from_yaml};
-use cairn_service::{
-    Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service,
-};
+use cairn_schema::{Actor, Mutation, Scenario, Timestamp};
+use cairn_service::{Capabilities, DeploymentSettings, McpAccess, Parts, Service};
 use cairn_store::{InProcessNotifier, MemoryStore};
 use jiff::tz::{Offset, TimeZone};
 use serde_json::{Value, json};
@@ -140,46 +138,16 @@ impl World {
         route.map_or(0, |route| u64::from(route.revision.get()))
     }
 
-    /// Applies `patch` as `actor` through the service: set-up that is not what a test checks.
-    pub async fn patch(&self, actor: &Actor, patch: Patch) {
-        let call = Call {
-            actor: actor.clone(),
-            now: self.now(),
-        };
-        let patch = DomainPatch::new(patch, None).unwrap();
-        self.service.patch(&call, &patch).await.unwrap();
+    /// Plays the vendor evaluation's first step: the shared people created, its route
+    /// published, and `j_vendor_eval` started from its version 1, at revision 1.
+    pub async fn vendor_journey(&self) {
+        crate::fixtures::play_fixture(&self.service, "vendor-evaluation", Some(1)).await;
     }
 
-    /// Creates the people the fixtures share; once a service is enough.
-    pub async fn people(&self) {
-        let (call, people) = crate::people::people_write();
-        self.service.patch(&call, &people).await.unwrap();
-    }
-
-    /// Publishes a fixture's route as version 1.
-    pub async fn publish(&self, actor: &Actor, fixture: &str) {
-        self.patch(actor, publish_fixture_route(fixture)).await;
-    }
-
-    /// Publishes the vendor evaluation and starts `j_vendor_eval` from its version 1 with
-    /// the shared people created first (the scenario's first step): the journey at revision 1.
-    pub async fn vendor_journey(&self, actor: &Actor) {
-        self.people().await;
-        self.publish(actor, "vendor-evaluation").await;
-        let path = fixtures_root()
-            .join("vendor-evaluation")
-            .join("journey.yaml");
-        let scenario: Scenario = from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        let first = scenario.steps.as_slice()[0].patch.clone();
-        self.patch(actor, first).await;
-    }
-
-    /// Starts the bake-off's empty journey, as its owner (its scenario's first step): the
-    /// journey at revision 1, with no route.
+    /// Plays the bake-off's first step, which starts its empty journey: the journey at
+    /// revision 1, with no route.
     pub async fn empty_bakeoff(&self) {
-        self.people().await;
-        let first = scenario("bake-off").steps.as_slice()[0].patch.clone();
-        self.patch(&user("u_owner"), first).await;
+        crate::fixtures::play_fixture(&self.service, "bake-off", Some(1)).await;
     }
 
     /// Opens the vendor evaluation's draft for editing, as `actor`: the route's revision
@@ -240,4 +208,4 @@ pub fn vendor_target() -> Target {
     Target::Journey("j_vendor_eval".parse().unwrap())
 }
 
-pub use crate::fixtures::{fixtures_root, publish_fixture_route, scenario};
+pub use crate::fixtures::scenario;
