@@ -1,19 +1,19 @@
 //! The durability testbed (PRACTICES, Simulation with patina: Testbeds,
 //! `durability`; PRD J2, J3, A17). The service runs on the real SQLite store in one data
 //! directory and one client submits a seeded plan of domain patches, recording in a durable
-//! ledger what it submitted and what was acknowledged. Under the patina native shim the
+//! ledger what it submitted and what was acknowledged. Under patina the
 //! filesystem can fail operations (EIO), shorten writes, and crash the process at a chosen
 //! operation and restart it on what a power cut would leave, tearing unsynced writes.
 //!
 //! Every incarnation that starts on an existing ledger is a restart: it opens the store,
 //! checks the invariants (`audit`) before doing anything else, resubmits the step that was
 //! in flight, and finishes the plan; every run checks them again at the end. Each broken
-//! invariant is a `violation` verdict and the run exits 1 (not an `always!`, which aborts at the first broken
-//! invariant: decisions/2026-10-18-testbed-invariants-stay-verdicts.md); a clean run reports
-//! a `pass` verdict whose detail is echoed as a `DURABILITY_RESULT` line.
+//! audit's broken invariants are reported together as one patina `violation` and the run
+//! exits 1 (decisions/2026-10-18-testbed-invariants-stay-verdicts.md); a clean run prints a
+//! `DURABILITY_RESULT` line.
 //!
-//! Arguments: `--dir PATH` (the data directory; default `/cairn-durability`, which exists
-//! only in patina's in-memory filesystem, so a native run passes one), `--steps N` (the
+//! Arguments: `--dir PATH` (the data directory; default `/work/cairn-durability`, on
+//! patina's simulated disk, so a native run passes one), `--steps N` (the
 //! plan's length, default 24), `--plan-seed N` (default: drawn from the run's seed),
 //! `--bug ack-before-commit` (the planted
 //! client bug: a step is recorded as acknowledged before it is submitted, which only a crash
@@ -44,7 +44,7 @@ struct Options {
 
 fn parse_options(mut args: impl Iterator<Item = String>) -> Result<Options, String> {
     let mut options = Options {
-        directory: PathBuf::from("/cairn-durability"),
+        directory: PathBuf::from("/work/cairn-durability"),
         steps: DEFAULT_STEPS,
         plan_seed: None,
         ack_before_commit: false,
@@ -74,17 +74,21 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<Options, Stri
     Ok(options)
 }
 
-/// Reports every broken invariant as a `violation` verdict and stops the run if any broke.
+/// Reports every broken invariant as one `violation` and stops the run if any broke.
 fn judge(audit: &Audit, when: &str) -> Result<(), Stop> {
-    for violation in &audit.violations {
-        let detail = format!("{when}: {}", violation.detail);
-        world::report_violation(violation.invariant.label(), &detail);
-    }
-    if audit.violations.is_empty() {
-        Ok(())
-    } else {
-        Err(Stop::Violated)
-    }
+    let Some(first) = audit.violations.first() else {
+        return Ok(());
+    };
+    let detail: Vec<String> = audit
+        .violations
+        .iter()
+        .map(|violation| format!("{}: {}", violation.invariant.label(), violation.detail))
+        .collect();
+    world::report_violation(
+        first.invariant.label(),
+        &format!("{when}: {}", detail.join("; ")),
+    );
+    Err(Stop::Violated)
 }
 
 /// Reads of the store an audit may make before it gives up: injected errors fail reads
@@ -114,7 +118,7 @@ fn plan_of(ledger: &mut Ledger, options: &Options) -> Result<Plan, Stop> {
     if let Some(Entry::Plan { seed, length }) = ledger.entries().first() {
         return Ok(Plan::generate(*seed, *length));
     }
-    let seed = options.plan_seed.unwrap_or_else(patina_dst::rng);
+    let seed = options.plan_seed.unwrap_or_else(entropy);
     let recorded = ledger.append(Entry::Plan {
         seed,
         length: options.steps,
@@ -142,7 +146,7 @@ async fn run(options: &Options) -> Result<String, Stop> {
         let audit = check(&world, "after-restart").await?;
         resubmit = before.observe(&audit);
     }
-    patina_dst::lifecycle::setup_complete();
+    patina_dst::setup_complete();
     let acknowledged = restart::acknowledged(&world);
     for index in 0..world.plan.steps.len() {
         if acknowledged.contains(&index) {
@@ -170,6 +174,12 @@ async fn run(options: &Options) -> Result<String, Stop> {
     ))
 }
 
+/// A plan seed from the process's entropy, which patina draws from the run's seed.
+fn entropy() -> u64 {
+    use std::hash::{BuildHasher, RandomState};
+    RandomState::new().hash_one(0_u8)
+}
+
 fn main() -> ExitCode {
     let options = match parse_options(std::env::args().skip(1)) {
         Ok(options) => options,
@@ -187,7 +197,6 @@ fn main() -> ExitCode {
     };
     match runtime.block_on(run(&options)) {
         Ok(detail) => {
-            patina_dst::verdict(patina_dst::VerdictKind::Pass, "durability-outcome", &detail);
             eprintln!("DURABILITY_RESULT {detail}");
             ExitCode::SUCCESS
         }
@@ -201,21 +210,16 @@ fn main() -> ExitCode {
     }
 }
 
-/// A store that did not open: under injected I/O errors and short reads, an honest answer
-/// with nothing committed to judge, so the run passes as `unavailable`. The crash sweep
-/// injects neither and requires every run to complete (`sim.sh`), which is where a store
-/// that does not open after a crash fails.
+/// A store that did not open, or failed closed: exit 5. After an injected I/O error it is an
+/// honest answer with nothing committed to judge, and `known.txt` names it so for the sweep;
+/// in a run without one it is a finding.
 fn unavailable(detail: &str) -> ExitCode {
-    let detail = format!("outcome=unavailable {detail}");
-    patina_dst::verdict(patina_dst::VerdictKind::Pass, "durability-outcome", &detail);
-    eprintln!("DURABILITY_RESULT {detail}");
-    ExitCode::SUCCESS
+    eprintln!("DURABILITY_UNAVAILABLE {detail}");
+    ExitCode::from(5)
 }
 
-/// Announces a deliberate stop through the verdict channel, so the exit is attributed to
-/// the testbed rather than read as a patina refusal. Never exit code 2: patina reserves it.
+/// A deliberate stop: exit 3, which patina reports as a `failure` naming this line.
 fn abort(label: &str, detail: &str) -> ExitCode {
-    patina_dst::verdict(patina_dst::VerdictKind::AbortIntent, label, detail);
     eprintln!("DURABILITY_ABORT {label} {detail}");
     ExitCode::from(3)
 }

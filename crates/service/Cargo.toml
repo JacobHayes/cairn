@@ -21,7 +21,6 @@ serde.workspace = true
 [dev-dependencies]
 cairn-engine = { workspace = true, features = ["testing"] }
 cairn-store = { workspace = true, features = ["conformance"] }
-patina-dst-proptest.workspace = true
 proptest.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["rt", "sync", "time"] }

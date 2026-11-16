@@ -5,7 +5,7 @@
 mod property {
     use cairn_schema::testing::*;
     use cairn_schema::{from_json, from_yaml, to_json, to_yaml};
-    use patina_dst_proptest::prelude::*;
+    use proptest::prelude::*;
     use serde::Serialize;
     use serde::de::DeserializeOwned;
 

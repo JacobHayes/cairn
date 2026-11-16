@@ -124,6 +124,11 @@ pub fn arb_revision() -> impl Strategy<Value = Revision> {
     (0u32..10_000).prop_map(|value| Revision::try_from(value).unwrap_or(Revision::NONE))
 }
 
+/// A revision a write was recorded at, which is never [`Revision::NONE`].
+pub fn arb_recorded_revision() -> impl Strategy<Value = Revision> {
+    (1u32..10_000).prop_map(|value| Revision::try_from(value).unwrap_or(Revision::NONE))
+}
+
 /// A route version number.
 pub fn arb_version_number() -> impl Strategy<Value = VersionNumber> {
     (1u32..100).prop_map(|value| VersionNumber::try_from(value).unwrap_or(VersionNumber::FIRST))

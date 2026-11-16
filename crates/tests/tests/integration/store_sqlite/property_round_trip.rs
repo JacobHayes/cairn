@@ -14,7 +14,7 @@ mod property {
     use cairn_store::conformance::journey;
     use cairn_store::{Commit, MemoryStore, Store};
     use cairn_store_sqlite::SqliteStore;
-    use patina_dst_proptest::prelude::*;
+    use proptest::prelude::*;
     use tokio::runtime::Runtime;
 
     /// One runtime and one SQLite store for every case, each case in a journey of its own.

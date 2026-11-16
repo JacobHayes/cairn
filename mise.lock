@@ -42,14 +42,33 @@ checksum = "sha256:975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf8
 url = "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-pc-windows-msvc.tar.gz"
 url_api = "https://api.github.com/repos/EmbarkStudios/cargo-deny/releases/assets/471599057"
 
-[[tools."cargo:https://github.com/JacobHayes/patina"]]
-version = "rev:1dee57b448d57c390af26a9d5af5f2d3a8820cc8"
-backend = "cargo:https://github.com/JacobHayes/patina"
-specifiers = ["rev:1dee57b448d57c390af26a9d5af5f2d3a8820cc8"]
+[[tools."github:JacobHayes/patina"]]
+version = "0.12.2"
+backend = "github:JacobHayes/patina"
+specifiers = ["0.12.2"]
 
-[tools."cargo:https://github.com/JacobHayes/patina".options]
-crate = "cargo-patina"
-locked = "true"
+[tools."github:JacobHayes/patina"."platforms.linux-arm64"]
+checksum = "sha256:1a793e41be76c63865f62fb61fddd8a4b043d0434c2a3e7074e0346fd50c6aa2"
+checksum_source = "mise-versions"
+url = "https://github.com/JacobHayes/patina/releases/download/v0.12.2/patina-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/JacobHayes/patina/releases/assets/765352218"
+
+[tools."github:JacobHayes/patina"."platforms.linux-arm64-musl"]
+checksum = "sha256:1a793e41be76c63865f62fb61fddd8a4b043d0434c2a3e7074e0346fd50c6aa2"
+checksum_source = "mise-versions"
+url = "https://github.com/JacobHayes/patina/releases/download/v0.12.2/patina-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/JacobHayes/patina/releases/assets/765352218"
+
+[tools."github:JacobHayes/patina"."platforms.linux-x64"]
+checksum = "sha256:d232d32eac48c3f76727945ff0b7238143e9ae61383d2ec474139fb459dadb02"
+url = "https://github.com/JacobHayes/patina/releases/download/v0.12.2/patina-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/JacobHayes/patina/releases/assets/765352222"
+
+[tools."github:JacobHayes/patina"."platforms.linux-x64-musl"]
+checksum = "sha256:d232d32eac48c3f76727945ff0b7238143e9ae61383d2ec474139fb459dadb02"
+checksum_source = "mise-versions"
+url = "https://github.com/JacobHayes/patina/releases/download/v0.12.2/patina-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/JacobHayes/patina/releases/assets/765352222"
 
 [[tools."github:WebAssembly/binaryen"]]
 version = "ersion_133"

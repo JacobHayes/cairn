@@ -1,8 +1,8 @@
 //! The multiplayer testbed (PRACTICES, Simulation with patina: Testbeds).
 //!
 //! One process runs Cairn's real HTTP server (the API's router over a service on the SQLite
-//! store) and N virtual clients, all as tasks on a multi-thread tokio runtime
-//! (`WORKER_THREADS` workers; decisions/2026-10-18-the-multiplayer-testbed-runs-a-multi-thread-runtime.md). Each client patches one
+//! store) and N virtual clients, all as tasks on a multi-thread tokio runtime with one worker
+//! per CPU, as the binary serves (patina presents four). Each client patches one
 //! shared journey through the real Rust client: a patch is submitted once and the server
 //! rejects a stale one, and a transport retry resends a patch whose answer was lost, which the server answers from its receipt.
 //! Each client also keeps a view current through its SSE subscription and H6's tracking.
@@ -18,7 +18,7 @@
 //! the interesting paths ran (`client.rs`, `view.rs`), and fault sites in the store make
 //! commits overlap (`faults.rs`).
 //!
-//! Exit codes: 0 pass, 1 violation (a `violation` verdict per broken invariant), 3 abort (the runtime, store, or listener could not start), 4 a
+//! Exit codes: 0 pass, 1 violation (one patina `violation` naming every broken invariant), 3 abort (the runtime, store, or listener could not start), 4 a
 //! liveness miss (a client gave up, a view never caught up, or the server would not stop),
 //! 64 bad arguments. Never 2, which patina reserves.
 
@@ -35,11 +35,6 @@ use tokio::task::JoinSet;
 
 use crate::client::{Client, GaveUp};
 use crate::outcome::{Outcome, Truth};
-
-/// Worker threads of the runtime. Cairn's binary serves on one worker per CPU, but patina
-/// presents one CPU, so the default would start a single worker and requests would never run
-/// beside each other; four lets PCT reorder them, as on a four-core host.
-const WORKER_THREADS: usize = 4;
 
 /// What a run is told on its command line.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -100,7 +95,7 @@ async fn run(options: &Options) -> Result<Outcome, Stop> {
     let server = world::Server::start().await?;
     let setup = world::set_up(&Client::new(world::SERVER, u32::MAX)).await?;
     server.arm();
-    patina_dst::lifecycle::setup_complete();
+    patina_dst::setup_complete();
     let started = tokio::time::Instant::now();
 
     let mut views = Vec::new();
@@ -145,7 +140,6 @@ fn main() -> ExitCode {
         }
     };
     let runtime = match tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(WORKER_THREADS)
         .enable_all()
         .build()
     {
@@ -162,10 +156,8 @@ fn main() -> ExitCode {
     }
 }
 
-/// Announces a deliberate stop through the verdict channel, so the exit is attributed to
-/// the testbed rather than read as a patina refusal.
+/// A deliberate stop: exit 3, which patina reports as a `failure` naming this line.
 fn abort(label: &str, detail: &str) -> ExitCode {
-    patina_dst::verdict(patina_dst::VerdictKind::AbortIntent, label, detail);
     eprintln!("MULTIPLAYER_ABORT {label} {detail}");
     ExitCode::from(3)
 }

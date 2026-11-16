@@ -5,10 +5,7 @@
 //! does not follow from the frames before it, ends recovery).
 //!
 //! The coverage oracles here fire only in a restarted incarnation, which only a crash-restart
-//! makes, and `cargo patina campaign` draws no crash
-//! (decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md). Their
-//! labels are constants rather than literals, so they stay out of the link-time site table a
-//! campaign gates on; the crash sweep in `sim.sh` gates on them instead.
+//! makes, so only runs with crashes reach them.
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -18,13 +15,6 @@ use cairn_service::Written;
 use crate::audit::Audit;
 use crate::ledger::{Entry, Ledger, read_if_present};
 use crate::world::{Stop, World, database, report_violation};
-
-/// The crash sweep's oracles (`sim.sh` requires each to fire).
-pub const RECOVERED: &str = "durability-restart-recovered-commits";
-pub const INTERRUPTED_LOST: &str = "durability-crash-interrupted-commit-lost";
-pub const INTERRUPTED_LANDED: &str = "durability-crash-interrupted-commit-landed";
-pub const BETWEEN_STATE_AND_EVENTS: &str = "durability-crash-between-state-and-events";
-pub const TORN_TAIL_DISCARDED: &str = "durability-torn-log-tail-discarded";
 
 /// The write-ahead log's header length.
 const LOG_HEADER_LENGTH: usize = 32;
@@ -73,14 +63,17 @@ impl Before {
     /// Fires the restart oracles once the restart audit has passed, and answers the step
     /// in flight with whether its commit landed.
     pub fn observe(&self, audit: &Audit) -> Option<(usize, bool)> {
-        patina_dst::sometimes!(!audit.committed.is_empty(), RECOVERED);
-        patina_dst::sometimes!(self.torn_tail, TORN_TAIL_DISCARDED);
+        patina_dst::sometimes!(
+            !audit.committed.is_empty(),
+            "durability-restart-recovered-commits"
+        );
+        patina_dst::sometimes!(self.torn_tail, "durability-torn-log-tail-discarded");
         let in_flight = self.in_flight?;
         let landed = audit.committed.contains(&in_flight);
-        patina_dst::sometimes!(!landed, INTERRUPTED_LOST);
-        patina_dst::sometimes!(landed, INTERRUPTED_LANDED);
+        patina_dst::sometimes!(!landed, "durability-crash-interrupted-commit-lost");
+        patina_dst::sometimes!(landed, "durability-crash-interrupted-commit-landed");
         let between = self.last_point.as_deref() == Some("BetweenStateAndEvents");
-        patina_dst::sometimes!(between, BETWEEN_STATE_AND_EVENTS);
+        patina_dst::sometimes!(between, "durability-crash-between-state-and-events");
         eprintln!(
             "DURABILITY_RESTART in_flight={in_flight} landed={landed} last_point={} torn_tail={} log_bytes={} ledger_torn_bytes={}",
             self.last_point.as_deref().unwrap_or("none"),

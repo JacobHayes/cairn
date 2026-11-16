@@ -1,7 +1,7 @@
 //! Judging a finished run: what the clients were told and what their views held, against
-//! what the store holds (read through the service, not over the faulted network). A broken
-//! invariant is a `violation` verdict under its label; the counts go out with a `pass`
-//! verdict and a `MULTIPLAYER_RESULT` line.
+//! what the store holds (read through the service, not over the faulted network). Each
+//! broken invariant is named in the run's one patina `violation`; the counts go out with a
+//! `MULTIPLAYER_RESULT` line.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::process::ExitCode;
@@ -13,14 +13,13 @@ use cairn_schema::{
 };
 use cairn_service::Service;
 use cairn_store::{EventQuery, PageSize};
-use patina_dst::VerdictKind;
 
 use crate::Stop;
 use crate::client::{Ack, Report};
 use crate::view::{CaughtUp, Held};
 use crate::world::{DEV_EMAIL, Setup};
 
-/// The invariants, by verdict label, in the order a run reports them.
+/// The invariants, by label, in the order a run reports them.
 pub const INVARIANTS: [&str; 9] = [
     "applied-once",
     "acknowledged-visible",
@@ -169,9 +168,9 @@ impl Outcome {
         let mut acks: Vec<Ack> = setup
             .receipts
             .iter()
-            .map(|receipt| Ack {
+            .map(|(receipt, drafted)| Ack {
                 receipt: receipt.clone(),
-                drafted: Revision::NONE,
+                drafted: *drafted,
                 visible: true,
             })
             .collect();
@@ -315,11 +314,9 @@ impl Outcome {
         violations
     }
 
-    /// Reports the run through patina's verdict channel: a `violation` under each broken
-    /// invariant's label, in [`INVARIANTS`] order, or a `pass` under `multiplayer-outcome`
-    /// carrying the counts. Not `always!`, which aborts at the first broken invariant while
-    /// this reports every one of a run (decisions/2026-10-18-testbed-invariants-stay-verdicts.md);
-    /// the exit code is 1 instead.
+    /// Reports the run: every broken invariant as one patina `violation` under the first
+    /// broken label in [`INVARIANTS`] order, its detail naming every one of the run
+    /// (decisions/2026-10-18-testbed-invariants-stay-verdicts.md), and exit 1; else exit 0.
     pub fn judge(&self) -> ExitCode {
         let report = &self.report;
         let caught_up_us = self
@@ -345,21 +342,19 @@ impl Outcome {
             eprintln!("MULTIPLAYER_VIOLATION {label} {violation}");
         }
         eprintln!("MULTIPLAYER_RESULT {detail}");
-        for label in INVARIANTS {
-            let broken: Vec<&str> = violations
-                .iter()
-                .filter(|(broken, _)| *broken == label)
-                .map(|(_, detail)| detail.as_str())
-                .collect();
-            if !broken.is_empty() {
-                patina_dst::verdict(VerdictKind::Violation, label, &broken.join("; "));
+        let first = INVARIANTS
+            .iter()
+            .find(|label| violations.iter().any(|(broken, _)| broken == *label));
+        match first {
+            None => ExitCode::SUCCESS,
+            Some(label) => {
+                let every: Vec<String> = violations
+                    .iter()
+                    .map(|(broken, detail)| format!("{broken}: {detail}"))
+                    .collect();
+                patina_dst::violation(label, &every.join("; "));
+                ExitCode::FAILURE
             }
-        }
-        if violations.is_empty() {
-            patina_dst::verdict(VerdictKind::Pass, "multiplayer-outcome", &detail);
-            ExitCode::SUCCESS
-        } else {
-            ExitCode::FAILURE
         }
     }
 }
@@ -387,7 +382,10 @@ mod tests {
                 acks: Vec::new(),
             };
             history.land(&patches::create_journey(2), Revision::NONE);
-            history.land(&patches::create_identities(1), Revision::NONE);
+            history.land(
+                &patches::create_identities(1, Revision::NONE),
+                Revision::NONE,
+            );
             history.arrive("p_arrival");
             history
         }

@@ -14,7 +14,7 @@ mod property {
     };
     use cairn_engine::{Graph, apply, replay};
     use cairn_schema::Rejection;
-    use patina_dst_proptest::prelude::*;
+    use proptest::prelude::*;
 
     proptest! {
         #[test]

@@ -497,7 +497,6 @@ dependencies = [
  "cairn-engine",
  "cairn-schema",
  "jiff",
- "patina-dst-proptest",
  "proptest",
  "schemars 1.2.3",
  "serde",
@@ -530,7 +529,6 @@ dependencies = [
  "cairn-schema",
  "jiff",
  "jsonschema",
- "patina-dst-proptest",
  "proptest",
  "schemars 1.2.3",
  "serde",
@@ -550,7 +548,6 @@ dependencies = [
  "jiff",
  "metrics",
  "patina-dst",
- "patina-dst-proptest",
  "proptest",
  "schemars 1.2.3",
  "serde",
@@ -612,7 +609,6 @@ dependencies = [
  "metrics-util",
  "openidconnect",
  "p256 0.14.0",
- "patina-dst-proptest",
  "proptest",
  "rmcp",
  "rusqlite",
@@ -2513,17 +2509,8 @@ checksum = "2ee67f1008b1ba2321834326597b8e186293b049a023cdef258527550b9935b4"
 
 [[package]]
 name = "patina-dst"
-version = "0.1.0"
-source = "git+https://github.com/JacobHayes/patina?rev=1dee57b448d57c390af26a9d5af5f2d3a8820cc8#1dee57b448d57c390af26a9d5af5f2d3a8820cc8"
-
-[[package]]
-name = "patina-dst-proptest"
-version = "0.1.0"
-source = "git+https://github.com/JacobHayes/patina?rev=1dee57b448d57c390af26a9d5af5f2d3a8820cc8#1dee57b448d57c390af26a9d5af5f2d3a8820cc8"
-dependencies = [
- "patina-dst",
- "proptest",
-]
+version = "0.12.2"
+source = "git+https://github.com/JacobHayes/patina?tag=v0.12.2#89e5fce07181010ddd29dec2a29a98b8424c57e1"
 
 [[package]]
 name = "pem-rfc7468"

@@ -88,7 +88,7 @@ Limits are named constants, each with the reason for its value in its doc commen
 
 - **Scenario tests** cover every product rule once, at a fixed clock over the shared fixtures, citing the requirement ids they cover.
 - **Replay**: engine tests apply through a helper that replays the patch's events and compares with stored state.
-- **Property tests** over generated graphs and operation sequences: apply then replay equals apply; a rejected patch changes nothing; derive is pure and deterministic. They use `patina-dst-proptest`; a failing case becomes a scenario test, then a fix.
+- **Property tests** over generated graphs and operation sequences: apply then replay equals apply; a rejected patch changes nothing; derive is pure and deterministic. They use `proptest`; a failing case becomes a scenario test, then a fix.
 - **Persisted types are mapped exhaustively in every backend**, with no `..`, `Default`, or catch-all, so a new field or variant does not compile until every backend maps it.
 - **API and MCP tests** run in process: every endpoint and tool once, every rejection shape once.
 - **Browser tests** are only for what a browser catches: real layout, scroll, focus, gestures, wiring across modules, live updates, sign-in, the shipped binary. One test per write path, never per rule. Every test and screenshot runs the shared structural checks.
@@ -97,11 +97,11 @@ Limits are named constants, each with the reason for its value in its doc commen
 
 ### Simulation with patina
 
-[`patina`](https://github.com/JacobHayes/patina) runs programs under a seeded virtual OS with injected faults and byte-for-byte replay. Campaigns (`mise run sim`) are exploratory, never part of the check. Testbeds in `testbeds/` simulate concurrent clients against stale-patch handling, and SQLite under crashes. A finding becomes an ordinary deterministic test, then a fix.
+[`patina`](https://github.com/JacobHayes/patina) runs programs under a seeded virtual OS with injected faults and byte-for-byte replay. Testbeds in `testbeds/` run concurrent clients against stale-patch handling, and SQLite under crashes; the check's sim step sweeps each over the faults its `patina.toml` names (`mise run check --part sim` alone). A finding's rerun line reproduces it; it then becomes an ordinary deterministic test, then a fix.
 
-- Shell crates carry inert `sometimes!` oracles and `buggify!` fault sites, added with the code; they stay even before a campaign uses them.
-- Timing-sensitive code takes time as an argument and is tested deterministically, not under simulation.
-- **No check depends on a seed's outcome**: it names the fault it injects, or states a property over every run. A declared `sometimes!` that never fired fails the campaign.
+- Shell crates carry inert `sometimes!` oracles and `buggify!` fault sites, added with the code; they stay even before a sweep uses them.
+- Timing-sensitive code takes time as an argument and is tested deterministically, not under simulation: a testbed's deadlines are liveness bounds.
+- **No check depends on a seed's outcome**: it names the fault it injects, or states a property over every run. A declared site that never fired fails the sweep, unless the testbed's `patina.toml` lists it as out of reach.
 
 ## The validation ladder
 

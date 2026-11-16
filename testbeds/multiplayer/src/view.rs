@@ -12,7 +12,6 @@ use cairn_api::client::Tracker;
 use cairn_api::query::WatchName;
 use cairn_schema::{Domain, Revision, RevisionOf};
 use cairn_service::wire::Tick;
-use cairn_store::limits::SSE_COALESCING_INTERVAL;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
@@ -20,10 +19,10 @@ use tokio::time::Instant;
 use crate::client::{ATTEMPT_TIMEOUT, Client, GaveUp};
 use crate::world::Setup;
 
-/// How long after writes stop every view may take to hold the store's revisions: the
-/// coalescing interval (H6: the last commit's tick waits at most that long), plus one
-/// attempt's budget for the tick to cross the network and the refetch to come back.
-pub const CATCH_UP_DEADLINE: Duration = SSE_COALESCING_INTERVAL.saturating_add(ATTEMPT_TIMEOUT);
+/// How long after writes stop every view may take to hold the store's revisions (H6). A
+/// liveness bound, not a latency one: a faulted link takes what it takes, and how soon a
+/// tick follows a commit is the notifier's deterministic tests' to check.
+pub const CATCH_UP_DEADLINE: Duration = Duration::from_secs(60);
 /// The pause before a view opens its stream again.
 const RECONNECT_BACKOFF: Duration = Duration::from_millis(5);
 

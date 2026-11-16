@@ -4,7 +4,7 @@
 #[cfg(test)]
 mod property {
     use cairn_schema::testing::*;
-    use patina_dst_proptest::prelude::*;
+    use proptest::prelude::*;
     use serde::Serialize;
     use serde::de::DeserializeOwned;
 

@@ -10,3 +10,5 @@ dist
 
 # Per-checkout agent notes.
 AGENTS.local.md
+# Run directories a patina rerun line leaves where it is run.
+patina-out

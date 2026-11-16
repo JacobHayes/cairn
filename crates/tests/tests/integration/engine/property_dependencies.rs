@@ -16,7 +16,7 @@ mod property {
     use cairn_engine::testing::generated::arb_journey;
     use cairn_engine::{Derived, Graph, derive};
     use cairn_schema::{DependencyVia, Deployment, NodeKey, Payload, State};
-    use patina_dst_proptest::prelude::*;
+    use proptest::prelude::*;
 
     type Dependency = NodeKey;
 

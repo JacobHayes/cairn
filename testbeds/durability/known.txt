@@ -1,0 +1,4 @@
+# A store that does not open, or fails closed, ends its run unavailable (exit 5). After an
+# injected I/O error or failed fsync that is an honest answer; in any other run it is a finding.
+unavailable  failure exit: DURABILITY_UNAVAILABLE *; exit 5 {faults: *fs-error*}
+unavailable  failure exit: DURABILITY_UNAVAILABLE *; exit 5 {faults: *fsync-error*}

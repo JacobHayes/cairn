@@ -26,7 +26,6 @@ sha2.workspace = true
 [dev-dependencies]
 cairn-schema = { workspace = true, features = ["testing"] }
 jsonschema.workspace = true
-patina-dst-proptest.workspace = true
 proptest.workspace = true
 
 [lints]

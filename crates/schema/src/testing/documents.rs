@@ -6,8 +6,9 @@ use super::model::{bounded_set, bounded_vec, keyed};
 
 use super::{
     ArbRefs, arb_annotation, arb_date, arb_email, arb_identity_key, arb_identity_set,
-    arb_journey_id, arb_kind_key, arb_markdown, arb_node, arb_node_key, arb_reason, arb_revision,
-    arb_role_key, arb_route_id, arb_slug, arb_timestamp, arb_title, arb_version_number, arb_when,
+    arb_journey_id, arb_kind_key, arb_markdown, arb_node, arb_node_key, arb_reason,
+    arb_recorded_revision, arb_revision, arb_role_key, arb_route_id, arb_slug, arb_timestamp,
+    arb_title, arb_version_number, arb_when,
 };
 
 use crate::domain::{
@@ -92,9 +93,9 @@ pub fn arb_node_state() -> impl Strategy<Value = NodeState> {
         arb_state(),
         any::<bool>(),
         prop::option::of(arb_date()),
-        prop::option::of((arb_date(), arb_revision())),
+        prop::option::of((arb_date(), arb_recorded_revision())),
         prop::option::of(arb_reason()),
-        prop::option::of((arb_revision(), arb_revision())),
+        prop::option::of((arb_recorded_revision(), arb_recorded_revision())),
     )
         .prop_map(
             |(state, atomic, started_on, finished, reason, reopened)| NodeState {

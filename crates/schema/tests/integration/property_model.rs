@@ -5,7 +5,7 @@
 mod property {
     use cairn_schema::testing::*;
     use cairn_schema::{FileRefs, KeyRefs, NodeField, NodeFieldValue};
-    use patina_dst_proptest::prelude::*;
+    use proptest::prelude::*;
     use serde::Serialize;
     use serde::de::DeserializeOwned;
 
