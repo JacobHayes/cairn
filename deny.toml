@@ -14,4 +14,8 @@ ignore = [
   # only the tests sign, with fixed keys. The fix is in crypto-bigint 0.7, which elliptic-curve
   # 0.13 under openidconnect 4.0.1 (the newest release) cannot take.
   { id = "RUSTSEC-2026-0387", reason = "no elliptic-curve secret: p256 and p384 only verify signatures" },
+  # chrono is unmaintained, with no known flaw and no maintained release. openidconnect and
+  # oauth2 (expiry checks), rmcp and schemars require it, so it stays in the tree whatever
+  # Cairn's own code uses.
+  { id = "RUSTSEC-2026-0543", reason = "unmaintained, no flaw; required by openidconnect, oauth2, rmcp and schemars" },
 ]
