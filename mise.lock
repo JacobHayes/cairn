@@ -42,14 +42,34 @@ checksum = "sha256:975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf8
 url = "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-pc-windows-msvc.tar.gz"
 url_api = "https://api.github.com/repos/EmbarkStudios/cargo-deny/releases/assets/471599057"
 
-[[tools."cargo:https://github.com/JacobHayes/patina"]]
-version = "rev:1dee57b448d57c390af26a9d5af5f2d3a8820cc8"
-backend = "cargo:https://github.com/JacobHayes/patina"
-specifiers = ["rev:1dee57b448d57c390af26a9d5af5f2d3a8820cc8"]
+[[tools."github:JacobHayes/patina"]]
+version = "0.13.1"
+backend = "github:JacobHayes/patina"
+specifiers = ["0.13.1"]
 
-[tools."cargo:https://github.com/JacobHayes/patina".options]
-crate = "cargo-patina"
-locked = "true"
+[tools."github:JacobHayes/patina"."platforms.linux-arm64"]
+checksum = "sha256:027ac2524c620b374bce177cbbfe86a210739708e8a004b40cb0d3f55a49000e"
+checksum_source = "mise-versions"
+url = "https://github.com/JacobHayes/patina/releases/download/v0.13.1/patina-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/JacobHayes/patina/releases/assets/766065960"
+
+[tools."github:JacobHayes/patina"."platforms.linux-arm64-musl"]
+checksum = "sha256:027ac2524c620b374bce177cbbfe86a210739708e8a004b40cb0d3f55a49000e"
+checksum_source = "mise-versions"
+url = "https://github.com/JacobHayes/patina/releases/download/v0.13.1/patina-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/JacobHayes/patina/releases/assets/766065960"
+
+[tools."github:JacobHayes/patina"."platforms.linux-x64"]
+checksum = "sha256:954c646803eafae3ab3a341f4afdae7d043276fd0492328e340b1b1858a09bc6"
+checksum_source = "mise-versions"
+url = "https://github.com/JacobHayes/patina/releases/download/v0.13.1/patina-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/JacobHayes/patina/releases/assets/766065961"
+
+[tools."github:JacobHayes/patina"."platforms.linux-x64-musl"]
+checksum = "sha256:954c646803eafae3ab3a341f4afdae7d043276fd0492328e340b1b1858a09bc6"
+checksum_source = "mise-versions"
+url = "https://github.com/JacobHayes/patina/releases/download/v0.13.1/patina-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/JacobHayes/patina/releases/assets/766065961"
 
 [[tools."github:WebAssembly/binaryen"]]
 version = "ersion_133"

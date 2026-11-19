@@ -10,7 +10,7 @@ mod property {
     use cairn_engine::testing::{arb_graph, arb_ops, derive_inputs, fixed_inputs, journey_id};
     use cairn_engine::{Derived, Graph, Records, apply, derive};
     use cairn_schema::{Deployment, NodeKind, Relevance, StallCause, State};
-    use patina_dst_proptest::prelude::*;
+    use proptest::prelude::*;
 
     fn derived(graph: &Graph) -> Derived {
         derive(graph, None, &derive_inputs(Deployment::default()))

@@ -9,7 +9,7 @@ use cairn_engine::{Graph, Records, from_file};
 use cairn_schema::{
     Mutation, Mutations, Patch, PatchTarget, RouteFile, SequentialKeys, from_yaml, to_yaml,
 };
-use patina_dst_proptest::prelude::*;
+use proptest::prelude::*;
 
 fn heading() -> RouteHeading {
     RouteHeading {

@@ -34,7 +34,6 @@ metrics.workspace = true
 metrics-util.workspace = true
 openidconnect.workspace = true
 p256.workspace = true
-patina-dst-proptest.workspace = true
 proptest.workspace = true
 rmcp = { workspace = true, features = ["client", "transport-streamable-http-client"] }
 schemars.workspace = true

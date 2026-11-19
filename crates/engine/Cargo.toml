@@ -22,7 +22,6 @@ serde_json.workspace = true
 
 [dev-dependencies]
 cairn-engine = { workspace = true, features = ["testing"] }
-patina-dst-proptest.workspace = true
 proptest.workspace = true
 schemars.workspace = true
 

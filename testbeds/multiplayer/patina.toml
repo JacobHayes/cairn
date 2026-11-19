@@ -1,0 +1,22 @@
+# The multiplayer testbed's sweep, which the check's sim step runs from this directory
+# (PRACTICES, Simulation with patina): buggify and network faults.
+[run]
+cmd = ["target/release/cairn-multiplayer"]
+
+[sdk]
+buggify = true
+# Sites in the crates under test that this testbed cannot reach, so a sweep in which they
+# never fire is not vacuous. Any other site that never fires fails the sweep.
+allow-unmet = [
+  # The assistant, proposals, route imports and derived reads: the testbed drives none of them.
+  "assistant-*",
+  "service-proposal-*",
+  "service-import-*",
+  "service-derived-read-*",
+  # A resubmission whose original commits between its receipt lookup and its load: on the
+  # SQLite store that window is two reads, and 4,096 seeds never landed a commit in it.
+  "service-duplicate-original-committed-meanwhile",
+]
+
+[faults]
+preset = "net"

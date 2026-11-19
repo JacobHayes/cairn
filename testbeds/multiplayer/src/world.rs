@@ -23,11 +23,10 @@ use crate::client::Client;
 use crate::faults::Sites;
 use crate::patches;
 
-/// The server's address: an IP literal, since the shim resolves no names without a host
-/// table.
+/// The server's address: an IP literal, so no name is resolved.
 pub const SERVER: SocketAddr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 7878));
-/// The database file, in the run's own virtual filesystem.
-const DATABASE: &str = "/multiplayer.db";
+/// The database file, on the run's simulated disk.
+const DATABASE: &str = "/work/multiplayer.db";
 /// How long a graceful server shutdown may take once every client and view is done.
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(1);
 /// Nodes in the shared journey: few, so edits to one node's title collide often.
@@ -184,23 +183,28 @@ pub struct Setup {
     /// Each pair is (survivor, merged).
     pub merges: Vec<(IdentityKey, IdentityKey)>,
     pub deployment_revision: Revision,
-    /// What setup's own patches were acknowledged with.
-    pub receipts: Vec<PatchReceipt>,
+    /// What setup's own patches were acknowledged with, and the revision each was drafted at.
+    pub receipts: Vec<(PatchReceipt, Revision)>,
 }
 
-/// Creates the shared journey and the identities to merge, through the API.
+/// Creates the shared journey and the identities to merge, through the API. The identities
+/// are drafted at the deployment as it stands after the first request, whose sign-in may
+/// have created the caller's identity.
 ///
 /// # Errors
 ///
 /// A liveness miss when setup cannot land.
 pub async fn set_up(client: &Client) -> Result<Setup, Stop> {
     let created = client.land(patches::create_journey(NODE_COUNT)).await?;
-    let identities = client.land(patches::create_identities(MERGE_COUNT)).await?;
+    let base = client.deployment().await?.revision;
+    let identities = client
+        .land(patches::create_identities(MERGE_COUNT, base))
+        .await?;
     Ok(Setup {
         journey: patches::journey(),
         nodes: (0..NODE_COUNT).map(patches::node).collect(),
         merges: (0..MERGE_COUNT).map(patches::merge_pair).collect(),
         deployment_revision: identities.revision,
-        receipts: vec![created, identities],
+        receipts: vec![(created, Revision::NONE), (identities, base)],
     })
 }

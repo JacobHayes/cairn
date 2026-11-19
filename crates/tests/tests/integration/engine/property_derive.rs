@@ -13,7 +13,7 @@ mod property {
         Deployment, IdentityKey, KindKey, NodeKey, NodeKind, ParticipationOrigin,
         ParticipationSource, Relevance, RoleKey, State, ViolationCode,
     };
-    use patina_dst_proptest::prelude::*;
+    use proptest::prelude::*;
 
     use crate::engine::support;
 

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Step sim: each testbed's patina sweep (PRACTICES, Simulation with patina). A testbed is a
+# directory of testbeds/ whose patina.toml holds its sweep's settings; the step builds it and
+# sweeps SIM_SEEDS seeds (default 256; CI's nightly run sweeps more) from that directory. The
+# sweep's exit status is the verdict: a finding, or a site in reach that never fired, fails it,
+# and its output names each finding's first seed with the command that reruns it from any
+# directory. A sweep of an unchanged binary and settings resumes: patina runs only the seeds it
+# has not run.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+LADDER_STEP=sim
+# shellcheck source=scripts/ladder-lib.sh
+source scripts/ladder-lib.sh
+
+ladder_require_tool cargo cargo --version
+ladder_require_tool patina patina --version
+seeds=${SIM_SEEDS:-256}
+
+for config in testbeds/*/patina.toml; do
+  testbed=$(dirname "$config")
+  out=dist/ladder/sim-$(basename "$testbed").out
+  "$ladder_timed" build cargo build --quiet --locked --release --manifest-path "$testbed/Cargo.toml" >"$out" 2>&1 || {
+    ladder_show <"$out"
+    ladder_fail "the build of $testbed failed"
+  }
+  (cd "$testbed" && "$ladder_timed" tests patina sweep --seeds "1..$seeds" --out target/patina/sweep) >"$out" 2>&1 || {
+    ladder_show <"$out"
+    ladder_fail "the sweep of $testbed failed (rerun a finding with its rerun line)"
+  }
+  ladder_suite "$testbed sweep" "$(sed -n 's/^patina sweep: \([0-9]*\) runs.*/\1/p' "$out")" runs
+done
+
+ladder_step_end

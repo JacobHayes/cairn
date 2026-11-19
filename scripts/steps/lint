@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Step lint of `mise run check` and `check:fast`: format, lint, typecheck (rustfmt, clippy,
-# workspace lints, the same over each testbed, patina site labels, the engine's wasm32 build, the
+# workspace lints, the same over each testbed, the engine's wasm32 build, the
 # TypeScript typecheck, eslint, the CSS lint).
 # PRACTICES, The validation ladder; Code conventions. This step runs tools, not tests: it
 # fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
@@ -71,9 +71,8 @@ eslint_job=$!
   echo "$status" >"$typescript/tsc.status"
 } &
 
-# `mise run check:fast` leaves out the Rust half (rustfmt, clippy, the wasm32 build, the patina
-# labels) when no Rust input changed (scripts/ladder passes LADDER_RUST=0); the full check
-# never does. The TypeScript checks and the CSS lint always run.
+# `mise run check:fast` leaves out the Rust half (rustfmt, clippy, the wasm32 build) when no
+# Rust input changed (scripts/ladder passes LADDER_RUST=0); the full check never does. The TypeScript checks and the CSS lint always run.
 rust=${LADDER_RUST:-1}
 
 if [ "$rust" = 1 ]; then
@@ -242,9 +241,8 @@ if [ "$rust" = 1 ]; then
   ladder_suite clippy "$checked" crates
 
   # Each testbed is a workspace of its own with its own lock file and target directory, which
-  # nothing above reads. Formatting and clippy over them (--locked also fails a lock file that
-  # no longer matches the crates it depends on) is what keeps a service API change from
-  # breaking them unseen until the nightly `mise run sim`.
+  # nothing above reads, so they are formatted and linted here (--locked also fails a lock file
+  # that no longer matches the crates it depends on).
   testbeds=0
   for manifest in testbeds/*/Cargo.toml; do
     testbed=$(dirname "$manifest")
@@ -260,56 +258,6 @@ if [ "$rust" = 1 ]; then
     testbeds=$((testbeds + 1))
   done
   ladder_suite "testbed rustfmt and clippy" "$testbeds" testbeds
-
-  # PRACTICES, Simulation with patina: every `sometimes!`, `reachable!`, `always!`, and
-  # `buggify!` site carries a literal kebab-case label. A campaign gates the literal labels
-  # declared at link time, so a label built at run time is not seen; and the testbeds' sim.sh
-  # scripts word-split and grep labels, so a spaced label would break them. The
-  # exception: the durability testbed's crash oracles, whose kebab-case labels are constants
-  # so a campaign, which draws no crash, does not declare them (decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md).
-  label_exceptions=(
-    testbeds/durability/src/restart.rs
-  )
-  for exception in "${label_exceptions[@]}"; do
-    [ -f "$exception" ] || ladder_fail "the label exception $exception no longer exists"
-  done
-  mapfile -t sources < <(find crates testbeds -name '*.rs' -not -path '*/target/*' | sort |
-    grep -vxF -f <(printf '%s\n' "${label_exceptions[@]}"))
-  # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
-  labels=$(node -e '
-    const fs = require("fs");
-    const site = /(?<![A-Za-z0-9_])(sometimes|reachable|always|buggify)!\s*\(/g;
-    const kebab = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-    let count = 0;
-    const bad = [];
-    for (const file of process.argv.slice(1)) {
-      const text = fs.readFileSync(file, "utf8");
-      for (const match of text.matchAll(site)) {
-        // The arguments up to the closing parenthesis, and the string literals among them.
-        let depth = 0, at = match.index + match[0].length - 1, literal = null, literals = [];
-        for (; at < text.length; at++) {
-          const char = text[at];
-          if (literal !== null) {
-            if (char === "\\") { literal += text[++at]; continue; }
-            if (char === "\"") { literals.push(literal); literal = null; } else literal += char;
-            continue;
-          }
-          if (char === "\"") literal = "";
-          else if (char === "(") depth++;
-          else if (char === ")" && --depth === 0) break;
-        }
-        const line = text.slice(0, match.index).split("\n").length;
-        const label = literals.at(-1);
-        count++;
-        if (label === undefined || !kebab.test(label)) bad.push(`${file}:${line}: ${match[1]}! label ${JSON.stringify(label ?? null)}`);
-      }
-    }
-    for (const line of bad) console.error(line);
-    console.log(bad.length === 0 ? count : -1);
-  ' "${sources[@]}" 2>"$typescript/labels.err")
-  ladder_show <"$typescript/labels.err"
-  [ "$labels" -ge 0 ] || ladder_fail "a patina site label is not a kebab-case literal"
-  ladder_suite "patina site labels" "$labels" sites
 
   # ARCHITECTURE, Repository layout: the engine is I/O-free, so it builds for the browser with
   # the schema beneath it and the wasm surface (crates/wasm) on top. A dependency that pulls in

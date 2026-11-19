@@ -25,7 +25,7 @@ const REOPEN_AFTER: u32 = 3;
 /// Consecutive failed writes after which the run gives up.
 const ATTEMPTS: u32 = 64;
 
-/// Why a run stopped short of a verdict on the store.
+/// Why a run stopped short of judging the store.
 #[derive(Debug)]
 pub enum Stop {
     /// The testbed's own machinery failed (the ledger could not be written).
@@ -34,7 +34,7 @@ pub enum Stop {
     Liveness(String),
     /// The store did not open, or failed closed.
     Unavailable(String),
-    /// An invariant broke; its verdict has been reported.
+    /// An invariant broke; it has been reported.
     Violated,
 }
 
@@ -62,8 +62,8 @@ pub struct World {
 
 impl World {
     /// Opens the store in `directory` with the commit-point hook, which records in the
-    /// ledger each point the in-flight step's commit reaches, so a crash-restart sweep can
-    /// stop the process right after one (`--fs-crash-at sync:N`).
+    /// ledger each point the in-flight step's commit reaches, so a restart knows the last one
+    /// before the crash.
     pub fn open(directory: PathBuf, plan: Plan, ledger: Ledger) -> Result<World, Stop> {
         let ledger = Arc::new(Mutex::new(ledger));
         let faults = Faults::default();
@@ -164,9 +164,14 @@ impl World {
                         lost = Some(written);
                         continue;
                     }
-                    if let Some(first) = lost.take() {
-                        judge_resent(&first, &written)?;
-                    }
+                    // The step's answer is the first one: the resend only repeats it.
+                    let written = match lost.take() {
+                        Some(first) => {
+                            judge_resent(&first, &written)?;
+                            first
+                        }
+                        None => written,
+                    };
                     if !self.ack_before_commit {
                         let revision = written.receipt().revision.get();
                         self.record(Entry::Ack { index, revision })?;
@@ -239,11 +244,11 @@ fn judge_resent(first: &Written, again: &Written) -> Result<(), Stop> {
     Err(Stop::Violated)
 }
 
-/// Reports a broken invariant: a `violation` verdict, echoed as a `DURABILITY_VIOLATION`
-/// line.
+/// Reports a broken invariant: a `DURABILITY_VIOLATION` line, then a patina `violation`,
+/// which ends the run.
 pub fn report_violation(label: &str, detail: &str) {
-    patina_dst::verdict(patina_dst::VerdictKind::Violation, label, detail);
     eprintln!("DURABILITY_VIOLATION {label} {detail}");
+    patina_dst::violation(label, detail);
 }
 
 /// Opens the store, as a server under a supervisor does: one whose store does not open

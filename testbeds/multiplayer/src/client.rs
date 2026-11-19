@@ -29,10 +29,13 @@ use crate::Stop;
 use crate::patches::Draft;
 use crate::world::{NODE_COUNT, Setup};
 
-/// One attempt's budget: connect, send, and read the whole answer. Many times a round trip
-/// under the sweep's millisecond-scale delays, so only stacked delays or a lost answer time
-/// an attempt out.
+/// The first attempt's budget: connect, send, and read the whole answer. Many times a round
+/// trip under millisecond-scale delays, so only stacked delays or a lost answer time it out.
+/// Each retry doubles the budget, up to [`ATTEMPT_DOUBLINGS`] times, as a client backs off
+/// on a slow link: a link that carries an answer in any time carries it eventually.
 pub const ATTEMPT_TIMEOUT: Duration = Duration::from_millis(200);
+/// How many times a request's attempt budget doubles.
+const ATTEMPT_DOUBLINGS: u32 = 6;
 /// The pause before an attempt is sent again.
 const RETRY_BACKOFF: Duration = Duration::from_millis(5);
 /// Attempts per request before the client gives up (a liveness miss).
@@ -148,8 +151,8 @@ impl Client {
         }
     }
 
-    /// Runs `attempt` until it answers within [`ATTEMPT_TIMEOUT`], at most [`ATTEMPTS_MAX`]
-    /// times; an attempt answers `Err` to be tried again.
+    /// Runs `attempt` until it answers within its budget (from [`ATTEMPT_TIMEOUT`]), at most
+    /// [`ATTEMPTS_MAX`] times; an attempt answers `Err` to be tried again.
     async fn with_retries<T, F, Fut>(
         &self,
         what: &str,
@@ -162,7 +165,8 @@ impl Client {
     {
         let mut last_error = String::new();
         for made in 1..=ATTEMPTS_MAX {
-            let outcome = tokio::time::timeout(ATTEMPT_TIMEOUT, attempt(made))
+            let budget = ATTEMPT_TIMEOUT * (1 << (made - 1).min(ATTEMPT_DOUBLINGS));
+            let outcome = tokio::time::timeout(budget, attempt(made))
                 .await
                 .unwrap_or_else(|_| Err("timed out".to_owned()));
             match outcome {

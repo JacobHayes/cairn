@@ -31,7 +31,7 @@ mod property {
         LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId,
         Payload, State, Title, Trace,
     };
-    use patina_dst_proptest::prelude::*;
+    use proptest::prelude::*;
 
     fn derived(graph: &Graph) -> Derived {
         derive(graph, None, &derive_inputs(Deployment::default()))

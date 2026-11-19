@@ -107,8 +107,8 @@ pub fn create_journey(nodes: u32) -> Patch {
     )
 }
 
-/// Creates `pairs` pairs of identities for merges, in one deployment patch.
-pub fn create_identities(pairs: u32) -> Patch {
+/// Creates `pairs` pairs of identities for merges, in one deployment patch drafted at `base`.
+pub fn create_identities(pairs: u32, base: Revision) -> Patch {
     let mutations = (0..pairs)
         .flat_map(|index| {
             let (survivor, merged) = merge_pair(index);
@@ -126,7 +126,7 @@ pub fn create_identities(pairs: u32) -> Patch {
     patch(
         "p_setup_identities",
         PatchTarget::Deployment,
-        Revision::NONE,
+        base,
         mutations,
     )
 }
@@ -208,6 +208,6 @@ mod tests {
             };
             assert_eq!(patch.target.domain(), expected, "{draft:?}");
         }
-        assert_eq!(create_identities(2).mutations.len(), 4);
+        assert_eq!(create_identities(2, Revision::NONE).mutations.len(), 4);
     }
 }

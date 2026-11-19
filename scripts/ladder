@@ -9,14 +9,15 @@
 # then, in the full check, generated (regenerates files the others read, so it runs alone)
 # and embed (the binary's build with the web build embedded).
 # Only then do the slow steps that are independent of one another run side by side: property,
-# integration, cost, browser, and, in the full check, advisories (RustSec, over the network).
+# integration, cost, sim (the testbeds' patina sweeps), browser, and, in the full check,
+# advisories (RustSec, over the network).
 # A step prints one line when it passes and what a person acts on when it fails, and writes
 # everything else to dist/ladder/<step>.log. The side-by-side
 # steps' lines are printed in order once all have finished.
 #
 # With --fast, steps are left out when the current change touches none of their inputs
-# (scripts/changed): the Rust steps (unit, property) and the Rust half of lint (rustfmt,
-# clippy, also over the testbeds, the wasm32 build, patina labels) when no Rust input changed, and the web steps
+# (scripts/changed): the Rust steps (unit, property, sim) and the Rust half of lint (rustfmt,
+# clippy, also over the testbeds, the wasm32 build) when no Rust input changed, and the web steps
 # (web-unit, browser) when neither side changed (the web unit tests read the fixtures from a
 # `cairn demo`). The full check and CI skip nothing. The integration step runs when the
 # change touches the crates its tests build, with their dependencies, derived from the manifests
@@ -27,7 +28,8 @@
 # CI runs the full check in parts, one runner each and side by side: --part NAME runs the steps
 # of that part, in the order above, building only what they need. A part is the steps that
 # share one build (lint: lint and advisories, which build nothing; rust: the Rust test steps;
-# web: the web build and what reads it; browser: the binary and Playwright). --parts prints them as a JSON array, which is the
+# web: the web build and what reads it; browser: the binary and Playwright; sim: the testbeds'
+# release builds and patina, on a runner set up for its sandbox). --parts prints them as a JSON array, which is the
 # workflow's matrix, so a part added here runs in CI with no workflow edit; every invocation
 # fails when a step of the full check belongs to no part, or to two.
 #
@@ -38,9 +40,9 @@ cd "$(dirname "$0")/.."
 # The steps of the full check in the order they run (one at a time, then side by side), and the
 # part each runs in on CI. Plain arrays and "step:part" entries: macOS ships Bash 3.2.
 all_first=(lint unit web-unit generated embed)
-all_side=(property integration cost browser advisories)
-step_parts=(lint:lint advisories:lint unit:rust property:rust integration:rust cost:rust web-unit:web generated:web embed:web browser:browser)
-parts=(lint rust web browser)
+all_side=(property integration cost sim browser advisories)
+step_parts=(lint:lint advisories:lint unit:rust property:rust integration:rust cost:rust sim:sim web-unit:web generated:web embed:web browser:browser)
+parts=(lint rust web browser sim)
 
 usage() { echo "usage: scripts/ladder [--fast | --part NAME | --parts]" >&2; exit 2; }
 partition_fail() { echo "ladder: the parts are wrong: $1" >&2; exit 2; }
@@ -133,7 +135,7 @@ else
   first=(lint)
   if [ "$rust" = 1 ]; then first+=(unit); fi
   if [ "$rust" = 1 ] || [ "$web" = 1 ]; then first+=(web-unit); fi
-  if [ "$rust" = 1 ]; then side+=(property); fi
+  if [ "$rust" = 1 ]; then side+=(property sim); fi
   if [ "$integration" = 1 ]; then side+=(integration cost); fi
   if [ "$web" = 1 ]; then side+=(browser); fi
 fi

@@ -19,7 +19,7 @@ mod property {
         Date, DateSource, Deployment, Direction, Instant, InstantPoint, NodeKey, NodeKind, Payload,
         State,
     };
-    use patina_dst_proptest::prelude::*;
+    use proptest::prelude::*;
 
     fn derived(graph: &Graph) -> Derived {
         derive(graph, None, &derive_inputs(Deployment::default()))

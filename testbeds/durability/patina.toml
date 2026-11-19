@@ -1,0 +1,30 @@
+# The durability testbed's sweep, which the check's sim step runs from this directory
+# (PRACTICES, Simulation with patina): buggify, disk faults and machine crashes, each class on
+# in about half the seeds, so one sweep has runs with crashes alone, errors alone, and both.
+[run]
+cmd = ["target/release/cairn-durability"]
+# A store that does not open, or fails closed, ends its run unavailable (exit 5). After an
+# injected I/O error or failed fsync that is an honest answer; in any other run it is a finding.
+ok-exit = ["5:fs-error,fsync-error"]
+
+[sdk]
+buggify = true
+# Sites in the crates under test that this testbed cannot reach, so a sweep in which they
+# never fire is not vacuous. Any other site that never fires fails the sweep.
+allow-unmet = [
+  # Proposals, route imports and derived reads: the plan writes domain patches only.
+  "service-proposal-*",
+  "service-import-*",
+  "service-derived-read-*",
+  # Two writers in flight on one domain (the multiplayer testbed's ground): this testbed has
+  # one client, which moves on only once a step is acknowledged.
+  "service-duplicate-original-committed-meanwhile",
+  "service-patch-lost-at-commit",
+  "service-resubmission-raced-original",
+  "service-stale-patch-completed-with-intervening",
+]
+
+[faults]
+preset = "disk"
+crash = "machine"
+swarm = 1

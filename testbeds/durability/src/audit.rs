@@ -15,7 +15,7 @@ use cairn_store_sqlite::SqliteStore;
 use crate::ledger::{Entry, fnv};
 use crate::plan::Plan;
 
-/// The invariants; each broken one is a `violation` verdict under its label.
+/// The invariants, each under its label.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Invariant {
     /// No acknowledged commit is missing, and each is at the revision it was acknowledged
@@ -49,7 +49,7 @@ pub struct Audit {
 }
 
 impl Invariant {
-    /// The verdict label.
+    /// The label a broken one is reported under.
     pub fn label(self) -> &'static str {
         match self {
             Invariant::Acknowledged => "durability-acknowledged-commit-present",

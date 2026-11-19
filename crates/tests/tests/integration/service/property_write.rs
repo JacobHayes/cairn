@@ -11,7 +11,7 @@ mod property {
     use cairn_engine::{Records, apply};
     use cairn_schema::{Mutations, Patch, PatchTarget, from_yaml};
     use cairn_service::{Call, WriteError, Written};
-    use patina_dst_proptest::prelude::*;
+    use proptest::prelude::*;
 
     use crate::service::support::{domain, memory, run};
 
