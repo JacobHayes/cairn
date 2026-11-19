@@ -38,8 +38,8 @@ log, and is every acknowledged commit still there?
 Arguments: `--dir`, `--steps`, `--plan-seed`, `--bug ack-before-commit` (the planted
 client bug). A run that passes prints `DURABILITY_RESULT outcome=complete ...` and exits 0. A
 store that did not open, or failed closed, exits 5 (`DURABILITY_UNAVAILABLE`): after an
-injected I/O error or failed fsync that is an honest answer, and `known.txt` tells the sweep
-so; in any other run it is a finding. The data directory defaults to `/work/cairn-durability`,
+injected I/O error or failed fsync that is an honest answer, and `patina.toml` makes it an
+ok run then; in any other run it is a finding. The data directory defaults to `/work/cairn-durability`,
 on patina's simulated disk, which its faults and crashes act on.
 
 ## The sweep
@@ -50,11 +50,11 @@ both. Every run must pass its audits, and every site in reach must fire somewher
 the crash oracles (a crash between a commit's state rows and its events, an interrupted commit
 lost whole, one that had landed, a torn log tail discarded, a restart recovering acknowledged
 commits) and the client's (a failed write retried, a lost acknowledgement answered from the
-receipt). The check's sim step runs it over 256 seeds, CI's nightly run over 2048.
+receipt). The check's sim step runs it over 256 seeds, CI's nightly run over 4096.
 
 ```
 cargo build --release
-patina sweep --seeds 1..256 --known known.txt                    # the step's sweep, from here
+patina sweep --seeds 1..256                                      # the step's sweep, from here
 patina run --seed 1 --crash machine -- target/release/cairn-durability
 patina sweep --seeds 1..200 --crash machine -- target/release/cairn-durability --bug ack-before-commit
 ```

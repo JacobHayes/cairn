@@ -38,7 +38,7 @@ rust = { version = "1.99.1", profile = "minimal", components = "clippy,rustfmt",
 "github:WebAssembly/binaryen" = "version_133"
 # The testbeds' simulator (PRACTICES, Simulation with patina): the release whose tag the SDK
 # dependencies in Cargo.toml name. Only the check's sim step uses it.
-"github:JacobHayes/patina" = "0.12.2"
+"github:JacobHayes/patina" = "0.13.1"
 # RustSec advisories over every lock file: the full check's advisories step (deny.toml).
 cargo-deny = "0.20.2"
 # Dependencies a crate declares and never uses: the lint step's unused-dependency check

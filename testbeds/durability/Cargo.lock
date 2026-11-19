@@ -451,8 +451,8 @@ dependencies = [
 
 [[package]]
 name = "patina-dst"
-version = "0.12.2"
-source = "git+https://github.com/JacobHayes/patina?tag=v0.12.2#89e5fce07181010ddd29dec2a29a98b8424c57e1"
+version = "0.13.1"
+source = "git+https://github.com/JacobHayes/patina?tag=v0.13.1#40db06f4fd470ef9df20abd6d40df80c99594ff2"
 
 [[package]]
 name = "pin-project-lite"

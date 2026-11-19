@@ -71,7 +71,7 @@ up after 64 attempts, or the server would not stop), 64 bad arguments; never 2.
 ## Commands
 
 Its own Cargo workspace: the check ladder formats and lints it (lint step), runs its unit tests
-(unit step) and sweeps it (sim step: 256 seeds, CI's nightly run 2048); its `Cargo.lock`
+(unit step) and sweeps it (sim step: 256 seeds, CI's nightly run 4096); its `Cargo.lock`
 started as the root's, so the crates under test resolve as `check` tests them. `patina.toml`
 holds the sweep's settings (buggify and the network faults) and the sites out of reach.
 
@@ -89,5 +89,3 @@ A finding's `rerun:` line runs it again from any directory.
   oracle within the step's seeds.
 - The long faults are rationed per run (four waits, one stall): each long stall surfaces
   nearly every patch drafted during it, so more add nothing.
-- The network faults deliver pieces of at least 256 bytes (`patina.toml`): the preset's
-  smallest, under its per-piece delays, carry a few bytes a second, and no request finishes.

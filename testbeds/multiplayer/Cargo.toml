@@ -33,7 +33,7 @@ axum = { version = "0.8.9", default-features = false, features = ["http1", "toki
 jiff = { version = "0.2.38", default-features = false, features = ["std"] }
 url = "2.5.8"
 # The SDK at the release mise.toml pins the runner to.
-patina-dst = { git = "https://github.com/JacobHayes/patina", tag = "v0.12.2" }
+patina-dst = { git = "https://github.com/JacobHayes/patina", tag = "v0.13.1" }
 tokio = { version = "1.54.1", features = ["macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
 
 # The crate-wide lints of the root workspace (Cargo.toml [workspace.lints]); this

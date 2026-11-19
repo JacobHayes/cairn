@@ -65,9 +65,9 @@ jobs:
       MISE_DISABLE_TOOLS: ${{ matrix.part != 'sim' && 'github:JacobHayes/patina' || '' }}
       # The property tests at more cases than a local run's 64, and at a larger count in the
       # nightly run; the testbeds' sweeps at more seeds in the nightly run, as many as fit well
-      # inside the job's time limit (256 take about two minutes on this runner).
+      # inside the job's time limit (256 take one to two minutes on this runner).
       PROPTEST_CASES: ${{ github.event_name == 'schedule' && 4096 || 256 }}
-      SIM_SEEDS: ${{ github.event_name == 'schedule' && 2048 || 256 }}
+      SIM_SEEDS: ${{ github.event_name == 'schedule' && 4096 || 256 }}
       # The engine's module as it ships, optimized: its bindings are the ones the generated
       # step checks, and the browser step tests it (a local check builds the faster wasm-dev profile;
       # decisions/2026-10-08-the-check-builds-the-wasm-module-without-lto.md).

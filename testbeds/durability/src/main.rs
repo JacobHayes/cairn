@@ -211,8 +211,8 @@ fn main() -> ExitCode {
 }
 
 /// A store that did not open, or failed closed: exit 5. After an injected I/O error it is an
-/// honest answer with nothing committed to judge, and `known.txt` names it so for the sweep;
-/// in a run without one it is a finding.
+/// honest answer with nothing committed to judge, and `patina.toml` accepts it so for the
+/// sweep; in a run without one it is a finding.
 fn unavailable(detail: &str) -> ExitCode {
     eprintln!("DURABILITY_UNAVAILABLE {detail}");
     ExitCode::from(5)

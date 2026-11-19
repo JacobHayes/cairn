@@ -27,7 +27,7 @@ cairn-store-sqlite = { path = "../../crates/store-sqlite" }
 # bundled database (the fixtures' zone).
 jiff = { version = "0.2.38", default-features = false, features = ["std", "tzdb-bundle-always"] }
 # The SDK at the release mise.toml pins the runner to.
-patina-dst = { git = "https://github.com/JacobHayes/patina", tag = "v0.12.2" }
+patina-dst = { git = "https://github.com/JacobHayes/patina", tag = "v0.13.1" }
 # The SQLite backend's runtime: one current-thread runtime with its timer.
 tokio = { version = "1.54.1", default-features = false, features = ["rt", "time"] }
 
